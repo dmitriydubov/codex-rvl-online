@@ -20,8 +20,8 @@ import ru.projectx.datareference.service.ReferenceQueryService;
  *
  * <p>Единственное, что контроллер решает сам, — что запрос без ключа неверен: у Spring
  * на такой путь нашёлся бы только «не найдено», а вызывающему нужно «нет параметра».
- * Литерал {@code contract-view} Spring предпочитает переменной {@code {id}}, как и {@code search}:
- * путь без переменных специфичнее.
+ * Путь {@code /policies/contract-view} не читается как {@code /policies/{id}}, как и {@code search}:
+ * Spring сначала ищет обработчик с точно таким путём без шаблонов и только без него перебирает шаблоны.
  */
 @InternalApi
 public class PolicyController {

@@ -40,14 +40,14 @@ class PolicyContractViewServiceTest {
 
     @Test
     void byId_returnsProjectionFoundById() {
-        when(policies.findById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.of(VIEW));
+        when(policies.findContractViewById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.of(VIEW));
 
         assertThat(service.byId(POLICY_ID)).isSameAs(VIEW);
     }
 
     @Test
     void byId_unknown_isPolicyNotFoundNamingId() {
-        when(policies.findById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.empty());
+        when(policies.findContractViewById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.empty());
 
         ReferenceNotFoundException notFound =
                 catchThrowableOfType(ReferenceNotFoundException.class, () -> service.byId(POLICY_ID));
@@ -58,14 +58,16 @@ class PolicyContractViewServiceTest {
 
     @Test
     void byExternalId_returnsProjectionFoundByExternalId() {
-        when(policies.findByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class)).thenReturn(Optional.of(VIEW));
+        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class))
+                .thenReturn(Optional.of(VIEW));
 
         assertThat(service.byExternalId(POLICY_EXTERNAL_ID)).isSameAs(VIEW);
     }
 
     @Test
     void byExternalId_unknown_isPolicyNotFoundNamingExternalId() {
-        when(policies.findByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class)).thenReturn(Optional.empty());
+        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class))
+                .thenReturn(Optional.empty());
 
         ReferenceNotFoundException notFound = catchThrowableOfType(ReferenceNotFoundException.class,
                 () -> service.byExternalId(POLICY_EXTERNAL_ID));

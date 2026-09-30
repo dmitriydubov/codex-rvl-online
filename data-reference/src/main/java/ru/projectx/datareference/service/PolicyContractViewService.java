@@ -24,14 +24,14 @@ public class PolicyContractViewService implements PolicyContractViews {
     @Override
     @Transactional(readOnly = true)
     public PolicyContractView byId(UUID id) {
-        return policies.findById(id, PolicyContractView.class)
+        return policies.findContractViewById(id, PolicyContractView.class)
                 .orElseThrow(() -> ReferenceNotFoundException.policy(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public PolicyContractView byExternalId(UUID externalId) {
-        return policies.findByExternalId(externalId, PolicyContractView.class)
+        return policies.findContractViewByExternalId(externalId, PolicyContractView.class)
                 .orElseThrow(() -> ReferenceNotFoundException.policyByExternalId(externalId));
     }
 }

@@ -41,6 +41,8 @@ class PolicyControllerTest {
     private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_id";
     /** У полиса для Договоров ключ по GUID 1С один — отказ называет только его. */
     private static final String NO_EXTERNAL_ID_REASON = "нужен external_id";
+    /** Причина отказа Spring по пустому обязательному параметру ({@link ApiExceptionHandler}). */
+    private static final String MISSING_VALUE_REASON = "обязательный параметр";
 
     @Mock
     private ReferenceQueryService references;
@@ -212,12 +214,17 @@ class PolicyControllerTest {
         verifyNoInteractions(references, policySearch, contractViews);
     }
 
+    /**
+     * Пустой {@code external_id} — это «ключ передан пустым», а не «ключа нет»: запрос выбирает ручку
+     * с параметром, и отказ даёт Spring (пустая строка в UUID — {@code null}), а не ручка без ключа.
+     */
     @Test
-    void contractViewWithEmptyExternalId_isValidationErrorNamingExternalId_withoutAskingService() {
+    void contractViewWithEmptyExternalId_isMissingValueOfExternalId_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(POLICIES + "/contract-view?external_id=").exchange();
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
         verifyNoInteractions(references, policySearch, contractViews);
     }
 
