@@ -385,6 +385,8 @@ tasks.register('cpdReport', JavaExec) {
     if (setting('dry.ignoreLiterals', 'true').toBoolean()) {
         args '--ignore-literals'
     }
+    // paths (files or directories) relative to the module, left out of the duplicate search (CLI --exclude, CPD 7.0+)
+    listSetting('dry.exclude', '').each { args '--exclude', file(it).absolutePath }
     inputs.dir('src/main/java').optional()
     outputs.file(report)
     onlyIf { file('src/main/java').exists() }
