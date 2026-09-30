@@ -178,6 +178,11 @@ apt_pid=$!
   for image in postgres:16.10-alpine rabbitmq:4.1-alpine testcontainers/ryuk:0.14.0; do
     docker pull -q "mirror.gcr.io/${image}" || true
   done
+  # 3. Образы docker compose (стенд Ш2a и профиль app) — под исходными именами: на compose и Dockerfile
+  #    префикс Testcontainers не действует. JAR_SOURCE=host, поэтому eclipse-temurin:21-jdk в облаке не нужен.
+  for image in postgres:16.10-alpine eclipse-temurin:21-jre; do
+    docker pull -q "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}" || true
+  done
   if [ "$started" = 1 ] && [ -f /var/run/docker.pid ]; then
     kill "$(cat /var/run/docker.pid)" 2> /dev/null || true
     for _ in $(seq 1 20); do [ -f /var/run/docker.pid ] || break; sleep 1; done
@@ -192,7 +197,8 @@ exit 0
 **Не проверено в этой сессии.** Сам setup script виден только в диалоге окружения, а запуск `dockerd` внутри setup script
 документацией не описан. Вторая новая сессия после сохранения скрипта должна показать:
 - `which pdftoppm` → путь;
-- в `docker images` образы `mirror.gcr.io/postgres`, `mirror.gcr.io/rabbitmq` и `mirror.gcr.io/testcontainers/ryuk`;
+- в `docker images` образы `mirror.gcr.io/postgres`, `mirror.gcr.io/rabbitmq` и `mirror.gcr.io/testcontainers/ryuk`, а также
+  `postgres:16.10-alpine` и `eclipse-temurin:21-jre` под исходными именами (для docker compose);
 - строку статуса `docker: up`.
 
 **Не включено, пока не проверено.**
