@@ -158,6 +158,16 @@ class PolicyControllerTest {
         verifyNoInteractions(references, policySearch);
     }
 
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    @Test
+    void policyById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
+        MvcTestResult result = mvc.get().uri(POLICIES + "/{id}", POLICY_ID).accept(MediaType.APPLICATION_XML)
+                .exchange();
+
+        assertThat(result).hasStatus(406);
+        verifyNoInteractions(references, policySearch);
+    }
+
     private static PolicyResponse policy() {
         return new PolicyResponse(POLICY_ID, POLICY_EXTERNAL_ID, POLICY_NUMBER, "Фамилия", "Имя", null,
                 LocalDate.of(2000, 1, 1), null, null, LocalDate.of(2026, 1, 1), null, true, false, null, List.of());

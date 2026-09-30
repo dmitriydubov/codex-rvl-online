@@ -75,6 +75,16 @@ class Mkb10ControllerTest {
         verifyNoInteractions(mkb10);
     }
 
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    @Test
+    void search_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
+        MvcTestResult result = mvc.get().uri(MKB10 + "?query={query}", "Q06").accept(MediaType.APPLICATION_XML)
+                .exchange();
+
+        assertThat(result).hasStatus(406);
+        verifyNoInteractions(mkb10);
+    }
+
     private static Mkb10Response codes(String code) {
         return new Mkb10Response(List.of(
                 new Mkb10Response.Item(CODE_ID, CODE_EXTERNAL_ID, code, "Наименование кода", 2, null, false)));

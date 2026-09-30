@@ -93,6 +93,15 @@ class LpuControllerTest {
         assertThat(result).bodyJson().extractingPath("$.lpu.id").isEqualTo(LPU_ID.toString());
     }
 
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    @Test
+    void card_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
+        MvcTestResult result = mvc.get().uri(LPU + "/{id}", LPU_ID).accept(MediaType.APPLICATION_XML).exchange();
+
+        assertThat(result).hasStatus(406);
+        verifyNoInteractions(lpuCatalog);
+    }
+
     private static LpuServicesResponse services() {
         return new LpuServicesResponse(
                 new LpuServicesResponse.LpuRef(LPU_ID, LPU_EXTERNAL_ID, LPU_NAME), priceContract(), List.of());

@@ -66,6 +66,16 @@ class InsuranceContractControllerTest {
         verifyNoInteractions(references);
     }
 
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    @Test
+    void contractById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
+        MvcTestResult result = mvc.get().uri(CONTRACTS + "/{id}", CONTRACT_ID).accept(MediaType.APPLICATION_XML)
+                .exchange();
+
+        assertThat(result).hasStatus(406);
+        verifyNoInteractions(references);
+    }
+
     private static InsuranceContractResponse contract() {
         return new InsuranceContractResponse(
                 CONTRACT_ID, CONTRACT_EXTERNAL_ID, "ДМС-0001", LocalDate.of(2026, 1, 1), null, false, null);
