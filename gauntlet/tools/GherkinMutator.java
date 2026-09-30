@@ -46,7 +46,10 @@ import org.w3c.dom.NodeList;
  * and the substituted steps) plus manifest.tsv. Run them with Cucumber, then {@code verdict}
  * reads the JUnit XML results: failed = killed (an undefined step for the new value is reported as a
  * failure and counted separately), passed = survived, skipped/aborted or missing = error.
- * {@code no-skipped} fails when a normal acceptance run skipped scenarios.
+ * {@code no-skipped} fails when a normal acceptance run skipped scenarios, or ran none although
+ * {@code --features} holds feature files; without feature files it passes without reading any results.
+ * {@code generate} fails when a feature file in scope has scenarios but no Examples value to mutate:
+ * gherkinMutation would otherwise pass it without having checked anything.
  * Supports English and Russian keywords ("# language: ru").
  * Exit codes: 0 = OK / all killed, 1 = survivors or errors, 2 = usage or IO error.
  */
@@ -152,7 +155,7 @@ public class GherkinMutator {
                 case "verdict" -> verdict(Path.of(opts.getOrDefault("--mutants", "build/gherkin-mutation/mutants")),
                         Path.of(opts.getOrDefault("--results", "build/gherkin-mutation/results")), out);
                 case "no-skipped" -> noSkipped(Path.of(opts.getOrDefault("--results", "build/test-results/acceptanceTest")),
-                        out);
+                        opts.containsKey("--features") ? Path.of(opts.get("--features")) : null, out);
                 default -> {
                     err.println("GherkinMutator: unknown command " + args[0]);
                     yield 2;
@@ -178,6 +181,7 @@ public class GherkinMutator {
         List<Mutant> mutants = new ArrayList<>();
         int inScope = 0;
         int unreadable = 0;
+        int vacuous = 0;
         for (Path file : files) {
             if (only != null && !matchesAny(file, only)) {
                 continue;
@@ -197,7 +201,13 @@ public class GherkinMutator {
                         + "'; supported: " + LANGUAGES.keySet() + " - add the keywords to GherkinMutator.LANGUAGES)");
                 continue;
             }
+            int before = mutants.size();
             collectMutants(doc, mutants);
+            if (!doc.scenarios.isEmpty() && mutants.size() == before) {
+                vacuous++;
+                out.println("GHERKIN VACUOUS " + file + ": " + doc.scenarios.size() + " scenario(s), but no Examples value"
+                        + " to mutate - gherkinMutation cannot check its step definitions");
+            }
         }
         List<String> manifest = new ArrayList<>();
         manifest.add("id\tfeature\tline\tscenario\tkey\toriginal\tmutated");
@@ -209,7 +219,12 @@ public class GherkinMutator {
         Files.write(outDir.resolve("manifest.tsv"), manifest, StandardCharsets.UTF_8);
         out.println("Gherkin mutation: " + mutants.size() + " mutant(s) from " + inScope + " feature file(s) in scope -> "
                 + outDir);
-        return unreadable == 0 ? 0 : 1;
+        if (vacuous > 0) {
+            out.println("  Every value a scenario depends on must be an Examples parameter (Scenario Outline), so that");
+            out.println("  a hollow step definition shows up as a surviving mutant. The specifier rewrites the feature;");
+            out.println("  the human approves it.");
+        }
+        return unreadable == 0 && vacuous == 0 ? 0 : 1;
     }
 
     static void collectMutants(FeatureDoc doc, List<Mutant> mutants) {
@@ -667,7 +682,11 @@ public class GherkinMutator {
     }
 
     /** Cucumber reports undefined steps as aborted, which Gradle shows as skipped - not as failed. */
-    static int noSkipped(Path resultsDir, PrintStream out) throws IOException {
+    static int noSkipped(Path resultsDir, Path featuresDir, PrintStream out) throws IOException {
+        if (featuresDir != null && !hasFeatureFiles(featuresDir)) {
+            out.println("Acceptance: no feature files in " + featuresDir + " - nothing to check (older results ignored)");
+            return 0;
+        }
         List<String> skipped = new ArrayList<>();
         int total = 0;
         for (Element tc : testcases(resultsDir)) {
@@ -678,6 +697,11 @@ public class GherkinMutator {
                 }
             }
         }
+        if (total == 0 && featuresDir != null) {
+            out.println("Acceptance: FAILED - feature files exist in " + featuresDir + ", but no scenario ran (no results in "
+                    + resultsDir + "). An empty run proves nothing: check cucumber.features, the glue and the engine.");
+            return 1;
+        }
         if (skipped.isEmpty()) {
             out.println("Acceptance: " + total + " scenario(s), none skipped - OK");
             return 0;
@@ -687,6 +711,25 @@ public class GherkinMutator {
         out.println("  pending steps as skipped, so they would otherwise pass silently. Implement the missing step");
         out.println("  definitions (run with -Dcucumber.plugin=pretty to see the snippets).");
         return 1;
+    }
+
+    static boolean hasFeatureFiles(Path featuresDir) throws IOException {
+        if (!Files.isDirectory(featuresDir)) {
+            return false;
+        }
+        try (Stream<Path> s = Files.walk(featuresDir)) {
+            return s.filter(p -> p.toString().endsWith(".feature")).anyMatch(GherkinMutator::hasGherkin);
+        }
+    }
+
+    /** Empty and comment-only feature files are valid for Cucumber but hold no specification. */
+    static boolean hasGherkin(Path featureFile) {
+        try {
+            return Files.readAllLines(featureFile, StandardCharsets.UTF_8).stream()
+                    .map(l -> l.replace("\uFEFF", "").trim()).anyMatch(l -> !l.isEmpty() && !l.startsWith("#"));
+        } catch (IOException unreadable) {
+            return true;   // unreadable is not proof of emptiness
+        }
     }
 
     static List<Element> testcases(Path resultsDir) throws IOException {

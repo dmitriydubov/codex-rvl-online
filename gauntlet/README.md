@@ -46,8 +46,9 @@ gauntlet/
                           glue, исключения из мутаций, архитектура)
   tools/                  IntegrityCheck, CrapGate, DryGate, GherkinMutator, PitSummary (single-file Java)
   archtest/               ArchUnit-тест, читающий config/architecture.properties
-  hooks/                  guard.py (PreToolUse), stop_gate.py (Stop), session_start.sh (SessionStart),
-                          selftest.py (517 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
+  hooks/                  guard.py (PreToolUse), stop_gate.py (Stop; SubagentStop hardener'а — matcher в
+                          .claude/settings.json), session_start.sh (SessionStart),
+                          selftest.py (526 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
   templates/              конфигурация Cucumber+Spring, пример фичи на русском
   claude/, ci/            только до установки: install.sh переносит их в .claude/ и .github/workflows/
 ```
@@ -66,7 +67,7 @@ gauntlet/
 | `pmdGate` | PMD 7.27 (CLI) | 0 антипаттернов: god class, > 12 методов, cognitive complexity ≥ 10, сырые/проглоченные исключения, неиспользуемое, незакрытые ресурсы, потоки, крипто, именование | `config/pmd-ruleset.xml` |
 | `test` | JUnit, как у вас | — | — |
 | `archTest` | ArchUnit 1.5.1 | разрешённые рёбра, без циклов | `config/architecture.properties` |
-| `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное и **ни одного skipped** | — |
+| `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное, **ни одного skipped**, при наличии фич исполнен хотя бы один сценарий; судятся только результаты этого прогона | — |
 | `crapGate` | свой (`CrapGate.java`) по JaCoCo XML, формула crap4java | **8** | `crap.threshold`, `config/crap-allowlist.txt` |
 | `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются) | `dry.*` |
 | `mutationGate` | PIT 1.22 + gradle-pitest-plugin 1.19.0 | **все покрытые мутанты убиты** (test strength 100 %), покрытие мутируемых классов ≥ 80 % | `pit.*` |
@@ -184,6 +185,10 @@ Auto-fix (кнопка в CI status bar сессии): на упавший CI и
 | спрятать код от JaCoCo и PIT через `@Generated` | `integrityCheck` M1 |
 | `CHECKSTYLE:OFF`, `NOPMD`, `@SuppressWarnings("checkstyle…")` | M2–M3; в checkstyle.xml нет фильтров подавления |
 | сценарий «skipped», а сборка зелёная | `acceptanceCheck` |
+| фичи есть, а не исполнено ни одного сценария; устаревшие результаты прошлого прогона | `acceptanceCheck` (результаты стираются перед прогоном) |
+| фича без значений «Примеров» проходит `gherkinMutation` вхолостую | `gherkinMutants`: «GHERKIN VACUOUS» |
+| два прогона Gradle в одном `build/` (фоновый прогон, Stop-хук, сабагент) | блокировка `.gradle/gauntlet-build.lock`: второй ждёт до 1500 с (`-Pgauntlet.lockWaitSeconds`) |
+| hardener заканчивает с выжившими мутантами | SubagentStop-хук в `.claude/settings.json` (matcher `^hardener$`) гоняет `mutationGate` |
 | step-определение игнорирует параметр | `gherkinMutation` |
 | слабые ассерты | `mutationGate` |
 | сабагент вышел за роль | guard по `agent_type`: specifier пишет только фичи, hardener — только тесты, reviewer — ничего |
