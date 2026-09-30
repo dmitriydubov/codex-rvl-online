@@ -323,15 +323,19 @@ tasks.register('acceptanceTest', Test) {
     onlyIf { hasFeatures(featuresDir) }
     mustRunAfter 'archTest'
     finalizedBy 'acceptanceCheck'
+    // acceptanceCheck must judge this run only, never results a previous run left behind
+    def results = reports.junitXml.outputLocation.get().asFile
+    doFirst { results.deleteDir(); results.mkdirs() }
 }
 
 tasks.register('acceptanceCheck', Exec) {
     group = 'gauntlet'
-    description = 'Fails when scenarios were skipped (aborted by an assumption or a skipped step) - Gradle would pass them.'
+    description = 'Fails when scenarios were skipped (aborted by an assumption or a skipped step) - Gradle would pass them - ' +
+            'or when feature files exist but no scenario ran.'
     def results = buildDirFile('test-results/acceptanceTest')
     executable javaBin
-    args "${tools}/GherkinMutator.java", 'no-skipped', '--results', results.absolutePath
-    onlyIf { results.exists() }
+    args "${tools}/GherkinMutator.java", 'no-skipped', '--results', results.absolutePath,
+            '--features', featuresDir.absolutePath
 }
 
 // ------------------------------------------------------------------------------ CRAP and DRY
@@ -539,6 +543,85 @@ tasks.register('gauntlet') {
     group = 'gauntlet'
     description = 'The whole gauntlet: gauntletFast + mutationGate + gherkinMutation.'
     dependsOn 'gauntletFast', 'mutationGate', 'gherkinMutation'
+}
+
+// ------------------------------------------------------------------------------ one run per build directory
+
+// Two Gradle runs in the same build/ (the agent's own run in the background, a Stop hook, a subagent's run)
+// overwrite each other's classes, test results and reports: a gate can then judge a half-written or foreign
+// result. Every task of this build therefore holds an exclusive OS file lock on .gradle/gauntlet-build.lock
+// (outside build/, so clean cannot delete it from under a holder) from its first action until the build ends;
+// a second run waits for it. Gradle closes the service after the last task that uses it (Gradle 8.14 user guide,
+// "Using Shared Build Services"), which releases the lock.
+abstract class GauntletBuildLock implements BuildService<GauntletBuildLock.Params>, AutoCloseable {
+    interface Params extends BuildServiceParameters {
+        Property<String> getLockPath()
+        Property<Integer> getWaitSeconds()
+    }
+
+    private java.nio.channels.FileChannel channel
+    private java.nio.channels.FileLock lock
+
+    synchronized void hold(String taskPath) {
+        if (lock != null) {
+            return
+        }
+        def file = new File(parameters.lockPath.get())
+        file.parentFile.mkdirs()
+        channel = java.nio.channels.FileChannel.open(file.toPath(), java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE)
+        long deadline = System.currentTimeMillis() + parameters.waitSeconds.get() * 1000L
+        boolean told = false
+        while ((lock = tryLock()) == null) {
+            if (System.currentTimeMillis() > deadline) {
+                channel.close()
+                channel = null
+                throw new GradleException("[gauntlet] another Gradle run (${holder(file)}) has been using this build " +
+                        "directory for over ${parameters.waitSeconds.get()} s - wait for it to finish, then run again.")
+            }
+            if (!told) {
+                println "[gauntlet] ${taskPath}: another Gradle run (${holder(file)}) is using this build directory - waiting for it"
+                told = true
+            }
+            Thread.sleep(2000)
+        }
+        channel.truncate(0)
+        channel.write(java.nio.ByteBuffer.wrap("pid ${ProcessHandle.current().pid()}".getBytes('UTF-8')), 0)
+        channel.force(false)
+    }
+
+    // a lock another build of the same JVM (daemon) still holds shows up as an exception, not as null
+    private java.nio.channels.FileLock tryLock() {
+        try {
+            return channel.tryLock()
+        } catch (java.nio.channels.OverlappingFileLockException ignored) {
+            return null
+        }
+    }
+
+    private static String holder(File file) {
+        try {
+            return file.getText('UTF-8').trim() ?: 'pid unknown'
+        } catch (IOException ignored) {
+            return 'pid unknown'
+        }
+    }
+
+    @Override
+    void close() {
+        lock?.release()
+        channel?.close()
+    }
+}
+
+def buildLock = gradle.sharedServices.registerIfAbsent('gauntletBuildLock-' + projectDir.absolutePath.md5(), GauntletBuildLock) {
+    parameters.lockPath = new File(projectDir, '.gradle/gauntlet-build.lock').absolutePath
+    parameters.waitSeconds = (findProperty('gauntlet.lockWaitSeconds') ?: '1500').toString().toInteger()
+}
+tasks.configureEach { Task task ->
+    task.usesService(buildLock)
+    def path = task.path
+    task.doFirst { buildLock.get().hold(path) }
 }
 
 // ------------------------------------------------------------------------------ configuration cache

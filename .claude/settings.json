@@ -34,6 +34,19 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "^hardener$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/stop_gate.py\" --task mutationGate --max-attempts 2 --timeout 3300",
+            "timeout": 3600,
+            "statusMessage": "Gauntlet: running ./gradlew mutationGate for the hardener..."
+          }
+        ]
+      }
     ]
   },
   "permissions": {

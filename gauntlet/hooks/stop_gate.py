@@ -206,8 +206,11 @@ def next_attempt(attempts_file, event):
             previous, stamp = int(raw.split()[0]), float(raw.split()[1])
         except (ValueError, IndexError):
             previous = 0
-    if "stop_hook_active" in event or event.get("hook_event_name") == "Stop":
-        continuing = bool(event.get("stop_hook_active"))   # set by Claude Code after a blocked stop
+    # Stop: stop_hook_active is set by Claude Code after a blocked stop. SubagentStop: the same field only says
+    # whether the subagent has Stop hooks of its own (hooks docs), so its retries are told apart by time.
+    if event.get("hook_event_name") == "Stop" or ("stop_hook_active" in event
+                                                  and event.get("hook_event_name") != "SubagentStop"):
+        continuing = bool(event.get("stop_hook_active"))
     else:
         continuing = time.time() - stamp < CONTINUATION_WINDOW_S
     attempts = previous + 1 if continuing else 1

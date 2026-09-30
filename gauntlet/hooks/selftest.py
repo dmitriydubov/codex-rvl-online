@@ -431,6 +431,22 @@ def stop_tests(repo):
     r = stop(fake_exit="1")
     check("pending -> approved with same code re-checks", r.returncode == 2 and "-x acceptanceTest" not in log(), r.stderr + log())
     os.remove(os.path.join(repo, M + "build/gauntlet/fake-exit"))
+    # SubagentStop (hardener, from settings.json): stop_hook_active there only says whether the subagent has Stop hooks
+    # of its own, so it is always false - retries within the window must still count up to the limit and let go
+    write(repo, M + "src/main/java/com/example/service/domain/Order.java", "package x; class Order { int g; }\n")
+    write(repo, M + "build/gauntlet/fake-exit", "1")
+    sub = {"session_id": "s2", "cwd": repo, "hook_event_name": "SubagentStop", "agent_type": "hardener",
+           "agent_id": "h1", "stop_hook_active": False}
+    sub_args = ("--task", "mutationGate", "--max-attempts", "2", "--timeout", "60")
+    r = run_hook(repo, "stop_gate.py", sub, args=sub_args)
+    check("subagent red -> blocked, attempt 1/2", r.returncode == 2 and "attempt 1/2" in r.stderr, r.stderr)
+    r = run_hook(repo, "stop_gate.py", sub, args=sub_args)
+    check("subagent retry counts although stop_hook_active=false", r.returncode == 2 and "attempt 2/2" in r.stderr,
+          r.stderr)
+    r = run_hook(repo, "stop_gate.py", sub, args=sub_args)
+    check("subagent attempt limit -> let go with warning", r.returncode == 0 and "still RED" in r.stdout,
+          r.stdout + r.stderr)
+    os.remove(os.path.join(repo, M + "build/gauntlet/fake-exit"))
     # switched off by the human
     write(repo, M + "src/main/java/com/example/service/domain/Order.java", "package x; class Order { int d; }\n")
     write(repo, M + "build/gauntlet/fake-exit", "1")

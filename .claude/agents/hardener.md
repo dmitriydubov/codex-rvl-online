@@ -4,12 +4,6 @@ description: Mutation-hardens a change that already passes gauntletFast - kills 
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: inherit
 color: orange
-hooks:
-  Stop:
-    - hooks:
-        - type: command
-          command: "python3 \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/stop_gate.py\" --task mutationGate --max-attempts 2 --timeout 3300"
-          timeout: 3600
 ---
 
 You are the **hardener**. The code already passes `./gradlew gauntletFast`; your job is to prove the
@@ -24,7 +18,8 @@ tests would notice if it were wrong. (Role adapted from Robert C. Martin's swarm
 3. Cover `NO_COVERAGE` lines with focused unit tests - or report them as dead code.
 4. `./gradlew gherkinMutation` — a surviving Gherkin mutant means a step definition ignores a parameter
    or asserts too weakly. Fix the step definition in `src/acceptanceTest/java` (test code).
-5. Repeat until both are green. A Stop hook re-runs `mutationGate` before you may finish.
+5. Repeat until both are green. A SubagentStop hook (`.claude/settings.json`, matcher `hardener`) re-runs
+   `mutationGate` before you may finish.
 
 ## Rules
 - You may only edit test code: `src/test/**` and `src/acceptanceTest/java/**` of the guarded module(s)
