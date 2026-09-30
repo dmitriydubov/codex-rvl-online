@@ -71,6 +71,7 @@ services:
       # и умолчания Dockerfile перестают действовать. См. .env.example.
       args:
         - JAR_SOURCE
+        - PUBLIC_REPOSITORIES
         - JDK_IMAGE
         - JRE_IMAGE
         - GRADLE_DISTRIBUTION_URL

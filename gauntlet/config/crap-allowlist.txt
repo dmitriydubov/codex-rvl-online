@@ -1,0 +1,6 @@
+# Human-approved CRAP exceptions. One method per line:  fully.qualified.Class#method   # reason
+# Use it for the case Uncle Bob allows: "a single switch that answers one question may stay
+# above the limit - do not split it into helpers that take booleans the caller already knew".
+# Class#* allows every method of a class. Agents cannot edit this file.
+#
+# com.example.service.domain.DeliveryZone#forRegionCode   # one switch over 12 region codes

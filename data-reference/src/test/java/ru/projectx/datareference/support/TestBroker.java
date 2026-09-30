@@ -1,7 +1,5 @@
 package ru.projectx.datareference.support;
 
-import java.util.Optional;
-
 /**
  * Откуда тестам приёма взять RabbitMQ.
  *
@@ -12,23 +10,13 @@ import java.util.Optional;
  * должен быть <b>тестовым</b>: тесты публикуют в очереди с именами контура и вычитывают
  * из них, и указать сюда брокер 1С:УСК значит забрать оттуда настоящие сообщения.
  *
- * <p>Тесту приёма нужны и брокер, и база, поэтому «доступно» здесь означает оба сразу.
+ * <p>Тесту приёма нужны и брокер, и база. Без Docker он работает, только когда заданы
+ * оба адреса, {@code TEST_RABBITMQ_URL} и {@code TEST_POSTGRES_URL}; иначе он падает,
+ * а не пропускается — см. {@link TestDatabase}.
  */
 public final class TestBroker {
 
     public static final String URL_PROPERTY = "test.rabbitmq.url";
-
-    private static final boolean AVAILABLE = DockerAvailability.isDockerAvailable()
-            || externalUrl().isPresent() && TestDatabase.externalUrl().isPresent();
-
-    public static boolean isAvailable() {
-        return AVAILABLE;
-    }
-
-    /** Адрес внешнего брокера из окружения; пусто — тесты поднимают контейнер. */
-    public static Optional<String> externalUrl() {
-        return Optional.ofNullable(System.getenv("TEST_RABBITMQ_URL")).filter(url -> !url.isBlank());
-    }
 
     private TestBroker() {
     }

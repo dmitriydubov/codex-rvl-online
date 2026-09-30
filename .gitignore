@@ -1,0 +1,9 @@
+# Gradle: локальный кэш и результаты сборки каждого модуля
+.gradle/
+build/
+
+# IDE и ОС
+.idea/
+*.iml
+.vscode/
+.DS_Store

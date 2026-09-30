@@ -30,6 +30,9 @@ import org.springframework.context.annotation.Import;
  * <p>Набор свойств у всех тестов один, поэтому контекст Spring между ними
  * переиспользуется, а вместе с контекстом — и контейнер с базой. Отсюда же
  * {@link DatabaseCleaner}: база общая, и каждый тест начинает с пустой.
+ *
+ * <p>Базу даёт Docker (контейнер) либо {@code TEST_POSTGRES_URL}. Нет ни того, ни другого —
+ * тест падает, а не пропускается, см. {@link TestDatabase}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -37,6 +40,5 @@ import org.springframework.context.annotation.Import;
         "projectx.import.poll-interval=1h",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
-@EnabledIfDatabaseAvailable
 public @interface IntegrationTest {
 }
