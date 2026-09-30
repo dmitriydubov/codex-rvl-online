@@ -36,8 +36,11 @@
   CI, потому что workflow запускается только на `pull_request`.
 - **Старый код против гейтов.** Со `scope=all` 49 из 93 продакшен-файлов красные: при первом касании их придётся резать.
   - Checkstyle — 16 нарушений, PMD — 21, дублей CPD — 52.
-  - PIT: test strength 82 % при пороге 100 %.
-  - Четыре конфликта гейтов с кодом решает владелец, и решить их нужно до рефакторинга (раздел 7).
+  - PIT: test strength 82 % при пороге 100 %. После Ш3 (PR #5, тег `no-mutate`) — 81 %, но 604 из 666 мутантов без покрытия:
+    покрытие строк PIT ≥ 80 % только у 5 из 67 классов с мутантами (у трёх из них есть выжившие), касание остальных
+    62 классов требует unit-тестов (раздел 6).
+  - Четыре конфликта гейтов с кодом решает владелец, и решить их нужно до рефакторинга (раздел 7; из его решений п. 3,
+    `no-mutate`, после Ш3 выполнен — PR #5).
 - **Подтверждённые дефекты** (с воспроизведением):
   - тело с `\u0000`, BOM или в UTF-16 бесконечно крутится в очереди;
   - повтор после временного отказа затирает более новые данные;
@@ -140,8 +143,9 @@ www.jacoco.org
   очереди с именами контура (`TestBroker.java`), то есть на настоящем брокере забрали бы настоящие сообщения.
 - `RABBITMQ_SSL_ENABLED`: `bootRun` и приёмка пошли бы по TLS.
 
-`BASH_MAX_TIMEOUT_MS` можно задать, если нужны команды дольше 10 минут. Полный `mutationGate -Pgauntlet.scope=all` идёт
-18–20 минут, но в работе он не нужен: область `changed` занимает минуты.
+`BASH_MAX_TIMEOUT_MS` можно задать, если нужны команды дольше 10 минут. Полный `mutationGate -Pgauntlet.scope=all` до Ш3
+шёл 18–20 минут, но в работе он не нужен: область `changed` занимала минуты. После Ш3 (PR #5, тег `no-mutate`) pitest со
+`scope=all` идёт 15 с, область `changed` — секунды (проба Ш3 на двух классах: 8 с против 72 с без тега).
 
 ### 1.3. Setup script (оба окружения)
 
@@ -227,7 +231,7 @@ exit 0
   | `gauntletFast`, холодный кэш | 142 с |
   | `gauntletFast --rerun-tasks`, `scope=all` | 57 с |
   | `test` | ~72 с |
-  | `mutationGate -Pgauntlet.scope=all` (4 миниона, у каждого свой контейнер PostgreSQL) | 18–20 мин |
+  | `mutationGate -Pgauntlet.scope=all` (4 миниона; до Ш3 у каждого свой контейнер PostgreSQL) | 18–20 мин; после Ш3 (PR #5, тег `no-mutate`) pitest — 15 с, 0 стартов контейнеров |
   | Сборка в режиме контура | 85 с тёплая, ~113 с холодная |
 
 - **Параллельные прогоны.** Два прогона гейтов в одном каталоге сборки не запускать: отчёты побьются. Параллельные
@@ -343,8 +347,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 4. **Гейты.** В `data-reference`:
    - `./gradlew gauntletInfo`: `module : data-reference`, overlay `config/data-reference/gauntlet.properties`,
      `basePackage : ru.projectx.datareference`, glue `ru.projectx.datareference.acceptance`, cucumber 8.0.1;
-   - `./gradlew gauntletFast --continue`: BUILD SUCCESSFUL, «changed vs origin/main … 0 file(s)», 155 тестов в `test`, 6 в
-     `archTest`, приёмка SKIPPED;
+   - `./gradlew gauntletFast --continue`: BUILD SUCCESSFUL, «changed vs origin/main … 0 file(s)», 155 тестов в `test`
+     (на ветке Ш3, PR #5, — 167 в 25 классах, 0 skipped: тег `no-mutate` из `test` не исключает), 6 в `archTest`, приёмка SKIPPED;
    - `./gradlew mutationGate`: «no changed main classes - mutation testing skipped»;
    - `./gradlew buildEnvironment` показывает `info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.19.0`: набор подключён.
 
@@ -414,16 +418,29 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - CPD валит дубль, если хотя бы одно его место в изменённом файле: парный неизменённый файл тоже придётся трогать.
   - Порог покрытия PIT (80 %) считается суммарно по мутируемым классам, и проверяется до test strength.
 - **PIT:**
-  - Он гоняет 19 контекстных тестовых классов на Testcontainers (тегов `no-mutate` нет). Отсюда долгие прогоны, TIMED_OUT и
-    ложные выжившие: 9 мутантов «`stream()` → null» выживают, потому что контексты создаются до первого мутанта.
+  - До Ш3 он гонял контекстные тестовые классы на Testcontainers (19 на момент scan, тегов `no-mutate` не было). Отсюда долгие
+    прогоны, TIMED_OUT и ложные выжившие: 9 мутантов «`stream()` → null» выживали, потому что контексты создаются до первого
+    мутанта.
+  - После Ш3 (PR #5) `@Tag("no-mutate")` стоит на составных аннотациях `@IntegrationTest` и `@AmqpIntegrationTest`
+    (`src/test/java/…/support/`). 20 контекстных классов (с `ConsumerStandTest` из Ш2a) идут только в `test`: PIT исполняет
+    5 unit-классов, контейнеры не стартуют, pitest со `scope=all` — 15 с.
+  - Мутант, которого убивали только контекстные тесты, теперь NO_COVERAGE или SURVIVED: проба Ш3 на `OneCValues` — строки 51,
+    70, 86, 87, 97 → nocov, 92 → surv. 9 ложных выживших «`stream()` → null» ушли в NO_COVERAGE.
   - RUN_ERROR на record-классах (падение JVM и `UnsupportedOperationException` при `redefineClasses`) засчитывается как убитый
-    мутант и оставляет в `data-reference/` файлы `hs_err_pid*.log`. Они не в `.gitignore`, и `gauntletScope` считает их
-    изменёнными файлами.
+    мутант и может оставить в `data-reference/` файлы `hs_err_pid*.log`. С Ш2a они в `.gitignore` (корень, `hs_err_pid*.log`),
+    и `gauntletScope` их не видит: в Ш3 подложенный файл не попал в `git ls-files --others --exclude-standard`.
+    После Ш3 (PR #5) в прогоне `scope=all` с тегом `hs_err_pid*.log` не появился, но RUN_ERROR остались:
+    3 мутанта `InboundRetryProperties:36` (record) засчитаны убитыми.
+  - Цена: покрытие для mutationGate дают только unit-тесты — они есть у 7 из 67 классов, поэтому каждый касаемый класс
+    требует unit-тестов (≥ 80 % строк, все покрытые мутанты убиты). Новый тест с `@IntegrationTest` молча выпадает из PIT.
   - Перед контрольным прогоном удалять `build/pitHistory.txt`: включён инкрементальный анализ.
 - **Приёмка при нуле фич SKIPPED.** Если фичи есть, но исполнено 0 сценариев, `acceptanceCheck` зелёный. После удаления фич
   он читает устаревшие результаты.
-- **Под строгой политикой каждый касаемый класс требует unit-тестов.** Если тесты с Testcontainers пометят `no-mutate`
-  (решение 8 PR #1), unit-покрытие будет 10,3 % строк: у 9 из 77 файлов ≥ 80 %.
+- **Под строгой политикой каждый касаемый класс требует unit-тестов.** Тесты с Testcontainers помечены `no-mutate` (решение 8
+  PR #1, Р3 а; Ш3, PR #5). На scan unit-покрытие (JaCoCo) — 10,3 % строк: у 9 из 77 файлов ≥ 80 %. После Ш3 PIT со
+  `scope=all`: покрытие строк 9 %, ≥ 80 % только у `InboundRetryProperties`, `OneCStream`, `OneCEnvelopeParser`, `OneCValues` и
+  `ReferenceImportService`, у остальных 62 классов с мутантами ниже (у 58 — 0 %). Касание такого класса без unit-тестов может
+  уронить `mutationGate` по покрытию: порог суммарный (см. выше).
 
 **Код и конфигурация data-reference**
 - **Лимит PMD TooManyMethods (12).** `ReferenceController` (15 методов) и `OneCQueueListener` (15) краснеют при любой правке.
@@ -477,7 +494,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | Checkstyle | 16 нарушений в 12 файлах: CC 4 у 9 методов, у `ContragentMapper#applySanatorium` CC 5 и 28 строк, ParameterNumber 5 у трёх, ClassFanOutComplexity 22 у `LpuCatalogService`, LambdaBodyLength у `PolicyMapper` |
 | PMD | 21 нарушение в 17 файлах: TooManyMethods у 5 классов, ConstructorCallsOverridableMethod у 9 сущностей, ImmutableField на трёх коллекциях, AbstractClassWithoutAbstractMethod у `OneCEntity`, ClassWithOnlyPrivateConstructorsShouldBeFinal у трёх исключений |
 | CPD | 52 дубля в 29 файлах; 35 из них — цепочки аксессоров и присваиваний в сущностях; все 52 держатся на `dry.ignoreIdentifiers=true` |
-| PIT | 666 мутантов: убито 467, выжило 107 (в 34 классах), без покрытия 80, RUN_ERROR 10, TIMED_OUT 2; test strength 82 % (порог 100), покрытие строк 93 %; ниже 80 % у 6 классов (`AppealTypeMapper` 20 %, `Jackson3JsonFormatMapper`, `StuckTransferAlert`, `AppealType`, `ReferenceNotFoundException`, `OneCQueueListener`) |
+| PIT | 666 мутантов: убито 467, выжило 107 (в 34 классах), без покрытия 80, RUN_ERROR 10, TIMED_OUT 2; test strength 82 % (порог 100), покрытие строк 93 %; ниже 80 % у 6 классов (`AppealTypeMapper` 20 %, `Jackson3JsonFormatMapper`, `StuckTransferAlert`, `AppealType`, `ReferenceNotFoundException`, `OneCQueueListener`). После Ш3 (PR #5, тег `no-mutate`): убито 50 (в том числе 3 RUN_ERROR у `InboundRetryProperties:36`), выжило 12 (`OneCEnvelopeParser` @41,46, `OneCQueueListener` @135,146,181, `OneCValues` @77,92, `ReferenceImportService` @72,97,106,109,114), без покрытия 604; test strength 81 %; покрытие строк 9 % (146 из 1551), ≥ 80 % только у 5 из 67 классов с мутантами; pitest 15 с, 0 стартов контейнеров |
 
 **49 файлов придётся резать при касании:**
 
@@ -496,7 +513,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 
 **44 файла зелёные:** `DataReferenceApplication`, остальные `config`, `ApiExceptionHandler`, `RequestIdFilter`, шесть DTO, три
 перечисления и сущности inbox, три исключения 1С, все `repository`, `InboxService`, `PriceContract`, `ReferenceCalendar`,
-`ImportResult`, `StreamMapper`, `ReferenceImportScheduler`.
+`ImportResult`, `StreamMapper`, `ReferenceImportScheduler`. Это итог на `795e5ec`, где PIT исполнял и контекстные тесты. После Ш3
+(PR #5, тег `no-mutate`) покрытие строк PIT ≥ 80 % из этих файлов только у `InboundRetryProperties` и `OneCStream`; у остальных
+файлов с мутантами (`ImportResult` — 50 %, прочие — 0 %) первое касание требует unit-тестов (в плане — «зел.†»).
 
 **Решения владельца до рефакторинга.** Это правки набора, делаются в админ-окружении; подробные варианты — в плане, Р1–Р5.
 1. **CPD на аксессорах сущностей.** Варианты: `--exclude` каталога `entity` в задаче `cpdReport`; новая опция `DryGate`;
@@ -504,7 +523,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 2. **PMD ImmutableField на персистентных коллекциях.** Требование JPA 3.2 §2.1 — поля без `final`. Нужен узкий
    `violationSuppressXPath` для `@OneToMany`, `@ManyToMany`, `@ElementCollection`. ConstructorCallsOverridableMethod снимается
    кодом (статическая фабрика), исключение не нужно.
-3. **Решение 8 PR #1 (`no-mutate`) с новыми данными.** Unit-покрытие без контекстных тестов — 10,3 %. Варианты:
+3. **Решение 8 PR #1 (`no-mutate`) с новыми данными** — решено 2026-09-30 (Р3 а), выполнено Ш3 (PR #5) тегом в тестах
+   `data-reference`, не правкой набора. Unit-покрытие без контекстных тестов — 10,3 %. Варианты:
    - (а) тег сразу на составных аннотациях — каждый касаемый класс потребует unit-тестов;
    - (б) оставить контекстные тесты в PIT — медленно, ложные выжившие;
    - (в) тег на классы тестов по кластерам, по мере появления unit-тестов.
@@ -550,7 +570,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   приёма — в `service.integration`.
 
 **Кандидаты в `exclude.classes`.** Новых нет: `*Repository*` и `PolicySpecifications` уже исключены, остальные тонкие адаптеры
-покрыты тестами. Record-классы без логики — только поштучно и по решению владельца (п. 4).
+покрыты тестами. Record-классы без логики — только поштучно и по решению владельца (п. 4). После Ш3 (PR #5) PIT контекстные
+тесты не исполняет: тонкий адаптер, до которого дотягиваются только они, для PIT без покрытия — при касании unit-тест либо
+`exclude.classes` по решению владельца (правило 8 набора).
 
 ---
 
