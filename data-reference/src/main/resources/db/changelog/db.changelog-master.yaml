@@ -1,0 +1,31 @@
+# Точка входа Liquibase. Здесь только оглавление — сами изменения лежат
+# в пронумерованных файлах рядом, по одному на фазу разработки.
+#
+# Правило: применённый changeSet не редактируется. Liquibase считает его
+# идентичностью (id + author + путь к файлу) и на изменённом содержимом остановит
+# старт приложения. Правки вносятся новым changeSet'ом.
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-inbox.yaml
+  - include:
+      file: db/changelog/002-outbox.yaml
+  - include:
+      file: db/changelog/003-outbox-index.yaml
+  - include:
+      file: db/changelog/004-references.yaml
+  - include:
+      file: db/changelog/005-references-linked.yaml
+  - include:
+      file: db/changelog/006-policies.yaml
+  - include:
+      file: db/changelog/007-drop-data-version.yaml
+  - include:
+      file: db/changelog/008-rename-outbox.yaml
+  - include:
+      file: db/changelog/009-lpu-contracts-v2.yaml
+  - include:
+      file: db/changelog/010-insurance-contracts.yaml
+  - include:
+      file: db/changelog/011-mkb10-search.yaml
+  - include:
+      file: db/changelog/012-catalog-indexes.yaml

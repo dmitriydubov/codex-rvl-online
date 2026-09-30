@@ -1,0 +1,34 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 012-catalog-indexes
+      author: rvl-online
+      comment: >
+        Фаза 7b: индексы под каталог ЛПУ (R-01) и поиск полисов (R-04) по разделу ТЗ на API
+        «Индексы сверх ТЗ БД v.0.1», приведённые к фактическим условиям запросов. Перечень
+        программы читается по программе, а существующий индекс начинается с учреждения.
+        Связь условия обслуживания с программой у нас логическая, по external_program_id,
+        поэтому индекс по нему, а не по FK из ТЗ. Кандидаты прайсового договора — по
+        учреждению и сроку среди действующих. Номер полиса ищется подстрокой по lower(number),
+        отсюда триграммный GIN, а не btree по префиксу из ТЗ. Индексов по ФИО нет: поиск
+        ограничен договором, и его индекса достаточно; триграммный из ТЗ не совпадает
+        с нашими условиями (префикс по каждому полю отдельно), решение — по замеру в 7c.
+        Частичные индексы — по действующим записям; CURRENT_DATE в условиях нет намеренно.
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: create index idx_program_lpu_program on program_lpu (program_id)
+        - sql:
+            dbms: postgresql
+            sql: create index idx_lpu_contracts_active on lpu_contracts (lpu_id, end_date) where is_archive = false
+        - sql:
+            dbms: postgresql
+            sql: create index idx_policy_services_program on policy_services (external_program_id, policy_id) where availability = true
+        - sql:
+            dbms: postgresql
+            sql: create index idx_policies_number_trgm on policies using gin (lower(number) gin_trgm_ops) where is_archive = false
+      rollback:
+        - sql: drop index if exists idx_policies_number_trgm
+        - sql: drop index if exists idx_policy_services_program
+        - sql: drop index if exists idx_lpu_contracts_active
+        - sql: drop index if exists idx_program_lpu_program

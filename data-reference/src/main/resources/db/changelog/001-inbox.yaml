@@ -1,0 +1,22 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 001-inbox
+      author: data-reference-service
+      comment: >
+        Журнал входящих: дедупликация сообщений 1С по metadata.message-id. Тела
+        сообщения здесь нет — сырьё хранит outbox. Ключ таблицы это сам message_id:
+        он GUID, он приходит из источника и он же единственное, чем строки различаются,
+        поэтому суррогатный id не заводится.
+      changes:
+        - createTable:
+            tableName: inbox
+            columns:
+              - column:
+                  name: message_id
+                  type: uuid
+                  constraints: { primaryKey: true, primaryKeyName: pk_inbox, nullable: false }
+              - column:
+                  name: received_at
+                  type: timestamptz
+                  constraints: { nullable: false }

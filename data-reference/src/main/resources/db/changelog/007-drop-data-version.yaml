@@ -1,0 +1,55 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 007-drop-data-version
+      author: data-reference-service
+      comment: >
+        Колонка data_version убрана из всех справочников и полисов вместе с механизмом
+        версий сообщения.
+
+        Причина: контракт объявляет dataVersion не у всех потоков. Он есть в ТЗ-1, ТЗ-4,
+        ТЗ-5, ТЗ-6, ТЗ-7 и ТЗ-10 и отсутствует в ТЗ-2, ТЗ-3, ТЗ-8 и ТЗ-9 — в примере
+        сообщения ТЗ-3 его нет вовсе, отчего lpu.data_version и insurers.data_version
+        были пусты всегда. Правило «применяем только более старшую версию» работало
+        у половины справочников и молча не работало у второй половины, а половина защиты
+        хуже её отсутствия: она выглядит гарантией, ею не являясь.
+
+        Теперь правило одно для всех потоков: применяется последнее полученное сообщение.
+        Порядок держится на пути доставки — очередь одна, потребитель один, разбор идёт
+        по возрастанию received_at.
+
+        Данных правка не теряет: колонка нигде не читалась, кроме самой проверки версии.
+      changes:
+        - dropColumn: { tableName: mkb10, columnName: data_version }
+        - dropColumn: { tableName: appeal_types, columnName: data_version }
+        - dropColumn: { tableName: lpu, columnName: data_version }
+        - dropColumn: { tableName: insurers, columnName: data_version }
+        - dropColumn: { tableName: lpu_contracts, columnName: data_version }
+        - dropColumn: { tableName: contragent_services, columnName: data_version }
+        - dropColumn: { tableName: programs, columnName: data_version }
+        - dropColumn: { tableName: policies, columnName: data_version }
+      rollback:
+        - addColumn:
+            tableName: mkb10
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: appeal_types
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: lpu
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: insurers
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: lpu_contracts
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: contragent_services
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: programs
+            columns: [ { column: { name: data_version, type: bigint } } ]
+        - addColumn:
+            tableName: policies
+            columns: [ { column: { name: data_version, type: bigint } } ]

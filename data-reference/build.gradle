@@ -1,0 +1,102 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version "${springBootVersion}"
+}
+
+description = 'РВЛ ОНЛАЙН — справочники, полисы и заявки личного кабинета застрахованного'
+
+java {
+    // Стек зафиксирован на Java 21 (LTS).
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll([
+            // Имена параметров нужны привязке @ConfigurationProperties к записям
+            '-parameters',
+            '-Xlint:all,-processing',
+    ])
+}
+
+/*
+ * Отдельная конфигурация под одну задачу: собрать путь к jar-у Mockito, чтобы отдать
+ * его JVM как -javaagent. transitive = false, потому что агентом должен быть ровно
+ * один файл — asPath ниже склеивает список через разделитель пути, и второй артефакт
+ * молча превратил бы аргумент в мусор.
+ */
+configurations {
+    mockitoAgent
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    /*
+     * Mockito подключает свой агент сам, на ходу, и JDK уже предупреждает, что однажды
+     * это запретит. Подключаем заранее и явно: mockito-core объявляет Premain-Class,
+     * то есть агентом служит он же — отдельной зависимости для этого не нужно.
+     */
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
+    testLogging {
+        events 'failed'
+        exceptionFormat = 'full'
+        showStackTraces = true
+    }
+}
+
+dependencies {
+    /*
+     * Версии зависимостей — только здесь, и только через BOM: в объявлениях ниже
+     * координаты пишутся без версий. Плагин Spring Boot управление версиями сам
+     * не включает, поэтому платформа подключается явно; io.spring.dependency-management
+     * для той же задачи не нужен — Gradle умеет BOM'ы нативно.
+     *
+     * compileOnly и annotationProcessor не наследуют implementation, поэтому платформа
+     * добавляется в каждую конфигурацию отдельно.
+     */
+    ['implementation', 'compileOnly', 'annotationProcessor',
+     'testCompileOnly', 'testAnnotationProcessor', 'mockitoAgent'].each { configuration ->
+        add(configuration, platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
+    }
+
+    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // Boot 4 вынес LiquibaseAutoConfiguration из общего autoconfigure в свой модуль
+    // (тот же паттерн, что и с DataSourceAutoConfiguration → spring-boot-jdbc):
+    // просто liquibase-core на classpath автоконфигурацию больше не включает.
+    implementation 'org.springframework.boot:spring-boot-starter-liquibase'
+    // REST-чтение справочников для сервисов Заявок и Договоров. В Boot 4 стартер MVC
+    // называется webmvc, а starter-web объявлен устаревшим — но по POM это один и тот же
+    // набор модулей: starter-jackson, starter-tomcat, http-converter, spring-boot-webmvc.
+    // Nexus контура отдаёт только starter-web; отсюда выбор. Появится в Nexus
+    // starter-webmvc — заменить координаты, код не меняется.
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // Приём сообщений из брокера 1С:УСК — единственного брокера, с которым говорит сервис.
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    // Проверка @ConfigurationProperties на старте: неверная конфигурация обязана
+    // ронять приложение при развёртывании, а не в первом же сообщении из очереди.
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // Пробы Kubernetes: /actuator/health/liveness и /readiness. Наружу открыт только
+    // health, остальные ручки актуатора не публикуются (management в application.yml).
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // @Nullable в сигнатурах. Аннотации нужны и в рантайме — Spring 7 читает их сам.
+    implementation 'org.jspecify:jspecify'
+    // Jackson 3 — тот, что приносит Boot 4. Явно, а не транзитивно: на нём написан
+    // мост к колонкам jsonb, и без объявления его не видно на пути компиляции.
+    implementation 'tools.jackson.core:jackson-databind'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // MockMvcTester и его AssertJ-проверки живут в spring-test, который приходит
+    // с этим стартером. Boot-овский starter-webmvc-test не подключён: он тянет
+    // starter-webmvc и ещё два модуля, которых в Nexus контура нет, а из полезного
+    // давал только @AutoConfigureMockMvc — его заменяет бин в TestSupportConfig.
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-rabbitmq'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Тот же mockito-core, что приходит со стартером тестов, — но как агент JVM.
+    mockitoAgent('org.mockito:mockito-core') { transitive = false }
+}

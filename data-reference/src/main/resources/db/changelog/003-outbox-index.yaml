@@ -1,0 +1,21 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 003-outbox-pending-index
+      author: data-reference-service
+      comment: >
+        Под выборку шедулера: NEW и дозревшие RETRY, в порядке поступления. Индекс
+        частичный, потому что разобранные строки составят почти всю таблицу и в этой
+        выборке не участвуют — держать их в индексе значит платить за них на каждой
+        вставке и ничего не получать взамен.
+
+        Сырым sql, а не createIndex: у createIndex в Liquibase нет частичных индексов,
+        и ключ where он молча игнорирует — получается обычный индекс по всей таблице.
+      changes:
+        - sql:
+            sql: >
+              CREATE INDEX idx_outbox_pending ON outbox (received_at)
+              WHERE status IN ('NEW', 'RETRY')
+      rollback:
+        - sql:
+            sql: DROP INDEX idx_outbox_pending

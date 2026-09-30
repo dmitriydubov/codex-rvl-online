@@ -1,0 +1,174 @@
+spring:
+  application:
+    name: data-reference
+
+  # REST обслуживается на виртуальных потоках: ручки — короткие чтения из базы,
+  # и держать под каждое платформенный поток незачем.
+  threads:
+    virtual:
+      enabled: true
+
+  # Плавное завершение вместе с server.shutdown ниже: на SIGTERM от Kubernetes сервис
+  # перестаёт принимать запросы, дорабатывает начатые и только потом гасит контекст.
+  # Слушатель очереди за это время подтверждает сообщение в работе; что не успел —
+  # вернётся в очередь неподтверждённым и придёт снова, дедупликация это переживёт.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  # Поля JSON наружу — snake_case, как во всех контрактах контура (individual_request_id,
+  # external_id, request_id). На разбор сообщений 1С не влияет: маппер читает их деревом,
+  # по именам полей источника, а не в POJO.
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+  # Умолчания — для локального контура из docker-compose.yml. Stage и prod
+  # передают свои значения переменными окружения, код при этом не меняется.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/data_reference}
+    username: ${DB_USERNAME:data_reference}
+    password: ${DB_PASSWORD:data_reference}
+
+  jpa:
+    # Схему ведёт Liquibase. Hibernate её не трогает: ddl-auto на живой базе — это
+    # изменения, которых нет ни в одном ревью и которые нечем откатить.
+    hibernate:
+      ddl-auto: none
+    # Сессия закрывается вместе с транзакцией сервиса. С open-in-view ленивые поля
+    # догружаются уже за её границей — то есть отдельным запросом на каждое обращение.
+    open-in-view: false
+    properties:
+      hibernate:
+        type:
+          # Без этого Hibernate 7 не отображает колонки jsonb вовсе: он ищет Jackson 2,
+          # а Boot 4 приносит Jackson 3. Разбор — в javadoc самого класса.
+          json_format_mapper: ru.projectx.datareference.config.Jackson3JsonFormatMapper
+
+  # Брокер 1С:УСК — единственный брокер, с которым говорит этот сервис. Умолчания
+  # ведут на локальный контур из docker-compose.yml; адрес, учётные данные и TLS
+  # настоящего контура приходят переменными окружения. Учётные данные в репозиторий
+  # не попадают ни в каком виде.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    # Тестовый контур слушает 5671 (TLS). Локальный брокер — обычные 5672.
+    port: ${RABBITMQ_PORT:5672}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    username: ${RABBITMQ_USERNAME:data_reference}
+    password: ${RABBITMQ_PASSWORD:data_reference}
+    # Внешний вызов без таймаута — дефект: без него попытка соединиться с недоступным
+    # брокером висит до таймаута операционной системы, то есть минутами.
+    connection-timeout: 10s
+    ssl:
+      enabled: ${RABBITMQ_SSL_ENABLED:false}
+      # Тестовый контур отдаёт самоподписанный сертификат, хранилища доверия под него
+      # нет. Эти два свойства выключают проверку — режим «доверять любому»: клиент
+      # RabbitMQ сам печатает на старте SECURITY ALERT, так что незамеченным он
+      # не проходит. Для прода значение обоих — true, задаётся переменными окружения.
+      validate-server-certificate: ${RABBITMQ_SSL_VALIDATE_CERTIFICATE:false}
+      verify-hostname: ${RABBITMQ_SSL_VERIFY_HOSTNAME:false}
+    # Очереди на брокере заведены со стороны 1С:УСК. Свой AmqpAdmin не нужен
+    # и вреден: объявление с параметрами, отличными от фактических (durable, аргументы),
+    # закрывает канал — а фактических параметров чужой очереди мы не знаем.
+    dynamic: false
+    listener:
+      simple:
+        # Стартовать ли слушателей вообще. Локально сервис к брокеру 1С не подключается:
+        # RabbitMQ из docker-compose.yml изображает межсервисный брокер контура, очередей
+        # 1С в нём нет, и с missing-queues-fatal ниже запуск падал бы на первой же.
+        # Поэтому умолчание — выключено. На контуре переменная обязана быть true:
+        # без неё сервис стартует и молча не читает 1С, по журналу этого не видно.
+        auto-startup: ${RABBITMQ_LISTENER_AUTO_STARTUP:false}
+        # Подтверждение уходит из слушателя вручную и только после того, как приём
+        # зафиксирован в базе. При автоматическом сообщение считается обработанным
+        # в момент доставки, и падение до коммита теряет его молча.
+        acknowledge-mode: manual
+        # Очереди нет на брокере — значит, имя задано неверно либо контур не тот.
+        # С этим значением потребитель делает три попытки объявления и роняет запуск
+        # приложения; со сброшенным — повторяет попытку бесконечно, а в логе это
+        # выглядит как «сообщений нет» и обнаруживается через неделю по пустому
+        # справочнику. Пусть лучше не стартует.
+        missing-queues-fatal: true
+        # По одному потребителю на очередь. Порядок сообщений внутри потока значим —
+        # ТЗ-9 собирает передачу из частей, dataVersion применяется только
+        # по возрастанию, — а параллельные потребители его перемешивают.
+        concurrency: 1
+        # Сколько сообщений брокер отдаёт потребителю, не дожидаясь подтверждения.
+        # Все они висят неподтверждёнными, пока идёт запись сырья, поэтому число
+        # небольшое: при остановке сервиса они возвращаются в очередь и приходят снова.
+        prefetch: 20
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+server:
+  # См. spring.lifecycle: без этого Tomcat обрывает соединения в момент SIGTERM.
+  shutdown: graceful
+
+# Пробы Kubernetes на том же порту, что и API: /actuator/health/liveness и /readiness.
+# Наружу открыт только health. Группы liveness и readiness отвечают состоянием самого
+# приложения, а не базы и брокера: перезапуск пода недоступную базу не починит.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+projectx:
+  api:
+    # Календарный день для правила «действует на сегодня» (ТЗ на API): сервис живёт
+    # в UTC, а день считается московский, иначе три часа в сутки договоры отставали бы
+    # на день. День вычисляется на запрос и уходит в SQL параметром, не CURRENT_DATE.
+    zone: Europe/Moscow
+    # Виды обращения РВЛ по наименованию (ТЗ на API, R-01 и R-03; ответ В-9): по ним
+    # из перечня программы и из услуг прайсового договора отбираются позиции размещения,
+    # а не процедуры и анализы. Сравнение без учёта регистра и краевых пробелов; на старте
+    # сервис пишет WARN, если хотя бы одного наименования нет в appeal_types. Придут GUID
+    # от 1С (OQ-48) — их место здесь же.
+    rvl-appeal-types:
+      - РВЛ и СКЛ
+      - РВЛ в России
+
+  onec:
+    contract:
+      # GUID вида деятельности «РВЛ» (ТЗ-3, п. 3.2). В документе на его месте
+      # плейсхолдер; фактическое значение уточнено отдельно и принадлежит контуру.
+      # В коде умолчания у него нет намеренно: подставленный наугад GUID дал бы пустой
+      # справочник санаториев без единой ошибки в логе — все сообщения аккуратно
+      # уходили бы в пропуск как «не РВЛ».
+      #
+      # Что значение верное, показывают данные: пустая таблица lpu при непустой insurers
+      # означает, что GUID не тот.
+      rvl-activity-id: f3876c53-c7d8-4620-b364-9538164ba5d4
+
+      # Тип продукта, по которому договор страхования признаётся договором ДМС (ТЗ-2).
+      # Документ называет это значение прямо, но оговаривает, что оно фиксируется при
+      # подключении к контуру, — поэтому здесь, а не константой в коде. Не задано —
+      # поток ТЗ-2 не применяется вовсе: отличить ДМС от еОСАГО нечем.
+      dms-product-type: Личное страхование
+
+    # Имена очередей — конфигурация контура, а не константы кода. В ТЗ и в письме
+    # со стороны 1С:УСК они названы иначе, чем объявлены на брокере: `1c-usk_to_rvl_online…`
+    # против фактического `1c-usk_to_rvl-online…`, у ТЗ-8 — `-information-changes`
+    # без `contact`, у ТЗ-9 — через подчёркивания. Ниже — то, что снято со списка
+    # очередей брокера; при развёртывании на новом контуре сверять со списком снова.
+    #
+    # Умолчаний у записи OneCQueueProperties нет намеренно: опечатка в имени — это
+    # молчаливое «сообщений нет», очередь просто не находится.
+    queues:
+      policies: ${ONEC_QUEUE_POLICIES:1c-usk_to_rvl-online_policies}
+      # Заведена на контуре 23.09.2026 через дефис, как и остальные. В ТЗ-2 и в предварительной
+      # договорённости она шла через подчёркивание (rvl_online), и под него имя здесь одно
+      # время стояло — сервис на этом и не стартовал. Сверять со списком брокера, не с ТЗ.
+      insurance-contracts: ${ONEC_QUEUE_INSURANCE_CONTRACTS:1c-usk_to_rvl-online_contracts-changes}
+      contragents: ${ONEC_QUEUE_CONTRAGENTS:1c-usk_to_rvl-online_contragents-ul-changes}
+      mkb10: ${ONEC_QUEUE_MKB10:1c-usk_to_rvl-online_mkb10-changes}
+      lpu-contracts: ${ONEC_QUEUE_LPU_CONTRACTS:1c-usk_to_rvl-online_contragents-contracts-changes}
+      programs: ${ONEC_QUEUE_PROGRAMS:1c-usk_to_rvl-online_programms-changes}
+      appeal-types: ${ONEC_QUEUE_APPEAL_TYPES:1c-usk_to_rvl-online_types-treatments-changes}
+      lpu-contacts: ${ONEC_QUEUE_LPU_CONTACTS:1c-usk_to_rvl-online_contact-information-changes}
+      price-lists: ${ONEC_QUEUE_PRICE_LISTS:1c-usk_to_rvl-online_pricelists-contragents-changes}
+      price-lists-final: ${ONEC_QUEUE_PRICE_LISTS_FINAL:1c-usk_to_rvl-online_pricelists-contragents-changes-final}
+      contragent-services: ${ONEC_QUEUE_CONTRAGENT_SERVICES:1c-usk_to_rvl-online_contragents-services-changes}

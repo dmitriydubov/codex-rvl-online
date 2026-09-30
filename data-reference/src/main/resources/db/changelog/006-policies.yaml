@@ -1,0 +1,151 @@
+# Полисы застрахованных, поток ТЗ-1 — единственное место в сервисе, где лежат
+# персональные данные: ФИО, дата рождения, почта.
+#
+# Из этого следуют два решения ниже: тело сообщения в таблице сырья становится
+# обнуляемым (его стирает срок хранения), а связи полиса с договором страхования
+# и с программами остаются логическими, GUID'ом.
+databaseChangeLog:
+
+  - changeSet:
+      id: 006-outbox-payload-nullable
+      author: data-reference-service
+      comment: >
+        У тела сообщения появляется срок хранения: полис приезжает полным пакетом JSON,
+        и хранить его вечно значит держать вторую копию реестра застрахованных в таблице,
+        которая для этого не предназначена. Стирается только тело — строка остаётся,
+        и по ней по-прежнему видно, что сообщение приходило и чем закончилось.
+
+        Снятие NOT NULL в PostgreSQL меняет только каталог, таблица не переписывается.
+      changes:
+        - dropNotNullConstraint:
+            tableName: outbox
+            columnName: payload
+            columnDataType: jsonb
+
+  - changeSet:
+      id: 006-policies
+      author: data-reference-service
+      comment: >
+        ТЗ-1. Договор страхования — логическая ссылка GUID'ом, без внешнего ключа:
+        поток ТЗ-2 на контуре не создан, и требовать существования строки, которой
+        неоткуда взяться, нельзя. Паспортных данных здесь нет — ТЗ-1 прямо пишет,
+        что структура их потока не определена.
+
+        end_date допускает NULL: 3000-01-01 источника означает открытую дату.
+      changes:
+        - createTable:
+            tableName: policies
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_policies, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_policies_external_id } }
+              - column: { name: external_contract_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: number, type: text, constraints: { nullable: false } }
+              - column: { name: last_name, type: text, constraints: { nullable: false } }
+              - column: { name: first_name, type: text, constraints: { nullable: false } }
+              - column: { name: middle_name, type: text }
+              - column: { name: date_of_birth, type: date, constraints: { nullable: false } }
+              - column: { name: gender, type: text }
+              - column: { name: email, type: text }
+              - column: { name: begin_date, type: date, constraints: { nullable: false } }
+              - column: { name: end_date, type: date }
+              - column: { name: availability, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: policies
+            indexName: idx_policies_contract
+            columns: [ { column: { name: external_contract_id } } ]
+        - createIndex:
+            comment: Вход в личный кабинет идёт по адресу почты
+            tableName: policies
+            indexName: idx_policies_email
+            columns: [ { column: { name: email } } ]
+
+  - changeSet:
+      id: 006-policy-programs
+      author: data-reference-service
+      comment: >
+        Табличная часть программ полиса: полное замещение при каждом сообщении, поэтому
+        ON DELETE CASCADE. Ссылка на программу логическая: программа может быть не-РВЛ
+        и отсутствовать в справочнике намеренно, и ТЗ-1 прямо оговаривает, что ошибкой
+        это не считается.
+      changes:
+        - createTable:
+            tableName: policy_programs
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_policy_programs, nullable: false } }
+              - column:
+                  name: policy_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_policy_programs_policy
+                    references: 'policies(id)'
+                    deleteCascade: true
+              - column: { name: external_program_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: begin_date, type: date, constraints: { nullable: false } }
+              - column: { name: end_date, type: date }
+              - column: { name: amount, type: 'numeric(15,2)' }
+              - column: { name: amount_d, type: 'numeric(15,2)' }
+              - column: { name: premium, type: 'numeric(15,2)' }
+              - column: { name: premium_d, type: 'numeric(15,2)' }
+              - column: { name: limit_amount, type: 'numeric(15,2)', constraints: { nullable: false } }
+              - column: { name: availability, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: policy_programs
+            indexName: idx_policy_programs_policy
+            columns: [ { column: { name: policy_id } } ]
+
+  - changeSet:
+      id: 006-policy-services
+      author: data-reference-service
+      comment: >
+        Табличная часть условий обслуживания. Ссылка на программу здесь необязательна,
+        в отличие от таблицы программ: маппинг ТЗ-1 помечает её так, а нулевой GUID
+        источника означает «ссылки нет».
+      changes:
+        - createTable:
+            tableName: policy_services
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_policy_services, nullable: false } }
+              - column:
+                  name: policy_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_policy_services_policy
+                    references: 'policies(id)'
+                    deleteCascade: true
+              - column: { name: external_program_id, type: uuid }
+              - column: { name: layer_number, type: int, constraints: { nullable: false } }
+              - column: { name: copayment, type: 'numeric(5,2)', constraints: { nullable: false } }
+              - column: { name: begin_date, type: date }
+              - column: { name: end_date, type: date }
+              - column: { name: availability, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: policy_services
+            indexName: idx_policy_services_policy
+            columns: [ { column: { name: policy_id } } ]
+
+  - changeSet:
+      id: 006-outbox-retention-index
+      author: data-reference-service
+      comment: >
+        Под выборку срока хранения: строки полисов, у которых ещё лежит тело. Индекс
+        частичный — у подавляющего большинства строк тело либо уже стёрто, либо поток
+        не тот, и держать их в индексе значит платить за них на каждой вставке.
+
+        Сырым sql, а не createIndex: у createIndex в Liquibase нет частичных индексов,
+        и ключ where он молча игнорирует.
+      changes:
+        - sql:
+            sql: >
+              CREATE INDEX idx_outbox_retention ON outbox (received_at)
+              WHERE stream = 'POLICIES' AND payload IS NOT NULL
+      rollback:
+        - sql:
+            sql: DROP INDEX idx_outbox_retention

@@ -1,0 +1,200 @@
+# Справочники со связями: потоки ТЗ-8, ТЗ-5, ТЗ-10, ТЗ-9 и ТЗ-6.
+#
+# Правило внешних ключей здесь одно и следует из ТЗ: жёсткий FK ставится там, где
+# существование родителя ТЗ делает ФИЛЬТРОМ — сообщение без резолва вообще
+# не применяется, значит родитель гарантированно есть. Там, где ТЗ помечает ссылку
+# необязательной (виды обращений), хранится GUID источника без FK: справочник
+# приходит в произвольном порядке, и «родителя ещё нет» — норма.
+databaseChangeLog:
+
+  - changeSet:
+      id: 005-outbox-transfer-columns
+      author: data-reference-service
+      comment: >
+        Разметка многочастной передачи (ТЗ-9). Заполняет её сборщик, а не приём: чтобы
+        узнать эти значения, надо разобрать тело, а приём тела не разбирает. Остальным
+        потокам колонки остаются пустыми.
+      changes:
+        - addColumn:
+            tableName: outbox
+            columns:
+              - column: { name: correlation_id, type: uuid }
+              - column: { name: batch_count, type: int }
+              - column: { name: row_count, type: int }
+        - createIndex:
+            tableName: outbox
+            indexName: idx_outbox_correlation
+            columns: [ { column: { name: correlation_id } } ]
+
+  - changeSet:
+      id: 005-lpu-contacts
+      author: data-reference-service
+      comment: >
+        ТЗ-8: адрес и регион санатория. Отдельными колонками в lpu, а не отдельной
+        таблицей: ТЗ-8 приносит ровно один актуальный адрес, истории по нему нет.
+      changes:
+        - addColumn:
+            tableName: lpu
+            columns:
+              - column: { name: region, type: text }
+              - column: { name: address, type: text }
+        - createIndex:
+            tableName: lpu
+            indexName: idx_lpu_region
+            columns: [ { column: { name: region } } ]
+
+  - changeSet:
+      id: 005-lpu-contracts
+      author: data-reference-service
+      comment: >
+        ТЗ-5. Жёсткий FK на lpu оправдан: принадлежность договора нашему санаторию —
+        это фильтр потока. end_date допускает NULL: 3000-01-01 источника означает
+        открытую дату, а не тысячу лет.
+      changes:
+        - createTable:
+            tableName: lpu_contracts
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_lpu_contracts, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_lpu_contracts_external_id } }
+              - column:
+                  name: lpu_id
+                  type: uuid
+                  constraints: { nullable: false, foreignKeyName: fk_lpu_contracts_lpu, references: 'lpu(id)' }
+              - column: { name: number, type: text }
+              - column: { name: name, type: text }
+              - column: { name: main_price_dog, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: begin_date, type: date, constraints: { nullable: false } }
+              - column: { name: end_date, type: date }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: lpu_contracts
+            indexName: idx_lpu_contracts_lpu
+            columns: [ { column: { name: lpu_id } } ]
+
+  - changeSet:
+      id: 005-contragent-services
+      author: data-reference-service
+      comment: >
+        ТЗ-10. Жёсткий FK на договор: принадлежность нашему договору — фильтр потока.
+        Вид обращения — GUID'ом без FK: ТЗ помечает его необязательным.
+      changes:
+        - createTable:
+            tableName: contragent_services
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_contragent_services, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_contragent_services_external_id } }
+              - column:
+                  name: lpu_contract_id
+                  type: uuid
+                  constraints: { nullable: false, foreignKeyName: fk_contragent_services_contract, references: 'lpu_contracts(id)' }
+              - column: { name: external_appeal_type_id, type: uuid }
+              - column: { name: code, type: text }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: contragent_services
+            indexName: idx_contragent_services_contract
+            columns: [ { column: { name: lpu_contract_id } } ]
+
+  - changeSet:
+      id: 005-price-list-items
+      author: data-reference-service
+      comment: >
+        ТЗ-9. Строки замещаются целиком по услуге, поэтому ON DELETE CASCADE: они
+        принадлежат услуге и живут ровно столько, сколько её последний прайс.
+        valid_to допускает NULL — открытая дата источника.
+      changes:
+        - createTable:
+            tableName: price_list_items
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_price_list_items, nullable: false } }
+              - column:
+                  name: contragent_service_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_price_list_items_service
+                    references: 'contragent_services(id)'
+                    deleteCascade: true
+              - column: { name: service_name, type: text }
+              - column: { name: service_code, type: text }
+              - column: { name: service_code_pf, type: text }
+              - column: { name: price, type: 'numeric(15,2)', constraints: { nullable: false } }
+              - column: { name: price_with_discount, type: 'numeric(15,2)' }
+              - column: { name: valid_from, type: date, constraints: { nullable: false } }
+              - column: { name: valid_to, type: date }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: price_list_items
+            indexName: idx_price_list_items_actual
+            columns:
+              - column: { name: contragent_service_id }
+              - column: { name: valid_from }
+              - column: { name: valid_to }
+
+  - changeSet:
+      id: 005-programs
+      author: data-reference-service
+      comment: 'ТЗ-6, шапка сообщения. Только программы с признаком РВЛ.'
+      changes:
+        - createTable:
+            tableName: programs
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_programs, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_programs_external_id } }
+              - column: { name: external_product_id, type: uuid }
+              - column: { name: external_parent_id, type: uuid }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: type_programm, type: text }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+
+  - changeSet:
+      id: 005-program-lpu
+      author: data-reference-service
+      comment: >
+        ТЗ-6, табличная часть: полное замещение при каждом сообщении, поэтому
+        ON DELETE CASCADE — строки принадлежат программе и живут ровно столько,
+        сколько длится её последняя версия.
+      changes:
+        - createTable:
+            tableName: program_lpu
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_program_lpu, nullable: false } }
+              - column:
+                  name: program_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_program_lpu_program
+                    references: 'programs(id)'
+                    deleteCascade: true
+              - column:
+                  name: lpu_id
+                  type: uuid
+                  constraints: { nullable: false, foreignKeyName: fk_program_lpu_lpu, references: 'lpu(id)' }
+              - column: { name: external_appeal_type_id, type: uuid }
+              - column: { name: begin_date, type: date }
+              - column: { name: end_date, type: date }
+              - column: { name: layer_number, type: int, constraints: { nullable: false } }
+              - column: { name: direct_attachment, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: percent_copayment, type: 'numeric(5,2)', defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: type_rd, type: char(1), constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - sql:
+            comment: Рисковая или депозитная часть — из взаимоисключающих флагов сообщения
+            sql: ALTER TABLE program_lpu ADD CONSTRAINT ck_program_lpu_type_rd CHECK (type_rd IN ('R', 'D'))
+        - createIndex:
+            tableName: program_lpu
+            indexName: idx_program_lpu_lpu_program
+            columns:
+              - column: { name: lpu_id }
+              - column: { name: program_id }

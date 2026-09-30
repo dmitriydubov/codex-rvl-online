@@ -1,0 +1,87 @@
+package ru.projectx.datareference.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.time.Instant;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Услуга, оказываемая санаторием в рамках договора (ТЗ-10). К ней привязан прейскурант
+ * (ТЗ-9), поэтому услуга — та единица, по которой цена замещается целиком.
+ *
+ * <p>Номенклатура медицинских услуг ({@code medicalServise} сообщения) отдельным
+ * справочником не хранится: ТЗ-10 прямо это оговаривает.
+ *
+ * <p>Вид обращения хранится GUID'ом источника: ТЗ помечает его необязательным, и услуга
+ * не должна пропадать из-за справочника, который ещё не приехал.
+ */
+@Entity
+@Table(name = "contragent_services")
+public class ContragentService extends OneCEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "lpu_contract_id", nullable = false)
+    private LpuContract contract;
+
+    @Nullable
+    @Column(name = "external_appeal_type_id")
+    private UUID externalAppealTypeId;
+
+    @Nullable
+    private String code;
+
+    @Column(nullable = false)
+    private String name;
+
+    protected ContragentService() {
+        // JPA
+    }
+
+    private ContragentService(UUID externalId, LpuContract contract, Details details, Instant now) {
+        super(externalId, now);
+        applySnapshot(contract, details, now);
+    }
+
+    public static ContragentService create(UUID externalId, LpuContract contract, Details details, Instant now) {
+        return new ContragentService(externalId, contract, details, now);
+    }
+
+    public void applySnapshot(LpuContract contract, Details details, Instant now) {
+        this.contract = contract;
+        this.externalAppealTypeId = details.externalAppealTypeId();
+        this.code = details.code();
+        this.name = details.name();
+        applyCommon(details.deleteMark(), now);
+    }
+
+    /** Разобранные поля сообщения ТЗ-10. */
+    public record Details(
+            @Nullable UUID externalAppealTypeId,
+            @Nullable String code,
+            String name,
+            boolean deleteMark) {
+    }
+
+    public LpuContract contract() {
+        return contract;
+    }
+
+    @Nullable
+    public UUID externalAppealTypeId() {
+        return externalAppealTypeId;
+    }
+
+    @Nullable
+    public String code() {
+        return code;
+    }
+
+    public String name() {
+        return name;
+    }
+}

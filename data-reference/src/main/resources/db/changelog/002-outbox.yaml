@@ -1,0 +1,56 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 002-outbox
+      author: data-reference-service
+      comment: >
+        Сырьё из 1С: сообщение целиком плюс статус его обработки. Ключ — message_id,
+        как и у inbox: на одно сообщение приходится ровно одна строка сырья, а дубли
+        сюда не доходят, их отсекает журнал входящих. Внешнего ключа на inbox нет
+        намеренно — у таблиц разные задачи и разное время жизни.
+      changes:
+        - createTable:
+            tableName: outbox
+            columns:
+              - column:
+                  name: message_id
+                  type: uuid
+                  constraints: { primaryKey: true, primaryKeyName: pk_outbox, nullable: false }
+              - column:
+                  name: stream
+                  type: text
+                  constraints: { nullable: false }
+              - column:
+                  name: source_queue
+                  type: text
+                  constraints: { nullable: false }
+              - column:
+                  name: payload
+                  type: jsonb
+                  constraints: { nullable: false }
+              - column:
+                  name: status
+                  type: text
+                  defaultValue: NEW
+                  constraints: { nullable: false }
+              - column:
+                  name: attempt
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+              - column: { name: next_retry_at, type: timestamptz }
+              - column: { name: last_error, type: text }
+              - column:
+                  name: received_at
+                  type: timestamptz
+                  constraints: { nullable: false }
+              - column: { name: processed_at, type: timestamptz }
+
+# Индекса под выборку «что пора обработать» здесь нет намеренно. Запрос заведёт
+# шедулер фазы 4 — тогда же станет видно, по каким колонкам и в каком порядке
+# индексировать, и это можно будет подтвердить планом. Индекс, подобранный под
+# воображаемый запрос, проверить нечем.
+#
+# Учтите при этом: createIndex в Liquibase не умеет частичных индексов, и ключ
+# where он молча игнорирует — получается обычный индекс по всей таблице. Частичный
+# создаётся отдельным changeSet'ом с сырым sql.

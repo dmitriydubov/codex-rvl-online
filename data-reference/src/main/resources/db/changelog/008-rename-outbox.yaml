@@ -1,0 +1,42 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 008-rename-outbox-to-inbound-message
+      author: rvl-online
+      comment: >
+        Таблица сырья переименована из outbox в inbound_message.
+
+        Причина: имя было выбрано, когда исходящих сообщений у сервиса не существовало,
+        и расхождение с общепринятым смыслом (transactional outbox — это очередь
+        ИСХОДЯЩИХ событий) оставалось терпимым. С заявками появляются настоящие
+        исходящие сообщения, и держать под именем outbox таблицу входящего сырья
+        значило бы разослать ложь по всему коду разом.
+
+        Переименование, а не создание новой таблицы: данные остаются на месте,
+        накопленное сырьё не теряется.
+
+        author здесь новый — rvl-online. У применённых наборов он остаётся прежним:
+        author входит в идентичность changeSet вместе с id и путём к файлу, и правка
+        задним числом заставила бы Liquibase считать их новыми.
+      changes:
+        - renameTable: { oldTableName: outbox, newTableName: inbound_message }
+        # Имена индексов и ограничений PostgreSQL при переименовании таблицы
+        # не трогает — они так и остались бы с приставкой outbox.
+        - sql:
+            sql: ALTER TABLE inbound_message RENAME CONSTRAINT pk_outbox TO pk_inbound_message
+        - sql:
+            sql: ALTER INDEX idx_outbox_correlation RENAME TO idx_inbound_message_correlation
+        - sql:
+            sql: ALTER INDEX idx_outbox_pending RENAME TO idx_inbound_message_pending
+        - sql:
+            sql: ALTER INDEX idx_outbox_retention RENAME TO idx_inbound_message_retention
+      rollback:
+        - sql:
+            sql: ALTER INDEX idx_inbound_message_retention RENAME TO idx_outbox_retention
+        - sql:
+            sql: ALTER INDEX idx_inbound_message_pending RENAME TO idx_outbox_pending
+        - sql:
+            sql: ALTER INDEX idx_inbound_message_correlation RENAME TO idx_outbox_correlation
+        - sql:
+            sql: ALTER TABLE inbound_message RENAME CONSTRAINT pk_inbound_message TO pk_outbox
+        - renameTable: { oldTableName: inbound_message, newTableName: outbox }

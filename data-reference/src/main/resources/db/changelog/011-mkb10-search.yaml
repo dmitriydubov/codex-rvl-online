@@ -1,0 +1,26 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 011-mkb10-search
+      author: rvl-online
+      comment: >
+        Фаза 7a, R-07: индексы под подсказку по МКБ-10. Префикс кода ищется без учёта
+        регистра — отсюда выражение upper(code) и text_pattern_ops: без него LIKE
+        по префиксу не использует btree ни в одной локали, кроме C. Подстрока
+        наименования — триграммный GIN из pg_trgm; расширение доверенное, его создаёт
+        владелец базы, суперпользователь не нужен. Оба индекса частичные, по действующим
+        кодам: подсказка архивные не показывает, а батч по кодам идёт точным сравнением.
+        CURRENT_DATE в условиях индексов нет намеренно — функция не IMMUTABLE.
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: create extension if not exists pg_trgm
+        - sql:
+            dbms: postgresql
+            sql: create index idx_mkb10_code_prefix on mkb10 (upper(code) text_pattern_ops) where is_archive = false
+        - sql:
+            dbms: postgresql
+            sql: create index idx_mkb10_name_trgm on mkb10 using gin (lower(name) gin_trgm_ops) where is_archive = false
+      rollback:
+        - sql: drop index if exists idx_mkb10_name_trgm
+        - sql: drop index if exists idx_mkb10_code_prefix

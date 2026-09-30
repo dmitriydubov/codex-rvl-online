@@ -1,0 +1,94 @@
+# Локальный контур для запуска сервиса вне тестов. Тесты поднимают своё
+# через Testcontainers и в этом файле не нуждаются.
+#
+# Значения захардкожены нарочно: это не прод, секретов здесь нет, а .env-файл —
+# лишняя переменная в схеме, когда контур и так локальный.
+#
+# Запуск: docker compose up -d
+# Вместе с самим сервисом из Dockerfile: docker compose --profile app up -d
+# (переменные — из .env, шаблон в .env.example).
+#
+# Брокер здесь изображает межсервисный брокер контура, а не брокер 1С:УСК, и этот
+# сервис к нему по умолчанию не подключается: слушатели очередей 1С локально
+# не стартуют (spring.rabbitmq.listener.simple.auto-startup). Проверить на нём приём
+# и подтверждение всё же можно: RABBITMQ_LISTENER_AUTO_STARTUP=true и очереди 1С,
+# заведённые через панель; данных 1С в нём всё равно нет.
+
+name: data-reference
+
+services:
+
+  postgres:
+    image: postgres:16.10-alpine
+    container_name: data-reference-postgres
+    environment:
+      POSTGRES_DB: data_reference
+      POSTGRES_USER: data_reference
+      POSTGRES_PASSWORD: data_reference
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U data_reference -d data_reference" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    container_name: data-reference-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: data_reference
+      RABBITMQ_DEFAULT_PASS: data_reference
+    ports:
+      # 5672 — AMQP; тестовый контур слушает 5671 (TLS), локально TLS не нужен.
+      - "5672:5672"
+      # Панель управления на http://localhost:15672 — оттуда и создаются очереди,
+      # если слушателей включили: сервис их не объявляет (spring.rabbitmq.dynamic: false),
+      # потому что на контуре они заведены со стороны 1С:УСК.
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD-SHELL", "rabbitmq-diagnostics -q check_running" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # Сам сервис из Dockerfile — проверить образ локально. В профиле, чтобы обычный
+  # docker compose up поднимал только базу и брокер и не собирал образ каждый раз.
+  # Переменные — из .env (шаблон .env.example); адреса базы и брокера подменяются
+  # на имена сервисов compose: внутри его сети localhost — это сам контейнер.
+  data-reference:
+    profiles: [ app ]
+    build:
+      context: .
+      # Аргументы сборки без значений: compose передаёт только те, что заданы в .env
+      # или в окружении, остальные берут умолчания из ARG в Dockerfile (jar собирается
+      # в образе, базовые образы с Docker Hub, Gradle с services.gradle.org). Форма
+      # «ИМЯ: ${ИМЯ:-умолчание}» здесь не годится: она передаёт значение всегда,
+      # и умолчания Dockerfile перестают действовать. См. .env.example.
+      args:
+        - JAR_SOURCE
+        - JDK_IMAGE
+        - JRE_IMAGE
+        - GRADLE_DISTRIBUTION_URL
+    container_name: data-reference
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/data_reference
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  rabbitmq-data:

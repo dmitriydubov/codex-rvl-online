@@ -1,0 +1,52 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 009-lpu-contracts-v2
+      author: rvl-online
+      comment: >
+        ТЗ-5 версии 2 и структура БД v0.2: договор ЛПУ хранит поля источника, а не
+        выведенный из них признак.
+
+        Убрано main_price_dog. Раньше маппер вычислял его из mainContractId
+        и usePricesMainAgreement и сохранял только результат; по v2 признак
+        ценообразующего договора выводится при расчёте цены, а храниться должны
+        исходные поля. Потери данных нет: оба они добавляются этим же набором.
+
+        Добавлено main_contract_external_id — внешний GUID головного договора,
+        от которого пролонгирован текущий. Без FK: головной договор мог не приехать
+        или принадлежать чужому контрагенту, и жёсткая ссылка превратила бы обычную
+        строку в отказ применения.
+
+        Добавлено use_prices_main_contract — брать цены головного договора.
+
+        Добавлено uploaded_to_sob — «Выгружать прейскуранты в систему бронирования».
+        С самой СОБ разговаривает 1С, а не мы: сюда её признак приходит данными,
+        как и booking_source в ответах по заявкам.
+      changes:
+        - dropColumn: { tableName: lpu_contracts, columnName: main_price_dog }
+        - addColumn:
+            tableName: lpu_contracts
+            columns:
+              - column: { name: main_contract_external_id, type: uuid }
+              - column:
+                  name: use_prices_main_contract
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+              - column:
+                  name: uploaded_to_sob
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+      rollback:
+        - dropColumn: { tableName: lpu_contracts, columnName: uploaded_to_sob }
+        - dropColumn: { tableName: lpu_contracts, columnName: use_prices_main_contract }
+        - dropColumn: { tableName: lpu_contracts, columnName: main_contract_external_id }
+        - addColumn:
+            tableName: lpu_contracts
+            columns:
+              - column:
+                  name: main_price_dog
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }

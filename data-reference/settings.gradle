@@ -1,0 +1,26 @@
+/*
+ * Сборка одномодульная: один сервис — один build.gradle. Отдельного build-logic,
+ * BOM'а и модулей платформы здесь нет намеренно — соседние компоненты ProjectX живут
+ * в своих репозиториях и общих артефактов с этим сервисом не имеют.
+ *
+ * Внутреннее зеркало Nexus объявлено первым — для корпоративной сети; публичные
+ * репозитории следом, запасным вариантом (вне контура maven-group недоступен,
+ * резолв падает на первом и уходит на них). pluginManagement {} обязан быть первым
+ * выражением файла, поэтому URL здесь не вынесен в переменную.
+ */
+pluginManagement {
+    repositories {
+        maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'data-reference'

@@ -1,0 +1,38 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 010-insurance-contracts
+      author: rvl-online
+      comment: >
+        ТЗ-2: договоры страхования. Таблица не создавалась до сих пор потому, что очереди
+        на контуре не было; ТЗ прислан, поток реализуется.
+
+        external_insurer_id — логическая связь со справочником страхователей, без FK.
+        Так предписывает ТЗ-2, и причина названа там же: страхователем может быть
+        физлицо, которого в insurers нет вовсе. Жёсткая ссылка превратила бы такой
+        договор в отказ применения.
+
+        end_date допускает NULL, хотя ТЗ помечает поле обязательным: у источника открытая
+        дата приходит значением 3000-01-01, и оно разбирается в NULL. То же решение,
+        что у lpu_contracts.
+
+        data_version нет: механизм версий убран целиком changeSet'ом 007, а у этого
+        потока его нет и в контракте.
+      changes:
+        - createTable:
+            tableName: insurance_contracts
+            remarks: Договоры страхования ДМС (ТЗ-2). Прочие продукты не сохраняются.
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_insurance_contracts, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_insurance_contracts_external_id } }
+              - column: { name: number, type: text, constraints: { nullable: false } }
+              - column: { name: begin_date, type: date, constraints: { nullable: false } }
+              - column: { name: end_date, type: date }
+              - column: { name: external_insurer_id, type: uuid }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: insurance_contracts
+            indexName: idx_insurance_contracts_insurer
+            columns: [ { column: { name: external_insurer_id } } ]

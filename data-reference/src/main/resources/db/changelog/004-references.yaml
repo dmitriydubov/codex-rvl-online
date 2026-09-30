@@ -1,0 +1,116 @@
+# Справочники без внешних связей: потоки ТЗ-4, ТЗ-7 и ТЗ-3.
+#
+# Общая часть у всех четырёх таблиц одинакова и приходит из контракта 1С:
+# external_id (GUID объекта в источнике, ключ upsert-а), is_archive (deleteMark
+# источника; физического удаления нет нигде), data_version (сообщение применяется,
+# только если версия строго больше сохранённой) и две отметки времени.
+#
+# Иерархии хранятся GUID'ом родителя, без внешнего ключа: справочник приходит
+# в произвольном порядке, и «родителя ещё нет» — норма, а не отказ применения.
+databaseChangeLog:
+
+  - changeSet:
+      id: 004-mkb10
+      author: data-reference-service
+      comment: 'ТЗ-4: справочник МКБ-10 целиком, без фильтра.'
+      changes:
+        - createTable:
+            tableName: mkb10
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_mkb10, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_mkb10_external_id } }
+              - column: { name: external_parent_id, type: uuid }
+              - column: { name: code, type: text, constraints: { nullable: false } }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: system_code, type: text }
+              - column: { name: hierarchy_level, type: int }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: mkb10
+            indexName: idx_mkb10_parent
+            columns: [ { column: { name: external_parent_id } } ]
+        - createIndex:
+            tableName: mkb10
+            indexName: idx_mkb10_code
+            columns: [ { column: { name: code } } ]
+
+  - changeSet:
+      id: 004-appeal-types
+      author: data-reference-service
+      comment: 'ТЗ-7: виды обращений за медицинской помощью, без фильтра.'
+      changes:
+        - createTable:
+            tableName: appeal_types
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_appeal_types, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_appeal_types_external_id } }
+              - column: { name: external_parent_id, type: uuid }
+              - column: { name: external_code, type: text }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: category, type: text }
+              - column: { name: system_code, type: text }
+              - column: { name: hierarchy_level, type: int }
+              - column: { name: direct_attachment, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: non_direct_attachment, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: appeal_types
+            indexName: idx_appeal_types_parent
+            columns: [ { column: { name: external_parent_id } } ]
+
+  - changeSet:
+      id: 004-lpu
+      author: data-reference-service
+      comment: >
+        ТЗ-3, ветка А: контрагенты с видом деятельности РВЛ — санатории каталога.
+        Адреса и региона здесь нет: их приносит отдельный поток ТЗ-8, и колонки
+        появятся вместе с ним.
+      changes:
+        - createTable:
+            tableName: lpu
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_lpu, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_lpu_external_id } }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: full_name, type: text }
+              - column: { name: inn, type: varchar(12) }
+              - column: { name: kpp, type: varchar(9) }
+              - column: { name: phone, type: text }
+              - column: { name: email, type: text }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: lpu
+            indexName: idx_lpu_name
+            columns: [ { column: { name: name } } ]
+
+  - changeSet:
+      id: 004-insurers
+      author: data-reference-service
+      comment: 'ТЗ-3, ветка Б: юрлица-страхователи, без фильтра.'
+      changes:
+        - createTable:
+            tableName: insurers
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_insurers, nullable: false } }
+              - column: { name: external_id, type: uuid, constraints: { nullable: false, unique: true, uniqueConstraintName: uq_insurers_external_id } }
+              - column: { name: name, type: text, constraints: { nullable: false } }
+              - column: { name: full_name, type: text }
+              - column: { name: inn, type: varchar(12) }
+              - column: { name: kpp, type: varchar(9) }
+              - column: { name: is_archive, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: data_version, type: bigint }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: insurers
+            indexName: idx_insurers_inn
+            columns: [ { column: { name: inn } } ]
