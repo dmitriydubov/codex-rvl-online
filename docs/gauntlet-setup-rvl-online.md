@@ -161,7 +161,9 @@ set -u
 export DEBIAN_FRONTEND=noninteractive
 
 # 1. poppler-utils: без pdftoppm инструмент Read не открывает PDF из project_files/ (ТЗ — источник предметной области).
-( apt-get update -qq && apt-get install -y -qq poppler-utils ) > /tmp/setup-apt.log 2>&1 &
+#    apt-get update в образе VM падает на сторонних PPA (403 от прокси), основной архив Ubuntu при этом обновляется —
+#    поэтому установка не зависит от кода возврата update.
+( apt-get update -qq || true; apt-get install -y -qq poppler-utils ) > /tmp/setup-apt.log 2>&1 &
 apt_pid=$!
 
 # 2. Образы Testcontainers под теми именами, которые спросит Testcontainers при
