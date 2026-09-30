@@ -1,0 +1,56 @@
+{
+  "disableAllHooks": false,
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/session_start.sh\"",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/guard.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/stop_gate.py\" --task gauntletFast --max-attempts 3 --timeout 1700",
+            "timeout": 1800,
+            "statusMessage": "Gauntlet: running ./gradlew gauntletFast..."
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(./gradlew:*)",
+      "Bash(git:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr comment:*)"
+    ],
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git filter-repo:*)"
+    ]
+  }
+}

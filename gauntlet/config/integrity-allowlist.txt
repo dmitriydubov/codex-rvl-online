@@ -1,0 +1,6 @@
+# Human-approved integrity exceptions:   <path glob from project root>  <RULE-ID>   # reason
+# Rule IDs are printed by the integrity check (T1..T5 tests, M1..M3 main code, F1 features,
+# B1..B5 build scripts, P1 test properties). Agents cannot edit this file.
+#
+# src/main/java/**/entity/*.java          M1   # Hibernate @Generated on DB-generated columns
+# build.gradle.kts                        B2   # excludeTags("slow") reviewed by a human

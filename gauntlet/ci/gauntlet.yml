@@ -1,0 +1,59 @@
+# Gauntlet gate for pull requests. Installed to .github/workflows/gauntlet.yml by gauntlet/install.sh.
+# The agent's hooks run only inside Claude Code; this job is the check nobody can skip.
+name: gauntlet
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: gauntlet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gauntlet:
+    name: gauntlet
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                      # scope=changed needs the merge base with the base branch
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve the base branch and the module
+        id: base
+        run: |
+          base="${{ github.base_ref }}"
+          if [ -z "$base" ]; then
+            base=$(sed -n 's#^[[:space:]]*baseRef[[:space:]]*=[[:space:]]*origin/##p' gauntlet/config/gauntlet.properties | tail -1)
+          fi
+          modules=$(sed -n 's#^[[:space:]]*module[[:space:]]*=[[:space:]]*##p' gauntlet/config/gauntlet.properties | tail -1 | tr ',' ' ')
+          echo "ref=origin/${base:-main}" >> "$GITHUB_OUTPUT"
+          echo "modules=${modules:-.}" >> "$GITHUB_OUTPUT"
+          git fetch --no-tags origin "${base:-main}"
+
+      - name: Run the gauntlet in every guarded build
+        run: |
+          status=0
+          for dir in ${{ steps.base.outputs.modules }}; do
+            echo "::group::gauntlet in $dir"
+            ( cd "$dir" && ./gradlew gauntlet --continue --console=plain -Pgauntlet.baseRef="${{ steps.base.outputs.ref }}" ) || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gauntlet-reports
+          path: |
+            **/build/reports
+            **/build/gauntlet
+          if-no-files-found: ignore

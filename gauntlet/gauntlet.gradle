@@ -1,0 +1,553 @@
+/*
+ * =============================================================================================
+ *  GAUNTLET - the checks that let you stop reading AI-written code (after Robert C. Martin).
+ *  HUMAN-OWNED: agents are blocked from editing gauntlet/. Thresholds: gauntlet/config/*.
+ * =============================================================================================
+ *
+ *  Install: in build.gradle(.kts) declare the PIT plugin, then apply this script at the END:
+ *      plugins { ...; id("info.solidsoft.pitest") version "1.19.0" }
+ *      apply(from = "gauntlet/gauntlet.gradle")            // Kotlin DSL, build at the repository root
+ *      apply from: '../gauntlet/gauntlet.gradle'           // Groovy DSL, build in a module directory (monorepo)
+ *  The script finds gauntlet/ next to itself, so it works from any module; src/ and build/ are the module's.
+ *  Several modules in one repository share gauntlet/config/*; a module overrides what differs (basePackage,
+ *  acceptance.glue, exclude.classes, the architecture...) in gauntlet/config/<module>/ - a file there
+ *  replaces the common one of the same name, gauntlet.properties there is an overlay of the common one.
+ *
+ *  The script does not change what ./gradlew build does (it only adds jacoco to the test task); every
+ *  check runs through the gauntlet tasks below.
+ *
+ *  Tasks (group "gauntlet"):
+ *      gauntletFast     integrity -> checkstyle -> PMD (anti-patterns) -> unit tests -> architecture ->
+ *                       acceptance (Cucumber) -> CRAP -> DRY
+ *      mutationGate     PIT on the classes in scope, no surviving mutants (+ agent-friendly summary)
+ *      gherkinMutation  mutate Examples values one at a time; every mutant must fail a scenario
+ *      gauntlet         all of the above
+ *
+ *  The specification (feature files) is approved by the human in the chat and frozen by the
+ *  Claude Code guard hook once committed; there is no lock file to maintain (see gauntlet/README.md).
+ *
+ *  Scope: -Pgauntlet.scope=changed|all  -Pgauntlet.baseRef=origin/main  (defaults in gauntlet.properties)
+ */
+
+import java.nio.file.Files
+
+// gauntlet/ is wherever this script lives (repository root, or one level above a module's build)
+def gauntletDir = buildscript.sourceFile.parentFile
+def gauntletFile = { String path -> new File(gauntletDir, path) }
+// the module = this build's directory relative to the repository root ('' for a build at the root)
+def moduleName = gauntletDir.parentFile.toPath().toAbsolutePath().normalize()
+        .relativize(projectDir.toPath().toAbsolutePath().normalize()).toString().replace(File.separator, '/')
+// config/<module>/<name> replaces config/<name> when it exists
+def configFile = { String name ->
+    def own = moduleName ? gauntletFile("config/${moduleName}/${name}") : null
+    (own != null && own.exists()) ? own : gauntletFile("config/${name}")
+}
+def gauntletConfig = new Properties()
+gauntletFile('config/gauntlet.properties').withReader('UTF-8') { gauntletConfig.load(it) }
+def moduleProperties = moduleName ? gauntletFile("config/${moduleName}/gauntlet.properties") : null
+if (moduleProperties != null && moduleProperties.exists()) {
+    moduleProperties.withReader('UTF-8') { gauntletConfig.load(it) }   // overlay: the module's keys win
+}
+def setting = { String key, String fallback -> (gauntletConfig.getProperty(key) ?: fallback).trim() }
+def listSetting = { String key, String fallback -> setting(key, fallback).split(',')*.trim().findAll { it } }
+
+def scope = (findProperty('gauntlet.scope') ?: setting('scope', 'changed')).toString()
+def baseRef = (findProperty('gauntlet.baseRef') ?: setting('baseRef', 'origin/main')).toString()
+def featuresPath = setting('acceptance.features', 'src/acceptanceTest/resources/features')
+def featuresDir = file(featuresPath)
+def glue = setting('acceptance.glue', '')
+def basePackage = setting('basePackage', '')
+def excludedClassGlobs = listSetting('exclude.classes', '*Application,*MapperImpl')  // not 'excludedClasses': a local of that name would shadow pitest.excludedClasses
+def tools = gauntletFile('tools').absolutePath
+def javaBin = "${System.getProperty('java.home')}/bin/java"
+def buildDirFile = { String path -> layout.buildDirectory.file(path).get().asFile }
+
+// ------------------------------------------------------------------------------ changed files
+
+def git = { List<String> args ->
+    providers.exec {
+        commandLine(['git', '-c', 'core.quotePath=false'] + args)
+        workingDir = projectDir
+        ignoreExitValue = true
+    }.standardOutput.asText.get().readLines()*.trim().findAll { it }
+}
+def mergeBase = { -> scope == 'all' ? null : git(['merge-base', 'HEAD', baseRef]).find() }.memoize()
+// Why scope=changed cannot work here (null = fine). Reported by the gauntletScope task, never silently ignored.
+def scopeProblem = { ->
+    if (scope == 'all') {
+        return null
+    }
+    if (git(['rev-parse', '--is-inside-work-tree']) != ['true']) {
+        return 'scope=changed needs a git work tree'
+    }
+    return mergeBase() ? null : "cannot find the merge base of HEAD and '${baseRef}'"
+}.memoize()
+// null = whole codebase; otherwise paths relative to the project directory
+def changedFiles = {
+    if (scope == 'all') {
+        return null
+    }
+    if (scopeProblem()) {
+        return []   // gauntletScope fails the build before any scoped check runs
+    }
+    def files = new LinkedHashSet<String>()
+    files.addAll(git(['diff', '--relative', '--name-only', '--diff-filter=ACMR', mergeBase()]))
+    files.addAll(git(['ls-files', '--others', '--exclude-standard']))
+    return files as List<String>
+}.memoize()
+def changedMainJava = { -> changedFiles()?.findAll { it.startsWith('src/main/java/') && it.endsWith('.java') } }
+def changedFeatures = { -> changedFiles()?.findAll { it.startsWith(featuresPath + '/') && it.endsWith('.feature') } }
+def changedClassGlobs = { ->
+    changedMainJava()?.collectMany {
+        def fqcn = (it - 'src/main/java/').replaceAll(/\.java$/, '').replace('/', '.')
+        [fqcn, fqcn + '$*']
+    }
+}
+
+// ------------------------------------------------------------------------------ source sets
+
+apply plugin: 'java'
+apply plugin: 'jacoco'
+
+sourceSets {
+    acceptanceTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    archTest {
+        java.srcDirs = [gauntletFile('archtest')]
+        resources.srcDirs = []
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    acceptanceTestImplementation.extendsFrom testImplementation
+    acceptanceTestRuntimeOnly.extendsFrom testRuntimeOnly
+    archTestImplementation.extendsFrom testImplementation
+    archTestRuntimeOnly.extendsFrom testRuntimeOnly
+    gauntletCpd
+    gauntletCheckstyle
+}
+
+def addDefault = { String configuration, List<Object> notations ->
+    if (configurations.getByName(configuration).dependencies.isEmpty()) {
+        notations.each { dependencies.add(configuration, it) }
+    }
+}
+addDefault('acceptanceTestImplementation', [
+        dependencies.platform("io.cucumber:cucumber-bom:${setting('cucumber.version', '7.23.0')}"),
+        'io.cucumber:cucumber-java',
+        'io.cucumber:cucumber-junit-platform-engine'] +
+        (setting('acceptance.spring', 'true').toBoolean() ? ['io.cucumber:cucumber-spring'] : []))
+addDefault('archTestImplementation', ["com.tngtech.archunit:archunit:${setting('archunit.version', '1.5.1')}"])
+addDefault('gauntletCheckstyle', ["com.puppycrawl.tools:checkstyle:${setting('checkstyle.version', '12.3.1')}"])
+addDefault('gauntletCpd', ["net.sourceforge.pmd:pmd-cli:${setting('pmd.version', '7.27.0')}",     // pmdGate and cpdReport
+                           "net.sourceforge.pmd:pmd-java:${setting('pmd.version', '7.27.0')}"])
+
+// ------------------------------------------------------------------------------ cheap checks first
+
+tasks.register('gauntletInfo') {
+    group = 'gauntlet'
+    description = 'Prints which gauntlet files and settings this build uses.'
+    def lines = [
+            "gauntlet dir : ${gauntletDir}",
+            "module       : ${moduleName ?: '(build at the repository root)'}",
+            "properties   : config/gauntlet.properties" + ((moduleProperties != null && moduleProperties.exists()) ?
+                    " + config/${moduleName}/gauntlet.properties (overlay)" : ''),
+            "architecture : ${gauntletDir.toPath().relativize(configFile('architecture.properties').toPath())}",
+            "checkstyle   : ${gauntletDir.toPath().relativize(configFile('checkstyle.xml').toPath())}",
+            "pmd          : ${gauntletDir.toPath().relativize(configFile('pmd-ruleset.xml').toPath())}",
+            "allowlists   : ${gauntletDir.toPath().relativize(configFile('integrity-allowlist.txt').toPath())}, " +
+                    "${gauntletDir.toPath().relativize(configFile('crap-allowlist.txt').toPath())}",
+            "basePackage  : ${basePackage ?: '(not set)'}    glue: ${glue ?: '(not set)'}",
+            "cucumber     : ${setting('cucumber.version', '7.23.0')}    scope: ${scope}    baseRef: ${baseRef}",
+            "features     : ${featuresPath}"].collect { it.toString() }
+    doLast { lines.each { println it } }
+}
+
+tasks.register('gauntletScope') {
+    group = 'gauntlet'
+    description = 'Prints the scope of the scoped checks; fails when scope=changed cannot tell what changed.'
+    def problem = scopeProblem()
+    def summary = scope == 'all' ? 'whole codebase' :
+            "changed vs ${baseRef} (merge-base ${mergeBase()?.take(10)}): ${changedFiles()?.size() ?: 0} file(s)".toString()
+    doLast {
+        if (problem) {
+            def branch = baseRef.contains('/') ? baseRef.substring(baseRef.indexOf('/') + 1) : baseRef
+            throw new GradleException("gauntlet: ${problem}, so the changed files are unknown. Fetch the base branch: " +
+                    "git fetch origin +refs/heads/${branch}:refs/remotes/origin/${branch} (a single-branch clone needs the " +
+                    "refspec; a shallow clone needs git fetch --unshallow origin first; CI needs full history: " +
+                    "GIT_DEPTH=0 / fetch-depth: 0). Or set baseRef in gauntlet/config/gauntlet.properties, or run " +
+                    "with -Pgauntlet.scope=all.")
+        }
+        logger.lifecycle("gauntlet scope: ${summary}")
+    }
+}
+
+tasks.register('integrityCheck', Exec) {
+    group = 'gauntlet'
+    description = 'Finds disabled tests, coverage/mutation evasion, inline suppressions and gate tampering.'
+    executable javaBin
+    args "${tools}/IntegrityCheck.java", '--root', projectDir.absolutePath, '--features', featuresPath,
+            '--allowlist', configFile('integrity-allowlist.txt').absolutePath
+}
+
+// Checkstyle runs through its CLI on purpose: the Gradle checkstyle plugin would hook into `check`/`build`
+// and collide with a project's own Checkstyle setup.
+tasks.register('checkstyleGate', JavaExec) {
+    group = 'gauntlet'
+    description = 'Size and structure rules from gauntlet/config/checkstyle.xml (main sources in scope).'
+    dependsOn 'gauntletScope'
+    mustRunAfter 'integrityCheck'
+    classpath = configurations.gauntletCheckstyle
+    mainClass = 'com.puppycrawl.tools.checkstyle.Main'
+    systemProperty 'config_loc', configFile('checkstyle.xml').parentFile.absolutePath
+    def changed = changedMainJava()
+    def targets = changed == null ? [file('src/main/java').absolutePath] : changed.collect { file(it).absolutePath }
+    def report = buildDirFile('reports/checkstyle/gauntlet.xml')
+    args(['-c', configFile('checkstyle.xml').absolutePath, '-f', 'xml', '-o', report.absolutePath] + targets)
+    // The CLI exits with the violation count, which the OS truncates to 8 bits (256 violations = exit 0),
+    // so the verdict comes from the XML report instead.
+    ignoreExitValue = true
+    onlyIf { !targets.isEmpty() && new File(targets[0]).exists() }
+    doFirst {
+        report.delete()
+        report.parentFile.mkdirs()
+    }
+    doLast {
+        if (!report.exists()) {
+            throw new GradleException("Checkstyle did not produce ${report} - see the output above")
+        }
+        def violations = []
+        new groovy.xml.XmlSlurper().parse(report).file.each { f ->
+            f.error.each { e ->
+                def check = e.@source.toString().tokenize('.').last().replaceAll(/Check$/, '')
+                violations << "[ERROR] ${f.@name}:${e.@line}: ${e.@message} [${check}]"
+            }
+        }
+        violations.each { println it }
+        if (violations) {
+            throw new GradleException("Checkstyle: ${violations.size()} violation(s) of gauntlet/config/checkstyle.xml")
+        }
+        println 'Checkstyle: OK'
+    }
+}
+
+// PMD through the same CLI as CPD, for the same reason as Checkstyle. It needs the compiled classes and their
+// dependencies (--aux-classpath) so that rules about types, overrides and resources can resolve symbols.
+// Suppressed violations (NOPMD, @SuppressWarnings("PMD...")) count as violations: rules are switched off
+// only by the human, in gauntlet/config/pmd-ruleset.xml.
+tasks.register('pmdGate', JavaExec) {
+    group = 'gauntlet'
+    description = 'Anti-pattern rules from gauntlet/config/pmd-ruleset.xml (main sources in scope).'
+    dependsOn 'gauntletScope', 'classes'
+    mustRunAfter 'checkstyleGate'
+    classpath = configurations.gauntletCpd
+    mainClass = 'net.sourceforge.pmd.cli.PmdCli'
+    def changed = changedMainJava()
+    def targets = changed == null ? [file('src/main/java').absolutePath] : changed.collect { file(it).absolutePath }
+    def report = buildDirFile('reports/pmd/gauntlet.xml')
+    args(['check', '--rulesets', configFile('pmd-ruleset.xml').absolutePath,
+          '--use-version', "java-${java.targetCompatibility.majorVersion}".toString(),
+          '--format', 'xml', '--report-file', report.absolutePath, '--relativize-paths-with', projectDir.absolutePath,
+          '--no-fail-on-violation', '--no-cache', '--no-progress', '--show-suppressed'] + targets.collectMany { ['--dir', it] })
+    ignoreExitValue = true   // the verdict comes from the XML report, like checkstyleGate
+    onlyIf { !targets.isEmpty() && new File(targets[0]).exists() }
+    doFirst {
+        // the JDK's own classes (jrt-fs.jar of the JDK running PMD) explicitly, or PMD warns about guessing them
+        def jdk = javaLauncher.get().metadata.installationPath.asFile
+        args '--aux-classpath', (sourceSets.main.compileClasspath + sourceSets.main.output.classesDirs +
+                files(new File(jdk, 'lib/jrt-fs.jar'))).asPath
+        report.delete()
+        report.parentFile.mkdirs()
+    }
+    doLast {
+        if (!report.exists()) {
+            throw new GradleException("PMD did not produce ${report} - see the output above")
+        }
+        def root = new groovy.xml.XmlSlurper().parse(report)
+        def violations = []
+        root.file.each { f ->
+            f.violation.each { v -> violations << "[ERROR] ${f.@name}:${v.@beginline}: ${v.text().trim()} [${v.@rule}]" }
+        }
+        root.suppressedviolation.each { s ->
+            violations << "[ERROR] ${s.@filename}: suppressed (${s.@suppressiontype}) - ${s.@msg} [suppression]"
+        }
+        root.error.each { e -> violations << "[ERROR] ${e.@filename}: PMD could not analyse the file - ${e.@msg} [error]" }
+        root.configerror.each { e -> violations << "[ERROR] rule ${e.@rule}: ${e.@msg} [ruleset]" }
+        violations.each { println it }
+        if (violations) {
+            throw new GradleException("PMD: ${violations.size()} violation(s) of gauntlet/config/pmd-ruleset.xml")
+        }
+        println 'PMD: OK'
+    }
+}
+
+// ------------------------------------------------------------------------------ tests
+
+tasks.named('test') {
+    mustRunAfter 'checkstyleGate', 'pmdGate'
+}
+
+tasks.register('archTest', Test) {
+    group = 'gauntlet'
+    description = 'Enforces gauntlet/config/architecture.properties with ArchUnit.'
+    testClassesDirs = sourceSets.archTest.output.classesDirs
+    classpath = sourceSets.archTest.runtimeClasspath
+    useJUnitPlatform()
+    systemProperty 'gauntlet.architecture', configFile('architecture.properties').absolutePath
+    testLogging { events 'failed'; exceptionFormat = 'full'; showStandardStreams = true }
+    jacoco { enabled = false }
+    mustRunAfter 'test'
+}
+
+def configureCucumber = { Test task, File features ->
+    task.testClassesDirs = sourceSets.acceptanceTest.output.classesDirs
+    task.classpath = sourceSets.acceptanceTest.runtimeClasspath
+    task.useJUnitPlatform { includeEngines 'cucumber' }
+    task.systemProperty 'cucumber.features', features.absolutePath
+    task.systemProperty 'cucumber.publish.quiet', 'true'
+    if (glue) {
+        task.systemProperty 'cucumber.glue', glue
+    }
+}
+def hasFeatures = { File dir -> dir.exists() && Files.walk(dir.toPath()).withCloseable { s -> s.anyMatch { it.toString().endsWith('.feature') } } }
+
+tasks.register('acceptanceTest', Test) {
+    group = 'gauntlet'
+    description = 'Runs the Gherkin acceptance tests (Cucumber) from ' + featuresPath
+    configureCucumber(it, featuresDir)
+    testLogging { events 'failed'; exceptionFormat = 'full' }
+    onlyIf { hasFeatures(featuresDir) }
+    mustRunAfter 'archTest'
+    finalizedBy 'acceptanceCheck'
+}
+
+tasks.register('acceptanceCheck', Exec) {
+    group = 'gauntlet'
+    description = 'Fails when scenarios were skipped (aborted by an assumption or a skipped step) - Gradle would pass them.'
+    def results = buildDirFile('test-results/acceptanceTest')
+    executable javaBin
+    args "${tools}/GherkinMutator.java", 'no-skipped', '--results', results.absolutePath
+    onlyIf { results.exists() }
+}
+
+// ------------------------------------------------------------------------------ CRAP and DRY
+
+jacoco {
+    toolVersion = setting('jacoco.version', '0.8.15')
+}
+def jacocoExcludes = excludedClassGlobs.collectMany { ["**/${it}.class", "**/${it}\$*.class"] }
+tasks.named('jacocoTestReport', JacocoReport) {
+    dependsOn 'test'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(files(sourceSets.main.output.classesDirs.files.collect { dir ->
+        fileTree(dir) { exclude jacocoExcludes }
+    }))
+}
+
+tasks.register('crapGate', Exec) {
+    group = 'gauntlet'
+    description = 'CRAP = CC^2 * (1 - coverage)^3 + CC per method; fails above crap.threshold.'
+    dependsOn 'jacocoTestReport', 'gauntletScope'
+    mustRunAfter 'acceptanceTest'
+    executable javaBin
+    args "${tools}/CrapGate.java", '--report', buildDirFile('reports/jacoco/test/jacocoTestReport.xml').absolutePath,
+            '--threshold', setting('crap.threshold', '8'), '--allowlist', configFile('crap-allowlist.txt').absolutePath,
+            '--exclude', excludedClassGlobs.join(',')
+    def only = changedMainJava()
+    if (only != null) {
+        args '--only', only.join(',')
+    }
+}
+
+tasks.register('cpdReport', JavaExec) {
+    group = 'gauntlet'
+    description = 'Runs PMD CPD (copy/paste detector) over src/main/java.'
+    def report = buildDirFile('reports/cpd/cpd.xml')
+    classpath = configurations.gauntletCpd
+    mainClass = 'net.sourceforge.pmd.cli.PmdCli'
+    args 'cpd', '--language', 'java', '--dir', file('src/main/java').absolutePath,
+            '--minimum-tokens', setting('dry.minimumTokens', '60'), '--format', 'xml',
+            '--report-file', report.absolutePath, '--no-fail-on-violation', '--ignore-annotations'
+    if (setting('dry.ignoreIdentifiers', 'true').toBoolean()) {
+        args '--ignore-identifiers'
+    }
+    if (setting('dry.ignoreLiterals', 'true').toBoolean()) {
+        args '--ignore-literals'
+    }
+    inputs.dir('src/main/java').optional()
+    outputs.file(report)
+    onlyIf { file('src/main/java').exists() }
+    doFirst { report.parentFile.mkdirs() }
+}
+
+tasks.register('dryGate', Exec) {
+    group = 'gauntlet'
+    description = 'Fails on duplicated code (in scope: duplications touching a changed file).'
+    dependsOn 'cpdReport', 'gauntletScope'
+    mustRunAfter 'crapGate'
+    executable javaBin
+    args "${tools}/DryGate.java", '--report', buildDirFile('reports/cpd/cpd.xml').absolutePath,
+            '--project-dir', projectDir.absolutePath, '--max', setting('dry.maxDuplications', '0')
+    def only = changedMainJava()
+    if (only != null) {
+        args '--only', only.join(',')
+    }
+}
+
+// ------------------------------------------------------------------------------ mutation testing
+
+def pit = [applied: false]
+plugins.withId('info.solidsoft.pitest') {
+    pit.applied = true
+    pitest {
+        pitestVersion = setting('pit.version', '1.22.1')
+        junit5PluginVersion = setting('pit.junit5PluginVersion', '1.2.3')
+        // The plugin would add its own org.junit.platform:junit-platform-launcher to the test runtime classpath; when
+        // the JUnit version is managed by a BOM (Spring Boot) rather than declared literally it falls back to a
+        // hard-coded 1.x launcher, which cannot drive a JUnit 6 engine ("OutputDirectoryCreator not available") and
+        // breaks ./gradlew test. The project declares the launcher itself (testRuntimeOnly), BOM-aligned.
+        addJUnitPlatformLauncher = false
+        threads = setting('pit.threads', '4').toInteger()
+        mutators = listSetting('pit.mutators', 'DEFAULTS') as Set
+        outputFormats = ['XML', 'HTML'] as Set
+        timestampedReports = false
+        enableDefaultIncrementalAnalysis = true
+        excludedGroups = listSetting('pit.excludedGroups', 'no-mutate') as Set
+        excludedClasses = excludedClassGlobs as Set
+        // Uncle Bob's rule: every COVERED mutant is killed (PIT test strength). maxSurviving would also count
+        // uncovered mutants; uncovered code is policed by coverageThreshold (line coverage of mutated classes).
+        testStrengthThreshold = setting('pit.testStrengthThreshold', '100').toInteger()
+        coverageThreshold = setting('pit.coverageThreshold', '0').toInteger()
+        failWhenNoMutations = false
+        if (basePackage) {
+            targetClasses = ["${basePackage}.*".toString()] as Set
+            // must be explicit: by default the plugin uses targetClasses as targetTests, and with a changed-class
+            // scope that would exclude FooTest when mutating Foo - every mutant would look uncovered
+            targetTests = ["${basePackage}.*".toString()] as Set
+        }
+    }
+    tasks.named('pitest') {
+        group = 'gauntlet'
+        dependsOn 'gauntletScope'
+        mustRunAfter 'crapGate', 'dryGate', 'acceptanceTest'
+        finalizedBy 'pitSummary'
+        def staleReport = buildDirFile('reports/pitest/mutations.xml')
+        def pkg = basePackage
+        doFirst {
+            staleReport.delete()
+            if (!pkg) {
+                throw new GradleException('gauntlet: set basePackage in gauntlet/config/gauntlet.properties')
+            }
+        }
+        def targets = changedClassGlobs()
+        if (targets != null) {
+            if (targets.isEmpty()) {
+                onlyIf { false }
+                logger.lifecycle('gauntlet: no changed main classes - mutation testing skipped')
+            } else {
+                targetClasses.set(targets as Set)
+            }
+        }
+    }
+}
+
+tasks.register('pitSummary', Exec) {
+    group = 'gauntlet'
+    description = 'Lists surviving/uncovered mutants and oversized files from the PIT report.'
+    def nothingToMutate = changedClassGlobs()?.isEmpty()
+    onlyIf { !nothingToMutate }
+    executable javaBin
+    args "${tools}/PitSummary.java", '--report', buildDirFile('reports/pitest/mutations.xml').absolutePath,
+            '--max-per-file', setting('pit.maxMutationsPerFile', '100')
+}
+
+tasks.register('mutationGate') {
+    group = 'gauntlet'
+    description = 'Mutation testing with PIT: every covered mutant in scope must be killed.'
+    if (pit.applied) {
+        dependsOn 'pitest'
+    }
+    def applied = pit.applied
+    doLast {
+        if (!applied) {
+            throw new GradleException("mutationGate needs the PIT plugin: add id(\"info.solidsoft.pitest\") version \"1.19.0\" to plugins {}")
+        }
+    }
+}
+
+// ------------------------------------------------------------------------------ Gherkin mutation
+
+def mutantsDir = buildDirFile('gherkin-mutation/mutants')
+def mutantResults = buildDirFile('gherkin-mutation/results')
+
+tasks.register('gherkinMutants', Exec) {
+    group = 'gauntlet'
+    description = 'Generates one feature file per mutated Examples value.'
+    dependsOn 'acceptanceTest', 'gauntletScope'
+    if (pit.applied) {
+        mustRunAfter 'pitest'
+    }
+    executable javaBin
+    args "${tools}/GherkinMutator.java", 'generate', '--features', featuresPath, '--out', mutantsDir.absolutePath
+    def only = changedFeatures()
+    if (only != null) {
+        args '--only', only.join(',')
+    }
+}
+
+tasks.register('gherkinMutantsRun', Test) {
+    group = 'gauntlet'
+    description = 'Runs the generated mutant scenarios; failures are the expected outcome.'
+    dependsOn 'gherkinMutants'
+    configureCucumber(it, mutantsDir)
+    ignoreFailures = true
+    reports.junitXml.outputLocation.set(mutantResults)
+    reports.html.required = false
+    outputs.upToDateWhen { false }
+    jacoco { enabled = false }
+    onlyIf { hasFeatures(mutantsDir) }
+    // Gradle 8.14 lists the report directory without creating it: recreate it after the wipe
+    doFirst { mutantResults.deleteDir(); mutantResults.mkdirs() }
+}
+
+tasks.register('gherkinMutation', Exec) {
+    group = 'gauntlet'
+    description = 'Gherkin acceptance mutation: every mutated Examples value must make a scenario fail.'
+    dependsOn 'gherkinMutantsRun'
+    executable javaBin
+    args "${tools}/GherkinMutator.java", 'verdict', '--mutants', mutantsDir.absolutePath, '--results', mutantResults.absolutePath
+}
+
+// ------------------------------------------------------------------------------ aggregates
+
+tasks.register('gauntletFast') {
+    group = 'gauntlet'
+    description = 'Integrity, checkstyle, PMD, unit, architecture and acceptance tests, CRAP, DRY.'
+    dependsOn 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'test', 'archTest', 'acceptanceTest',
+            'acceptanceCheck', 'crapGate', 'dryGate'
+}
+
+tasks.register('gauntlet') {
+    group = 'gauntlet'
+    description = 'The whole gauntlet: gauntletFast + mutationGate + gherkinMutation.'
+    dependsOn 'gauntletFast', 'mutationGate', 'gherkinMutation'
+}
+
+// ------------------------------------------------------------------------------ configuration cache
+
+// A project may enable the configuration cache (org.gradle.configuration-cache=true in gradle.properties).
+// Several gauntlet tasks read the project while they run (file() in onlyIf, sourceSets and javaLauncher in
+// doFirst), which the cache forbids. They opt out explicitly (Task.notCompatibleWithConfigurationCache): a build
+// that runs any of them discards its cache entry instead of failing; the project's own builds keep the cache.
+def notCacheable = { Task task -> task.notCompatibleWithConfigurationCache('gauntlet tasks read the project at execution time') }
+['gauntletInfo', 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'archTest', 'acceptanceTest',
+ 'acceptanceCheck', 'crapGate', 'cpdReport', 'dryGate', 'pitSummary', 'mutationGate', 'gherkinMutants',
+ 'gherkinMutantsRun', 'gherkinMutation', 'gauntletFast', 'gauntlet'].each { tasks.named(it, notCacheable) }
+plugins.withId('info.solidsoft.pitest') { tasks.named('pitest', notCacheable) }

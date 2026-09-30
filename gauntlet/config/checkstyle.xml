@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+        "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Size, structure and control flow - no formatting rules. HUMAN-OWNED (gauntlet/ is guarded).
+  Uncle Bob measures "module sizes" and keeps functions small; these are the kit's defaults.
+  Anti-patterns that need semantics (types, exceptions, concurrency) live in pmd-ruleset.xml (pmdGate).
+  There is deliberately no SuppressWarningsFilter / comment filter: agents cannot switch rules
+  off inline. Human-approved exceptions go to checkstyle-suppressions.xml (optional file).
+-->
+<module name="Checker">
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <module name="SuppressionFilter">
+        <property name="file" value="${config_loc}/checkstyle-suppressions.xml"/>
+        <property name="optional" value="true"/>
+    </module>
+
+    <!-- A file that needs more than this usually has more than one job. -->
+    <module name="FileLength">
+        <property name="max" value="300"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- Small functions. Blank lines and comments do not count. -->
+        <module name="MethodLength">
+            <property name="max" value="25"/>
+            <property name="countEmpty" value="false"/>
+        </module>
+        <module name="LambdaBodyLength">
+            <property name="max" value="10"/>
+        </module>
+        <!-- Few arguments (Clean Code: more than three needs a very good reason).
+             Constructors are exempt: DI constructors are policed by ClassFanOutComplexity. -->
+        <module name="ParameterNumber">
+            <property name="max" value="4"/>
+            <property name="ignoreOverriddenMethods" value="true"/>
+            <property name="tokens" value="METHOD_DEF"/>
+        </module>
+        <!-- Simple functions: cyclomatic complexity below 4 (Martin's CC < 4) at the source, not only via CRAP,
+             which forgives complexity when coverage is high. A switch counts as one decision point. -->
+        <module name="CyclomaticComplexity">
+            <property name="max" value="3"/>
+            <property name="switchBlockAsSingleDecisionPoint" value="true"/>
+        </module>
+        <!-- Number of acyclic execution paths through a method. -->
+        <module name="NPathComplexity">
+            <property name="max" value="20"/>
+        </module>
+        <!-- Shallow control flow. -->
+        <module name="NestedIfDepth">
+            <property name="max" value="1"/>
+        </module>
+        <module name="NestedForDepth">
+            <property name="max" value="1"/>
+        </module>
+        <module name="NestedTryDepth">
+            <property name="max" value="1"/>
+        </module>
+        <module name="BooleanExpressionComplexity">
+            <property name="max" value="3"/>
+        </module>
+        <!-- Coupling: how many other classes one class depends on. -->
+        <module name="ClassFanOutComplexity">
+            <property name="max" value="20"/>
+        </module>
+        <!-- One top-level type per file. -->
+        <module name="OuterTypeNumber">
+            <property name="max" value="1"/>
+        </module>
+
+        <!-- Control flow that hides intent. -->
+        <module name="NeedBraces"/>
+        <module name="AvoidNestedBlocks">
+            <property name="allowInSwitchCase" value="true"/>
+        </module>
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="InnerAssignment"/>
+        <module name="ModifiedControlVariable"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="EqualsHashCode"/>
+        <!-- A number in the logic needs a name. -1, 0, 1, 2 and constant definitions are fine. -->
+        <module name="MagicNumber">
+            <property name="ignoreHashCodeMethod" value="true"/>
+            <property name="ignoreAnnotation" value="true"/>
+        </module>
+        <!-- Catching Exception/RuntimeException is a human decision: the service catches broadly at its
+             boundaries (listeners, dispatchers, parsers) on purpose. Enable here (per-file exceptions in
+             checkstyle-suppressions.xml) or extend AvoidCatchingGenericException in pmd-ruleset.xml, which
+             already forbids Throwable, Error and NullPointerException. -->
+        <!-- <module name="IllegalCatch"/> -->
+    </module>
+</module>
