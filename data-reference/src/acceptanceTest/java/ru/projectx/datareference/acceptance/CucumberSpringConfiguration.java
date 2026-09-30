@@ -22,9 +22,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * или тик шедулера из шага, эту обвязку расширяет первая же такая задача, вместе со
  * спецификацией.
  *
- * <p>Контекст и контейнер общие на все сценарии, поэтому данные между ними не
- * изолированы: первая задача со сценариями, которые пишут в базу, обязана добавить
- * очистку таблиц в хуке {@code @Before} (DatabaseCleaner из src/test приёмке не виден).
+ * <p>Контекст и контейнер общие на все сценарии, поэтому перед каждым сценарием база
+ * очищается ({@link DatabaseCleanupHook}), а состояние сценария живёт в бинах
+ * {@code @ScenarioScope} ({@link ContractsService}, {@link OneCInbox}).
  */
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
