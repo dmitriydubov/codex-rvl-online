@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -157,14 +156,17 @@ class SchedulersFirstTickTest {
         verify(repository).findByStatusAndReceivedAtLessThan(eq(InboundStatus.BUFFERED), any(Instant.class));
     }
 
-    /** @return все поручения заглушке; «запустить сразу» ей не поручали ни разу */
+    /**
+     * @return все поручения заглушке. Задачу {@code @Scheduled} Spring 7.0 поручает всегда
+     *         с моментом первого запуска — без задержки это просто «сейчас», — поэтому
+     *         защищает только сравнение самого момента, а не выбор перегрузки
+     */
     private List<Assignment> assignments() {
         ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
         ArgumentCaptor<Instant> firstTicks = ArgumentCaptor.forClass(Instant.class);
         ArgumentCaptor<Duration> periods = ArgumentCaptor.forClass(Duration.class);
         verify(taskScheduler, times(3)).scheduleWithFixedDelay(tasks.capture(), firstTicks.capture(),
                 periods.capture());
-        verify(taskScheduler, never()).scheduleWithFixedDelay(any(Runnable.class), any(Duration.class));
 
         return IntStream.range(0, periods.getAllValues().size())
                 .mapToObj(i -> new Assignment(tasks.getAllValues().get(i), firstTicks.getAllValues().get(i),

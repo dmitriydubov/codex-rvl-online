@@ -37,7 +37,7 @@ public class StuckTransferAlert {
     }
 
     @Scheduled(fixedDelayString = "${projectx.import.stuck-transfer-poll-interval:15m}",
-            initialDelayString = ImportProperties.INITIAL_DELAY)
+            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     public void reportStuckTransfers() {
         List<InboundMessage> stuck = agedMessages.inStatus(InboundStatus.BUFFERED, properties.stuckTransferThreshold());
         if (stuck.isEmpty()) {

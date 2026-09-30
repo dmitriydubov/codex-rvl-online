@@ -50,7 +50,7 @@ public class PersonalDataRetention {
     }
 
     @Scheduled(fixedDelayString = "${projectx.import.retention-poll-interval:1h}",
-            initialDelayString = ImportProperties.INITIAL_DELAY)
+            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     @Transactional
     public void forgetExpiredPayloads() {
         List<InboundMessage> expired = agedMessages.withPayload(

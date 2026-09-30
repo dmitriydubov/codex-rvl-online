@@ -63,7 +63,7 @@ public class ReferenceImportScheduler {
      * декларативностью.
      */
     @Scheduled(fixedDelayString = "${projectx.import.poll-interval:10s}",
-            initialDelayString = ImportProperties.INITIAL_DELAY)
+            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     public void importPendingMessages() {
         List<InboundMessage> due = repository.findDueForImport(clock.instant(), Limit.of(properties.batchSize()));
         for (InboundMessage message : due) {
