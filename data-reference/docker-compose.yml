@@ -22,18 +22,20 @@
 # примеры с ответами сервиса на тех же файлах.
 #
 #   ./gradlew clean bootJar        # при JAR_SOURCE=host; с умолчанием build jar собирается в образе
-#   docker compose up --build data-reference-stand stand-seed
+#   docker compose up --build stand-seed
 #
-# Сервисы названы явно: профиль stand, включённый целиком (--profile stand up), поднял бы
+# Сервис назван явно: профиль stand, включённый целиком (--profile stand up), поднял бы
 # и брокер — сервисы без profiles входят в любой набор. Названный сервис включает свой
-# профиль сам и тянет только свои depends_on, то есть postgres.
+# профиль сам и тянет только свои depends_on: закладка — сервис стенда и postgres.
 #
 # Стенд готов, когда закладка напечатала «сырьё 1С заложено» и прошёл опрос планировщика
 # (раз в 10 с): строки inbound_message — PROCESSED, кроме страхователя: у него SKIPPED
 # с причиной, так ТЗ-3 помечает контрагента, ставшего страхователем, а не санаторием.
-# Сервис — http://localhost:8080 (порт тот же, что у профиля app: вместе их не поднимать).
-# Повторный up данных не дублирует. Сброс: docker compose --profile stand down -v —
-# том базы общий с профилем app.
+# Сервис — http://localhost:8080 (порт тот же, что у профиля app: вместе их не поднимать);
+# готовность — /actuator/health. Повторный up данных не дублирует.
+# Сброс: docker compose --profile stand down -v. Удаляет все тома проекта — и базу, общую
+# с профилем app, и данные брокера; только базу — docker volume rm data-reference_postgres-data
+# после down без -v.
 #
 # В облачной сессии Claude Code контейнеры не выходят в сеть, а Docker Hub отвечает 429:
 # в .env — JAR_SOURCE=host и JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21-jre,
@@ -123,7 +125,8 @@ services:
   # depends_on на rabbitmq, слушатели 1С выключены явно — чтобы смена умолчания
   # RABBITMQ_LISTENER_AUTO_STARTUP в application.yml стенд не изменила. Переменные
   # сервиса из .env (env_file) сюда не подключаются — стенд не зависит от локальных
-  # настроек профиля app; аргументы сборки образа те же, что у app.
+  # настроек профиля app; аргументы сборки образа те же, что у app. Проверка здоровья
+  # брокера выключена: брокера у стенда нет, и /actuator/health иначе отвечал бы DOWN.
   data-reference-stand:
     profiles: [ stand ]
     build: *data-reference-build
@@ -131,14 +134,15 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/data_reference
       RABBITMQ_LISTENER_AUTO_STARTUP: "false"
+      MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
 
-  # Одноразовая закладка сырья стенда: ждёт таблицу inbound_message (её создаёт сервис
-  # на старте) и кладёт seed.sql. Файлы — только для чтения. Идемпотентна по message_id.
+  # Одноразовая закладка сырья стенда: ждёт схему, которую накатывает сервис на старте,
+  # и кладёт seed.sql. Файлы — только для чтения. Идемпотентна по message_id.
   stand-seed:
     profiles: [ stand ]
     image: postgres:16.10-alpine
@@ -155,6 +159,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      data-reference-stand:
+        condition: service_started
 
 volumes:
   postgres-data:

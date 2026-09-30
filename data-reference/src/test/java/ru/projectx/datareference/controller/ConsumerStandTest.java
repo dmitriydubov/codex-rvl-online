@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,19 @@ class ConsumerStandTest {
     private static final String CONTRACT_MESSAGE = "16136d1e-39fe-4b1f-9eca-bb90d7f2c5db";
     private static final String PROGRAM_MESSAGE = "a1960bab-85db-47b4-bc2b-0cc4beb976a1";
     private static final String POLICY_MESSAGE = "fb9a7691-a49f-40a7-a675-715a4ba94617";
+
+    private static final String[] EXAMPLES = {
+            "01-policy-by-external-id.json",
+            "02-insurance-contract-by-external-id.json",
+            "03-policy.json",
+            "04-insurance-contract.json",
+            "05-program.json",
+            "06-policy-not-found.json",
+            "07-malformed-id.json",
+            "08-insurance-contract-without-key.json"};
+    private static final List<String> REQUIRED_SECTIONS = List.of(
+            "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
+            "/response/status", "/response/headers", "/response/body");
 
     @Autowired
     private MockMvcTester mvc;
@@ -105,14 +119,32 @@ class ConsumerStandTest {
                 .noneMatch(message -> message.status() == InboundStatus.NEW);
     }
 
-    /** Раздел {@code placeholders} примера — описание для читателя, и оно обязано быть полным. */
+    /**
+     * Набор примеров закреплён поимённо: пропавший или переименованный пример иначе
+     * просто перестал бы проверяться, а стенд — показывать то, что обещано Договорам.
+     */
     @Test
-    void examples_describeEveryPlaceholderTheyUse() {
+    void examples_coverTheConsumerContract() {
         assertThat(StandExample.loadAll())
-                .isNotEmpty()
-                .allSatisfy(example -> assertThat(example.describedPlaceholders())
-                        .as(example.name())
-                        .containsExactlyInAnyOrderElementsOf(StandPlaceholders.namesIn(example.text())));
+                .extracting(StandExample::name)
+                .containsExactly(EXAMPLES);
+    }
+
+    /**
+     * Пример без запроса или без ответа сравнивать не с чем: отсутствующее тело сошлось бы
+     * с пустым ответом. Раздел {@code placeholders} — описание для читателя, и оно обязано
+     * быть полным.
+     */
+    @Test
+    void examples_areComplete() {
+        assertThat(StandExample.loadAll()).allSatisfy(example -> {
+            assertThat(REQUIRED_SECTIONS)
+                    .as(example.name())
+                    .noneMatch(section -> example.root().at(section).isMissingNode());
+            assertThat(example.describedPlaceholders())
+                    .as(example.name())
+                    .containsExactlyInAnyOrderElementsOf(StandPlaceholders.namesIn(example.text()));
+        });
     }
 
     @TestFactory
