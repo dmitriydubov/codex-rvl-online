@@ -1,0 +1,2221 @@
+# План серии задач rvl-online, ревизия 1 (2026-09-30)
+
+Репозиторий `dmitriydubov/rvl-online`, база кода `main` = `795e5ec`, 2026-09-30. Источник — протокол `scan`: 11 читателей
+первой фазы, 8 бандлов скептиков, прогон гейтов со scope=all, решения владельца Д1–Д5 и две схемы из чата сессии scan (1.2,
+2.11). Как проверялся план — раздел 8, отступления от заданного владельцем порядка — раздел 9. Окружения описывает
+«Инструкция по настройке проекта» (`docs/gauntlet-setup-rvl-online.md`, редакция `1fad4f2`), ниже — «Инструкция, раздел N».
+Её раздел 7 описывает тот же порядок: первый поведенческий шаг — Ш25a, правило пакета `config` — как в 3.1.
+
+## Коротко
+
+- **База** `main` = `795e5ec`: 49 из 93 main-файлов краснеют при касании. **Порядок** (Д1–Д3): `data-reference` до финала,
+  первым — контракт для Договоров; затем `contract-service`; оплата последней. Первым — О4 ч. 1, первый шаг кода — Ш2a (7.1).
+
+| Этап | Шаги в порядке выполнения | Часы |
+|---|---|---|
+| 1. Контракт data-reference для Договоров | Ш2a, Ш3, Ш7, Ш25a, Ш39, Ш4, Ш41, Ш26 | 52–54 |
+| 2. Запуск на контуре | Ш1, Ш1a, Ш1b, Ш5, Ш6; Ш2 параллельно | 20,5 |
+| 3. Контракт с Заявками | Ш8, Ш25, Ш10, Ш11, Ш12, Ш27, Ш38, Ш40, Ш44 | 86 |
+| 4. Надёжность приёма из 1С и наблюдаемость | 22 шага, от Ш13 до Ш43 (3.7) | 202–206 |
+| **Финальное рабочее решение data-reference (1–4)** | **45 шагов** | **360,5–366,5 (≈ 45–46 дней)** |
+| 5. Бэклог качества data-reference | Ш9, Ш21, Ш22, Ш23 | 31 |
+| 6. contract-service без оплаты | К1, (О11), К2, К2a, К3, К4, К5, К6 | 102 |
+| 7. Оплата | К7, К8 | 62 |
+| **Всего** | 49 шагов data-reference, 9 шагов contract-service | **555,5–561,5** |
+
+**Первая очередь решений владельца** (до этапа 1, 4.1; очереди 2–6 — до своих этапов; ответ строкой «1) да 2) а …»):
+1. **Р38** образы Testcontainers (О4, до Ш2a) — рек.: префикс `mirror.gcr.io/` в обоих окружениях и предзагрузка.
+2. **Р3** no-mutate (Ш3 перед Ш7, от него зависят все оценки) — рек.: (а) тег на составных аннотациях.
+3. **Р13** таймауты БД (Ш4) — рек.: да, на пул приложения; миграции Liquibase не ограничивать.
+4. **Р19 п. 1** путь и формат ошибки REST (Ш25a) — рек.: оставить `/internal/v1` и `{error:{…}}` по СЭ.
+5. **Р20** ПДн в R-05 для Договоров (Ш39) — рек.: (а) отдельная проекция без ПДн, R-05 для ЛК без изменений.
+6. **Р24** 503 при недоступной базе (Ш41) — рек.: да, SERVICE_UNAVAILABLE в едином формате.
+7. **Р53 (а)** X-Request-Id (Ш26) — рек.: принимать `[A-Za-z0-9._-]{1,64}`, иначе выдать новый UUID, не отклонять.
+8. **Р6** путь приёмки для 1С (Ш25a, Ш28) — рек.: сырьё в `inbound_message` и явный запуск разбора; брокер — только Ш30, Ш31.
+- **Д5:** аутентификации между сервисами нет; ручки с ПДн защищает только сетевая политика (О9, проверить на контуре).
+
+---
+
+## 1. Решения владельца
+
+### 1.1. Принятые ранее (PR #1, 2026-09-30) и их место в плане
+
+| № PR #1 | Решение | Где в плане |
+|---|---|---|
+| 1 | Разорвать цикл `mapper ↔ service` в серии рефакторинга, после этого вернуть `fail.on.cycles=true` | Ш20 (этап 4); после мержа Ш8, Ш10, Ш20 владелец выполняет Р8 (О1) |
+| 2 | Перенести `contract-service/CLAUDE.md` в `data-reference/CLAUDE.md`, для `contract-service` завести свой файл | О2 (после Р37), Р33, Р61 |
+| 3 | `docs.junit.org` (и по желанию `site.mockito.org`) владелец открывает сам | О4, часть 2 |
+| 4 | Запуск `dockerd` SessionStart-хуком, выход задач набора из configuration cache | О4, часть 1 (dockerd и в setup script, срок — до Ш2a); configuration cache шагов не касается |
+| 5 | Удалить `.DS_Store` из git задачей гигиены | Ш1 (этап 2) |
+| 6 | Подключать `contract-service` к набору после правок в `data-reference` | остаётся в силе; по Д2 — после этапа 4: К1, затем О11 (вопрос Р50 снят) |
+| 7 | CI контура пока не уведомляем | О9 (напоминание) |
+| 8 | `@Tag("no-mutate")` на `@IntegrationTest`/`@AmqpIntegrationTest` плюс unit-тесты | **требует подтверждения — Р3**, варианты а/б/в (GA-4: unit-покрытие 10,3 %) |
+
+### 1.2. Принятые по этому плану
+
+| № | Решение (ответ владельца) | Дата | Где в плане |
+|---|---|---|---|
+| Д1 | Оплата — в последнюю очередь: Ordering, К7, К8 и все вопросы оплаты (Р43–Р48, Р63 и т. п.) | 2026-09-30, чат сессии scan | этап 7; очередь 6 (4.6); брокер маркетинга перенесён из К2 в К7; СЭ-03 в К6 — акцепт без ссылки на оплату |
+| Д2 | Начать с `data-reference` и довести его до финального рабочего решения (оплата его не касается); только потом `contract-service`. Решение 6 PR #1 остаётся в силе; вопрос Р50 этим закрыт: К1 — после завершения `data-reference` | 2026-09-30, чат сессии scan | этапы 1–4 и критерии готовности (3.7); этап 6 после этапа 4. «Этап 5 не держит contract-service» — толкование плана, а не слова владельца: вопрос Р67 (4.5) |
+| Д3 | Разработчик сервиса Договоров хочет тестировать контракт с `data-reference`. Контракт для Договоров сейчас — три GET: `/internal/v1/policies/{id}`, `/internal/v1/insurance-contracts/{id}`, `/internal/v1/programs/{id}` (реализованы, 29 REST-тестов зелёные) | 2026-09-30, чат сессии scan | этап 1: Ш2a (стенд), Ш25a (исполняемая спецификация), Ш39, Ш41, Ш26; очередь 1 — Р19 п. 1, Р20, Р24, Р53 (а), Р6; К2a (клиент Договоров) |
+| Д4 | Двунаправленная стрелка Data Reference ↔ RabbitMQ 1С на архитектурной схеме — ошибка: `data-reference` только получает данные из 1С и отдаёт их сервисам по REST | 2026-09-30, чат сессии scan | 2.11; О6 |
+| Д5 | «Межсервисной авторизации не планируется, за исключением, возможно, сервиса оплаты, но это не наша система» | 2026-09-30, чат | Р21 закрыт ответом «нет» (ОВ-10 = ОВС-01); межсервисная аутентификация REST — в «Не делать» (3.11), часы сняты с этапа 3 и итогов; контракт для Договоров (этап 1, К2a) — без аутентификации; ручки с ПДн защищает сетевая политика контура (О9) — остаточный риск; токен для Ordering, если понадобится, — часть К7 |
+
+Ответы на раздел 4 дописываются сюда строкой «Р38 да, Р3 а, …» с датой; те же ответы идут в описание PR каждого шага.
+
+- 2026-09-30, первая очередь (ответ «1) да 2) а) 3) да 4) да 5) а) 6) да 7) да 8) да»): **Р38 да** — префикс
+  `mirror.gcr.io/` в обоих окружениях и предзагрузка образов; **Р3 а** — `@Tag("no-mutate")` на составных аннотациях (Ш3 перед
+  Ш7), решение 8 PR #1 подтверждено; **Р13 да** — таймауты на пул приложения, миграции Liquibase без ограничения; **Р19 п. 1
+  да** — путь `/internal/v1` и формат `{error:{…}}` по СЭ; **Р20 а** — отдельная проекция полиса без ПДн для Договоров, R-05
+  для ЛК без изменений; **Р24 да** — 503 SERVICE_UNAVAILABLE в едином формате; **Р53 а** — X-Request-Id
+  `[A-Za-z0-9._-]{1,64}`, иначе новый UUID; **Р6 да** — приёмка 1С со строки сырья в `inbound_message` и явного запуска разбора.
+  Этап 1 разблокирован; остаётся О4 (окружение) — за владельцем.
+- 2026-09-30: **Р21 — нет** (Д5). Межсервисной аутентификации у `data-reference` не будет.
+- **Остаточный риск Д5:** ручки `/internal/v1` отдают ПДн (ФИО, дата рождения, e-mail) без аутентификации. Единственная
+  защита — сетевая политика контура (О9): к `/internal/v1` — только Заявки и Договоры. Её нужно проверить на контуре до
+  первого переноса; ПДн в ответе для Договоров ограничивает Р20.
+
+### 1.3. Сроки операционных задач
+
+| Задача | Что | Срок |
+|---|---|---|
+| О4, часть 1 | префикс зеркала образов в Default и gauntlet-admin (Р38), setup script (dockerd, три образа с префиксом, poppler-utils), что не класть в окружения | **до Ш2a** (первый шаг этапа 1) |
+| О4, часть 2 | проверка Default (строка статуса, отказ guard, selftest 517/0), Network access (выровнять, проверить curl), docs.junit.org | до первого шага со specifier (Ш25a) |
+| О1: Р39, Р36 | PR через MCP; guard для MCP github | до Ш2a (желательно) |
+| О1: источники документации | Docker и Compose — до Ш2a; Caffeine 3.2.4 — до Ш43; PDF-библиотека — до К6; Spring Security 7.0.6 (oauth2-client), OAuth 2.0 и Keycloak, `project_files/ordering/` — до К7 | до шага, которому источник нужен |
+| О1: Р5, Р42 | приёмка и черновик спецификации | до Ш25a |
+| О1: Р4 | RUN_ERROR на record | желательно до Ш39 (новый record DTO), обязательно до Ш10 и Ш11 |
+| О1: Р1 | калибровка CPD | до Ш10, Ш11 (этап 3); Ш17, Ш18, Ш30, Ш34 (этап 4); Ш21–Ш23 (этап 5) |
+| О1: Р2 | ImmutableField на персистентных коллекциях | до Ш21, Ш22 (этап 5) |
+| О1: Р8 | ужесточение политики архитектуры | после мержа Ш8 и Ш10 (этап 3) и Ш20 (этап 4), каждое отдельно |
+| О1: Р37 → О2 | guard для модульных CLAUDE.md, затем перенос и правка CLAUDE.md | О2 после Р37; желательно до Ш25a и Ш39, обязательно до Ш38 и К1 |
+| О3 | CI | параллельно этапу 2 |
+| О6 | документы `project_files/` | Р18 — до Ш38 и Ш40 (этап 3); Р41 — до Ш28 (этап 4) |
+| О7, О8 | запросы к 1С, ИБ, Заявкам, Договорам | отправить сразу |
+| О8: Ordering | запросы команде Ordering (оплата, Д1) | по Р68; рекомендация — в начале этапа 6 |
+| О9 | контур | до первого переноса в контур; координаты зависимостей в Nexus — до начала шага с зависимостью |
+| О10 | проверки по ходу серии | в Ш25a |
+| О11 | подключение `contract-service` к набору (INSTALL.md) | после мержа К1, до К2 |
+
+---
+
+## 2. Подтверждённые дефекты
+
+Вошли только находки с вердиктом скептика confirmed или partly. Формулировки взяты из correctedStatement, места указаны
+по HEAD `795e5ec`. «Зонд сессии scan» — временный тест или эксперимент сессии сканирования. В репозитории его нет,
+поэтому в колонке сказано, что именно он показал. Находки первой фазы без отдельной проверки, на которые опираются
+шаги и вопросы, собраны в 2.10, схемы владельца — в 2.11.
+
+### 2.1. Приём и разбор 1С
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| CA-01, DOM1C-01 | Тело, которое Jackson разбирает, а jsonb не принимает (UTF-8 BOM, `\u0000`, UTF-16), крутится бесконечно: `OneCQueueListener.java:128-149` любую RuntimeException считает недоступностью базы (пауза 5 с + `basicNack(requeue=true)`); javadoc `:122-127` неверен; колонка — `InboundMessage.java:74-77` | major / confirmed | Зонд сессии scan (полный контекст, Testcontainers): тело с `\u0000` даёт 22P05 → DataIntegrityViolationException, не меньше 5 кругов nack за 4 с, строки нет ни в inbox, ни в inbound_message. Если в голове очереди 20 таких сообщений, хорошее сообщение не сохраняется 40 с |
+| CA-05, DOM1C-02 | Очереди не объявляются (`application.yml:68-71`), их тип неизвестен. На quorum-очереди RabbitMQ ≥ 4.0 (delivery-limit 20) бесконечный nack при недоступной базе теряет сообщение: ≈ 100 с при быстром отказе, ≈ 12 мин на сообщение при сетевом (Hikari 30 с), ≈ 4 ч на весь prefetch 20 (`:97`) | major / partly | Зонд сессии scan (amqp-client 5.27.1, rabbitmq:4.1-alpine): quorum-очередь без явного лимита после 21-й доставки удаляет сообщение, classic-очередь хранит его после 30 nack |
+| CA-02, DOM1C-04 | Порядок держится только на `ORDER BY received_at` (`InboundMessageRepository.java:33-39`). Более новая строка обгоняет строку в RETRY (`ReferenceImportScheduler.java:82-89`, лестница `InboundRetryProperties.java:26`), а после повтора старое затирает новое. Версий нет (changeSet 007). То же при ручном возврате FAILED/SKIPPED → NEW (`InboundStatus.java:44-46`) | major / confirmed | Зонд сессии scan: два сообщения МКБ-10 с одним id; первое один раз получает TransientDataAccessResourceException, и после next_retry_at в справочнике оказывается старое имя |
+| DOM1C-03 | 11 очередей читаются параллельно (`OneCQueueListener.java:51-106`), а разбор идёт по received_at всех потоков, поэтому порядок первичной загрузки не соблюдается. Ребёнок без родителя уходит в SKIPPED (`LpuContractMapper.java:93-97`, `ContragentServiceMapper.java:52-54`, `LpuContactMapper.java:64`, `PriceListMapper.java:67`) с причиной, которую не отличить от «не РВЛ», и без алерта | major / partly | Путь детерминирован кодом: если очередь ТЗ-5 наполнена раньше ТЗ-3 до старта, договоры ЛПУ получают SKIPPED. Сценарий не прогонялся |
+| CA-08 | Нет защиты от нескольких экземпляров: `findDueForImport` — select без блокировки (`InboundMessageRepository.java:29-39`), у InboundMessage нет @Version, распределённой блокировки нет. Порядок держится на «один потребитель» (007-drop-data-version.yaml) | major / confirmed | Выведено из кода: два пода, в том числе при выкатке с перекрытием, разбирают одни и те же строки. Не прогонялось |
+| DOM1C-12 | Детерминированные ошибки идут на лестницу ~36 мин и получают FAILED с ложной причиной «лестница исчерпана» (`ReferenceImportScheduler.java:77-90`): JsonNodeException (`PriceListTransferAssembler.java:85,157`, `OneCValues.java:97`), ИНН/КПП длиннее varchar(12)/varchar(9) (`ContragentMapper.java:151-152,162-163`), переполнение numeric(5,2). numeric(15,2) молча округляет цену | minor / confirmed | Jackson 3.1.4: `TextNode("abc").asInt()` → JsonNodeException; psql 16.10: 22001, 22003, `830.005::numeric(15,2)` → 830.01 |
+| PH-09, CA-10 | Переход в FAILED по исчерпанию лестницы в журнал не пишется (`InboundMessageService.java:78-81`), постоянный отказ — только WARN (`ReferenceImportScheduler.java:78-79`). Метрик нет, actuator открывает только health (`application.yml:109-117`). Тело FAILED-полиса стирается через 30 суток вместе с остальными (`PersonalDataRetention.java:55-57`) | major / partly | grep по src/main: нет MeterRegistry и @Timed; последняя попытка ничем не отличается от промежуточных WARN |
+| CA-09, DOM1C-05 | ТЗ-9: постоянная ошибка поля при сборке переводит в FAILED только сообщение-триггер, остальные части навсегда остаются BUFFERED, алерт повторяется каждые 15 мин (`PriceListTransferAssembler.java:34-37,83-90`; `PriceListMapper.java:93-96`; `ReferenceImportScheduler.java:77-80`). Лишний batch после применения остаётся сиротой BUFFERED вопреки ТЗ-09 стр. 2 | minor / confirmed | Зонды сессии scan: batch без price — batch в BUFFERED, финальное сообщение в FAILED; лишний batch после применения даёт [PROCESSED, PROCESSED, BUFFERED] |
+| DOM1C-05 (rowNumber) | Нецелочисленный rowNumber при двух и более строках даёт JsonNodeException в компараторе (`PriceListTransferAssembler.java:157`) и уходит на лестницу; отсутствующий rowNumber молча читается как 0 | minor / partly | Зонд сессии scan: rowNumber «первая»/«вторая» → финальное RETRY, attempt=1 |
+| DOM1C-13 | Старая передача ТЗ-9 с опоздавшим batch применяется после новой и возвращает старые цены (`PriceListTransferAssembler.java:92-114`, `PriceListMapper.java:63-79`); что значит «финализировалась последней», не определено | minor / partly | Зонд сессии scan: старая передача, собранная позже, меняет прайс 200.00 → 100.00 |
+| DOM1C-14 | ТЗ-8: сообщение без строки «Адрес» очищает lpu.address и lpu.region (`LpuContactMapper.java:66-72`, `Lpu.java:86-90`); что сообщение несёт полный набор контактов, ТЗ-08 не утверждает | minor / confirmed | Тест репозитория LpuContactImportTest.messageWithoutAddresses_clearsPreviousOne закрепляет стирание |
+| DOM1C-11 | ТЗ-6: отсутствующие или пришедшие строкой numberLayer и percentCopayment сохраняются как 0, directAttachment — как false (`ProgramMapper.java:169-171`, `OneCValues.java:90-98,105-108`); это уходит наружу через `ProgramResponse.java:46-55` | minor / confirmed | Зонд сессии scan: {idLPU, r:true} → PROCESSED, layer=0, copay=0, direct=false |
+| PH-14 | StuckTransferAlert каждые 15 мин без предела грузит все BUFFERED-строки вместе с jsonb (`StuckTransferAlert.java:44-64`, `InboundMessageRepository.java:59`); WARN по одному cid повторяется бесконечно; закрыть зависшую передачу нечем | minor / partly | Зонд сессии scan: два вызова reportStuckTransfers дают два одинаковых WARN |
+
+### 2.2. REST
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| DR-03 | В ReferenceController 15 методов при maxmethods=12, поэтому любая правка файла роняет pmdGate (`ReferenceController.java:42`) | major / confirmed | Отчёт PMD гейтов со scope=all: TooManyMethods@42 |
+| DR-01 | `GET /internal/v1/mkb10?query=…&codes=…` (даже с пустыми значениями) → 500 INTERNAL_ERROR и ERROR со стеком (`ReferenceController.java:137,145`; `ApiExceptionHandler.java:98-103`) | minor / confirmed | Зонд сессии scan на встроенном Tomcat: `?query=A0&codes=A00` → 500, IllegalStateException «Ambiguous handler methods» |
+| CA-03, DR-02, PH-12 | Любой не-GET на существующий путь → 500 без Allow и ERROR со стеком; `Accept: application/xml` → 406 с пустым телом, ложный ERROR и два WARN (`ApiExceptionHandler.java:98-103`, `ReferenceController.java:41`) | minor / confirmed | POST /internal/v1/programs/{id} → 500; GET с Accept: application/xml → 406, Content-Length: 0 |
+| DR-04, CA-12, PH-06 | R-05 отдаёт ФИО, дату рождения, пол и e-mail, R-04 — ФИО (`PolicyResponse.java:32-47`, `PolicySearchResponse.java:19-25`, закреплено `PolicyApiTest.java:80-82`). Это противоречит `contract-service/CLAUDE.md:489-492,677-680`; Договорам нужны только номер, external_id и период | major / confirmed | Чтение DTO и теста; ТЗ API стр. 6–7 против CLAUDE.md |
+| CS-06, DR-06 | У /internal/v1 нет межсервисной аутентификации, а ручки отдают ПДн (`ReferenceController.java:31-32`, spring-security в classpath нет) | major / confirmed; **не чинится — Д5** (1.2): защита — сетевая политика (О9), остаточный риск | `./gradlew dependencies --configuration runtimeClasspath`: нет security/oauth |
+| DR-11 | R-04 выбирает все подходящие полисы договора, предел применяется только в Java (`PolicySearchService.java:78-100`, `:81`) | major / confirmed | Зонд сессии scan: 30 000 полисов, запрос «26» — 30 001 сущность ради 10 строк, 0,8–1,1 с |
+| DR-18, PH-13 | X-Request-Id принимается любой длины (до ~8 КБ) и с любым печатным содержимым и попадает в заголовок, в error.request_id и в строки журнала (`RequestIdFilter.java:37-42`; `ApiExceptionHandler.java:69-70,77-78,101`). CR/LF Tomcat отсекает | minor / partly | Зонд сессии scan на Tomcat: 7000 символов и строка «… ERROR … fake entry» оказались внутри одной ERROR-строки |
+| PH-07 | ФИО и номер полиса передаются в query GET (R-04 `ReferenceController.java:111-118`, R-05 `:100-103`). При включённом access-логе шаблон common (`%r`) их запишет | minor / confirmed | metadata spring-boot-tomcat 4.0.7, sources tomcat-embed-core 11.0.22 |
+| DR-16 | Отказ базы превращается в 500 INTERNAL_ERROR без признака временности, а ответ ждёт до 30 с (`ApiExceptionHandler.java:98-103`, Hikari connectionTimeout) | minor / partly | Чтение кода; ТЗ API 503 не требует — это решение владельца |
+| DR-08 | Контракт в коде расходится с ТЗ API от 21.09 (путь, формат ошибки, путь и форма R-08, ключ R-05, код 404, поля) и совпадает с СЭ Договоров (`ReferenceController.java:44,100-103,121-134`; `ErrorResponse.java:19-32`; `ReferenceNotFoundException.java:21`; `InsuranceContractResponse.java:22-29`; `LpuCardResponse.java:13-21`) | major / partly | Сверка текста PDF с кодом |
+| DR-09 | «Действующее» считается по `begin_date <= today` (`PolicyRepository.java:44`, `PolicySpecifications.java:45`, `LpuContractRepository.java:35`), R-01 фильтруется по виду обращения (`LpuRepository.java:41`), а ТЗ API стр. 1-2, 5, 9-10 требует иного | major / confirmed | Тест `PolicyApiTest.java:172` закрепляет отсев будущих полисов |
+| DR-10 | R-06 (стоимость за период) не реализован; javadoc ссылается на несуществующий расчёт (`PriceContractResolver.java:18,42`, `LpuServicesResponse.java:61`) | major / confirmed | git grep по PRICE_NOT_COVERED и AMBIGUOUS_PRICE ничего не находит |
+| DR-07 | Отступления от ТЗ API обоснованы журналом решений, которого в репозитории нет (В-4…В-9, «решение от 23.09», OQ-48): 20 мест в 14 файлах, причём «В-6» обозначает три разных правила (`LpuContractRepository.java:24`, `ReferenceController.java:33`, `ErrorResponse.java:13`, `application.yml:125-129`) | major / confirmed | Поиск по коду и по тексту всех PDF: в документах этих идентификаторов нет |
+| DR-12 | Соседи ждут от data-reference пользователей, профиль лечения, минимальный возраст, город ЛПУ и ручку по услуге; источника в потоках 1С нет, граница сервиса не решена | minor / partly | «Структура данных Сервис Заявок v.2.pdf» стр. 3-5, 12 (ОВ-01, ОВ-04) |
+
+### 2.3. ПДн и журнал
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| CA-04, PH-03 | Срок хранения стирает тело только у POLICIES (`PersonalDataRetention.java:55-58`, индекс `006-policies.yaml:146-148`). ФИО страхователей-физлиц из ТЗ-2, в том числе SKIPPED еОСАГО, хранятся бессрочно. Утверждение документации «в остальных потоках ПДн нет» неверно (`PersonalDataRetention.java:29-31`, `OneCStream.java:15-19`, `contract-service/CLAUDE.md:677`) | major / partly | Чтение кода и ТЗ-02 стр. 1; forgetPayload вызывается только из PersonalDataRetention |
+| PH-04, DOM1C-15 | В last_error пишется `temporary.toString()` вместе с Detail PostgreSQL (`ReferenceImportScheduler.java:89`, `InboundMessageService.java:80-81`), а стирание тела его не трогает (`InboundMessage.java:178-180`) | minor / confirmed | Зонд сессии scan: временный CHECK на policies — last_error содержит «Failing row contains (…)» с ФИО, датой рождения и e-mail и остаётся после forgetExpiredPayloads |
+| PH-05 | Чистка ПДн стирает не больше 500 строк в час (~12 000 тел в сутки), без сортировки (`PersonalDataRetention.java:53`, `ImportProperties.java:40`) | minor / confirmed | Чтение кода: 100 000 полисов будут стёрты примерно к 38-м суткам |
+| PH-01, DOM1C-16 | Пример ТЗ-01 (стр. 2) и его вторая копия в `project_files` содержат похожие на реальные e-mail, дату рождения, номер полиса и GUID v1 из живой 1С | major / confirmed | Отрисовка PDF; значения не выводились |
+| PH-02, tests-11 | В тесты скопированы номер полиса из ТЗ-1, а также номер, GUID, код продукта и даты договора из ТЗ-2 (`PolicyApiTest.java:159-160,163,167`; `InsuranceContractImportTest.java:38-39,73,163-168`; `ReferenceApiTest.java:104,110,123,138`) | minor / partly | Скриптовое сравнение текста PDF с литералами тестов |
+| CS-09, DN-14, DOM1C-21 | Внутренние хосты, IP и настоящий домен компании лежат в PDF `project_files` и в `contract-service/CLAUDE.md:257,443-444`; домен в `settings.gradle:25,35` раскрыт осознанно | minor / partly | Скан PDF через PyMuPDF; значения не выводились |
+
+### 2.4. Конфигурация и эксплуатация
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| CS-01 | `application.yml:79` меняет умолчание auto-startup на false: без `RABBITMQ_LISTENER_AUTO_STARTUP=true` сервис здоров по пробам, но 1С не читает и в журнал об этом ничего не пишет | major / confirmed | Зонд сессии scan: jar HEAD с PostgreSQL 16.10 без RABBITMQ_* — liveness и readiness UP, о слушателях в журнале ни строки |
+| CS-02 | Проверка сертификата и имени хоста брокера выключена по умолчанию (`application.yml:66-67`), хотя в Boot 4.0.7 она включена | major / partly | spring-rabbit 4.0.4 setUpSSL → TrustEverythingTrustManager; amqp-client пишет WARN «SECURITY ALERT», запуск продолжается |
+| CS-15 | SSL без `RABBITMQ_PORT=5671` ведёт к TLS на порт 5672 (`application.yml:53`) | minor / confirmed | RabbitProperties.determinePort (sources 4.0.7); рукопожатие не прогонялось |
+| CA-07 | Все три @Scheduled — fixedDelay и выполняются на одном потоке SimpleAsyncTaskScheduler (виртуальные потоки, `application.yml:7-9`): зависший запрос останавливает и импорт, и стирание ПДн, и алерт (`ReferenceImportScheduler.java:65`, `PersonalDataRetention.java:53`, `StuckTransferAlert.java:44`) | major / confirmed | Зонд сессии scan: ACCESS EXCLUSIVE на inbound_message на 25 с — единственный поток scheduling-1 висит в findDueForImport (дамп потоков jcmd) |
+| CS-04 | У запросов к PostgreSQL нет таймаутов: socketTimeout 0, statement_timeout и lock_timeout 0, транзакционный таймаут не задан (`application.yml:26-29`) | major / confirmed | PGProperty (sources pgjdbc 42.7.11); SHOW в postgres:16.10 |
+| CS-08 | Логин и пароль локального контура стоят умолчаниями в `application.yml:28-29,55-56`; порты compose открыты на всех интерфейсах (`docker-compose.yml:28-29,45-50`) | minor / partly | Без DB_PASSWORD старт падает с «password authentication failed» — не тихо, но диагностика хуже |
+| CS-03, DOM1C-07 | Имя очереди ТЗ-2: `contract-service/CLAUDE.md:274,284-286,303-306` пишет его через подчёркивание («ещё нет»), `application.yml:162-165` и `OneCQueueProperties.java:13-16` — через дефис («заведена 23.09.2026»). Документы вопрос не решают; при missing-queues-fatal неверное имя роняет старт | major / confirmed | Сверка текстов и PDF ТЗ-01…ТЗ-10 |
+| BUILD-01, NET-4, INF-09, PH-20 | Liquibase 5.0.3 при каждом старте обращается к config.liquibase.com: `spring.liquibase.analytics-enabled` не задан (`application.yml:99-100`) | minor / confirmed | Зонд сессии scan: старт jar — CONNECT config.liquibase.com:443 в журнале прокси; с `SPRING_LIQUIBASE_ANALYTICS_ENABLED=false` обращения нет |
+
+### 2.5. Сборка и репозиторий
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| CS-05, BUILD-06 | `.env` не внесён в `.gitignore`; `.env.example`, на который ссылаются `Dockerfile:21` и `docker-compose.yml:9,61,71`, отсутствует; `.dockerignore` нет | minor / confirmed | `cat .gitignore`, `git ls-files` |
+| BUILD-03 | `Dockerfile:74` копирует по маске `data-reference-*.jar`: при нескольких совпадениях BuildKit молча берёт последний по алфавиту | minor / confirmed | Зонд сессии scan: из 0.1.0, 0.9.0 и 0.10.0 в образ попал 0.9.0 |
+| BUILD-04 | Плавающие теги образов (`Dockerfile:37-38`, `RabbitTestcontainer.java:35`, `docker-compose.yml:39`) | minor / confirmed | `docker image inspect`: 21-jre = JDK 21.0.12.1 на Ubuntu 26.04.1; rabbitmq:4.1-alpine = 4.1.8 от 2026-09-29 |
+
+### 2.6. Гейты и набор
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| GA-1 | 49 из 93 main-файлов краснеют при касании: Checkstyle — 16 нарушений в 12 файлах, PMD — 21 в 17, CPD — 52 дубля в 29 файлах, выжившие PIT — в 34 классах, покрытие ниже 80 % — у 6 классов. Гейты проверяют файл целиком (`gauntlet.gradle:207-208,249-250,363-366`); DRY валит дубль, касающийся файла, даже если парный файл не менялся (`DryGate.java:135-149`); порог покрытия PIT считается суммарно по прогону | major / confirmed | Независимый пересчёт отчётов гейтов scope=all и двух прогонов PIT (статусы 666 мутантов совпали) |
+| GA-2 | 35 из 52 дублей — цепочки аксессоров и присваиваний в entity; все 52 держатся на `dry.ignoreIdentifiers=true` | major / confirmed | CPD 7.27.0: без ignore-identifiers — 0 дублей; при minimumTokens=100 — 4 (3 в mapper, 1 в service) |
+| GA-3 | ImmutableField на персистентных коллекциях (`Policy.java:81,84`, `Program.java:49`) противоречит JPA 3.2 §2.1. Путь «private init + делегирование» против ConstructorCallsOverridableMethod не работает: правило транзитивное | minor / partly | Зонд сессии scan: PMD 7.27.0 на копиях Program и OneCEntity — со статической фабрикой `create()` правило молчит |
+| GA-4, tests-02 | PIT гоняет 19 контекстных тестовых классов на Testcontainers: весь прогон занимает 18–20 мин, два класса — 2 мин 16 с. Unit-покрытие — 10,3 % строк | major / partly | jacocoTestReport только по unit-тестам: 165 из 1603 строк; полный PIT scope=all — 1079 с |
+| GA-5 | 9 ложных выживших «stream() → null» в мапперах и RvlAppealTypes.warnIfMissing:60: контексты создаются до первого мутанта | major / partly | Зонд сессии scan в changed-области на одном Mkb10Mapper: мутант идёт в минионе первым и всё равно выживает |
+| GA-6 | RUN_ERROR на record-классах (SIGSEGV и неперехваченный UnsupportedOperationException при redefineClasses) засчитывается как убитый; hs_err_pid*.log остаются в data-reference/ и попадают в gauntletScope | major / partly | Зонд сессии scan на PolicyResponse: 3 RUN_ERROR; gauntletScope насчитал «6 file(s)» — 2 .java и 4 hs_err |
+| GA-7 | Выжившие «apply → null» в мапперах — реальные дыры: null от маппера превращается в SKIPPED «маппера … ещё нет» (`ReferenceImportService.java:76-86`) | minor / confirmed | mutations.xml прогона scope=all; `ProgramImportTest.java:95-99` проверяет только тип и count |
+| GA-8 | 7 выживших «→ null» в PriceListTransferAssembler в проде не наблюдаются: ImportResult никто не читает (`ReferenceImportScheduler.java:75`) | minor / partly | mutations.xml прогона scope=all |
+| tests-07 | acceptanceCheck зелёный, если фичи есть, а исполнено 0 сценариев (`GherkinMutator.java:670-684`) | minor / confirmed | Фича без сценариев: «0 scenario(s), none skipped - OK», BUILD SUCCESSFUL |
+| tests-01, GA-11 | После удаления фич acceptanceCheck читает устаревшие результаты (`gauntlet.gradle:323,334`); фича без «Примеров» проходит gherkinMutation вхолостую | minor / partly | Пробная фича: 2 сценария, OK за 39 с; после её удаления снова «2 scenario(s) … OK» |
+
+### 2.7. Облако, GitHub, CI
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| INF-01 | main не защищена, и на текущем тарифе её не защитить; CI запускается только на pull_request и workflow_dispatch (`gauntlet.yml:5-7`); 795e5ec запушен в main мимо CI | major / confirmed | GET /repos/…/rulesets → 403 «Upgrade to GitHub Pro» |
+| INF-04, DN-10 | Guard не защищает `contract-service/CLAUDE.md`, модульные CLAUDE.md и новые `.github/workflows/*.yml` (`guard.py:31-32,153-154`) | major / confirmed | Имитация PreToolUse: Edit `contract-service/CLAUDE.md` и `.github/workflows/other.yml` проходят |
+| INF-02, NET-1 | Анонимный pull с Docker Hub из облака получает 429, и Testcontainers-тесты краснеют | major / confirmed | Журнал dockerd сессии scan: 10 отказов 429. С `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` тесты зелёные. На 2026-09-30 mirror.gcr.io отдаёт postgres:16.10-alpine, rabbitmq:4.1-alpine и testcontainers/ryuk:0.14.0 по пути без `library/` |
+| INF-05 | setup-gradle@v4 на PR кэш не пишет; main CI не проверяет | minor / partly | action.yml v4 (cache-read-only); был всего один прогон, pull_request |
+| BUILD-09 | Сборка образа с `JAR_SOURCE=build` в облаке по умолчанию не проходит: у контейнера в bridge-сети нет выхода наружу | minor / partly | `docker run … curl` → 000 |
+| NET-2 | gh в VM нет (проверено 2026-09-30), GraphQL через прокси отвечает 403, поэтому `gh pr create` из шага 8 не сработает (`gauntlet/CLAUDE.md:96`) | minor / confirmed | gh 2.45, принесённый в сессию scan: `gh pr list` → HTTP 403 GraphQL |
+| INF-03 | Прогрева окружения нет: кэш Gradle и образы скачиваются уже внутри сессии | minor / confirmed | Метки времени `~/.gradle` (09:55) при старте сессии в 09:48 |
+| NET-5, INF-07 | Неверные адреса источников: `docs.gradle.org/8.14.3/userguide/` и `archunit.org/userguide/` → 404, checkstyle.org показывает 14.3.0, jacoco trunk — 0.8.16; у Tomcat нет javadoc-jar (`gauntlet/CLAUDE.md:266,275,276`) | minor / partly | curl -L из gauntlet-admin |
+| NET-6 | Запасные пути-каталоги на raw.githubusercontent.com отвечают 404 (`gauntlet/CLAUDE.md:261,269,270,272,276`) | minor / confirmed | curl |
+| NET-3 | Списки Network access окружений Default и gauntlet-admin, вероятно, различаются | minor / partly | Из сессии список не читается |
+| INF-10 | При недостижимом merge-base строка статуса выходит без guard, stop hook и docker (`session_start.sh:54-58`) | minor / confirmed | Чтение хука |
+| INF-11 | Stop-хук платформы советует amend/rebase, которые запрещает guard (`stop-hook-git-check.sh:77-111`, `guard.py:335-339`); тупика нет, вторая остановка проходит | minor / partly | Чтение хуков |
+| INF-14 | Stop-хук hardener'а из frontmatter в облаке, по всей видимости, не срабатывает: рабочая область не доверена | minor / confirmed | Журнал Claude Code сессии scan; прямого наблюдения ещё не было |
+| INF-15 | Незакоммиченный черновик фич может пропасть при смене VM после простоя | minor / partly | Документация облака; не воспроизводилось |
+
+### 2.8. Документы и предметная область (в том числе contract-service)
+
+| ID | Суть и место | Серьёзн. / вердикт | Как воспроизводится |
+|---|---|---|---|
+| DN-09, PH-18, INF-12, tests-14, DR-05 | `contract-service/CLAUDE.md` устарел в 17 пунктах: раскладка, процесс, фазы, OQ-46/47, ПДн, очередь ТЗ-2, REST, тесты, несуществующие хэши | major / partly | Сверка с кодом, git и PDF (полный список — в О2) |
+| DN-11 | Две противоречащие версии «Точек интеграции РВЛ и 1С:УСК»: 1.1 в корне и две копии 1.0; `contract-service/CLAUDE.md:222,458` ссылается на 1.0 | major / confirmed | md5sum и diff извлечённых текстов |
+| DN-01 | Контракт Ordering (orderId → fixed → асинхронный READY_TO_PAYMENT → checkout) противоречит ТЗ Договоров (ссылка сразу, ключ — номер договора). На архитектурной схеме владельца нет публикации ЗЛ → брокер маркетинга сообщения fixed (2.11) — довод к Р43, очередь «оплата» | major / confirmed | ordering.pdf стр. 2, 5, 7, 8, 12, 16-19 против СЭ стр. 5, 7 |
+| DN-02 | В закрытых перечнях Ordering нет кода продукта и канала для КМ РВЛ; при коде dmsfl события делились бы с ДМС ФЛ по кругу | major / partly | ordering.pdf стр. 4-10, 17-20; RabbitMQ 4.1 consumers.md |
+| DN-03 | Не определены источники clientId (он входит в путь) и обязательного payment.email | major / confirmed | ordering.pdf стр. 8, 10, 17-20, 27 |
+| DN-05 | documentId уникален в пределах продукта; «Структура данных» противоречит сама себе: 1:N против UQ по contract_number | major / partly | ordering.pdf стр. 8; «Структура данных» стр. 7, 10 |
+| DN-06 | За 5 с СЭ-03 ссылку не гарантирует; checkout должен делать фоновый процесс, а не СЭ-01 | major / confirmed | СЭ стр. 1, 2, 5, 6; ordering.pdf стр. 2, 6 |
+| DN-12 | Оплата до или после выпуска КМ и место приёма платежей в пилоте: docx (FR-W-06) противоречит ДГ. Схема процесса владельца (2.11): счёт на доплату (12) идёт до проведения КМ в 1С (13) — довод к Р48 | major / partly | docx word/document.xml, «Точки интеграций» стр. 3 |
+
+### 2.9. Сверх проверяемых находок (скептики, без формального вердикта)
+
+| Суть и место | Серьёзн. | Подтверждение |
+|---|---|---|
+| Hibernate сам пишет в WARN текст ошибки PostgreSQL с Detail и Where, то есть с ПДн, в обход правила «в лог только тип» (категория `org.hibernate.orm.jdbc.error`, HHH000247; у pgjdbc logServerErrorDetail=true по умолчанию) — **Ш1a** | major | Зонды сессии scan: WARN с «Failing row contains (…)»; при отравленном теле «Where: JSON data…» каждые 5 с |
+| nack с requeue при prefetch 20 переставляет сообщения уже на приёме, и received_at перестаёт отражать порядок источника (`OneCQueueListener.java:140-147`, `application.yml:90-97`) — **Ш1b (Р51), Ш31** | major | Зонд сессии scan (RabbitMQ 4.1): при отказе записи первого из пяти сообщений порядок записи [2, 3, 4, 5, 1] |
+| Запись в GitHub мимо guard: MCP-инструменты github (merge, auto-merge, push_files, create_or_update_file, delete_file) заранее разрешены и хуком не проверяются; `curl -X PUT api.github.com/…/merge` тоже проходит (`.claude/settings.json:17`, `guard.py:75-81`) — **Р36** | major | Имитация guard |
+| В наборе переменных тестового контура (`contract-service/CLAUDE.md:256-260`) нет `RABBITMQ_LISTENER_AUTO_STARTUP=true` — **Ш5, Р62, О2** | major | Зонд сессии scan: слушатели не стартуют, пробы UP |
+| verify-hostname ничего не делает при validate-certificate=false, хотя документация описывает флаги как независимые — **Ш5** | minor | spring-rabbit 4.0.4 RabbitConnectionFactoryBean |
+| `/policies?external_id&number&contract_id` молча идёт по номеру (`ReferenceController.java:95-103`); R-05 по номеру берёт наш contract_id вместо contract_external_id из ТЗ, а отказ называет поле external_id (`:100-108`) — **Ш38** | minor | Зонд сессии scan на MockMvc |
+| Правила кода `contract-service/CLAUDE.md` расходятся с gauntlet: абстракция с одной реализацией (`:591-593`) против DIP; catch (Exception) (`:657-658`) против правила 13 — **Р33** | minor | Чтение |
+| Шесть документов лежат в двух копиях под разными именами — **Р41** | minor | Сравнение текстов |
+| Устаревшие комментарии и описания: `application.yml:90-92` (dataVersion), `build.gradle:22` («заявки»), `Program.java:43-47` (сбой с final-коллекциями не воспроизводится) — **Ш1, Ш21** | info | Чтение; прогон 43 тестов с final-полями |
+| 5 файлов `.DS_Store` в индексе git; `permissions.allow` из `.claude/settings.json` в облаке игнорируются — **Ш1** | info | `git ls-files`; журнал Claude Code сессии scan |
+
+### 2.10. Находки первой фазы без отдельной проверки, на которые опираются шаги и вопросы
+
+| ID | Суть | Где в плане |
+|---|---|---|
+| CA-06 | Цикл `mapper ↔ service` и ещё два ребра против направления | Ш8, Ш10, Ш20, Р8 |
+| CA-11, CS-13, DR-13 | Кэша справочников нет (правило 14, ТЗ API стр. 9) | Р25, Ш43 |
+| CA-13, DOM1C-17 | Javadoc и комментарии о несуществующем контроле версий | Ш18 |
+| CA-14, DR-17 | Мёртвый бин ObjectMapper в JacksonConfig, два бина в контексте | Ш9 |
+| CA-15, CS-07 | Интервалы двух планировщиков только в плейсхолдерах; ImportProperties.pollInterval не читается | Ш14b |
+| CA-16 | null и boolean-переключатель на пути R-03 (`LpuCatalogService.java:107-125`, `LpuServicesResponse.java:45-51`, `ReferenceQueryService.java:116-119,139-144`) и в `ProgramMapper.java:169-171` | Ш11 (REST), Ш35 (ProgramMapper) |
+| CA-17 | OCP: ветка по типу потока в `ReferenceImportService.java:69-74`; общий LIKE-помощник между сервисами — `PolicySearchService.escapeLike` (`:145-148`), его вызывает `Mkb10QueryService.java:45`; `service.PriceContract` зависит от `dto.PriceContractRef.Kind` (`PriceContract.java:3,11-17`) | Ш16 (стратегия потока), Ш10 (LIKE); зависимость `PriceContract` от dto — отложено (3.11) |
+| CA-18 | Новые сущности сохраняются через merge — лишний SELECT | Отложено |
+| CA-19 | Нет пределов длины query и числа codes | Р53, Ш27 |
+| CS-11 | GUID вида деятельности РВЛ и dms-product-type заданы значениями тестового контура, без переменной (`application.yml:144,150`) | Р54, Ш5 |
+| CS-12, PH-10 | requestId лежит в MDC, но стандартный шаблон Boot 4.0.7 его не печатает; журнал — простой текст | Ш15a (формат), Ш14b и Ш15 (MDC) |
+| CS-14 | Пользователю БД нужны DDL и CREATE (Liquibase, pg_trgm) | О9 |
+| DOM1C-06, PH-11 | FAILED и SKIPPED не отслеживаются, метрик нет | О9 «Мониторинг до Ш24», Ш24 |
+| DOM1C-09 | ТЗ-5: правило «не более одного активного основного договора» не реализовано | Р56 |
+| DOM1C-10 | ТЗ-5: запасная привязка договора отделения к головной организации (`LpuContractMapper.java:121-131`) | Р57 |
+| DOM1C-19 | Документы требуют данных ЛПУ и услуг, которых нет в ТЗ-3/8/10 | Отложено, Р35 |
+| DR-14 | Критерий «позиция размещения» и имена видов обращения РВЛ под вопросом | О7, О9 |
+| DR-15 | OQ-47: только что выпущенный полис ищут раньше, чем он приходит к нам | Р58 |
+| PH-23 | Правило «в лог — только тип исключения» не закреплено тестами | Ш15, Ш1a |
+| PH-24 | Срок хранения самих полисов не определён | Р59 |
+| BUILD-02, PH-17, BUILD-05 | Обёртка без distributionSha256Sum; разные byte-buddy в тестах и проде | Ш6, Р16, Р17 |
+| BUILD-11 | Контуру нужен JDK 21: Gradle 8.14.3 не поддерживает JVM 25 | О9 |
+| BUILD-12 | Есть ли в Nexus контура все 312 модулей сборки | О9 |
+| BUILD-13 | Каким сборщиком и откуда CI контура берёт образы | Р55 |
+| BUILD-14 | CI не проверяет сборку в режиме контура | О3 |
+| INF-06 | В workflow нет permissions, actions закреплены мажорными тегами | О3 |
+| INF-16, INF-17 | В gauntlet-admin guard выключен целиком; правки только в `gauntlet/` Stop-хук не проверяет | О1 (общее правило), О11 |
+| tests-04 | Расписания в тестовых контекстах не выключены, а только отодвинуты | Ш14b |
+| tests-05, GA-9 | Поток ТЗ-7 не покрыт ни одним тестом | Ш18 (условие Ш18a) |
+| tests-06 | Не покрыты временный отказ разбора, StuckTransferAlert, 7 методов слушателя | Ш14a, Ш14b, Ш15 |
+| tests-09 | @Transactional-тесты импорта скрывают реальные границы транзакций | риски Ш30, Ш33 |
+| tests-10 | TEST_POSTGRES_URL на нетестовую базу очищает все её таблицы | О4, О9 |
+| DN-04 | Отмена после выставления счёта в Ordering не реализована (major) | Р63, К7 |
+| DN-07 | Формат дат Ordering — без долей секунды и без Z | К7 |
+| DN-15 | ФИО сотрудников в документах | Р60 |
+| DN-21 | Нет шаблонов печатных форм КМ и PDF-библиотеки | Р64, К6 |
+| DN-08 | Документы Ordering (`project_files/ordering/`) не входят в «Источники документации»: specifier и reviewer формально не могут на них опираться | О1 (источники), до этапа 7 |
+| DN-16 | `contract-service` нужны три брокера RabbitMQ (1С, межсервисный, «Оплата» / маркетинг) и токен Keycloak для Ordering; шаблон data-reference рассчитан на один брокер. Схема владельца (2.11) три брокера подтверждает, Keycloak на ней не показан | К2 (1С и межсервисный), К7 (маркетинг, Keycloak) |
+| DN-17 | INSTALL.md рассчитан на модуль с готовым кодом: пока `contract-service` не в `module=`, Stop-хук и CI его не проверяют, и каркас оказывается вне гейтов | К1 (без логики), О11 (подключение и прогон гейтов по всем файлам каркаса), К1b |
+
+### 2.11. Схемы, переданные владельцем
+
+Владелец передал две схемы в чате сессии scan 2026-09-30. В репозитории их нет, поэтому ниже — их содержание в том объёме,
+на который опирается план.
+
+**Архитектура.**
+- Внешний контур B2B: BFF HR, BFF ЗЛ.
+- Внутренний контур BACKEND РВЛ:
+  - HR [backend] с PostgreSQL и S3;
+  - ЗЛ [backend] (= `contract-service`) с PostgreSQL;
+  - Data Reference с PostgreSQL.
+- Контур 1С: RabbitMQ 1С УСК и 1С.
+- Ordering Service (OS) и «Оплата Rabbit MQ».
+
+Связи:
+- BFF HR → HR и BFF ЗЛ → HR: оба BFF говорят только с HR, это совпадает с CLAUDE.md;
+- HR ↔ ЗЛ — REST и межсервисный RabbitMQ;
+- HR → Data Reference и ЗЛ → Data Reference — REST;
+- HR ↔ RabbitMQ 1С и ЗЛ ↔ RabbitMQ 1С;
+- Data Reference ↔ RabbitMQ 1С — стрелка ошибочна (Д4);
+- ЗЛ → OS — REST;
+- OS → «Оплата Rabbit MQ» → ЗЛ.
+
+Выводы:
+1. Потребители REST `data-reference` подтверждены: HR (сервис Заявок) и ЗЛ (сервис Договоров). Это вводная 6
+   `contract-service/CLAUDE.md` и основа этапов 1 и 3.
+2. Направление «1С → data-reference» (Д4) подтверждает и код: сервис только слушает очереди 1С
+   (`spring.rabbitmq.dynamic: false`), публикаций в брокер 1С нет.
+3. У `contract-service` три брокера — 1С, межсервисный и «Оплата Rabbit MQ» (DN-16, К2, К7). Keycloak на схеме не
+   показан, а клиенту Ordering он нужен (К7, О8).
+4. На схеме нет публикации ЗЛ → брокер маркетинга сообщения `fixed`, хотя документ Ordering её требует. Это довод к DN-01
+   и Р43 (очередь «оплата», Д1).
+
+**Схема процесса «РВЛ: заявки HR, контроль ЦКЗ и ЛК застрахованного (ЗЛ)», верхнеуровневая концепция.**
+- B2B-портал (закрытый контур):
+  - HR: групповая заявка («min 90 дней»), просмотр резервирования, ФИО работника, проверка запроса, лимитов и
+    родственников;
+  - согласование ЦКЗ: санаторий и код МКБ из справки 070/у;
+  - отчётность («требует обсуждения»).
+- Учёт (1С + СОБ):
+  - групповое резервирование, индивидуальная заявка;
+  - 11.2 «1С: фиксация подтверждения, формирование полиса / счета, КМ договора-полиса»;
+  - 13 «проведение индивидуальной заявки, проведение договора КМ, если доплата, выпуск и передача ГП».
+- ЗЛ (открытый контур, интернет):
+  - авторизация в ЛК/МП;
+  - подтверждение поездки («min 60 дней»: 070/у, данные родственников);
+  - уведомления;
+  - 12 «счёт на доплату, если требуется оплата»;
+  - 14 — скачивание ГП и документов КМ.
+
+Выводы:
+- (а) **Новый вопрос по `contract-service` (не оплата) — Р65:** кто формирует договор КМ и счёт. По схеме (шаг 11.2) это
+  1С, по CLAUDE.md и ТЗ Договоров — Сервис Договоров. Рекомендация — ТЗ Договоров: схема — верхнеуровневая концепция.
+- (б) **Довод к Р48:** счёт на доплату (12) идёт до проведения КМ в 1С (13), то есть оплата — до КМ. Вопрос остаётся в
+  очереди «оплата».
+- (в) **Довод к Р19:** «min 90 / 60 дней» — правила процесса сервиса Заявок, а не атрибут справочника. Поэтому
+  `booking_limit_days` без источника в 1С в `data-reference` не держать.
+- (г) Согласование ЦКЗ опирается на уже реализованные R-07 (МКБ-10) и каталог ЛПУ (R-01…R-03). Их доработки для Заявок —
+  этап 3 (Ш27, Ш40, Ш11, Ш44).
+
+---
+
+## 3. Шаги
+
+### 3.1. Правила для всех шагов
+
+- Одна задача — одна сессия, одна ветка, один PR от свежего `main`. Историю не переписываем. Правки `gauntlet/`, `.claude/`,
+  `CLAUDE.md` и workflow — не шаги кода, а раздел 6 (админ-окружение или владелец).
+- **Порядок — по этапам** (решения Д1–Д3, 1.2). Этапы:
+  0. окружение и решения;
+  1. контракт для Договоров;
+  2. запуск на контуре;
+  3. контракт с Заявками;
+  4. надёжность приёма из 1С и наблюдаемость — конец этапа 4 и есть финальное рабочее решение `data-reference`, критерии
+     в 3.7;
+  5. бэклог качества;
+  6. `contract-service` без оплаты;
+  7. оплата.
+
+  Внутри этапа шаги перечислены в порядке выполнения. **Рефакторинг — по касанию:** шаг рефакторинга стоит в том этапе, где
+  его красный файл впервые нужен другому шагу. Рефакторинг, не нужный ни одному шагу этапов 1–4, — этап 5.
+- **Тип шага** указан у каждого:
+  - гигиена;
+  - рефакторинг — JSON ответов и сообщения не меняются;
+  - инфраструктура — меняется поведение во время работы, но не состояние, которое наблюдает приёмка. Каждое изменение
+    закрепляет unit-тест, а отчёт шага перечисляет, что изменилось для эксплуатации;
+  - со спецификацией.
+
+  Номера шагов и решений сохранены. Новые шаги получают суффикс (Ш1a, Ш1b, Ш2a, Ш14a/b, Ш15a, Ш18a, Ш25a, Ш38a, Ш39b,
+  К1b, К2a), новые решения — номера Р65 и дальше.
+- **Область гейтов — изменённый файл целиком** (GA-1). Шаг обязан привести к лимитам каждый трогаемый файл либо идти
+  после шага, который это сделал. Нотация в поле «Файлы → гейты»:
+  - **красн.** — нарушения по отчётам scope=all (CS — Checkstyle, PMD, CPD — число дублей, surv/nocov — выжившие и
+    непокрытые мутанты PIT, cov — покрытие строк PIT);
+  - **зел.** — файл чистый. Record без методов (например, `Mkb10Row`) мутантов не даёт: в mutations.xml прогона scope=all
+    их 0;
+  - **зел.†** — файл чистый, но покрыт только контекстными тестами. После Ш3 (Р3) при касании mutationGate **может**
+    упасть: порог покрытия 80 % считается суммарно по прогону (GA-1), поэтому шаг пишет unit-тесты к такому файлу.
+    Unit-покрытие ≥ 80 % сейчас только у IngestProperties, InboundRetryProperties, OneCEnvelopeParser,
+    ReferenceImportService, OneCValues, OneCStream, InboundStatus, OneCEnvelopeException и OneCFieldException. `ImportResult`
+    — «зел.†»: оба его мутанта убиты только контекстными тестами;
+  - **PIT-искл.** — класс в `exclude.classes` (*Application, *Config, *Configuration, *Repository*, PolicySpecifications):
+    Checkstyle, PMD и CPD на него действуют, PIT и CRAP — нет;
+  - новые файлы проверяются всеми гейтами целиком.
+- **«Зависит» перечисляет все шаги, после которых трогаемые файлы зелёные, а не только цепочку по смыслу** — даже если
+  шаг достижим транзитивно. Туда же входят шаги, которые раньше по порядку правят тот же файл (`application.yml`,
+  `docker-compose.yml`, `.env.example`, обработчик ошибок, фичи контракта, примеры стенда). Такие шаги не идут
+  параллельно: у каждого свой PR, и конфликт пришлось бы решать без rebase. Цепочки общих файлов перечислены в 3.2; по
+  общему файлу в «Зависит» стоит предыдущий шаг его цепочки, остальные предшественники следуют из неё. Поведенческий шаг
+  трогает только файлы «зел.» и «зел.†».
+
+  Каждый красный файл закреплён за шагом рефакторинга, в том числе красные только по PIT:
+  - InboundMessageService — Ш17;
+  - ReferenceQueryService и RvlAppealTypes — Ш11;
+  - OneCIngestService — Ш15;
+  - InsuranceContractMapper и LpuContactMapper — Ш19;
+  - ReferenceImportService — Ш16.
+
+  Отдельно их не закаляют: PR без правки main-кода не запускает mutationGate (`gauntlet.gradle:453-454`). Проверка графа и
+  цепочки по общим файлам — в 3.2.
+- CPD проверяет дубль, если хотя бы одно его место лежит в изменённом файле. Поэтому файлы одного кластера дублей трогаются
+  одним PR, либо сначала нужно решение Р1. Дубли через границы шагов есть только между сущностями (Ш17, Ш21–Ш23), и их
+  снимает Р1. Новый файл, повторяющий структуру красного (например, проекция рядом с `PolicyResponse`), тоже даёт дубль
+  с красным файлом: `dry.ignoreIdentifiers=true`.
+- **Пакеты новых классов** (`gauntlet/config/data-reference/architecture.properties`).
+  - Пустой `allowed.config` значит «ни от кого» (в файле: «empty = none»): класс в `config` не ссылается ни на один пакет
+    модуля — ни на `dto`, ни на `controller`, ни на `service`, ни на `repository`. Поэтому в `config` лежат только фабрики
+    бинов и свойства из классов JDK, Spring и библиотек, кроме Spring AMQP и клиента RabbitMQ: их запрещает
+    `forbidden.config=org.springframework.amqp..,com.rabbitmq..`. Фабрики контейнеров слушателей и программная регистрация
+    точек приёма (Ш15, Ш31) кладутся в `service.integration`.
+  - Регистрация задач и точек приёма, MeterBinder'ы, наблюдатели и обработчики событий кладутся в `service` или его
+    подпакеты.
+  - Веб-слой — фильтры и advice — кладётся в `controller` или его подпакеты.
+  - Имена кэшей — константы в `config`: ребро `service → config` разрешено.
+  - Расширение `allowed.config` — вопрос владельцу (О1), а не решение шага.
+- **Unit-тесты веб-слоя** — `MockMvcBuilders.standaloneSetup` из spring-test 7.0.8 (он уже есть в starter-test) с подменой
+  сервисов, без новых зависимостей. `@WebMvcTest` требует `spring-boot-starter-webmvc-test`, а его в Nexus контура нет
+  (`build.gradle:108-110`). standaloneSetup не применяет Jackson-настройки Boot (snake_case), поэтому имена полей JSON
+  по-прежнему проверяют API-тесты.
+- **Новая зависимость.** Шаг начинается, только когда выполнены два условия:
+  - владелец подтвердил координаты `group:artifact:version` в Nexus (О9); версии — из `./gradlew dependencies` (BOM Boot
+    4.0.7);
+  - владелец внёс источник документации этой библиотеки в «Источники документации» (О1). Без него правило 12 шаг
+    останавливает.
+- **Оценки** заложены под Р3 = «а»: каждый шаг пишет unit-тесты к трогаемым классам. При Р3 = «б» оценки рефакторинга
+  снижаются на 20–30 %, но PIT идёт от 2 до 20 мин на прогон, а ложных выживших (GA-5) придётся разбирать руками.
+  - **Поведенческий шаг — не меньше 7 ч.** Одни постоянные затраты процесса дают ≈ 5,5 ч без реализации: спецификация 1,5,
+    закалка 1, ревью в 2 раунда 2, прогон и PR 1.
+  - **Шаг без спецификации — не меньше 3 ч:** контекст и сверка источников 0,5, ревью в 2 раунда 1, прогон и PR 1. Ревью
+    здесь дешевле, чем у поведенческого шага: дифф мал и не несёт спецификации.
+  - Ожидание ответов на Р — календарный риск, в часы не входит.
+- Каждое изменённое умолчание, новая переменная или свойство, новая зависимость, удалённый или переименованный файл,
+  изменённый формат журнала идут в отчёт «Перенос в контур».
+- Шаги с непересекающимися файлами могут идти параллельными сессиями.
+
+### 3.2. Сводка по этапам, проверка графа и общие файлы
+
+**Шаги по этапам** (в порядке выполнения; «Зависит» — кратко, полностью — у шага):
+
+| Этап | Шаг | Тип | Часы | Главные предусловия |
+|---|---|---|---|---|
+| 1 | Ш2a Стенд потребителя для Договоров | инфраструктура (стенд) | 8–10 | О4 ч. 1 (Р38); источники Docker и Compose (О1) |
+| 1 | Ш3 Контекстные тесты вне PIT | гигиена тестов | 3 | Р3; Ш2a |
+| 1 | Ш7 Разделить ReferenceController | рефакторинг | 5 | Р3; Ш3 (при Р3 = а); Ш2a |
+| 1 | Ш25a Исполняемая спецификация контракта для Договоров | со спецификацией | 11 | О4; Ш2a; Р19 п. 1, Р6 |
+| 1 | Ш39 Полис для Договоров без ПДн | со спецификацией | 7 | Р20; Ш7, Ш25a |
+| 1 | Ш4 Таймауты PostgreSQL | инфраструктура | 4 | Р13; О4 ч. 1 (параллельно Ш7…Ш39) |
+| 1 | Ш41 503 при недоступной базе | со спецификацией | 7 | Р24; Ш4, Ш25a, Ш39 |
+| 1 | Ш26 X-Request-Id | со спецификацией | 7 | Р53 (а); Ш25a, Ш41 |
+| 2 | Ш1 Гигиена репозитория и образа | гигиена | 4,5 | О4 ч. 1; Р9 |
+| 2 | Ш1a Журнал без текста SQL-ошибок | гигиена (журнал) | 3 | Ш1 |
+| 2 | Ш1b prefetch 1 | инфраструктура | 4 | Р51; Ш1a |
+| 2 | Ш5 Безопасные умолчания подключений | гигиена (конфигурация) | 3 | Р10–Р12, Р34, Р54, Р62; Ш2a, Ш1b |
+| 2 | Ш6 Воспроизводимость сборки | гигиена (сборка) | 3 | Р16, Р17, Р55, Р38; Ш1, Ш5 |
+| 2 | Ш2 Синтетические фикстуры | гигиена тестов | 3 | Ш39, Ш26 (те же тестовые файлы) |
+| 3 | Ш8 Исключения REST и разделение обработчика | рефакторинг | 6 | Р3; Ш41, Ш26 |
+| 3 | Ш25 405 и 406 | со спецификацией | 7 | Ш25a, Ш26, Ш8, Ш7 |
+| 3 | Ш10 Сервисы чтения | рефакторинг | 9 | Р1, Р3, Р4 |
+| 3 | Ш11 LpuCatalogService и соседи | рефакторинг | 10 | Р1, Р3, Р4; Ш7 |
+| 3 | Ш12 R-04: предел в БД | инфраструктура | 7 | Ш10 |
+| 3 | Ш27 400 на взаимоисключающие параметры | со спецификацией | 8 | Р53 (б); Ш7, Ш8, Ш10, Ш12, Ш25, Ш25a, Ш39 |
+| 3 | Ш38 REST-контракт по решению владельца | со спецификацией | 14 | Р18, Р19, Р58, Р66; О2, О6; Ш2, Ш7, Ш8, Ш11, Ш25, Ш25a, Ш27, Ш39 |
+| 3 | Ш40 «Действующие» и фильтр R-01 | со спецификацией | 7 | Р18, Р22; Ш10, Ш11, Ш12, Ш27, Ш38 |
+| 3 | Ш44 R-06 | со спецификацией | 18 | Р23; Ш8, Ш10, Ш25a, Ш38 |
+| 4 | Ш13 OneCValues и OneCEnvelopeParser | рефакторинг | 5 | Р3 |
+| 4 | Ш14a Планировщики под лимиты | рефакторинг | 4 | Р3 |
+| 4 | Ш14b Планировщики: пул, интервалы, пачки | инфраструктура | 7 | Р3, Р7; Ш4, Ш5, Ш14a |
+| 4 | Ш15 OneCQueueListener и OneCIngestService | рефакторинг | 10 | Р3 |
+| 4 | Ш30 Отравленное тело не блокирует очередь | со спецификацией | 15 | Р1, Р6, Р26; Ш1a, Ш14a, Ш14b, Ш15, Ш25a |
+| 4 | Ш31 Пауза потребителей при недоступной базе | со спецификацией | 13 | Р27; Ш15, Ш30, Ш1b |
+| 4 | Ш15a Формат журнала с MDC | инфраструктура | 4 | Р15; Ш14b, Ш15, Ш31 |
+| 4 | Ш16 PriceListTransferAssembler и ReferenceImportService | рефакторинг | 9 | Р3, Р7 |
+| 4 | Ш17 InboundMessage и InboundMessageService | рефакторинг | 8 | Р1, Р3; Ш14a, Ш14b, Ш16, Ш30 |
+| 4 | Ш24 Метрики приёма и разбора | инфраструктура | 8 | Р15, Р52; Ш6, Ш14a, Ш14b, Ш15, Ш15a, Ш17, Ш30, Ш31 |
+| 4 | Ш18 Мапперы, кластер «upsert» | рефакторинг | 20–24 | Р1, Р3; Ш13 |
+| 4 | Ш28 Детерминированные ошибки → FAILED | со спецификацией | 10 | Р6, Р41; Ш14b, Ш17, Ш18, Ш24, Ш25a |
+| 4 | Ш29 last_error без текста чужого исключения | со спецификацией | 7 | Ш14b, Ш17, Ш24, Ш28 |
+| 4 | Ш32 Порядок применения при повторах | со спецификацией | 12 | Р28; Ш14b, Ш17, Ш28, Ш29, Ш31 |
+| 4 | Ш33 ТЗ-9: постоянная ошибка сборки | со спецификацией | 8 | Ш13, Ш16, Ш17, Ш28, Ш32 |
+| 4 | Ш35 ТЗ-6: обязательные поля | со спецификацией | 7 | Р29; Ш13, Ш18, Ш28, Ш33 |
+| 4 | Ш36 Срок хранения ПДн для ТЗ-2 и SKIPPED | со спецификацией | 7 | Р31; Ш14a, Ш14b, Ш17, Ш29, Ш30, Ш33 |
+| 4 | Ш19 Мапперы ЛПУ и договоров | рефакторинг | 12 | Р3; Ш13, Ш16 |
+| 4 | Ш34 ТЗ-9: порядок финализации | со спецификацией | 9 | Р30, Р1; Ш14a, Ш14b, Ш16, Ш19, Ш24, Ш33 |
+| 4 | Ш20 Разрыв цикла mapper ↔ service | рефакторинг | 5 | Ш13, Ш14b, Ш16, Ш17, Ш18, Ш19, Ш28, Ш32, Ш33, Ш34, Ш35 |
+| 4 | Ш37 Сообщение без родителя | со спецификацией | 10 | Р32; Ш16–Ш20, Ш24, Ш28, Ш29, Ш32, Ш33, Ш36 |
+| 4 | Ш43 Кэш справочников | со спецификацией | 12 | Р25; Ш6, Ш10, Ш11, Ш16, Ш17, Ш27, Ш29, Ш37, Ш38, Ш40, Ш44 |
+| 5 | Ш9 Jackson | рефакторинг | 4 | Р3 |
+| 5 | Ш21 Сущности договоров и программ | рефакторинг | 7 | Р1, Р2, Р3; Ш18, Ш19, Ш20, Ш37 |
+| 5 | Ш22 Сущности полиса | рефакторинг | 9 | Р1, Р2, Р3; Ш10, Ш11, Ш12, Ш18, Ш20, Ш43 |
+| 5 | Ш23 Сущности справочников | рефакторинг | 11 | Р1, Р3; Ш18, Ш19, Ш20, Ш37 |
+
+**Проверка графа** для шагов со спецификацией и для шагов этапа 1. В таблице — файлы, красные на HEAD, и шаг, после которого
+они зелёные; эти шаги стоят в «Зависит». Файлы «зел.†» получают unit-тесты в самом шаге.
+
+| Шаг | Красные на HEAD → шаг | зел.† в шаге |
+|---|---|---|
+| Ш2a | — (Java main не меняется) | — |
+| Ш25a | — (Java main не меняется) | — |
+| Ш39 | при Р20 = «а» — нет: контроллер полисов уже зелёный после Ш7, остальное — новые файлы; при Р20 = «б» — PolicyResponse и ReferenceQueryService → Ш11, шаг уходит в этап 3 | — |
+| Ш41 | — | ApiExceptionHandler |
+| Ш26 | — | RequestIdFilter, ApiExceptionHandler |
+| Ш25 | — (ReferenceController удалён в Ш7) | advice ошибок запроса и протокола (после Ш8) |
+| Ш27 | контроллеры МКБ-10 и полисов → Ш7; Mkb10QueryService, PolicySearchService → Ш10 | ReferenceApiProperties, InvalidRequestException, advice (Ш8) |
+| Ш38 | ReferenceController → Ш7; ReferenceNotFoundException → Ш8; ReferenceQueryService → Ш11 | ErrorResponse, advice, InsuranceContractResponse, LpuCardResponse |
+| Ш38a | сущности → Ш21, Ш23; ContragentMapper → Ш18; InsuranceContractMapper, LpuContractMapper → Ш19 | — |
+| Ш39b | PolicySearchResponse, PolicySearchService → Ш10 | — |
+| Ш40 | LpuCatalogService, RvlAppealTypes → Ш11; PolicySearchService → Ш10 (и Ш12) | — (репозитории PIT-искл.) |
+| Ш44 | PriceContractResolver → Ш10; IncompleteReferenceException, AmbiguousReferenceException → Ш8 | advice исключений справочника (Ш8) |
+| Ш28 | InboundMessageService → Ш17; ContragentMapper → Ш18 | ReferenceImportScheduler (unit-тесты — Ш14b) |
+| Ш29 | InboundMessageService, InboundMessage → Ш17 | ReferenceImportScheduler (Ш14b) |
+| Ш30 | OneCQueueListener, OneCIngestService → Ш15; PersonalDataRetention → Ш14a; новая сущность под CPD → Р1 | — |
+| Ш31 | OneCQueueListener → Ш15 | — |
+| Ш32 | InboundMessageService → Ш17 | ReferenceImportScheduler (Ш14b) |
+| Ш33 | PriceListTransferAssembler → Ш16; InboundMessageService → Ш17; OneCValues → Ш13 | — |
+| Ш34 | PriceListTransferAssembler → Ш16; PriceListMapper → Ш19; StuckTransferAlert → Ш14a; хранение ключа → Р1 (новая таблица) или Ш21/Ш23 (колонка) | — |
+| Ш35 | ProgramMapper → Ш18; OneCValues → Ш13 | — |
+| Ш36 | PersonalDataRetention → Ш14a | — (OneCStream зел.) |
+| Ш37 | LpuContractMapper, PriceListMapper, LpuContactMapper → Ш19; ContragentServiceMapper → Ш18; InboundMessage → Ш17; ReferenceImportService → Ш16 | ImportResult (после Ш20 — в `mapper`); InboundStatus зел. |
+| Ш43 | Mkb10QueryService, PolicySearchService, PriceContractResolver → Ш10; LpuCatalogService, ReferenceQueryService, RvlAppealTypes → Ш11; ReferenceImportService → Ш16; InboundMessageService → Ш17 | — |
+| К1–К8 | только новые файлы `contract-service`; оверлей набора — О11 (владелец или gauntlet-admin) | — |
+
+Шаги рефакторинга тоже трогают вызывающие файлы; такие зависимости записаны в самих шагах:
+- Ш11 ← Ш7: CA-16 меняет сигнатуру, которую вызывал ReferenceController;
+- Ш17 ← Ш14a, Ш14b, Ш16: API InboundMessage меняется обязательно;
+- Ш22 ← Ш10, Ш11, Ш12: аксессоры Policy используются в DTO и спецификациях;
+- Ш20 ← Ш13, Ш16, Ш18, Ш19;
+- Ш21, Ш23 — без новых: их публичные аксессоры не меняются, иначе понадобятся Ш10 и Ш11.
+
+**Общие файлы — только последовательно** (в порядке этапов). В «Зависит» шага стоит предыдущий шаг каждой его цепочки:
+- `application.yml`: Ш4 → Ш41 (если Р24 меняет connectionTimeout) → Ш1 → Ш1a → Ш1b → Ш5 → Ш14b (свойства пула и пачек) →
+  Ш30, Ш31 (если правят) → Ш15a → Ш24 → Ш29 → Ш43 (если правит).
+- `docker-compose.yml`: Ш2a → Ш5 → Ш6. `.env.example`: Ш2a → Ш5. `.gitignore`: Ш2a. `Dockerfile`: Ш1 → Ш6.
+  `build.gradle`: Ш1 → Ш6 → шаги с зависимостями (Ш24, Ш43).
+- Обработчик ошибок: Ш41 → Ш26 → Ш8 (разделение на advice) → Ш25 → Ш27 → Ш38 → Ш44.
+- Фичи контракта (Ш25a) и примеры стенда (Ш2a): Ш25a → Ш39 → Ш41 → Ш26 → Ш25 → Ш38. Фичи пишет только specifier; после
+  мержа шага ветка снова свободна для правки (guard замораживает спецификацию только в ветке шага).
+- Контроллеры полисов и МКБ-10 (после Ш7): Ш7 → Ш39 (полисы) → Ш27 → Ш38.
+- `PolicySearchService`: Ш10 → Ш12 → Ш27 (если проверка в сервисе) → Ш40 → Ш43 → Ш22.
+  `PriceContractResolver`: Ш10 → Ш44 → Ш43. `ReferenceQueryService`: Ш11 → Ш38 → Ш43 → Ш22.
+- `PolicyApiTest`, `ReferenceApiTest`: Ш39, Ш26 → Ш2 → Ш38 → Ш40.
+- `ReferenceImportScheduler`: Ш14b → Ш17 → Ш28 → Ш29 → Ш32 → Ш20 (после Р7 импортирует ImportResult).
+- `InboundMessageService`: Ш17 → Ш24 → Ш28 → Ш29 → Ш32 → Ш33 → Ш37 → Ш43.
+- `InboundMessageRepository`: Ш14b → Ш17 → Ш32 (до него Ш24, если добавляет выборки) → Ш33 → Ш36 → Ш37.
+- `PersonalDataRetention`: Ш14a → Ш14b → Ш30 → Ш17 (вызов `:65`) → Ш36. `StuckTransferAlert`: Ш14a → Ш14b → Ш17 → Ш24 → Ш34.
+- `OneCQueueListener`: Ш15 → Ш30 → Ш31 → Ш24. `PriceListTransferAssembler`: Ш16 → Ш17 → Ш33 → Ш34 → Ш20.
+- `OneCValues`: Ш13 → Ш33 (если rowNumber через него) → Ш35 → Ш20. `ContragentMapper`: Ш18 → Ш28 → Ш20 → Ш23.
+  `ProgramMapper`: Ш18 → Ш35 → Ш20 → Ш21.
+- `PriceListMapper`, `LpuContractMapper`, `LpuContactMapper`, `ContragentServiceMapper`: Ш18 или Ш19 → Ш34 (PriceListMapper)
+  → Ш20 → Ш37 → Ш21, Ш23. `ReferenceImportService`: Ш16 → Ш17 → Ш20 → Ш37 → Ш43.
+
+### 3.3. Этап 0 — окружение и решения первой очереди (без кода, вне итога)
+
+Работа владельца и админ-окружения, часы в итог не входят.
+1. **О4, часть 1** — зеркало образов (Р38), setup script с dockerd, образами и poppler-utils. Это предусловие Ш2a:
+   без зеркала Stop-хук краснеет на 429 Docker Hub.
+2. **Очередь 1 решений** (4.1): Р38, Р3, Р13, Р19 п. 1, Р20, Р24, Р53 (а), Р6. Желательно — Р39, Р58, Р36, Р5, Р42, Р4 и
+   Р37 с Р33 и Р61.
+3. **О1** по ответам:
+   - Р39 (PR через MCP) и Р36 (guard для MCP github) — до Ш2a;
+   - Р5 и Р42 (приёмка) — до Ш25a;
+   - Р4 — до Ш39;
+   - строки «Источников документации» для Docker и Compose — до Ш2a.
+4. **О2** после Р37 — желательно до Ш25a: specifier и reviewer читают правила REST в CLAUDE.md.
+5. **О4, часть 2** — до Ш25a (первый specifier).
+6. **О7 и О8** — отправить сразу, кроме запросов команде Ordering (Р68, рекомендация — в начале этапа 6). В О8 входит
+   согласование контракта этапа 1 с разработчиком Договоров: фичи Ш25a, примеры Ш2a, Р20, Р24, Р53 (а), Р58.
+
+### 3.4. Этап 1 — контракт data-reference для Договоров — 8 шагов, 52–54 ч
+
+**Контракт для Договоров (Д3)** — три GET:
+- `/internal/v1/policies/{id}`;
+- `/internal/v1/insurance-contracts/{id}`;
+- `/internal/v1/programs/{id}`.
+
+Они реализованы, 29 REST-тестов зелёные. Договоры хранят наши `id` (`insurance_contract_id`, `insurer_policy_id`,
+`program_id`) — `contract-service/CLAUDE.md:475-477`. Поиск по `external_id` им нужен только для только что выпущенного
+полиса (OQ-47, Р58). Аутентификации между сервисами нет и не будет (Д5).
+
+**Результат этапа:**
+- стенд с примерами (Ш2a);
+- исполняемая спецификация действующего контракта (Ш25a);
+- изменения контракта по решениям, которые меняют то, на что опирается разработчик Договоров: ПДн (Р20 → Ш39), 503
+  (Р24 → Ш41), X-Request-Id (Р53 (а) → Ш26).
+
+**Порядок:** Ш2a → Ш3 → Ш7 → Ш25a → Ш39 → Ш4 → Ш41 → Ш26. Ш4 можно вести параллельно Ш7…Ш39, а Ш25a — параллельно Ш7:
+их файлы не пересекаются.
+
+Два шага пришли сюда из этапа 2, по графу:
+- **Ш3** (при Р3 = «а»). Ш7 — первый шаг с PIT, и тег нужен до него. Иначе Ш7, Ш39, Ш41 и Ш26 пойдут с медленным PIT и
+  ложными выжившими (GA-5), а оценки этапа станут неверными.
+- **Ш4.** 503 из Ш41 имеет смысл только с таймаутами: без них зависший запрос висит бесконечно (socketTimeout 0). К тому
+  же наблюдаемый в приёмке отказ Ш41 получает через lock_timeout.
+
+**Ш2a. Стенд потребителя для сервиса Договоров** (новый; Д3) — тип: инфраструктура (стенд), без спецификации. Ответы
+API, сообщения и журнал не меняются, Java main не меняется.
+- Модуль: `data-reference` (не-Java файлы и `src/test`), корень (`.gitignore`).
+- Что даёт:
+  - `docker compose --profile stand up` поднимает PostgreSQL и data-reference;
+  - синтетические сообщения 1С (ТЗ-1, ТЗ-2, ТЗ-6 и их родитель ТЗ-3 — санаторий и страхователь-юрлицо) закладываются
+    сырьём в `inbound_message`, и их штатно разбирает планировщик. Так сервис и работает до подключения брокера
+    (`contract-service/CLAUDE.md`, вводная 8);
+  - разработчик Договоров получает живой сервис и примеры трёх GET.
+- Варианты закладки данных:
+  - (а) **сырьё в `inbound_message`** одноразовым контейнером psql на образе `postgres:16.10-alpine` (он уже есть в
+    compose), после того как Liquibase создал схему. **Рекомендуется:** без брокера и без правок main, данные проходят
+    штатный разбор;
+  - (б) публикация в брокер: definitions 11 очередей и `RABBITMQ_LISTENER_AUTO_STARTUP=true`. Так проверяется и приём,
+    но стенд начинает зависеть от брокера и от открытых дефектов приёма (CA-01, CA-05), а очереди контура он всё равно не
+    заменяет;
+  - (в) psql прямо в таблицы справочников — отвергнут: обходит разбор, данные расходятся с тем, что даёт 1С, и
+    ломаются при каждой миграции схемы;
+  - (г) changeSet Liquibase с контекстом — отвергнут: правит main-ресурсы, и данные рискуют попасть в базу контура.
+- Файлы → гейты:
+  - `docker-compose.yml` — профиль `stand`:
+    - сервис закладки (psql). Файлы закладки смонтированы только для чтения. Ожидание — по появлению таблицы
+      `inbound_message`, а не по healthcheck образа сервиса: есть ли в образе JRE curl или wget, не проверено;
+    - отдельный сервис data-reference профиля `stand` **без `depends_on` на rabbitmq** и с явным
+      `RABBITMQ_LISTENER_AUTO_STARTUP=false`, чтобы смена умолчания в Ш5 стенд не изменила. Образ брокера
+      (`rabbitmq:4.1-management-alpine`, `docker-compose.yml:39`) стенду не нужен, поэтому в О4, О9 и «Перенос в контур» его
+      нет;
+    - заодно исправить комментарий `:4-5` (перенесено из Ш1).
+  - `src/test/resources/stand/` — файлы и закладки, и примеров (их читают и тест, и compose):
+    - закладка: SQL со строками сырья в конверте `{data, metadata}`, status NEW, `received_at` по порядку родителей
+      ТЗ-3 → ТЗ-2 → ТЗ-6 → ТЗ-1, повторная закладка идемпотентна по `message_id`;
+    - примеры запросов и ответов:
+      - поиск полиса и договора по `external_id` → `id` — механика стенда: `id` генерирует сервис, поэтому пример сначала
+        находит его; `id` программы берётся из ответа полиса;
+      - три GET по `id`;
+      - 404 на неизвестный `id`;
+      - 400 на нечитаемый UUID и на запрос без ключа;
+      - X-Request-Id присланный и выданный сервисом, `error.request_id`.
+
+      Поля, которые генерирует сервис (`id` и выданный request_id), в примерах — плейсхолдеры с описанием формата.
+  - Новый тест в `src/test` (`@IntegrationTest`). Те же файлы закладки → проход разбора вызовом планировщика → ответы
+    трёх GET через MockMvcTester (`TestSupportConfig`) совпадают с примерами. Генерируемые поля сверяются по формату
+    UUID, остальное — сравнением JSON.
+  - `data-reference/.env.example` (новый; перенесено из Ш1): все переменные, включая `RABBITMQ_LISTENER_AUTO_STARTUP`,
+    только плейсхолдеры, без паролей.
+  - `.gitignore`: `.env` и `hs_err_pid*.log` (перенесено из Ш1). Следующий шаг, Ш7, первым запускает PIT.
+
+  Java main не меняется, поэтому у Checkstyle, PMD, CPD, CRAP и PIT пустая область. integrity проверит тест; test и
+  archTest зелёные.
+- Данные только синтетические (правило 9):
+  - ничего не копируется из PDF (PH-01, PH-02);
+  - ФИО вида «Тестов Тест», e-mail на `example.com`, номера и GUID сгенерированы;
+  - GUID вида деятельности РВЛ и dms-product-type — значения конфигурации (`application.yml:144,150`), это не ПДн.
+
+  Новых зависимостей и переменных сервиса нет. Каталог `stand/` лежит в `src/test` и переносится в контур вместе с
+  тестами.
+- Закрывает:
+  - Д3: контракт для Договоров проверяется на живом сервисе;
+  - GA-6: hs_err в области гейтов;
+  - CS-05 — `.env` и `.env.example`; `.dockerignore` (BUILD-06) остаётся в Ш1;
+  - устаревший комментарий compose.
+- Зависит:
+  - О4, часть 1 (Р38): новый тест идёт на Testcontainers, от этого зависит и Stop-хук;
+  - строки Docker и Compose в «Источниках документации» (О1): docs.docker.com из сессии закрыт, запасной путь — в О1;
+  - Р39, иначе PR открывает человек.
+
+  Решений по контракту шаг не ждёт: примеры описывают действующий контракт, и их правит каждый шаг, который контракт
+  меняет.
+- Оценка: 8–10 ч. Задача для Jira — 7.1.
+- Риски:
+  - (1) Образы compose в облаке идут с Docker Hub (429, INF-02). Выход — переменная префикса реестра для образов compose с
+    пустым умолчанием либо `docker tag` из зеркала в setup script (О4); реестр не хардкодить. JRE задаётся аргументом
+    `JRE_IMAGE`; есть ли eclipse-temurin на mirror.gcr.io, проверить.
+  - (2) Образ в облаке собирается только с `JAR_SOURCE=host` после `./gradlew bootJar` (BUILD-09). До Ш1 в `build/libs`
+    должен лежать один jar (BUILD-03).
+  - (3) `id` генерирует сервис (`UUID.randomUUID()`, `OneCEntity.java:52`), поэтому пример строится через поиск по
+    `external_id`.
+  - (4) Разбор идёт по `received_at`: ребёнок раньше родителя уйдёт в SKIPPED (DOM1C-03).
+  - (5) Приём из брокера стенд не проверяет.
+  - (6) Сервис data-reference профиля app зависит от rabbitmq (`depends_on`). Решено в шаге: у стенда отдельный сервис без
+    этой зависимости, брокер со стендом не стартует; синтаксис профилей и `depends_on` сверить по спецификации Compose.
+  - (7) Том `postgres-data` общий с профилем app; сброс стенда — `docker compose down -v`.
+  - (8) Примеры — часть контракта. Шаг, меняющий ответ (Ш39, Ш41, Ш26, Ш25, Ш38), правит их вместе со спецификацией,
+    иначе тест Ш2a красный. В этом и защита от расхождения примера с кодом.
+
+**Ш3. Контекстные тесты вне PIT (решение 8 PR #1)** — тип: гигиена тестов, без спецификации; вид шага зависит от Р3.
+- При Р3 = «а»: `src/test/.../support/IntegrationTest.java` и `AmqpIntegrationTest.java` — `@Tag("no-mutate")` на составных
+  аннотациях переключает все 19 классов (JUnit 6.0.3 поддерживает мета-аннотации). При Р3 = «в» отдельного шага нет:
+  тег ставится на класс теста в том шаге, который написал unit-тесты кластера. При Р3 = «б» шаг выпадает.
+- Гейты: только integrity, main не меняется. Проверка — пробный прогон mutationGate на одном классе во временном
+  worktree: контекстные тесты не исполняются, hs_err не попадает в gauntletScope.
+- Закрывает: GA-4, GA-5 (ложные выжившие кэша контекстов), TIMED_OUT в PIT.
+- Зависит: Р3; Ш2a (hs_err в .gitignore до первого PIT); О4, часть 1.
+- Оценка: 3 ч (пробный PIT на контейнерах 1, ревью 1, прогон и PR 1).
+- Риски: с этого момента каждый файл «зел.†» при касании требует unit-тестов (учтено в оценках).
+
+**Ш7. Разделить ReferenceController по ресурсам** — тип: рефакторинг.
+- Файлы → гейты: `controller/ReferenceController.java` удаляется (красн.: PMD TooManyMethods@42; все 12 мутантов убиты).
+  Вместо него — новые контроллеры ЛПУ (R-01…R-03), полисов (R-04, R-05), договоров страхования (R-08), МКБ-10 (R-07) и
+  программ (R-09) с общим BASE_PATH, под всеми гейтами целиком. Unit-тесты контроллеров — standaloneSetup с подменой
+  сервисов (3.1).
+- Закрывает: DR-03. Предусловие Ш11, Ш25, Ш27, Ш38, Ш39, Ш44.
+- Зависит: Р3; Ш3 (при Р3 = «а»); Ш2a (hs_err в .gitignore — Ш7 первым запускает PIT). API-тесты не меняются, правка их
+  проверок запрещена.
+- Оценка: 5 ч.
+- Риски: пути, параметры и `produces` должны совпасть до байта. Возможен CPD между новыми контроллерами (однотипные
+  обработчики). Удалённый файл — в «Перенос в контур». Тест стенда Ш2a и фичи Ш25a — дополнительная проверка, что
+  контракт не изменился.
+
+**Ш25a. Исполняемая спецификация контракта для Договоров и каркас приёмки** (новый; Д3) — тип: со спецификацией,
+характеризационной: она фиксирует действующий контракт, Java main не меняется.
+- Спецификация. Для полиса, договора страхования и программы (Договоры хранят наши `id`,
+  `contract-service/CLAUDE.md:475-477`):
+  - поиск по `external_id` — только для полиса (OQ-47, Р58) и договора страхования: эти ручки есть. У программы такой ручки
+    нет (есть только `/programs/{id}`), её `id` сценарий берёт из ответа полиса;
+  - GET по `id` → 200 с полями, которые называет ТЗ Договоров;
+  - 404 в едином формате `{error:{…}}` с кодом и `request_id`;
+  - 400 на нечитаемый UUID и на запрос без ключа;
+  - X-Request-Id: присланный возвращается в заголовке и в `error.request_id`, без него сервис выдаёт свой.
+
+  «Структура сценария» с «Примерами» (ресурс × ключ × исход), чтобы gherkinMutation работал не вхолостую. То, что меняют
+  Р20, Р24 и Р53 (а) — ПДн в R-05, 503, формат X-Request-Id, — в фичу не входит: это Ш39, Ш41, Ш26. Синтетические
+  значения общие с Ш2a.
+- Файлы → гейты: каркас приёмки в `src/acceptanceTest/java`:
+  - step-классы;
+  - очистка таблиц в `@Before` (DatabaseCleaner из `src/test` приёмке не виден);
+  - данные — сырьё 1С и явный вызов разбора, как на стенде Ш2a и по Р6;
+  - HTTP-клиент — `RestTestClient.bindToServer()` из spring-test 7.0.8 (сверено javap) на локальный порт: контекст приёмки
+    уже `RANDOM_PORT` (`CucumberSpringConfiguration`). Автонастройку Boot не использовать: `@AutoConfigureRestTestClient`
+    и `TestRestTemplate` лежат в `org.springframework.boot:spring-boot-resttestclient:4.0.7` (сверено по jar с Maven
+    Central). Этого модуля на classpath нет, и его подключение — новая зависимость с проверкой в Nexus;
+  - фичи пишет specifier.
+
+  Main не меняется: mutationGate пропускается, gherkinMutation и acceptanceCheck работают.
+- Почему отдельный шаг, а не расширенный Ш25:
+  - (1) Ш25a не меняет поведение и не трогает main. Спецификацию действующего контракта человек утвердит быстро, и
+    разработчик Договоров получит её первой;
+  - (2) Ш25 (405 и 406) меняет поведение и трогает обработчик ошибок, а Договорам он не нужен. Ему место в этапе 3,
+    после разделения обработчика (Ш8);
+  - (3) каркас приёмки появляется один раз — в первом шаге со specifier, — и дальше его используют Ш39, Ш41, Ш26 и все
+    поведенческие шаги.
+- Закрывает: Д3 — исполняемый контракт для Договоров. Шаг впервые проверяет приёмку (tests-01, tests-07) и Stop-хук
+  hardener'а (INF-14: появился ли журнал хука mutationGate в `build/gauntlet/`, О10).
+- Зависит:
+  - О4 полностью: во второй части — Network access и проверка Default; specifier читает ТЗ Договоров и ТЗ API в PDF;
+  - Ш2a — синтетические значения и примеры;
+  - Р19 п. 1 — путь и формат ошибки;
+  - Р6 — данные приёмки: сырьё 1С и явный вызов разбора (очередь 1);
+  - желательно Р58 (404 на полис, который ещё не пришёл), Р5 и Р42 (О1), О2.
+
+  От Ш3 и Ш7 по файлам шаг не зависит и может идти параллельно Ш7.
+- Оценка: 11 ч (спецификация 1,5; каркас 4; step-определения 1,5; закалка 1; ревью в 2 раунда 2; прогон и PR 1).
+- Риски:
+  - контекст приёмки один на все фичи, поэтому очистка обязательна;
+  - первый прогон приёмки может вскрыть проблемы обвязки;
+  - если ответ на Р19 п. 1 не «оставить», фичу перепишет Ш38 в этапе 3.
+
+**Ш39. Полис для Договоров без ПДн** (Р20) — тип: со спецификацией, меняется тело ответа.
+- Файлы → гейты при Р20 = «а»:
+  - контроллер полисов (зелёный после Ш7) — ручка проекции;
+  - новый DTO (record; Р4 желателен) и новый класс чтения проекции в `service`. Это новые файлы, поэтому красные
+    PolicyResponse и ReferenceQueryService (Ш11) не трогаются;
+  - фича Ш25a (пишет specifier) и примеры стенда Ш2a.
+- При Р20 = «б» (R-05 без ПДн для всех) меняются PolicyResponse и ReferenceQueryService, а `PolicyApiTest.java:80-82` —
+  вместе со спецификацией. Тогда шаг уходит в этап 3, после Ш11 и Ш38.
+- ФИО в R-04 (подсказка для HR) — отдельный шаг Ш39b (3.11), только если этого потребует ИБ.
+- Закрывает: DR-04, CA-12 и PH-06 для потребителя Договоров.
+- Зависит: Р20; Р19 п. 1 (если проекция на новом пути — путь по тем же правилам); Ш7, Ш25a; Ш3 (при Р3 = «а»). От Ш38 шаг
+  не зависит, пока Р19 п. 1 не меняет путь и формат ошибки. После мержа владелец правит
+  `contract-service/CLAUDE.md:489-492,677-680` (О2).
+- Оценка: 7 ч.
+- Риски: новая проекция, повторяющая структуру `PolicyResponse.from` (цепочку аксессоров), даст CPD-дубль с красным
+  PolicyResponse — строить её без копирования цепочки либо после Р1. Ручку согласовать с разработчиком Договоров до мержа
+  (О8).
+
+**Ш4. Таймауты PostgreSQL** — тип: инфраструктура, без спецификации. Меняется только поведение при сбое, которое
+приёмка не наблюдает.
+- Модуль: data-reference.
+- Файлы → гейты: `application.yml:26-44` — таймаут чтения драйвера
+  (`spring.datasource.hikari.data-source-properties.socketTimeout`), statement_timeout и lock_timeout (через `options`
+  pgjdbc или начальный SQL соединения). Плюс интеграционный тест на срабатывание lock_timeout (`src/test`). Java main не
+  меняется, PIT пропускается.
+- Закрывает: CS-04, часть CA-07 (зависание планировщика). Предусловие Ш41 и Ш14b.
+- Зависит: Р13; О4, часть 1; сверка имён и семантики по правилу 12 (pgjdbc 42.7.11 PGProperty, PostgreSQL 16, metadata
+  Boot 4.0.7). С шагами этапа 1 файлы не пересекаются: шаг идёт параллельно Ш7…Ш39.
+- Оценка: 4 ч (журнал SQL-ошибок вынесен в Ш1a).
+- Риски:
+  - statement_timeout на общем DataSource действует и на миграции Liquibase при старте (индексы pg_trgm из 011/012).
+    Миграции оставить без ограничения или дать им отдельную настройку;
+  - таймауты не должны мешать большим сообщениям ТЗ-6 (~1000 строк);
+  - все значения — в «Перенос в контур»;
+  - после Ш4 `application.yml` правят Ш41 (при смене connectionTimeout) и шаги этапа 2.
+
+**Ш41. 503 при недоступной базе** (Р24) — тип: со спецификацией.
+- Файлы → гейты:
+  - ApiExceptionHandler (зел.†: было 9 методов, станет 10; unit-тесты на standaloneSetup);
+  - при Р24 с меньшим connectionTimeout — `application.yml` (Hikari; имя свойства — по metadata Boot 4.0.7);
+  - фича Ш25a и примеры Ш2a: 503 в едином формате.
+
+  Какие исключения считать временным отказом базы, сверить по иерархии `DataAccessException` Spring Framework 7.0.8.
+- Закрывает: DR-16.
+- Зависит: Р24; Ш4 (таймауты и путь проверки); Ш25a; Ш39 (фича Ш25a и примеры Ш2a — последовательно); Ш3 (при Р3 = «а»).
+- Оценка: 7 ч.
+- Риски: **проверяемость.** Остановить общую базу приёмки посреди сценария нельзя (как в Ш31). Возможный путь: шаг
+  приёмки держит в отдельном соединении ACCESS EXCLUSIVE на таблице, запрос получает lock_timeout (после Ш4) и 503. Способ
+  выбирает specifier до утверждения. Отказ соединения проверяет unit-тест обработчика: сервис-заглушка бросает исключение
+  отказа. Лимит методов обработчика снимает Ш8 в этапе 3.
+
+**Ш26. X-Request-Id: формат и длина** (Р53 (а)) — тип: со спецификацией, меняются заголовок ответа и
+`error.request_id`.
+- Файлы → гейты: `controller/RequestIdFilter.java` (зел.†), `ApiExceptionHandler.java` (после Ш41), фича Ш25a, примеры
+  Ш2a. «Примеры» — допустимые и недопустимые значения.
+- Закрывает: DR-18, PH-13, CA-19 (часть про X-Request-Id).
+- Зависит: Р53 (а) — формат согласован с Заявками и Договорами (О8); Ш25a; Ш41 (тот же обработчик); Ш3 (при Р3 = «а»).
+- Оценка: 7 ч.
+- Риск: вызывающие сервисы могут присылать не-UUID. Поэтому по Р53 недопустимое значение заменяется новым UUID, а не
+  отклоняется.
+
+### 3.5. Этап 2 — запуск на контуре — 6 шагов, 20,5 ч
+
+Порядок по общим файлам (`application.yml`, `Dockerfile`, `docker-compose.yml`): Ш1 → Ш1a → Ш1b (при Р51 = «да») →
+Ш5 → Ш6. Ш2 правит только тестовые файлы и идёт параллельно. Ш4 из этого набора выполнен в этапе 1. До переноса этапа 1
+в контур действуют манифестные меры О9: `SPRING_LIQUIBASE_ANALYTICS_ENABLED=false`, `RABBITMQ_LISTENER_AUTO_STARTUP`,
+временный уровень журнала Hibernate.
+
+**Ш1. Гигиена репозитория и образа** — тип: гигиена, без спецификации: не меняются ни ответ API, ни сообщение, ни строка.
+- Модуль: корень репозитория, data-reference (только не-Java файлы).
+- Файлы → гейты:
+  - удалить 5 `.DS_Store` (корень, `contract-service/`, `data-reference/`, `project_files/`, `project_files/1C_data/`);
+  - `.gitattributes` (новый): LF, для `*.bat` — CRLF (в индексе CRLF уже у `gradlew.bat`), binary для pdf/docx/png/jar;
+  - `data-reference/.dockerignore` (новый): `.env`, `.gradle/`, `build/`, но не `build/libs`;
+  - `Dockerfile:67-69,74` и `build.gradle` — однозначный jar: отключить plain-jar (`IntegrityCheck.java:253-271`
+    разрешает это как упаковочную задачу), имя bootJar не менять;
+  - `build.gradle:22` (description);
+  - `application.yml:90-92` (комментарий о dataVersion) и `:99-100` (`spring.liquibase.analytics-enabled: false`).
+
+  `.gitignore`, `.env.example` и комментарий `docker-compose.yml:4-5` перенесены в Ш2a. Java не меняется, поэтому у
+  Checkstyle, PMD, CPD, CRAP и PIT пустая область; integrity проверит build.gradle; test и archTest зелёные.
+- Закрывает: BUILD-06 (`.dockerignore`), BUILD-03, BUILD-01/PH-20, PH-15/16, `.DS_Store` (решение 5 PR #1), устаревшие
+  комментарии `application.yml` и `build.gradle`.
+- Зависит: О4, часть 1 (без зеркала Stop-хук краснеет на 429 Docker Hub); Р9 (при «нет» пункт про Liquibase выпадает);
+  строки Docker в «Источниках документации» (О1). Р55 желателен: без ответа берётся вариант, не меняющий имя bootJar.
+  `application.yml` после Ш4 и Ш41 (этап 1).
+- Оценка: 4,5 ч. Задача для Jira — 7.2.
+- Риски:
+  - `.gitattributes` может перенормализовать файлы, поэтому сначала проверить `git ls-files --eol`;
+  - изменение состава артефакта затрагивает CI контура — сборку проверить через `docker build --build-arg
+    JAR_SOURCE=host`.
+
+**Ш1a. Журнал без текста SQL-ошибок** (extra 2.9) — тип: гигиена (журнал), без спецификации: меняется только журнал.
+- Модуль: data-reference.
+- Файлы → гейты: `application.yml` — уровень журнала выше WARN для категории, в которую Hibernate пишет текст SQL-ошибки.
+  По зонду сессии scan это `org.hibernate.orm.jdbc.error`, код HHH000247, WARN с Detail и Where от pgjdbc.
+  - Другой путь — настройка Hibernate, отключающая этот журнал, но только если она есть в `JdbcSettings` и
+    `SqlExceptionHelper` 7.2.19. Без подтверждения её не использовать.
+  - Тест в `src/test` (`@IntegrationTest`): SQL-ошибка с ПДн в тексте (нарушение CHECK) не оставляет в журнале ни текста,
+    ни Detail, а тип исключения остаётся.
+
+  Java main не меняется, PIT пропускается.
+- Закрывает: утечку ПДн в журнал через Hibernate (правило 9). `logServerErrorDetail=false` остаётся в Ш29, потому что
+  меняет и last_error.
+- Зависит: О4, часть 1; **Ш1** (тот же `application.yml`, последовательно). Сверка — Hibernate 7.2.19 (SqlExceptionHelper,
+  JdbcSettings), metadata Boot 4.0.7 (`logging.level.*`).
+- Оценка: 3 ч.
+- Риски: подавление категории скрывает и диагностику, поэтому тип исключения должен остаться в журнале слушателя и
+  планировщика. Изменённый уровень журнала — в «Перенос в контур»; до переноса — временная переменная в манифесте (О9).
+
+**Ш1b. prefetch 1 для очередей 1С** (только при Р51 = «да») — тип: инфраструктура, без спецификации: порядок записи при
+отказе приёмка не наблюдает.
+- Файлы → гейты: `application.yml:97` (prefetch 20 → 1) и комментарий `:93-96`. Тест `@AmqpIntegrationTest`: при отказе
+  записи первого из пяти сообщений порядок записи — [1, 2, 3, 4, 5] (на HEAD зонд сессии scan показал [2, 3, 4, 5, 1]).
+  Java main не меняется.
+- Закрывает: перестановку при nack с prefetch 20 (extra 2.9) — как временная мера до Ш31.
+- Зависит: Р51; Ш1 и Ш1a (тот же `application.yml`, блок `:90-97` правит и Ш1).
+  - Выкатывается вместе с алертом О9 «Мониторинг до Ш24» на повторяющийся WARN «не сохранено, вернём источнику»: при
+    prefetch 1 отравленное сообщение (CA-01) останавливает свою очередь целиком.
+  - Сверка: справочник Spring AMQP 4.0.4, `containerAttributes.adoc:569-579` по тегу v4.0.4 («if strict message ordering
+    is necessary (the prefetch value should be set back to 1)»); RabbitMQ 4.1 `confirms.md`.
+- Оценка: 4 ч.
+- Риски: падает пропускная способность очереди ТЗ-1 — замерить на локальном брокере и записать в отчёт. Изменённое
+  умолчание — в «Перенос в контур». Возвращать ли 20, решает Ш31.
+
+**Ш5. Безопасные умолчания подключений** — тип: гигиена (конфигурация), без спецификации: меняются умолчания
+конфигурации, приёмка их не видит.
+- Модуль: data-reference.
+- Файлы → гейты:
+  - `application.yml`: `:79` — убрать переопределение auto-startup; `:66-67` — TLS, validate и verify = true; `:28-29,55-56`
+    — убрать умолчания паролей;
+  - `docker-compose.yml`: локально `RABBITMQ_LISTENER_AUTO_STARTUP=false` (профиль `stand` задаёт его явно с Ш2a), SSL
+    выключен явно, порты на 127.0.0.1;
+  - `.env.example`;
+  - при Р54 = «да» — GUID вида деятельности РВЛ и dms-product-type (`application.yml:144,150`) переходят в переменные без
+    умолчания (+0,5 ч). Тогда `.env.example` и стенд Ш2a получают эти значения явно.
+
+  Java не меняется (при Р12 = «б» — меняется). Тесты не затронуты: `IntegrationTest.java:41` и приёмка исключают
+  RabbitAutoConfiguration, `AmqpIntegrationTest` ставит свои значения.
+- Закрывает: CS-01, CS-02, extra о verify-hostname (комментарий в yml), CS-08 частично — в yml больше нет известных
+  паролей.
+
+  **Явной ошибки «пароль не задан» удаление умолчания не даёт.** Boot 4.0.7 при связывании @ConfigurationProperties не
+  падает на неразрешённом плейсхолдере: ConfigurationPropertiesBinder создаёт `PropertySourcesPlaceholdersResolver`, а тот
+  — `PropertyPlaceholderHelper` с ignoreUnresolvablePlaceholders=true (javap spring-boot-4.0.7.jar). Строка `${DB_PASSWORD}`
+  уйдёт паролем буквально, и ошибка останется «password authentication failed». Явная проверка при старте — только по
+  Р12 = «б»; источник (javap) — в отчёт.
+- Зависит: Р10, Р11, Р12, Р34, Р54, Р62; Ш2a (`.env.example`, `docker-compose.yml`); Ш1b или Ш1a (тот же
+  `application.yml`). До переноса в контур — пункт О9: сверить все 11 имён ONEC_QUEUE_* со списком очередей брокера
+  контура.
+- Оценка: 3 ч (+3 ч при Р12 = «б», +0,5 ч при Р54 = «да»).
+- Риски:
+  - **смена поведения в контуре.** Где `RABBITMQ_LISTENER_AUTO_STARTUP` не задана (в наборе переменных тестового контура,
+    `contract-service/CLAUDE.md:256-260`, её нет), сервис начнёт реально читать очереди 1С;
+  - missing-queues-fatal (`application.yml:89`) уронит запуск при любом неверном имени из 11, в том числе при спорном
+    имени ТЗ-2 (CS-03, Р34);
+  - после смены умолчания TLS тестовый брокер 1С без CA в `certs/` не подключится. Манифесты и сертификат контура
+    подготовить до переноса (О9).
+
+**Ш6. Воспроизводимость сборки** — тип: гигиена (сборка), без спецификации.
+- Файлы → гейты:
+  - `Dockerfile:37-38`, `docker-compose.yml:39`, `RabbitTestcontainer.java:35` (test) — патч-версии или digest;
+  - `gradle/wrapper/gradle-wrapper.properties` — distributionSha256Sum;
+  - при выравнивании byte-buddy — ограничение версии в `build.gradle` для тестовых конфигураций.
+
+  Main не меняется.
+- Закрывает: BUILD-04, BUILD-02/PH-17, BUILD-05.
+- Зависит:
+  - Р16 (версия брокера 1С контура);
+  - Р17 (контрольную сумму присылает владелец: downloads.gradle.org из облака закрыт политикой, а services.gradle.org
+    открыт);
+  - Р55 (теги, которые есть у CI контура);
+  - Р38 (тег должен быть на mirror.gcr.io);
+  - Ш1 (`Dockerfile`, `build.gradle`) и Ш5 (`docker-compose.yml`).
+- Оценка: 3 ч.
+- Риски: выбранный тег должен быть и на mirror.gcr.io, и в Nexus контура.
+
+**Ш2. Синтетические значения в тестовых фикстурах** — тип: гигиена тестов, без спецификации.
+- Модуль: data-reference, только `src/test`.
+- Файлы → гейты:
+  - `PolicyApiTest.java:159-160,163,167`;
+  - `InsuranceContractImportTest.java:38-39,73,163-168`, там же переформулировать комментарий «Пример из ТЗ-2»;
+  - `ReferenceApiTest.java:104,110,123,138`.
+
+  На тесты Checkstyle, PMD и CPD не распространяются, integrity их проверяет. Main не меняется, поэтому mutationGate
+  пропускается.
+- Закрывает: PH-02, tests-11 (правило 9: `src/test` переносится в контур).
+- Зависит: Ш39 и Ш26 — они правят те же API-тесты в этапе 1, поэтому идти параллельно с ними нельзя. С шагами этапа 2
+  файлы не пересекаются. Если владелец хочет раньше, шаг можно поставить сразу после Ш26.
+- Оценка: 3 ч (контекст 0,5; правка 0,5; ревью 1; прогон и PR 1). Было 1,5 ч — поднято до нижней границы шага без
+  спецификации (3.1).
+- Риски: подставные значения должны сохранить формат — разбор номера и поиск по подстроке в `:163`.
+
+### 3.6. Этап 3 — контракт с Заявками — 9 шагов, 86 ч
+
+**Порядок:** Ш8 → Ш25 → Ш10 → Ш11 → Ш12 → Ш27 → Ш38 → Ш40 → Ш44. Ш10 может идти параллельно Ш8 и Ш25: файлы
+разные. Межсервисная аутентификация в этап не входит (Д5, «Не делать» в 3.11).
+
+**Решения этапа** (очередь 3): Р18, Р19 п. 2, Р22, Р23, Р53 (б), Р66 (OQ-46), Р35, Р1, Р4, Р20 для R-04.
+
+Согласование ЦКЗ на схеме процесса (2.11, г) опирается на R-07 и каталог ЛПУ, поэтому Ш27, Ш40 и Ш11 нужны Заявкам.
+Ш43 (кэш) стоит в конце этапа 4: событие «сообщение применено» публикуется из ReferenceImportService или
+InboundMessageService, а их к лимитам приводят Ш16 и Ш17 в этапе 4.
+
+**Ш8. Исключения REST, ребро exception → dto и разделение обработчика ошибок** — тип: рефакторинг.
+- Файлы → гейты:
+  - `exception/AmbiguousReferenceException.java` (красн.: PMD ClassWithOnlyPrivateConstructorsShouldBeFinal@15);
+  - `IncompleteReferenceException.java` (красн.: то же @15, surv 1);
+  - `ReferenceNotFoundException.java` (красн.: то же @14, внутренний дубль CPD в фабриках `:29-44↔:47-63`, cov 8/11);
+  - `dto/ErrorResponse.java` (зел.†);
+  - `controller/ApiExceptionHandler.java` (зел.†; после Ш41 в нём 10 методов из 12) делится на advice по семействам:
+    - исключения справочника (404, 409, 422);
+    - ошибки запроса и протокола (400; сюда Ш25 добавит 405 и 406, а Ш27 — свой обработчик, если понадобится);
+    - отказ инфраструктуры (503 из Ш41, 500);
+  - сборка `ErrorResponse.Detail` — отдельный класс пакета controller.
+
+  Unit-тесты — standaloneSetup (3.1). **Фабрики `AmbiguousReferenceException.policy/priceContract`,
+  `IncompleteReferenceException.noActivePriceContract` и константа `AMBIGUOUS_PRICE_CONTRACT` не меняются:** их вызывают
+  красные PriceContractResolver:47-48 (Ш10), ReferenceQueryService:90 и LpuCatalogService:149 (Ш11). **Сигнатуры фабрик
+  `ReferenceNotFoundException` (program, policy, policyByExternalId, policyByNumber, insuranceContract,
+  insuranceContractByExternalId, lpu) тоже не меняются:** их вызывают PolicySearchService:75 (Ш10), LpuCatalogService:82,166
+  и ReferenceQueryService:67-107 (Ш11). Внутренний CPD `:29-44↔:47-63` снимается внутри класса.
+- Закрывает: PMD в исключениях, ребро exception→dto (архитектура), покрытие. Снимает и лимит методов обработчика для
+  Ш25, Ш27, Ш44: у каждого advice не больше 12 методов. Предусловие Ш25, Ш27, Ш38, Ш44.
+- Зависит: Р3; Ш41 и Ш26 (тот же обработчик, этап 1). **После мержа — действие владельца Р8:** убрать dto из
+  allowed.exception.
+- Оценка: 6 ч (+1 ч к прежним 5 — на разделение обработчика).
+- Риски: выбор обработчика между несколькими advice — порядок (`@Order`) и правила ExceptionHandlerExceptionResolver
+  сверить по Spring Framework 7.0.8. Тела 409 и 422 и все ответы этапа 1 должны остаться байт в байт: это проверяют
+  API-тесты, фичи Ш25a и тест стенда Ш2a.
+
+**Ш25. REST: 405 и 406 в едином формате вместо 500** — тип: со спецификацией.
+- Спецификация: меняются код и тело ответа — 405 с Allow, 406 в едином формате, без ERROR в журнале. «Структура
+  сценария» с «Примерами» (метод × путь; Accept), чтобы gherkinMutation работал не вхолостую.
+- Файлы → гейты: advice ошибок запроса и протокола (после Ш8; +2 метода, unit-тесты на standaloneSetup); шаги приёмки —
+  на каркасе Ш25a; фича — от specifier. **ReferenceController не трогать** — после Ш7 его нет. Место DR-02,
+  `ReferenceController.java:41` (`produces`), уже перенесено в новые контроллеры без изменений.
+- Закрывает: CA-03, DR-02, PH-12.
+- Зависит: Ш25a (каркас), Ш26 (фича Ш25a и примеры Ш2a), Ш8, Ш7; Ш3 (при Р3 = «а»); желательно О2. Формат ошибки —
+  текущий; если Р19 п. 1 его сменит, он поменяется вместе со всеми в Ш38.
+- Оценка: 7 ч: спецификация 1,5; реализация и unit 1,5; закалка 1; ревью 2; прогон и PR 1. Было 11 ч — каркас приёмки
+  ушёл в Ш25a.
+- Риски: тело 406 в едином формате требует явного Content-Type (обход согласования, сверить по spring-webmvc 7.0.8).
+  OPTIONS (200, Allow) и HEAD не сломать.
+
+**Ш10. Сервисы чтения: CC ≤ 3, unit-тесты, ребро dto → repository, помощник LIKE** — тип: рефакторинг.
+- Файлы → гейты:
+  - `service/PriceContractResolver.java` (красн.: CS CC@65, surv 1);
+  - `service/Mkb10QueryService.java` (красн.: CC@65, surv 3);
+  - `service/PolicySearchService.java` (красн.: CC@111, CC@125, surv 5);
+  - `dto/Mkb10Response.java` (красн.: CPD с PolicySearchResponse) и `dto/PolicySearchResponse.java` (красн.: CPD) — только
+    вместе;
+  - `repository/Mkb10Row.java` (зел.: record без методов, 0 мутантов);
+  - `service/PriceContract.java` (зел.†).
+
+  Экранирование LIKE переезжает в отдельный класс пакета service (CA-17, SRP). Сейчас это
+  `PolicySearchService.escapeLike` (`:145-148`), его вызывает и `Mkb10QueryService.java:45`. Зависимость
+  `service.PriceContract` от `dto.PriceContractRef.Kind` (`PriceContract.java:3,11-17`, тоже CA-17) здесь не снимается —
+  отложено (3.11). Javadoc о несуществующем расчёте R-06 (`PriceContractResolver.java:18,42`) правится по Р23.
+  **API PriceContractResolver (`resolve`, `resolveAll`, `Resolution`) не меняется:** его использует красный
+  LpuCatalogService:28,86 (Ш11 идёт после Ш10).
+- Закрывает: 4 нарушения CC, 9 выживших, ребро dto→repository, пару DTO по CPD, CA-17 (часть LIKE). Предусловие Ш12, Ш22,
+  Ш27, Ш39b, Ш40, Ш43, Ш44.
+- Зависит: Р1 (в варианте «в» пара DTO может перестать быть дублем), Р3, Р4 (RUN_ERROR на record DTO). **После мержа —
+  действие владельца Р8:** убрать repository из allowed.dto.
+- Оценка: 9 ч.
+- Риски: ранжирование R-04 должно сохраниться точно (PolicyApiTest); имена вложенных record можно менять, JSON — нет.
+
+**Ш11. LpuCatalogService, ReferenceQueryService, RvlAppealTypes и пара DTO LpuServicesResponse/PolicyResponse** — тип:
+рефакторинг.
+- Файлы → гейты:
+  - `service/LpuCatalogService.java` (красн.: CS ClassFanOutComplexity 22@45, CC@107, surv 3);
+  - `dto/LpuServicesResponse.java` и `dto/PolicyResponse.java` (красн.: взаимный CPD `:29-41↔:61-75`);
+  - `service/ReferenceQueryService.java` (красн.: surv 1, nocov 5);
+  - `service/RvlAppealTypes.java` (красн.: surv 1 — ложный выживший «stream() → null» из GA-5 в warnIfMissing:60;
+    unit-тест его честно убивает).
+
+  CA-16: null и boolean-переключатель на пути R-03 (`LpuCatalogService.java:107-125`, `LpuServicesResponse.java:45-51`,
+  `ReferenceQueryService.java:116-119,139-144`) заменить двумя методами сервиса или стратегией. Reviewer по правилу 13
+  отметит этот переключатель при любом касании. Javadoc о несуществующем R-06 в `LpuServicesResponse.java:61` (DR-10)
+  правится здесь, по Р23: Ш10 этот файл трогать не может.
+- Закрывает: fan-out, CC, выжившие, пару DTO, CA-16 (часть REST). Предусловие Ш22, Ш38, Ш40, Ш43.
+- Зависит: Р1, Р3, Р4; **Ш7**. CA-16 меняет сигнатуру `LpuCatalogService.services(UUID, boolean)`, которую вызывает
+  красный `ReferenceController.java:80`; после Ш7 вызов живёт в зелёном контроллере ЛПУ.
+- Оценка: 10 ч.
+- Риски: новые классы, выделенные из сервиса, идут под всеми гейтами; LpuCatalogApiTest — без правок.
+
+**Ш12. R-04: ранжирование и предел в БД** (DR-11) — тип: инфраструктура, выдача та же.
+- Файлы → гейты: `service/PolicySearchService.java` (зелёный после Ш10), `repository/PolicyRepository.java`,
+  `PolicySpecifications.java` (PIT-искл., Checkstyle и PMD зел.).
+- Закрывает: DR-11 (30 001 сущность ради 10 строк). Предусловие Ш22, Ш40.
+- Зависит: Ш10; желателен замер на объёме контура.
+- Оценка: 7 ч.
+- Риски: порядок в SQL (collation, равные ранги) должен совпасть с Java — нужен тест на порядок и предел. Кэш набора
+  policy_id из ТЗ API стр. 9 — не здесь, а в Ш43.
+
+**Ш27. МКБ-10 и поиск полисов: 400 на взаимоисключающие и слишком большие параметры** — тип: со спецификацией,
+меняется код ответа.
+- Файлы → гейты:
+  - контроллеры МКБ-10 и полисов (после Ш7): сопоставление `params={"query","codes"}` → 400 VALIDATION_ERROR;
+  - пределы длины query и числа codes (CA-19) — в `config/ReferenceApiProperties.java` (зел.†) и
+    `InvalidRequestException` (зел.†);
+  - если проверка ложится в сервис — Mkb10QueryService и PolicySearchService (после Ш10);
+  - если нужен новый обработчик — advice ошибок запроса (после Ш8 и Ш25).
+- Закрывает: DR-01, CA-19 (пределы query и codes).
+- Зависит: Р53 (б); Ш7, Ш8, Ш10, Ш12 (PolicySearchService), Ш25, Ш25a, Ш39 (контроллер полисов).
+- Оценка: 8 ч.
+
+**Ш38. REST-контракт по решению владельца** — тип: со спецификацией; меняются путь, формат ошибки и ответы.
+- Файлы → гейты:
+  - контроллеры (после Ш7);
+  - ErrorResponse и advice (после Ш8 и Ш25);
+  - ReferenceNotFoundException (после Ш8; код 404);
+  - InsuranceContractResponse и LpuCardResponse (зел.†);
+  - ReferenceQueryService (после Ш11);
+  - репозитории (PIT-искл.);
+  - фичи Ш25a и примеры стенда Ш2a — если меняются путь, формат или код 404.
+
+  Новые поля с источником в 1С — отдельный шаг Ш38a (3.11). Они меняют и мапперы: InsuranceContractMapper и
+  LpuContractMapper (Ш19), ContragentMapper (Ш18), — и сущности (Ш21, Ш23).
+- Закрывает: DR-08, extra про external_id, number и contract_id.
+- Зависит: Р18, Р19, Р58, Р66; О2 (CLAUDE.md), О6 (журнал решений); Ш7, Ш8, Ш11, Ш25, Ш25a, Ш39 (общие контроллеры и
+  фичи); Ш27 (контроллеры МКБ-10 и полисов, advice ошибок запроса); Ш2 (PolicyApiTest, ReferenceApiTest).
+- Оценка: 14 ч.
+- Риски: меняется контракт для двух потребителей — уведомить их до мержа (О8). Если Р19 п. 1 меняет путь или формат,
+  здесь же меняется и контракт Договоров этапа 1 (фичи Ш25a, примеры Ш2a, клиент К2a ещё не написан).
+
+**Ш40. «Действующие» полисы и договоры ЛПУ, фильтр R-01** — тип: со спецификацией.
+- Файлы → гейты:
+  - `PolicyRepository.java:44`, `PolicySpecifications.java:45`, `LpuContractRepository.java:35`, `LpuRepository.java:41`
+    (все PIT-искл., CS и PMD зел.);
+  - LpuCatalogService и RvlAppealTypes (после Ш11) — если фильтр R-01 там;
+  - PolicySearchService (после Ш10, Ш12) — если меняется R-04;
+  - `PolicyApiTest.java:172` меняется вместе со спецификацией.
+- Закрывает: DR-09.
+- Зависит: Р18, Р22; Ш10, Ш11, Ш12 (тот же предикат уже перенесён в SQL); Ш27 (PolicySearchService); Ш38 (PolicyApiTest).
+- Оценка: 7 ч.
+
+**Ш44. R-06: расчёт стоимости услуги за период** — тип: со спецификацией.
+- Файлы → гейты: новый контроллер и сервис; PriceContractResolver (после Ш10); IncompleteReferenceException и
+  AmbiguousReferenceException (после Ш8); advice исключений справочника (после Ш8) — для PRICE_NOT_COVERED и
+  AMBIGUOUS_PRICE.
+- Закрывает: DR-10.
+- Зависит: Р23; Ш8, Ш10, Ш25a, Ш38.
+- Оценка: 18 ч.
+
+### 3.7. Этап 4 — надёжность приёма из 1С и наблюдаемость — 22 шага, 202–206 ч
+
+**Порядок:** Ш13 → Ш14a → Ш14b → Ш15 → Ш30 → Ш31 → Ш15a → Ш16 → Ш17 → Ш24 → Ш18 → Ш28 → Ш29 → Ш32 → Ш33 → Ш35 →
+Ш36 → Ш19 → Ш34 → Ш20 → Ш37 → Ш43. Порядок ставит вперёд major-дефекты приёма: CA-01 (Ш30), CA-05 (Ш31) и CA-02 (Ш32).
+Две линии частично параллельны:
+- «приём»: Ш14a → Ш14b → Ш15 → Ш30 → Ш31;
+- «разбор»: Ш13 → Ш16 → Ш17 → Ш18 → Ш28.
+
+Общие файлы — в 3.2. Для инфраструктурных шагов этапа (Ш14b, Ш15a, Ш24) проверка «API-тесты без правок» ничего не
+доказывает, поэтому каждое изменение закрепляет свой unit-тест, а отчёт шага перечисляет, что изменилось для эксплуатации.
+
+**Решения этапа** (очередь 4): Р7, Р15, Р52, Р25, Р26–Р32, Р41, Р56, Р57, Р59; Р1 — из очереди 3, Р6 — из очереди 1.
+
+**Ш13. Разбор 1С: OneCValues и OneCEnvelopeParser** — тип: рефакторинг.
+- Файлы → гейты: `service/onec/OneCValues.java` (красн.: CC@75, PMD TooManyMethods 14@36, surv 1; unit-покрытие ≥ 80 %),
+  `service/integration/OneCEnvelopeParser.java` (красн.: CC@39, surv 2; unit ≥ 80 %). Выделенный package-private
+  помощник — новый файл.
+- Закрывает: GA-1 для обоих классов, двойной Javadoc `OneCValues:119-136` (DOM1C-17). Предусловие Ш18, Ш19, Ш20, Ш33, Ш35.
+- Зависит: Р3.
+- Оценка: 5 ч.
+- Риски: **публичный API OneCValues не менять**, иначе в область попадут все 10 мапперов (красные). Выносить только
+  приватные помощники. **`OneCEnvelopeParser.messageIdOf` тоже не меняется:** его вызывает красный OneCQueueListener:113
+  (Ш15).
+
+**Ш14a. Планировщики под лимиты** — тип: рефакторинг, поведение не меняется.
+- Файлы → гейты: `service/schedulers/PersonalDataRetention.java` (красн.: CPD со StuckTransferAlert `:47-58↔:38-47`,
+  surv 1) и `service/schedulers/StuckTransferAlert.java` (красн.: CPD, surv 1, cov 10/18) — одним PR из-за CPD-пары. Общий
+  код — в новый класс пакета `service.schedulers`. Unit-тест StuckTransferAlert с ListAppender (tests-06).
+- Закрывает: GA-1 для обоих, tests-06 (StuckTransferAlert). Предусловие Ш14b, Ш17, Ш24, Ш30, Ш34, Ш36.
+- Зависит: Р3.
+- Оценка: 4 ч.
+- Риски: интервалы, выборки и тексты WARN не меняются; проверка — существующие тесты без правки проверок.
+
+**Ш14b. Планировщики: пул, интервалы из записи, выключатель, стирание пачками, проекция в алерте, исход разбора в
+журнале** — тип: инфраструктура.
+- Файлы → гейты:
+  - `DataReferenceApplication.java` (PIT-искл.): @EnableScheduling переносится в условную конфигурацию, по умолчанию
+    включённую;
+  - новый конфиг TaskScheduler с пулом ≥ 3 — в `config`, только фабрика из классов Spring;
+  - регистрация задач с Duration из ImportProperties через SchedulingConfigurer — в `service.schedulers`, потому что она
+    ссылается на планировщики;
+  - `config/ImportProperties.java` (**зел.†**: интервалы и валидация);
+  - `PersonalDataRetention.java` (после Ш14a): стирание пачками короткими транзакциями по `received_at` до опустошения;
+  - `StuckTransferAlert.java` (после Ш14a): проекция `correlation_id`, `min(received_at)` и числа строк без тел, с
+    пределом;
+  - `InboundMessageRepository.java` (PIT-искл.);
+  - `application.yml` — новые свойства пула, интервалов и размера пачки (после Ш5);
+  - `ReferenceImportScheduler.java` (зел.†): MDC messageId и stream на время importOne; **исход разбора (`ImportResult`)
+    — в журнал планировщика по Р7** (перенесено из Ш16: файл и так трогается здесь). Unit-тесты этого класса пишутся
+    здесь, на них опираются Ш17, Ш28, Ш29, Ш32.
+- Закрывает: CA-07 (общий поток), PH-05 (≤ 12 000 в сутки), часть PH-14 (выборка без тел), CS-07 и CA-15 (интервалы),
+  tests-04 (выключатель @Scheduled для тестов), tests-06 (временный отказ планировщика), часть PH-10 (MDC), GA-8 (журнал
+  исхода). Предусловие Ш15a, Ш17, Ш24, Ш28, Ш29, Ш30, Ш32, Ш34, Ш36.
+- Зависит: Р3, Р7; Ш4, Ш14a; Ш5 (тот же `application.yml`). Сверка по Spring Framework 7.0 (SchedulingConfigurer;
+  fixedDelay не даёт задаче наложиться на себя) и Boot 4.0.7 (@ConditionalOnBooleanProperty).
+- Оценка: 7 ч.
+- Риски:
+  - новые свойства, размер пачки и частота — в «Перенос в контур»;
+  - нужны отдельные unit-тесты: три задачи не блокируют друг друга, пачки идут до опустошения, выборка алерта ограничена,
+    выключатель работает;
+  - тесты, которые косвенно опирались на стартовый тик (tests-06), могут потерять покрытие — закрыть явными;
+  - алерт по cid предписан ТЗ-09, «не гаснет» здесь не меняется (это Ш34).
+
+**Ш15. OneCQueueListener и OneCIngestService** — тип: рефакторинг.
+- Файлы → гейты:
+  - `service/integration/OneCQueueListener.java` (красн.: CS ParameterNumber@128 и @165, PMD TooManyMethods 15@35,
+    внутренний CPD `:49-74↔:79-106`, surv 3, nocov 8, cov 43/59);
+  - новый класс регистрации 11 точек по OneCQueueProperties — в `service.integration`, потому что он ссылается на
+    слушатель (в `config` нельзя, 3.1);
+  - `service/onec/OneCIngestService.java` (красн.: surv 3) закаляется в этом шаге всегда, а не только при смене сигнатуры:
+    это предусловие Ш30.
+- Закрывает: GA-1 для слушателя и OneCIngestService; TIMED_OUT (удалённые вызовы в `:58` и `:94`); часть PH-10 (MDC
+  messageId, stream, queue); PH-23 (тест «в журнале нет текста чужого исключения»); tests-06 (все методы слушателя).
+  Предусловие Ш15a, Ш24, Ш30, Ш31.
+- Зависит: Р3; сверка Spring AMQP 4.0.4 (программная регистрация endpoint'ов, у каждой очереди свой контейнер,
+  concurrency 1, prefetch из конфигурации — Ш1b, missing-queues-fatal, auto-startup).
+- Оценка: 10 ч.
+- Риски: семантику ack/nack, паузу 5 с и повторную доставку сохранить (дефекты чинят Ш30 и Ш31). Проверяется
+  `@AmqpIntegrationTest` OneCQueueIngestTest и unit-тестом OneCQueueListenerTest.
+
+**Ш30. Приём: отравленное тело не блокирует очередь** — тип: со спецификацией; меняются подтверждение брокеру и
+сохранённое состояние.
+- Файлы → гейты:
+  - OneCQueueListener (после Ш15; javadoc `:122-127`), `OneCIngestService.java` (после Ш15);
+  - новая сущность карантина (`entity`), её репозиторий (`repository`), changeSet 013;
+  - срок хранения карантина — в PersonalDataRetention (после Ш14a, Ш14b);
+  - каркас приёмки через брокер: контейнер RabbitMQ в конфигурации приёмки (сейчас CucumberSpringConfiguration исключает
+    RabbitAutoConfiguration). При missing-queues-fatal=true очереди объявляются в брокере приёмки **до старта контекста** —
+    в конфигурации приёмки, а не в продакшен-коде, иначе падает вся приёмка.
+- Закрывает: CA-01, DOM1C-01; журнал без Detail обеспечивает Ш1a.
+- Зависит: Р1 (новая сущность под CPD), Р6, Р26; Ш1a, Ш14a, Ш14b, Ш15, Ш25a (каркас приёмки). Ответ 1С про BOM и `\u0000`
+  не блокирует.
+- Оценка: 15 ч.
+- Риски:
+  - карантин хранит ПДн, поэтому срок хранения обязателен;
+  - тело с `\u0000` нельзя класть в jsonb — только bytea или text;
+  - tests-09: запись в карантин и ack проверять без тестовой транзакции (TransactionTemplate в проверке, а не
+    @Transactional на классе), иначе границы транзакций не видны;
+  - как в сценарии получить отказ записи — вопрос specifier'у до утверждения спецификации.
+
+**Ш31. Приём: при недоступной базе потребители встают на паузу** — тип: со спецификацией; сообщения остаются в очереди,
+порядок приёма сохраняется.
+- Файлы → гейты: OneCQueueListener (после Ш15, Ш30); новый наблюдатель доступности базы и индикатор health — в
+  `service.integration` (ссылаются на контейнеры слушателей); при необходимости `application.yml:97`.
+- Закрывает: CA-05, DOM1C-02, перестановку при nack и prefetch 20 — окончательно (при Р51 = «да» её временно закрыл Ш1b).
+- Зависит: Р27; Ш15, Ш30; **Ш1b (при Р51 = «да»)** — Ш31 решает, возвращать ли prefetch 20, и правит ту же строку
+  `application.yml:97`. Тип очередей от 1С (О7) не блокирует.
+- Оценка: 13 ч.
+- Риски: **проверяемость.** Контекст приёмки один на все фичи (CucumberSpringConfiguration), остановить PostgreSQL посреди
+  сценария нельзя. Поэтому наблюдатель и остановку контейнеров проверяют unit-тесты и отдельный `@AmqpIntegrationTest` с
+  управляемой подменой доступности. В фиче остаётся только наблюдаемый исход: сообщение осталось в очереди, порядок записи
+  сохранён. Способ проверки выбирает specifier до утверждения. Семантику stop и start контейнеров и возврат
+  неподтверждённых при остановке сверить по Spring AMQP 4.0.4 и RabbitMQ 4.1. Там же решить, возвращать ли prefetch 20
+  после Ш1b и переходит ли readiness в DOWN.
+
+**Ш15a. Формат журнала с ключами MDC** (CS-12, PH-10) — тип: инфраструктура.
+- Файлы → гейты: `application.yml` — `logging.structured.format.console` (ecs или logstash — по Р15) либо шаблон с
+  `%X{requestId}`, `%X{messageId}`, `%X{stream}`, `%X{queue}`; имена свойств сверить по metadata spring-boot 4.0.7. Тест в
+  `src/test` (захват вывода): строка журнала обработки сообщения содержит messageId и не содержит тела сообщения, строка
+  REST-запроса содержит requestId. Java main не меняется.
+- Закрывает: CS-12 и PH-10 (журнал). Без этого шага MDC из Ш14b и Ш15 в журнале не виден: стандартный шаблон Boot
+  собственные ключи MDC не печатает.
+- Зависит: Р15; Ш14b, Ш15; Ш31 (тот же `application.yml`, строка `:97`).
+- Оценка: 4 ч.
+- Риски: **формат журнала меняется для контура** — разбор логов и алерты О9 «Мониторинг до Ш24» нужно перенастроить, в
+  «Перенос в контур». В structured-формате MDC попадает целиком: проверить, что туда не кладутся ПДн.
+
+**Ш16. PriceListTransferAssembler и ReferenceImportService** — тип: рефакторинг.
+- Файлы → гейты:
+  - `service/onec/PriceListTransferAssembler.java` (красн.: CC@121, surv 11; 12 методов — на пределе PMD, любой новый
+    метод роняет гейт);
+  - новый класс переходов статусов передачи;
+  - `service/onec/ReferenceImportService.java` (красн.: surv 2 — importMessage:73 и та же цепочка «→ null»).
+
+  CA-17: ветка по типу потока в `ReferenceImportService.java:69-74` становится обработчиком потока (стратегией) с
+  собственной записью исхода; сборщик ТЗ-9 — одна из реализаций (OCP, правило 11). **API InboundMessageService и
+  InboundMessage здесь не меняются**, иначе получится цикл Ш16 ↔ Ш17. ImportResult закрепляется тестами (Р7); запись
+  исхода в журнал планировщика делает Ш14b.
+- Закрывает: GA-1, GA-8 (тесты на ImportResult), CA-17 (часть OCP). Предусловие Ш17, Ш19, Ш20, Ш33, Ш34, Ш37, Ш43.
+- Зависит: Р3, Р7.
+- Оценка: 9 ч.
+- Риски: PriceListMapper не трогать (красн., кластер Ш19). Статусы передачи должны остаться прежними
+  (PriceListTransferTest).
+
+**Ш17. InboundMessage и InboundMessageService** — тип: рефакторинг.
+- Файлы → гейты: `entity/InboundMessage.java` (красн.: CS ParameterNumber 5@143, PMD TooManyMethods@41, CPD ×4 — цепочки
+  геттеров `:238-275` с Lpu, Policy, PolicyProgram), `service/InboundMessageService.java` (красн.: surv 1, nocov 1),
+  `repository/InboundMessageRepository.java` (PIT-искл.; пути JPQL, если часть полей уйдёт в @Embeddable).
+  - **Публичный API InboundMessage меняется обязательно.** TooManyMethods считает 20 методов: receive, 6 методов
+    `mark*`/`forgetPayload` и 13 аксессоров вида `messageId()`. PMD не считает их геттерами — имя не начинается с get или
+    is. При пределе 12 без смены API не обойтись.
+  - Вызывающие файлы и чьи они:
+    - `PriceListTransferAssembler:88-191` и `ReferenceImportService:72-113` — зелёные после Ш16;
+    - `PersonalDataRetention:65` и `StuckTransferAlert` — после Ш14a;
+    - `ReferenceImportScheduler:79-89` — зел.†, unit-тесты к нему написал Ш14b;
+    - `InboundMessageService` — правится в этом шаге.
+- Закрывает: GA-1 для сырья. Предусловие Ш24, Ш28, Ш29, Ш32, Ш33, Ш37, Ш43.
+- Зависит: **Р1** (без калибровки CPD дубли геттеров с неизменёнными сущностями не снять), Р3; **Ш14a, Ш14b, Ш16**; Ш30
+  (PersonalDataRetention, вызов `:65`).
+- **Публичный API InboundMessageService не меняется:** его вызывает OneCIngestService (Ш15); иначе в «Зависит» нужен Ш15.
+- Оценка: 8 ч (+2 ч к прежним 6 — на правку вызывающих).
+- Риски: JPA 3.2 §2.1 (без final); сменившиеся пути JPQL в запросах выборки и срока хранения.
+
+**Ш24. Метрики приёма и разбора** — тип: инфраструктура. Без спецификации при Р52 = «операционный интерфейс»; иначе
+со спецификацией (+3 ч, вне итога).
+- Файлы → гейты:
+  - новая зависимость по Р15 — `io.micrometer:micrometer-registry-prometheus:1.16.6` (BOM Boot 4.0.7; транзитивно
+    `io.prometheus:prometheus-metrics-*:1.4.3`). Нужен ли отдельно модуль Boot
+    `org.springframework.boot:spring-boot-micrometer-metrics:4.0.7`, сверить по раскладке модулей Boot 4.0;
+  - `application.yml` (exposure);
+  - MeterBinder'ы — в `service`: они читают репозитории, в `config` нельзя;
+  - счётчики переходов статусов в InboundMessageService (после Ш17), OneCQueueListener (после Ш15, Ш31),
+    StuckTransferAlert (после Ш14a, Ш14b);
+  - gauge'и FAILED, BUFFERED, backlog и возраста старейшей строки по потокам; метрика «просроченных тел не стёрто».
+- Закрывает: PH-11, CA-10 (метрики), DOM1C-06, часть PH-14 (gauge вместо повторов WARN). Предусловие Ш37.
+- Зависит: Р15, Р52; Ш14a, Ш14b, Ш15, Ш17; Ш30, Ш31 (OneCQueueListener); Ш15a (`application.yml`); Ш6 (`build.gradle`);
+  координаты подтверждены владельцем в Nexus (О9).
+- Оценка: 8 ч.
+- Риски: метки без ПДн и без неограниченной кардинальности (messageId в метки не идёт); /actuator/prometheus — в сетевую
+  политику (О9).
+
+**Ш18. Мапперы, кластер «upsert» (6 файлов)** — тип: рефакторинг.
+- Файлы → гейты: `mapper/AppealTypeMapper.java` (красн.: CPD 5, surv 1, nocov 5, cov 5/25), `Mkb10Mapper.java` (CPD 3,
+  surv 1), `ContragentMapper.java` (CS CC 5@80 и MethodLength 28@80, CPD 3, surv 6), `ContragentServiceMapper.java` (CPD 3,
+  surv 2, nocov 2), `PolicyMapper.java` (CS LambdaBodyLength@139, CPD 5, surv 5), `ProgramMapper.java` (CPD 2, surv 10);
+  новый общий шаг upsert (реальный дубль AppealTypeMapper↔Mkb10Mapper `:22-52`, 177 токенов). Все CPD-пары кластера лежат
+  внутри шага.
+- Закрывает:
+  - 12 дублей мапперов (часть) и 3 нарушения CS;
+  - 25 выживших: по GA-7 проверять конкретный ImportResult или статус строки, по GA-5 — unit-тест на stream();
+  - tests-05 (ТЗ-7 не покрыт);
+  - устаревшие комментарии о «контроле версии» (DOM1C-17, CA-13).
+
+  Предусловие Ш20, Ш28, Ш35, Ш37, Ш38a; Ш21–Ш23 (этап 5).
+- **Условие GA-9.** Первым делом — unit-тест маппера ТЗ-7 (новая запись, обновление снимка, обязательные id и name) по
+  ТЗ-07 и существующим тестам. Если поведение там однозначно не определено и тест пришлось бы писать «по коду», шаг
+  останавливается с вопросом владельцу. Тогда покрытие ТЗ-7 идёт отдельным поведенческим шагом **Ш18a** со спецификацией
+  (7 ч, вне итога), а Ш18 продолжается после него.
+- Зависит: Ш13, Р3, Р1 (сколько структурных дублей останется).
+- **Сущности не трогаются** (Ш21–Ш23 — этап 5): общий шаг upsert принимает поиск, создание и применение снимка
+  функциями-параметрами, а не новыми методами сущностей.
+- Оценка: 20–24 ч: 6 мапперов, 25 выживших, unit-тесты почти с нуля (unit-покрытие модуля 10,3 %).
+- Риски: большой PR, PIT на 6+ классах. Поведение разбора не менять (Import-тесты без правки проверок).
+
+**Ш28. Детерминированные ошибки разбора сразу получают FAILED с настоящей причиной; ERROR при любом переходе в FAILED;
+шаги приёмки пути 1С** — тип: со спецификацией; меняются статус и last_error сохранённой строки.
+- Файлы → гейты:
+  - `service/schedulers/ReferenceImportScheduler.java` (зел.†, после Ш14b): постоянными считать
+    NonTransientDataAccessException и JacksonException;
+  - `service/InboundMessageService.java` (после Ш17): ERROR с messageId, потоком, числом попыток и типом;
+  - длина ИНН и КПП в `ContragentMapper` (после Ш18);
+  - шаги приёмки: вставка сырья в inbound_message и явный запуск разбора из шага приёмки, без брокера (Р6). Каркас
+    для этого уже заложил Ш25a.
+- Закрывает: DOM1C-12, PH-09 (журнал).
+- Зависит: Р6, Р41 (действующая версия «Точек интеграции»); Ш14b, Ш17, Ш18, Ш25a; Ш24 (InboundMessageService). Сверка
+  иерархии исключений Spring Framework 7.0.8 и Jackson 3.1.
+- Оценка: 10 ч.
+- Риски: гонки на uq_*_external_id при одной реплике невозможны (Р14), но решение нужно записать. Политику округления
+  numeric(15,2) спросить у 1С (О7), в этот шаг она не входит.
+
+**Ш29. last_error без текста чужого исключения, стирание вместе с телом** — тип: со спецификацией; меняется содержимое
+сохранённой строки.
+- Файлы → гейты: ReferenceImportScheduler (`:89`, после Ш14b), InboundMessageService (`:80-81`),
+  `InboundMessage.java:178-180` (после Ш17), `application.yml` (`logServerErrorDetail=false` через hikari
+  data-source-properties — сверить с pgjdbc 42.7.11).
+- Закрывает: PH-04, DOM1C-15.
+- Зависит: Ш14b, Ш17, Ш28; Ш24 (InboundMessageService, `application.yml`).
+- Оценка: 7 ч.
+
+**Ш32. Порядок применения при повторах** — тип: со спецификацией; меняется сохранённое состояние справочника.
+- Файлы → гейты: InboundMessageRepository (PIT-искл.; выборка «голова потока»), ReferenceImportScheduler (после Ш14b),
+  InboundMessageService (после Ш17).
+- Закрывает: CA-02, DOM1C-04.
+- Зависит: Р28; Ш14b, Ш17; Ш28 (после него RETRY означает только временный отказ базы); Ш29 (ReferenceImportScheduler,
+  InboundMessageService); Ш31 (приём больше не переставляет
+  сообщения; при Р51 = «да» этого уже добился Ш1b).
+- Оценка: 12 ч.
+- Риски: RETRY блокирует поток на время лестницы (до 36 мин) — нужна метрика (Ш24). Ручной возврат FAILED → NEW остаётся
+  опасным — описать в регламенте (О9).
+
+**Ш33. ТЗ-9: постоянная ошибка сборки переводит в FAILED всю передачу; лишний batch — ошибка; rowNumber обязателен** —
+тип: со спецификацией; меняются статусы строк.
+- Файлы → гейты: PriceListTransferAssembler и класс статусов передачи (после Ш16), InboundMessageRepository,
+  InboundMessageService (после Ш17), OneCValues (после Ш13), если rowNumber читается через него.
+- Закрывает: CA-09, DOM1C-05.
+- Зависит: Ш13, Ш16, Ш17, Ш28; Ш32 (InboundMessageRepository, InboundMessageService).
+- Оценка: 8 ч.
+- Риски: tests-09 — переходы статусов всей передачи проверять без тестовой транзакции на классе.
+
+**Ш35. ТЗ-6: обязательные numberLayer, percentCopayment, directAttachment** — тип: со спецификацией; меняются статус
+сообщения и данные R-09.
+- Файлы → гейты: ProgramMapper (после Ш18; `:169-171` — часть CA-16 про null и boolean), OneCValues (после Ш13),
+  OneCFieldException (зел.).
+- Закрывает: DOM1C-11, CA-16 (часть ProgramMapper). Шаг меняет, какие программы попадают в R-09 для Договоров:
+  синтетическая программа стенда Ш2a должна нести все три поля — проверить тест Ш2a.
+- Зависит: Р29; Ш13, Ш18, Ш28; Ш33 (OneCValues).
+- Оценка: 7 ч.
+
+**Ш36. Срок хранения ПДн для ТЗ-2 и SKIPPED** — тип: со спецификацией; меняется сохранённое состояние.
+- Файлы → гейты: PersonalDataRetention (после Ш14a, Ш14b, Ш30); InboundMessageRepository; changeSet — расширить частичный
+  индекс `idx_inbound_message_retention`; документация `PersonalDataRetention.java:29-31` и `OneCStream.java:15-19` (зел.).
+- Закрывает: CA-04, PH-03.
+- Зависит: Р31; Ш14a, Ш14b, Ш29, Ш30 и Ш17 (тот же PersonalDataRetention); Ш33 (InboundMessageRepository).
+- Оценка: 7 ч.
+- Риск: строку со стёртым телом нельзя переобработать (`ReferenceImportService.java:114-118`).
+
+**Ш19. Мапперы ЛПУ и договоров (4 файла)** — тип: рефакторинг.
+- Файлы → гейты: `mapper/LpuContractMapper.java` (красн.: CC@121, CPD с PriceListMapper `:149-157↔:95-102`, surv 9,
+  nocov 7), `PriceListMapper.java` (красн.: CPD, nocov 2), `InsuranceContractMapper.java` (surv 3), `LpuContactMapper.java`
+  (surv 5, nocov 5).
+- Закрывает: 17 выживших, CC, CPD-пару. Предусловие Ш20, Ш34, Ш37, Ш38a.
+- Зависит: Ш13, Ш16 (сборщик вызывает PriceListMapper), Р3.
+- **Сущности не трогаются** (Ш21, Ш23 — этап 5); общий код — через функции-параметры, как в Ш18.
+- Оценка: 12 ч.
+
+**Ш34. ТЗ-9: порядок финализации и закрытие зависших передач** — тип: со спецификацией.
+- Файлы → гейты:
+  - сборщик (после Ш16, Ш33), PriceListMapper (после Ш19), StuckTransferAlert (после Ш14a, Ш14b);
+  - хранение ключа порядка финала по услуге. **Рекомендуется новая таблица** (changeSet; под CPD нужен Р1). Колонка в
+    ContragentService или PriceListItem потянула бы в этап 4 Ш21 или Ш23.
+- Закрывает: DOM1C-13, PH-14 (закрытие зависших).
+- Зависит: Р30; Р1 (новая таблица) или Ш21/Ш23 (колонка); Ш14a, Ш14b, Ш16, Ш19, Ш33; Ш24 (StuckTransferAlert).
+- Оценка: 9 ч.
+
+**Ш20. Разрыв цикла mapper ↔ service (решение 1 PR #1)** — тип: рефакторинг.
+- Файлы → гейты: перенос `service/onec/StreamMapper.java`, `ImportResult.java` (зел.†), `OneCValues.java` (и выделенного
+  в Ш13 помощника, OneCValuesTest) в `mapper`; импорты в 10 мапперах, ReferenceImportService и
+  PriceListTransferAssembler. К этому моменту все они зелёные после Ш13, Ш16, Ш18 и Ш19; перенесённые файлы проверяются
+  как новые. Перед шагом проверить `git grep` импортёров перенесённых классов: все должны быть зелёными.
+- Закрывает: цикл компонентов (CA-06). **После мержа — действие владельца Р8:** `fail.on.cycles=true`, убрать service из
+  allowed.mapper.
+- Зависит: Ш13, Ш16, Ш18, Ш19; по общим файлам — Ш14b и Ш32 (ReferenceImportScheduler импортирует ImportResult после Р7),
+  Ш17 (ReferenceImportService), Ш28 (ContragentMapper), Ш33 и Ш34 (PriceListTransferAssembler, PriceListMapper), Ш35
+  (ProgramMapper, OneCValues).
+- Оценка: 5 ч.
+- Риски: PIT на ~15 классах в одном прогоне. Переименованные файлы — в «Перенос в контур», иначе в контуре останутся дубли
+  классов.
+
+**Ш37. Сообщение без родителя: отличимая причина и (по решению) автоповтор или ранжирование** — тип: со спецификацией.
+- Файлы → гейты: LpuContractMapper, PriceListMapper, LpuContactMapper (после Ш19); ContragentServiceMapper (после Ш18);
+  ReferenceImportService (после Ш16); ImportResult (зел.†, после Ш20 лежит в `mapper`); при новом статусе — InboundStatus
+  (зел.) и InboundMessage (после Ш17); выборка разбора.
+- Закрывает: DOM1C-03 (часть кода).
+- Зависит: Р32; Ш16, Ш17, Ш18, Ш19, Ш20 (новый код не расширяет цикл mapper ↔ service), Ш24 (метрика); по общим файлам —
+  Ш28, Ш29, Ш32, Ш33 (InboundMessageService, InboundMessage), Ш36 (InboundMessageRepository).
+- Оценка: 10 ч.
+
+**Ш43. Кэш справочников** — тип: со спецификацией: допустимая устарелость видна потребителю. Шаг перенесён из этапа 3
+по графу.
+- Файлы → гейты:
+  - сервисы чтения (после Ш10, Ш11), RvlAppealTypes (после Ш11);
+  - публикация события «сообщение 1С применено» из ReferenceImportService (после Ш16) или InboundMessageService (после
+    Ш17) — а не @CacheEvict в мапперах; слушатель события — в `service`;
+  - CacheManager — в `config`, только фабрика; имена кэшей — константы в `config`;
+  - зависимости `org.springframework.boot:spring-boot-starter-cache:4.0.7` и `com.github.ben-manes.caffeine:caffeine:3.2.4`.
+- Закрывает: CA-11, CS-13, DR-13, правило 14.
+- Зависит: Р25; Ш10, Ш11, Ш16, Ш17, Ш38; по общим файлам — Ш37 (InboundMessageService, ReferenceImportService), Ш27 и
+  Ш40 (Mkb10QueryService, PolicySearchService), Ш44 (PriceContractResolver), Ш6 (`build.gradle`), Ш29 (`application.yml`, если правит); строка Caffeine 3.2.4
+  в «Источниках документации» (О1); координаты подтверждены в Nexus (О9).
+- Оценка: 12 ч.
+- Риски: устарелость ответа видна Договорам и Заявкам — согласовать TTL (О8); R-04 и R-05 не кэшировать (Р25).
+
+**Финальное рабочее решение data-reference — критерии готовности (конец этапа 4).** После них начинается этап 6 (Д2).
+1. **Все потоки ТЗ-1…ТЗ-10 принимаются и разбираются надёжно:**
+   - отравленное тело уходит в карантин и не блокирует очередь (Ш30);
+   - недоступность базы — пауза без потерь и перестановок (Ш31, до него Ш1b);
+   - повторы не затирают новое старым (Ш32);
+   - детерминированные ошибки получают FAILED с настоящей причиной и ERROR (Ш28);
+   - ТЗ-9 и ТЗ-6 — по Ш33, Ш34 и Ш35;
+   - сообщение без родителя отличимо (Ш37);
+   - ТЗ-7 покрыт (Ш18 или Ш18a);
+   - планировщики не блокируют друг друга (Ш14b).
+2. **REST для Договоров и Заявок работает по утверждённому контракту:**
+   - этап 1: Ш25a, Ш39, Ш41, Ш26;
+   - этап 3: Ш25, Ш27, Ш38, Ш40, Ш44 по Р23; межсервисной аутентификации нет (Д5), ручки с ПДн закрывает сетевая политика
+     контура (О9), проверенная на контуре;
+   - при Р19 = «новые поля» — Ш38a (конец этапа 4): без него контракт Заявок не финален;
+   - кэш — Ш43;
+   - фичи и примеры стенда совпадают с кодом (тест Ш2a).
+3. **Конфигурация готова к контуру:**
+   - этап 2: безопасные умолчания, TLS, воспроизводимость, журнал без ПДн;
+   - таймауты (Ш4);
+   - О9 выполнена, координаты новых зависимостей подтверждены в Nexus, CI в режиме контура зелёный (О3).
+4. **ПДн по срокам:**
+   - тело ТЗ-2 и SKIPPED — Ш36; карантин — со сроком (Ш30);
+   - `last_error` без текста чужого исключения — Ш29; журнал без Detail — Ш1a;
+   - фикстуры синтетические (Ш2, Ш2a);
+   - срок хранения самих полисов — отдельно по Р59.
+5. **Мониторинг:** метрики (Ш24), журнал с MDC (Ш15a), ERROR при FAILED (Ш28), алерты О9 перенастроены под новый формат.
+6. **Гейты и документы:**
+   - каждый тронутый файл в лимитах, `./gradlew gauntlet` на `main` зелёный, открытых blocker и major от ревью нет;
+   - Р8 выполнен (`fail.on.cycles=true` после Ш20);
+   - `data-reference/CLAUDE.md` актуален (О2), журнал решений REST в `project_files/` (О6, Р18).
+
+Не входят: бэклог этапа 5 и условные и отложенные шаги 3.11, кроме Ш38a при Р19 = «новые поля».
+
+### 3.8. Этап 5 — бэклог качества data-reference — 4 шага, 31 ч
+
+Эти шаги рефакторинга не нужны ни одному шагу этапов 1–4 и не входят в финальное рабочее решение. Их делают по касанию
+или отдельно, когда позволяет время. Шаг поднимается в раннюю очередь в трёх случаях:
+- понадобился Ш38a (новые поля) → Ш21 и Ш23;
+- ключ Ш34 решили хранить колонкой → Ш21 или Ш23;
+- шаг по Р59 (срок хранения полисов) меняет сущность полиса → Ш22.
+
+**Ш9. Jackson: мёртвый бин и покрытие Jackson3JsonFormatMapper** — тип: рефакторинг.
+- Файлы → гейты: `config/Jackson3JsonFormatMapper.java` (красн.: cov 2/4), `config/JacksonConfig.java` (PIT-искл.).
+- Закрывает: GA-1 (Jackson3JsonFormatMapper), DR-17 и CA-14 (неиспользуемый ObjectMapper, вводящий в заблуждение Javadoc).
+- Зависит: Р3. Р4 не нужен: record шаг не трогает.
+- Оценка: 4 ч (новые unit-тесты, доказательство внедряемого бина, пробный PIT, два раунда ревью).
+- Риски: тестом доказать, какой бин внедряется в парсеры 1С; snake_case наружу даёт @Primary jsonMapper Boot.
+
+**Ш21. Сущности: договоры страхования и программы** — тип: рефакторинг.
+- Файлы → гейты: `entity/InsuranceContract.java` (красн.: PMD ConstructorCallsOverridableMethod@49, CPD 2), `Insurer.java`
+  (@43, CPD 1, surv 1), `Program.java` (ImmutableField@49, @57, CPD 1, surv 2), `ContragentService.java` (@47),
+  `OneCEntity.java` (AbstractClassWithoutAbstractMethod@29 — снять abstract, nocov 2). Вызовы конструкторов:
+  InsuranceContractMapper, ProgramMapper, ContragentServiceMapper (к этому моменту зелёные).
+- Приём по GA-3: private-конструктор вызывает только super, `applySnapshot` вызывает статическая фабрика `create()`,
+  защищённый конструктор без аргументов остаётся для Hibernate, final не ставится. Комментарий `Program.java:43-47`
+  переписать со ссылкой на JPA §2.1. **Публичные аксессоры не меняются**; иначе в область попадут DTO и сервисы чтения, и
+  шагу понадобятся Ш10 и Ш11.
+- Зависит: Ш18, Ш19, Ш20, Ш37 (ContragentServiceMapper), **Р1**, **Р2**, Р3.
+- Оценка: 7 ч.
+
+**Ш22. Сущности полиса** — тип: рефакторинг.
+- Файлы → гейты: `entity/Policy.java` (красн.: TooManyMethods@36, ImmutableField@81 и @84, ConstructorCallsOverridableMethod@92,
+  CPD 16, surv 3), `PolicyProgram.java` (CPD 18, surv 4, nocov 5), `PolicyServiceLine.java` (CPD 4, surv 5); вызовы —
+  PolicyMapper.
+- **Аксессоры Policy меняются обязательно.** Учитываемых методов около 15, из них 12 — аксессоры (TooManyMethods@36). Ими
+  пользуются:
+  - PolicyResponse:57-60 и ReferenceQueryService:117 — зелёные после Ш11;
+  - PolicySearchResponse:28-29 и PolicySearchService:104-113 — после Ш10;
+  - PolicySpecifications и ранжирование в SQL — Ш12;
+  - класс проекции Ш39 — он зелёный.
+- Зависит: Ш18, Ш20, **Ш10, Ш11, Ш12**, Ш43 (PolicySearchService, ReferenceQueryService), Р1, Р2, Р3.
+- Оценка: 9 ч.
+- Риски: без калибровки CPD оценка удваивается: меняются JPQL, производные методы репозиториев, PolicySpecifications и
+  маппинг DTO.
+
+**Ш23. Сущности справочников** — тип: рефакторинг.
+- Файлы → гейты: `entity/AppealType.java` (красн.: @56, CPD 14, cov 17/24), `Mkb10.java` (@48, CPD 3), `Lpu.java` (@58,
+  CPD 7, surv 1), `LpuContract.java` (@86, CPD 6, surv 1), `PriceListItem.java` (CPD 6, surv 2), `ProgramLpu.java`
+  (CPD 6, surv 6); вызовы — AppealTypeMapper, Mkb10Mapper, ContragentMapper, LpuContractMapper, PriceListMapper,
+  ProgramMapper. **Публичные аксессоры не меняются**; иначе нужны Ш10 и Ш11 (LpuCatalogService, LpuCardResponse).
+- Зависит: Ш18, Ш19, Ш20, Ш37 (LpuContractMapper, PriceListMapper), Р1, Р3.
+- Оценка: 11 ч.
+
+### 3.9. Этап 6 — contract-service без оплаты — 7 шагов, 102 ч
+
+Начинается после этапа 4 (Д2; решение 6 PR #1). Бэклог этапа 5 его не держит — это толкование плана, вопрос Р67 (4.5).
+Оплата — этап 7 (Д1). Новый вопрос из схемы процесса — Р65 (кто формирует договор КМ и счёт) — в очереди 5.
+
+| № | Шаг | Тип | Файлы и гейты | Зависит | Оценка |
+|---|---|---|---|---|---|
+| К1 | Каркас `contract-service` в **Default, без правок `gauntlet/`**: settings.gradle с переключателем репозиториев, build.gradle, обёртка, класс приложения, application.yml, PostgreSQL и Liquibase, тест старта контекста, CucumberSpringConfiguration и `features/.gitkeep`. Логики нет. Блок подключения набора в build.gradle (INSTALL.md, раздел 4) добавляет О11 вместе с оверлеем: без оверлея archTest набора упал бы на шаблонном `base.package` | инфраструктура, без спецификации | всё новое. Модуль ещё не в `module=`, поэтому Stop-хук и CI его не проверяют (DN-17). Проверка — `./gradlew build` в сессии и сборка в режиме контура, итог — в отчёт | Д2 (после этапа 4), Р49, Р37, О2 (свой CLAUDE.md) | 8 ч |
+| — | **О11** (владелец или gauntlet-admin): подключение к набору по INSTALL.md и прогон гейтов по всем файлам каркаса (раздел 6) | — | — | К1 | вне итога |
+| К2 | Подключения RabbitMQ: брокер 1С и межсервисный (брокер «Оплата» / маркетинга перенесён в К7, Д1) | инфраструктура, без спецификации | новые, @ConfigurationProperties, Testcontainers. Схема владельца (2.11) подтверждает три брокера (DN-16); как Boot 4.0 и Spring AMQP 4.0 держат несколько ConnectionFactory, сверить | К1, О11; сверка Boot 4.0 и Spring AMQP 4.0.4 | 8 ч |
+| К2a | Клиент к REST `data-reference` (контракт этапа 1): три GET по нашим `id`, которые Договоры хранят сами (`contract-service/CLAUDE.md:475-477`), и поиск по `external_id` только для только что выпущенного полиса (OQ-47, Р58); без аутентификации (Д5); RestClient из spring-web без новых зависимостей; таймауты; ограниченные ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58) — стандартным механизмом Spring Framework 7.0 (resilience: `@Retryable`/`RetryTemplate`), сверить; сквозной X-Request-Id | инфраструктура, без спецификации (адаптер; наблюдаемое поведение — в сценариях К3 и К6) | новые. Тесты — `MockRestServiceServer.bindTo(RestClient.Builder)` из spring-test 7.0.8 (сверено javap) на примерах стенда Ш2a: копия в тестовых ресурсах contract-service, расхождение с сервисом ловит тест Ш2a на стороне data-reference | К1, О11; Ш39, Ш41, Ш26 (этап 1); Р58, Р24 | 8 ч |
+| К3 | ДГ-01, ДГ-02: приём и отмена задачи на выпуск | со спецификацией | новые | К2, К2a, ОВД-05 (ИБ, О8), Р65 | 22 ч |
+| К4 | ДГ-03: публикация состояния через outbox | со спецификацией | новые | К3 | 12 ч |
+| К5 | ДГ-06, ДГ-07: полисы ЛМ через 1С | со спецификацией | новые | К3, ОВД-02 (правило подбора программы, О8) | 12 ч |
+| К6 | Печатные формы КМ, СЭ-01…СЭ-03. СЭ-03 (акцепт) отвечает ACCEPTED без ссылки на оплату; создание заказа и ссылка — К7 (Р47, Д1) | со спецификацией | новые + PDF-библиотека | К4, К2a, **Р64** (шаблоны и библиотека; координаты подтверждены в Nexus, О9; источник документации библиотеки — О1), Р65 | 32 ч |
+
+Риски ветви:
+- CI обходит модули последовательно в одном job с timeout 90 мин. На VM с 4 vCPU Testcontainers двух модулей параллельно
+  не запускать. Режим контура проверять без `gauntlet/`.
+- До О11 каркас К1 вне гейтов (DN-17). Поэтому К1 держится без логики, а О11 один раз прогоняет гейты по всем файлам
+  модуля. Красное, если найдётся, исправляет К1b (вне итога).
+
+### 3.10. Этап 7 — оплата (Д1) — 2 шага, 62 ч
+
+| № | Шаг | Тип | Файлы и гейты | Зависит | Оценка |
+|---|---|---|---|---|---|
+| К7 | Оплата через Ordering: клиент (Keycloak, таймауты, ограниченные ретраи), заказ, fixed, checkout по READY_TO_PAYMENT, события paid, paymentError, paymentOverdue. Входят: **отмена в INVOICE_ISSUED и PENDING_PAYMENT (DN-04, Р63)**; **формат дат Ordering без долей секунды и без Z (DN-07)** — явный форматтер и unit-тест на границе клиента, сверка Jackson 3.1; **подключение брокера «Оплата» / маркетинга** (перенесено из К2); ссылка на оплату для СЭ-03 | со спецификацией | новые; RestClient из spring-web без новых зависимостей; токен Keycloak — `org.springframework.boot:spring-boot-starter-oauth2-client:4.0.7` (Nexus) | К6, Р43–Р48, Р63, ОВД-04 (paymentTtl), О8; источники Spring Security 7.0.6 (oauth2-client), OAuth 2.0 и Keycloak, `project_files/ordering/` (О1); координаты подтверждены в Nexus (О9) | 46 ч |
+| К8 | ДГ-04, ДГ-05: передача оплаченного договора КМ в 1С | со спецификацией | новые | К7, ОВД-13 (base64-вложения и предельный размер, О8), Р48 | 16 ч |
+
+Риск: К7 вырос на 4 ч из-за DN-04 и ещё на 2 ч — на подключение брокера маркетинга.
+
+### 3.11. Условные и отложенные шаги (вне итога)
+
+**Условные:**
+- **Ш18a** — ТЗ-7 (виды обращений) со спецификацией, если в Ш18 поведение не удалось зафиксировать по документам (GA-9),
+  7 ч.
+- **Ш38a** — новые поля REST с источником в 1С (по Р19). Место — **конец этапа 4**, после Ш43: зависит от Ш38, мапперов Ш18
+  и Ш19, сущностей Ш21 и Ш23 (они тогда переходят из этапа 5 в этап 4, перед Ш38a). При Р19 = «новые поля» Ш38a входит в
+  критерий 2 финального решения (3.7). Оценка — после Р19.
+- **Ш39b** — ФИО в R-04 (подсказка HR), только если ИБ потребует (Р20). Трогает PolicySearchResponse и
+  PolicySearchService (после Ш10), этап 3.
+- **К1b** — исправление красного в каркасе К1 по итогам прогона О11.
+
+**Отложено до ответов 1С или владельца (в серию не входит):**
+- ТЗ-8: полнота набора контактов и очередь `-final` (DOM1C-14); город и прочие части адреса из ТЗ-8 (DOM1C-19);
+- профили, возраст, пользователи (DR-12, Р35);
+- сохранение новых сущностей без merge (CA-18): сначала сверка Spring Data JPA 4.0.6 и замер на ТЗ-6;
+- блокирующая выборка SKIP LOCKED (CA-08), если Р14 ≠ «одна реплика»;
+- правило одного активного основного договора ТЗ-5 (Р56) и запасная привязка к головной организации (Р57) — шаги после
+  Ш19;
+- срок хранения самих полисов (Р59) — шаг после Ш36;
+- зависимость `service.PriceContract` от `dto.PriceContractRef.Kind` (CA-17, `PriceContract.java:3,11-17`): перенос
+  перечисления трогает DTO ответа и LpuCatalogService — при следующем касании после Ш10 и Ш11.
+
+**Не делать:**
+- **Ш42 «Межсервисная аутентификация REST»** — решение владельца Д5 (1.2): «межсервисной авторизации не планируется, за
+  исключением, возможно, сервиса оплаты, но это не наша система»; Р21 закрыт ответом «нет». Прежняя оценка 14 ч снята с
+  этапа 3 и итогов, зависимость `spring-boot-starter-security` в `data-reference` не нужна. Защита ручек с ПДн — сетевая
+  политика контура (О9). **Остаточный риск:** ручки `/internal/v1` отдают ПДн без аутентификации, единственная защита —
+  сетевая политика; её нужно проверить на контуре до первого переноса. Токен для Ordering, если понадобится, — часть К7.
+
+---
+
+## 4. Нужно решение человека
+
+Ответ — одной строкой: «Р38 да, Р3 а, Р13 да, Р19.1 да, …». Ответы попадают в раздел 1.2 и в описания PR. Очереди идут в
+порядке этапов; оплата — последней (Д1). Р50 снят решением Д2, Р21 закрыт решением Д5 (1.2).
+
+### 4.1. Очередь 1 — до этапа 1 (контракт для Договоров)
+
+Блокируют этап 1 (8 решений, они же — нумерованный список в «Коротко»): **Р38, Р3, Р13, Р19 п. 1, Р20, Р24, Р53 (а), Р6**.
+Желательно в той же очереди, но не блокирует: Р39, Р58, Р36, Р5, Р42, Р4, Р37 с Р33 и Р61.
+
+- Р38. **Образы Testcontainers в облаке** (О4, до Ш2a). Рекомендация: `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/`
+  в обоих окружениях плюс предзагрузка в setup script. На 2026-09-30 зеркало отдаёт все три образа по пути без
+  `library/`. Поправить `gauntlet/CLAUDE.md:144-145`.
+- Р3. **Решение 8 PR #1 (no-mutate) с учётом GA-4** (Ш3 — в этапе 1 перед Ш7; от этого решения зависят все оценки).
+  Варианты:
+  - (а) тег на составных аннотациях одной задачей Ш3. PIT идёт минуты, ложные выжившие и TIMED_OUT исчезают, но около 40
+    зелёных файлов становятся «зел.†», и каждая правка этапа 1 (Ш39, Ш41, Ш26) начинается с unit-тестов;
+  - (б) оставить контекстные тесты в PIT. Оценки рефакторинга на 20–30 % ниже, но прогоны по 2–20 мин и ручной разбор
+    ложных выживших GA-5;
+  - (в) тег на класс теста по кластерам, по мере появления unit-тестов. Пока кластер не переведён — медленный PIT и
+    ложные выжившие GA-5.
+
+  Рекомендация: (а).
+- Р13. **Таймауты БД** (Ш4 — в этапе 1, он нужен Ш41). Рекомендация: таймауты ставить на пул приложения (lock_timeout —
+  секунды, statement_timeout и socketTimeout — десятки секунд), миграции Liquibase не ограничивать. Конкретные числа
+  утвердить в PR Ш4.
+- Р19, п. 1. **Путь и формат ошибки REST** (DR-08; Ш25a, Ш39). Рекомендация: путь `/internal/v1` и формат `{error:{…}}`
+  оставить по СЭ. Они общие для внутренних сервисов, уже реализованы, на них опираются примеры стенда Ш2a, фичи Ш25a и
+  клиент Договоров. Если путь или формат меняются, контракт Договоров меняется в Ш38 (этап 3), а Ш39 ждёт Ш38. Остальные
+  пункты Р19 — в очереди 3.
+- Р20. **ПДн в R-05 и что получают Договоры (DR-04), вместе с ИБ.** Сейчас `/internal/v1/policies/{id}` отдаёт ФИО, дату
+  рождения, пол и e-mail. Договорам, по `contract-service/CLAUDE.md:489-492` и ТЗ Договоров, нужны только номер,
+  external_id и период. Варианты:
+  - (а) R-05 с ПДн остаётся для ЛК HR и ЛК ЗЛ по ТЗ API, а Договорам — отдельная проекция без ПДн на своём пути (путь
+    предлагает specifier в Ш39, согласование с Договорами — О8). Контракт Заявок не меняется, Ш39 идёт в этапе 1 без Ш11 и
+    Ш38;
+  - (б) R-05 без ПДн для всех, ПДн — отдельной ручкой для ЛК. Меняется контракт Заявок, Ш39 уходит в этап 3 после Ш11 и
+    Ш38;
+  - (в) оставить как есть до решения ИБ. Тогда Договоры получают ПДн, которые им не нужны (правило 9, CLAUDE.md).
+
+  Рекомендация: (а); затем владелец правит `contract-service/CLAUDE.md:489-492,677-680` (О2). ФИО в R-04 (подсказка HR) —
+  по ТЗ API; отдельный шаг Ш39b — только если ИБ потребует.
+- Р24. **503 при недоступной базе** (DR-16; Ш41). Рекомендация: да — SERVICE_UNAVAILABLE в едином формате для отказа
+  соединения и временных отказов базы (иерархия сверяется в Ш41). Договоры повторяют такие вызовы с ограниченным числом
+  попыток (К2a). Подпункт: время до ответа при отказе базы задаёт Hikari connectionTimeout (по умолчанию 30 с). Оставить
+  его или уменьшить для REST — значение утвердить в PR Ш41.
+- Р53 (а). **X-Request-Id** (Ш26). Рекомендация: принимать `[A-Za-z0-9._-]{1,64}`, иначе выдавать новый UUID и не
+  отклонять запрос. Согласовать с Договорами и Заявками до мержа Ш26 (О8). Пункт (б) — в очереди 3.
+- Р6. **Путь приёмки для 1С** (Ш25a — каркас приёмки строится по нему, затем Ш28; перенесён из очереди 4). Рекомендация:
+  сценарии разбора начинаются со строки сырья и явного запуска разбора; брокер в приёмке нужен только шагам приёма Ш30 и
+  Ш31.
+- Р39 (желательно). **Открытие PR из облака** (gh в VM нет, GraphQL через прокси — 403). Рекомендация: в шаге 8 заменить
+  `gh pr create` на MCP create_pull_request и учесть, что `guard.py:323` блокирует подстроку «merge» в `gh api`. До правки
+  PR создаёт человек кнопкой Create PR.
+- Р58 (желательно). **OQ-47: полис ищут раньше, чем он пришёл из 1С** (DR-15; Ш25a, К2a). Рекомендация: R-05 отвечает
+  404, как сейчас; Договоры повторяют запрос с ограниченным числом попыток. Согласовать с автором ТЗ Договоров (О8).
+- Р36 (желательно). **Запись в GitHub мимо guard и защита main.** Рекомендация: расширить matcher и guard на
+  `mcp__github__.*` (merge, auto-merge, push_files, create_or_update_file, delete_file) и на curl или wget к api.github.com
+  с методами PUT, POST, PATCH, DELETE, кроме создания PR. При возможности — GitHub Pro и ruleset на main с обязательной
+  проверкой «gauntlet». Лучше до Ш2a: с первого шага агенты работают с GitHub.
+- Р5 (желательно, до Ш25a). **Приёмка.** Рекомендация: no-skipped падает при 0 исполненных сценариев, если фичи есть
+  (tests-07); acceptanceCheck не читает устаревшие результаты (tests-01).
+- Р42 (желательно, до Ш25a). **Черновик спецификации при смене VM (INF-15).** Рекомендация: specifier выводит полный текст
+  сценариев в чат (правка роли), `spec.approval=chat` оставить.
+- Р4 (желательно до Ш39, обязательно до Ш10 и Ш11). **RUN_ERROR на record (GA-6).** Рекомендация: в отчёте гейтов
+  показывать RUN_ERROR отдельной строкой «не проверено» и не засчитывать их как убитые; record без логики исключать
+  поштучно через `exclude.classes`. Ш9 record не трогает, Р4 ему не нужен.
+- Р37 (желательно, до О2). **Guard для модульных CLAUDE.md и всего `.github/`.** Рекомендация: да, с кейсами в selftest.
+  Иначе `data-reference/CLAUDE.md` после О2 открыт для правки агентом.
+- Р33 (для О2). **Какие правила главнее: `contract-service/CLAUDE.md` или gauntlet** (DIP против «абстракций с одной
+  реализацией», границы catch (Exception)). Рекомендация: главнее gauntlet; поправить при переносе файла (О2).
+- Р61 (для О2). **Переносится ли `data-reference/CLAUDE.md` в рабочий контур.** Сейчас в `gauntlet/CLAUDE.md` в списке «не
+  переносятся» стоит только корневой CLAUDE.md, а Инструкция, раздел 9, называет этот файл единственным источником
+  контракта 1С в контуре. Рекомендация: переносить; владелец правит раздел «Рабочий контур» `gauntlet/CLAUDE.md`.
+
+### 4.2. Очередь 2 — до этапа 2 (запуск на контуре)
+
+- Р9. **Аналитика Liquibase выключена во всех средах** (Ш1). Рекомендация: да.
+- Р55. **CI контура: каким сборщиком и откуда берёт образы** (BUILD-13; Ш1, Ш6). Рекомендация: ответить в Инструкции,
+  раздел 9. Для Ш1 без ответа берётся вариант, не меняющий имя bootJar (отключить plain-jar); для Ш6 нужны теги, которые
+  есть в Nexus контура. Там же — версия Docker и Compose у CI контура (профиль стенда Ш2a).
+- Р51. **prefetch 1 сейчас** (Ш1b; extra 2.9). Выбор:
+  - (да) prefetch 1 до Ш31: порядок важнее пропускной способности справочников, а очередь с отравленным сообщением встаёт
+    целиком и видна по алерту О9;
+  - (нет) оставить 20 до Ш31: каждый сбой базы на контуре может молча дать «старое затирает новое».
+
+  Рекомендация: да, вместе с алертом О9.
+- Р10. **`RABBITMQ_LISTENER_AUTO_STARTUP`** (Ш5). Рекомендация: убрать переопределение (Boot по умолчанию true), false
+  только в локальном compose и `.env.example`; переменную добавить в набор тестового контура в CLAUDE.md (О2).
+- Р11. **TLS к брокеру** (Ш5). Рекомендация: проверку сертификата и имени хоста включить по умолчанию. Тестовый контур
+  доверяет своему сертификату через `certs/` или ssl.bundle. В Инструкции — полный набор TLS-переменных, включая
+  PORT=5671.
+- Р12. **Пароли по умолчанию** (Ш5). Варианты:
+  - (а) убрать их из application.yml, порты compose публиковать на 127.0.0.1. Симптом без пароля останется «password
+    authentication failed» (Ш5, javap Boot 4.0.7);
+  - (б) плюс явная проверка обязательных переменных при старте с понятным текстом (+3 ч). Механизм сверить по Boot 4.0,
+    без подтверждения не делать.
+
+  Рекомендация: (а).
+- Р34. **Имя очереди ТЗ-2** (Ш5, О2). Рекомендация: владелец сверяет список очередей брокера контура; если там дефис, как в
+  application.yml, исправить CLAUDE.md (О2).
+- Р62. **Читает ли тестовый контур очереди 1С после Ш5.** Рекомендация: да, если брокер 1С тестового контура доступен и
+  имена всех 11 очередей сверены (О9). Иначе в манифесте тестового контура явно `RABBITMQ_LISTENER_AUTO_STARTUP=false`,
+  без опоры на умолчание.
+- Р54. **GUID вида деятельности РВЛ и dms-product-type** (CS-11; Ш5). Рекомендация: спросить у 1С, совпадают ли значения в
+  тестовом и продовом 1С. Если нет — переменные окружения без умолчания в Ш5 (+0,5 ч), значения — в Инструкцию, раздел 9.
+- Р16. **Версии образов и byte-buddy** (Ш6). Рекомендация: закрепить патч-версию RabbitMQ, совпадающую с брокером 1С
+  контура, и Temurin; byte-buddy в тестах выровнять с продом (1.17.8).
+- Р17. **Контрольная сумма Gradle** (Ш6). Рекомендация: да; владелец присылает SHA-256 дистрибутива 8.14.3 с
+  gradle.org/release-checksums (downloads.gradle.org из облака закрыт).
+- Р14. **Число реплик (CA-08).** Рекомендация: одна реплика и выкатка без перекрытия (Recreate) — в Инструкцию (О9).
+  SKIP LOCKED — отдельной задачей, если понадобится масштабирование.
+- Р40. **ПДн и внутренние адреса в документах** (срока в шагах нет; решить с ИБ вместе с Р20, О8). Рекомендация:
+  запросить у 1С синтетический пример ТЗ-01 и заменить оба PDF; вопрос истории git и внутренних адресов решить с ИБ;
+  отключить форки (allow_forking=true). Историю агентам не переписывать.
+
+### 4.3. Очередь 3 — до этапа 3 (контракт с Заявками)
+
+- Р1. **CPD на структурных дублях сущностей (GA-2)** — до Ш10, Ш11 (этап 3); Ш17, Ш18, Ш30, Ш34 (этап 4); Ш21–Ш23
+  (этап 5). Это правка набора, а не настройка: DryGate принимает только `--report`, `--project-dir`, `--only`, `--max`
+  (`DryGate.java:53-60`). Варианты по трудоёмкости:
+  - (а) аргумент CLI CPD `--exclude` для каталога `entity` в задаче cpdReport (`gauntlet.gradle:372-385`). Есть ли он и
+    как работает, сверить по CLI PMD 7.27.0. 1–2 ч с прогоном gauntlet и selftest (О1);
+  - (б) новая опция DryGate (исключение путей) с кейсами в selftest — 3–4 ч;
+  - (в) `dry.minimumTokens` или `dry.ignoreIdentifiers` в `gauntlet/config/data-reference/gauntlet.properties` — 0,5 ч.
+    Но при minimumTokens=100 остаются 4 дубля и проходят реальные дубли на 60–99 токенов
+    (AppealTypeMapper↔ContragentServiceMapper — 83), а без ignoreIdentifiers дублей нет вообще.
+
+  Рекомендация: (а), если сверка CLI подтвердит; иначе (б). 17 дублей вне entity убирать кодом; @Embedded record не
+  делать.
+- Р8. **Ужесточить политику архитектуры после рефакторинга.** Это действие владельца после мержа, а не предусловие шагов:
+  - после Ш8 — убрать dto из allowed.exception;
+  - после Ш10 — убрать repository из allowed.dto;
+  - после Ш20 (этап 4) — `fail.on.cycles=true` и убрать service из allowed.mapper.
+
+  Рекомендация: да.
+- Р18. **Журнал решений** (В-4…В-9, «решение от 23.09», OQ-48). Рекомендация: положить в `project_files/` или выпустить
+  новую редакцию ТЗ API. До этого ссылки в коде считаются вопросами. Блокирует Ш38 и Ш40.
+- Р19, п. 2. **Главный документ REST (DR-08): состав, ключи и поля.** Рекомендация: состав ручек, ключи и поля брать по ТЗ
+  API, согласовав с разработчиком Заявок. Подпункты:
+  - ключ R-05 по номеру — contract_external_id;
+  - код 404 — INSURANCE_CONTRACT_NOT_FOUND (у Договоров CONTRACT_NOT_FOUND — это договор КМ);
+  - поля без источника в 1С (contract_date, booking_limit_days, short_description, relation_to_enterprise, lpu_id и
+    include_children в R-07) из ТЗ убрать до появления источника. Довод из схемы процесса (2.11, в): «min 90 / 60 дней» —
+    правила процесса сервиса Заявок, а не атрибут справочника, поэтому `booking_limit_days` в data-reference без источника
+    в 1С не держать;
+  - взаимоисключающие ключи — 400;
+  - новые поля с источником в 1С — отдельный шаг Ш38a.
+
+  Пункт 1 (путь и формат) — в очереди 1.
+- Р22. **«Действующее» и фильтр R-01 (DR-09).** Рекомендация: begin_date — как в ТЗ API (только is_archive и end_date),
+  если журнал Р18 не подтвердит В-4. Фильтр R-01 по виду обращения решить с бизнесом (ТЗ API против Q&A стр. 11).
+- Р23. **R-06 в пилоте и основная цена (DR-10).** Рекомендация: решить вместе с Заявками; если R-06 нужен — Ш44 после Ш38.
+  Javadoc, ссылающийся на несуществующий расчёт, пока поправить: `PriceContractResolver.java:18,42` — в Ш10,
+  `LpuServicesResponse.java:61` — в Ш11.
+- Р53 (б). **Пределы query и codes** (Ш27). Рекомендация: пределы длины query и числа codes — в ReferenceApiProperties,
+  значения — из ТЗ API, а если их там нет, предлагает specifier; превышение → 400 VALIDATION_ERROR. Согласовать с Заявками
+  до мержа Ш27 (О8).
+- Р35. **Границы data-reference (DR-12).** Рекомендация: пользователей, профили, возраст и ручку по услуге в data-reference
+  не добавлять до решения ОВ-01 и ОВ-04 Заявок; город — после ответа 1С по ТЗ-8.
+- Р66. **OQ-46: состав REST для сервиса Заявок** (новый; Ш38). `contract-service/CLAUDE.md` (фаза 6+) пишет «состав не
+  назван», а ТЗ API от 21.09 называет R-01…R-09. Рекомендация: закрыть OQ-46 ТЗ API с поправками Р19 и записать это в
+  `data-reference/CLAUDE.md` (О2).
+
+### 4.4. Очередь 4 — до этапа 4 (надёжность приёма из 1С и наблюдаемость)
+
+- Р7. **ImportResult (GA-8)** — до Ш14b и Ш16. Рекомендация: закрепить возвращаемое значение тестами (Ш16) и писать его в
+  журнал планировщика (Ш14b: он и так трогает ReferenceImportScheduler); сигнатуры не менять.
+- Р15. **Мониторинг и журнал контура** — до Ш15a и Ш24. Рекомендация:
+  - Prometheus — `io.micrometer:micrometer-registry-prometheus:1.16.6` (BOM Boot 4.0.7; транзитивно
+    `io.prometheus:prometheus-metrics-*:1.4.3`), проверить в Nexus;
+  - формат журнала для Ш15a — structured (ecs или logstash) по требованию платформы логов контура, без новых зависимостей;
+    если платформа ждёт текст — шаблон с ключами MDC.
+- Р52. **/actuator/prometheus — операционный интерфейс или наблюдаемый API** (Ш24). Рекомендация: операционный интерфейс,
+  Ш24 без спецификации; доступ — только сетевой политикой (О9).
+- Р25. **Кэш справочников** (Ш43, конец этапа 4). Рекомендация: после Ш38 и замера. Провайдер —
+  `com.github.ben-manes.caffeine:caffeine:3.2.4` со `org.springframework.boot:spring-boot-starter-cache:4.0.7` (проверить в
+  Nexus; источник — О1). Ключ с датой, TTL, предел размера, сброс по событию применения сообщения 1С; R-04 и R-05 не
+  кэшировать.
+- Р26. **Отравленные сообщения (CA-01).** Рекомендация: ведущий UTF-8 BOM снимать до записи; остальное класть в отдельную
+  таблицу карантина (bytea, messageId, очередь, причина) со сроком хранения как у полисов, затем ack и ERROR без тела.
+- Р27. **Временная недоступность базы в слушателе (CA-05).** Рекомендация: останавливать контейнеры слушателей до
+  восстановления базы вместо nack-цикла; это закрывает и перестановку при prefetch 20.
+- Р28. **Порядок при повторах (CA-02).** Рекомендация: вариант (а) «голова потока» — пока в потоке есть RETRY, более
+  поздние строки этого потока не разбираются. Вариант (б) с ключом порядка источника — после ответа 1С о
+  creation-timestamp.
+- Р29. **ТЗ-6, обязательные поля (DOM1C-11).** Рекомендация: отказ всему сообщению (OneCFieldException, как у ТЗ-1).
+- Р30. **ТЗ-9, «финализировалась последней», и зависшие передачи.** Рекомендация: порядок определяет момент приёма
+  финального сообщения; зависшая передача, если по услуге уже применена более новая, получает SKIPPED с причиной; ручное
+  закрытие — в регламент (О9). Ключ хранить новой таблицей (Ш34).
+- Р31. **Срок хранения ПДн (CA-04).** Рекомендация: тело ТЗ-2 во всех статусах и SKIPPED всех потоков — тот же срок
+  30 суток; ТЗ-8 — по ответу 1С.
+- Р32. **Сообщение без родителя (DOM1C-03).** Рекомендация: сейчас — регламент первичной загрузки и SQL-контроль (О9);
+  затем Ш37 с отличимой причиной и метрикой. Ранжирование по зависимостям — только если 1С не гарантирует порядок выгрузки.
+- Р41. **Дубли документов и версия «Точек интеграции»** (до Ш28). Рекомендация: действует 1.1; обе копии 1.0 и шесть
+  дублей удалить.
+- Р56. **ТЗ-5: «не более одного активного основного договора»** (DOM1C-09). Рекомендация: спросить у 1С (О7); до ответа не
+  реализовывать, решение записать в «Расхождения контракта» `data-reference/CLAUDE.md` (О2). При «реализовать» —
+  поведенческий шаг после Ш19 (вне итога).
+- Р57. **ТЗ-5: запасная привязка договора отделения к головной организации** (DOM1C-10; `LpuContractMapper.java:121-131`).
+  Рекомендация: подтвердить правило. При «да» — спецификация на оба исхода (найдено отделение / только головная),
+  поведенческий шаг после Ш19 (вне итога).
+- Р59. **Срок хранения самих полисов** (PH-24). Рекомендация: решить с ответственным за ПДн. Предложение — для архивных
+  полисов (is_archive или end_date в прошлом) после срока обезличивать ФИО, дату рождения и e-mail; отдельный шаг после
+  Ш36 (вне итога; может поднять Ш22 из бэклога).
+- Р2. **PMD ImmutableField на персистентных коллекциях** (`Policy.java:81,84`, `Program.java:49`). Нужен только бэклогу:
+  до Ш21 и Ш22 (этап 5). Рекомендация: узкое `violationSuppressXPath` для полей с @OneToMany, @ManyToMany и
+  @ElementCollection в `pmd-ruleset.xml` (JPA 3.2 §2.1). ConstructorCallsOverridableMethod и
+  AbstractClassWithoutAbstractMethod агент исправит кодом, исключения не нужны.
+
+### 4.5. Очередь 5 — contract-service (до этапа 6)
+
+- Р49. Пакет, имя приложения и БД, код фазы 7a, роли и ЕПК (К1). Рекомендация: `ru.projectx.contracts`,
+  `contract-service`, писать с нуля (коммитов 7a в истории нет, DN-13); две роли без ЕПК, как во вводных.
+- Р64. **Шаблоны печатных форм КМ и PDF-библиотека** (DN-21; предусловие К6). Рекомендация: владелец предоставляет
+  шаблоны. Агент К6 предлагает библиотеки с координатами `group:artifact:version` и лицензией; выбор, проверку в Nexus и
+  строку в «Источниках документации» (О1) делает владелец до начала К6.
+- Р60. **ФИО сотрудников в документах** (DN-15: ordering.pdf, docx требований к ЛК). Рекомендация: решить вместе с Р40 и
+  ИБ, допустимо ли хранить их в GitHub; в фикстуры и спецификации такие значения не брать.
+- Р65. **Кто формирует договор КМ и счёт** (новый; схема процесса 2.11, а; К3–К6). По схеме это 1С (шаг 11.2
+  «формирование полиса / счета, КМ договора-полиса»). По `contract-service/CLAUDE.md` и ТЗ Договоров договор КМ и печатные
+  формы формирует Сервис Договоров (К6), а в 1С передаётся оплаченный договор (ДГ-04, К8). Это не вопрос оплаты: от
+  ответа зависят К3–К6. Рекомендация: по ТЗ Договоров, потому что схема — верхнеуровневая концепция. Подтвердить у автора
+  ТЗ Договоров и 1С (О8).
+- Р50 — **снят** решением Д2 (1.2): К1 — после завершения data-reference (этап 4).
+- Р67. **Бэклог качества (Ш9, Ш21–Ш23) — после этапа 6 или параллельно ему?** (новый; толкование Д2 в 1.2 и 3.9). Д2 говорит
+  «довести data-reference до финального рабочего решения, потом contract-service»; что бэклог этапа 5 не держит этап 6 —
+  толкование плана. Варианты: (а) параллельно этапу 6, по касанию и в свободные окна; (б) весь бэклог до К1. Рекомендация:
+  (а) — бэклог не меняет поведение и не нужен ни одному шагу этапов 1–4 и 6.
+
+### 4.6. Очередь 6 — оплата (последней, Д1; до этапа 7)
+
+- Р43. Документ контракта Ordering (DN-01). Рекомендация: документ Ordering; ТЗ Договоров (СЭ-03, payment_orders)
+  поправить. Довод из архитектурной схемы (2.11): публикации ЗЛ → брокер маркетинга сообщения fixed на ней нет, а документ
+  Ordering её требует — уточнить у команды Ordering (О8).
+- Р44. Код продукта и канала КМ РВЛ (DN-02; К7 — брокер маркетинга перенесён туда из К2). Рекомендация: запросить
+  отдельный код у команды Ordering (О8), dmsfl не использовать.
+- Р45. clientId и email (DN-03). Рекомендация: clientId — непрозрачный UUID участника; email — e-mail учётной записи ЛК
+  через расширение ДГ-01 (R-05 может вернуть пусто).
+- Р46. documentId (DN-05). Рекомендация: documentId = payment_orders.id; UQ по contract_number снять; после просрочки —
+  draft того же заказа, после отмены — новый заказ.
+- Р47. СЭ-03 и 5 с (DN-06). Рекомендация: заказ создаётся на акцепте, checkout выполняет фоновый процесс по событию
+  READY_TO_PAYMENT через outbox, СЭ-03 отвечает ACCEPTED (так его и делает К6 без оплаты). Клиент Ordering — RestClient из
+  spring-web без новых зависимостей; токен Keycloak — `org.springframework.boot:spring-boot-starter-oauth2-client:4.0.7`
+  (проверить в Nexus).
+- Р48. Порядок оплаты и её место в пилоте (DN-12). Рекомендация: по ДГ — оплата до выпуска КМ. Схема процесса (2.11, б)
+  это подтверждает: счёт на доплату (12) идёт до проведения КМ в 1С (13). Входит ли приём платежей в пилот, подтвердить у
+  бизнеса.
+- Р68. **Когда отправлять запросы команде Ordering** (новый; О8; ответ нужен до этапа 6). Д1 ставит все вопросы оплаты
+  последними, но ответы Ordering — календарный риск этапа 7. Варианты: (а) сразу — отступление от Д1; (б) в начале этапа
+  6, чтобы ответы пришли к этапу 7. Рекомендация: (б).
+- Р63. **Отмена договора в INVOICE_ISSUED и PENDING_PAYMENT** (DN-04, major; К7). Рекомендация: короткий paymentTtl
+  (ОВД-04); ДГ-02 в этих статусах ждёт paymentOverdue и затем отменяет; оплата отменённого договора — ERROR, алерт и
+  ручной возврат. В спецификацию К7.
+
+---
+
+## 5. Ход выполнения
+
+| Этап | Шаг | Ветка и сессия | PR | Статус | Факт, ч | Отклонение от оценки и причина |
+|---|---|---|---|---|---|---|
+| | | | | | | |
+
+---
+
+## 6. Операционные задачи вне кода
+
+Сроки — в 1.3.
+
+- **О1. Правки набора (владелец или админ-окружение gauntlet-admin).**
+  - **Общее правило** (Инструкция, раздел 2; INF-16, INF-17). gauntlet-admin — только для правок набора: guard там
+    выключен целиком, а Stop-хук изменения только в `gauntlet/` не проверяет. После каждой правки до PR запустить
+    `cd data-reference && ./gradlew gauntlet --continue` и `python3 gauntlet/hooks/selftest.py`, итог — в описание PR.
+    Поведенческие задачи и шаги кода — только в Default.
+  - По ответам:
+    - Р1 (вариант а/б/в), Р2 (pmd-ruleset.xml), Р4 (строка RUN_ERROR в отчёте);
+    - Р5 (no-skipped при 0 сценариев и устаревшие результаты);
+    - Р8 (architecture.properties после мержа Ш8, Ш10, Ш20);
+    - Р36 и Р37 (guard.py, matcher в `.claude/settings.json`, selftest), Р39 (шаг 8), Р42 (роль specifier);
+    - Р61 (раздел «Рабочий контур»).
+  - **Источники документации — до шага, которому они нужны** (правило 12: без строки в таблице шаг останавливается).
+    Добавляет владелец:
+    - **Docker и Compose** — до Ш2a (и для Ш1, Ш6). docs.docker.com из сессии закрыт (403 прокси). Запасной путь:
+      - `raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/services.md` (Compose);
+      - `…/docker/docs/main/content/manuals/build/concepts/context.md` (`.dockerignore`);
+      - `raw.githubusercontent.com/moby/buildkit/master/frontend/dockerfile/docs/reference.md` (Dockerfile).
+
+      Версии: в VM облака Docker 29.3.1 и Compose v5.1.1; у CI контура — по Р55. Адреса без версии в пути, поэтому
+      сверять по тегу при расхождении.
+    - **Spring Security 7.0.6** — до К7 (oauth2-client): docs.spring.io/spring-security/reference/7.0/ (отвечает 200,
+      но показывает 7.0.7), API — `…/reference/7.0/api/java/`. Запасной путь — javadoc-jar и sources-jar 7.0.6 на
+      repo.maven.apache.org.
+    - **Caffeine 3.2.4** — до Ш43: javadoc.io/doc/com.github.ben-manes.caffeine/caffeine/3.2.4; вики —
+      `raw.githubusercontent.com/wiki/ben-manes/caffeine/<Страница>.md` (github.com закрыт). Кэш Spring уже покрыт строкой
+      Spring Framework (integration/cache.html).
+    - **PDF-библиотека** — до К6, после выбора по Р64: её документация той же версии.
+    - **OAuth 2.0 и Keycloak** — до К7. www.rfc-editor.org, datatracker.ietf.org и www.keycloak.org из сессии закрыты
+      (403 прокси): владелец открывает домены в Network access или называет запасной путь. Версию Keycloak сообщает команда
+      Ordering (О8).
+    - **`project_files/ordering/`** — в «Предметную область» (DN-08), до этапа 7.
+  - Сверх ответов:
+    - SubagentStop-хук hardener'а на уровне settings (INF-14; формат сверить по документации hooks);
+    - строка статуса при недостижимом merge-base (INF-10);
+    - исправить адреса источников: файлы-оглавления вместо каталогов, `docs.junit.org/6.0.3/`,
+      `userguide/userguide.html`, ArchUnit `html/000_Index.html`, Checkstyle и JaCoCo по тегу, у Tomcat sources-jar (NET-5,
+      NET-6);
+    - дописать в таблицу стека JUnit 6.1.3 (приёмка) и pitest-junit5-plugin 1.2.3;
+    - `gauntlet/CLAUDE.md:144-145` — зеркало образов (Р38).
+  - README, раздел «ловушки» — полный список (Инструкция, раздел 6):
+    - 429 Docker Hub и префикс зеркала; 429 Maven Central — повтор через 30–60 с;
+    - `build/pitHistory.txt` удалять перед контрольным прогоном PIT (инкрементальный анализ);
+    - raw.githubusercontent.com не отдаёт каталоги — нужны конкретные файлы;
+    - www.rabbitmq.com отвечает 403 Cloudflare — брать raw rabbitmq-website version-4.1;
+    - неверсионные сайты показывают чужую версию — сверять meta version;
+    - JDK 21 (Gradle 8.14.3 не поддерживает JVM 25) и BuildKit для Dockerfile;
+    - `TestRestTemplate` и автонастройка `RestTestClient` в Boot 4.0.7 лежат в модуле `spring-boot-resttestclient`, которого
+      на classpath нет. Без новых зависимостей — `RestTestClient.bindToServer()` из spring-test 7.0;
+    - два бина ObjectMapper — snake_case даёт только @Primary бин Boot;
+    - missing-queues-fatal и имена очередей; очистка базы через TEST_POSTGRES_URL;
+    - Stop-хук платформы советует amend (INF-11); смена VM теряет незакоммиченный черновик (INF-15);
+    - нулевая приёмка зелёная вхолостую до Р5;
+    - docs.docker.com закрыт — Compose и Dockerfile по raw-исходникам (выше).
+- **О2. Перенос и правка CLAUDE.md** (решение 2 PR #1, Р33, Р34, Р61, Р66). **Исполнитель — владелец или gauntlet-admin по
+  его поручению:** задача правит корневой `CLAUDE.md`, `gauntlet/CLAUDE.md` и `.claude/agents/*`, а это файлы человека.
+  - **Порядок: Р37 (guard и selftest) → О2**, иначе новый файл правил открыт для правки агентом через Edit и Bash
+    (`guard.py:31-32,153-154`).
+  - `contract-service/CLAUDE.md` переносится в `data-reference/CLAUDE.md`. При переносе исправить:
+    - 17 пунктов DN-09: ПДн R-05 (по Р20), фазы, OQ-46 (Р66) и OQ-47 (Р58), очередь ТЗ-2, правила REST, тесты, хэши,
+      ссылку на «Точки интеграции» 1.1;
+    - набор переменных контура: `+ RABBITMQ_LISTENER_AUTO_STARTUP=true` или явное false — по Р62;
+    - «Расхождения контракта» (Р56, Р57).
+  - Для `contract-service` — свой CLAUDE.md.
+  - Обновить ссылки: `CLAUDE.md:9`, `gauntlet/CLAUDE.md:21,68,238`, `.claude/agents/reviewer.md:28`,
+    `.claude/agents/specifier.md:26`, `architecture.properties:16`.
+  - По Р61 владелец правит раздел «Рабочий контур» `gauntlet/CLAUDE.md`: переносится ли модульный CLAUDE.md.
+  - Срок: желательно до Ш25a и Ш39 (specifier и reviewer читают этот файл), обязательно до Ш38 и К1.
+- **О3. CI (`.github/workflows/gauntlet.yml`, админ)** — параллельно этапу 2.
+  - Триггер `push: branches: [main]` — кэш Gradle и проверка main (INF-05).
+  - `permissions: contents: read` (INF-06).
+  - Job сборки в режиме контура (BUILD-14).
+  - Ночной прогон scope=all — только информационный, после адаптации.
+  - Проверка обёртки Gradle в setup-gradle@v4 не сверена — сверить по документации action той же версии.
+  - Закрепление actions по SHA вместо мажорных тегов (INF-06) — по решению владельца.
+  - После О11 — модуль contract-service в матрице.
+- **О4. Облачные окружения** (Инструкция, разделы 1, 4, 5).
+  - **Часть 1 — до Ш2a** (первый шаг этапа 1).
+    - `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` в Default и gauntlet-admin (Р38).
+    - Setup script, укладывающийся в 5 мин:
+      - dockerd;
+      - pull трёх образов (postgres:16.10-alpine, rabbitmq:4.1-alpine, testcontainers/ryuk:0.14.0) под именами с
+        префиксом;
+      - `poppler-utils` — без него Read по PDF падает («pdftoppm is not installed»), а обход через pypdf сломан;
+      - по желанию — образы стенда Ш2a (eclipse-temurin:21-jre, postgres:16.10-alpine под именем без префикса через
+        `docker tag`), если это укладывается в 5 мин;
+      - прогрев Gradle — только после проверки порядка относительно клона и доверия JVM прокси.
+    - **Что не класть в окружения облака:** DB_*, RABBITMQ_*, учётные данные брокера 1С и TEST_*. Тесты приёма читают
+      очереди с именами контура (`TestBroker.java:9-11`), а TEST_POSTGRES_URL очищает все таблицы указанной базы
+      (tests-10). RABBITMQ_SSL_ENABLED не задавать. Образ в облаке собирать только с JAR_SOURCE=host (BUILD-09).
+  - **Часть 2 — до первого шага со specifier (Ш25a).**
+    - Network access в Default и gauntlet-admin: Custom плюс стандартный список. Выровнять списки и дописать домены
+      документации; проверить curl по списку Инструкции, раздел 5; открыть docs.junit.org (и по желанию site.mockito.org)
+      — решение 3 PR #1.
+    - Проверка Default: нет GAUNTLET_*, строка статуса «guard: on; stop hook: on; docker: up», guard отказывает в правке
+      `gauntlet/README.md`, selftest 517/0.
+    - Закладки для задач с `environment=<ID Default>`.
+- **О5. GitHub.** Тариф: Pro и ruleset на main (Р36); до этого — правило «в main только через PR» в README.
+- **О6. Документы `project_files/`** (Р18, Р40, Р41, Р60):
+  - журнал решений или новая редакция ТЗ API — до Ш38 и Ш40;
+  - синтетический пример ТЗ-01 вместо двух PDF;
+  - удалить копии «Точек интеграции» 1.0 и шесть дублей — до Ш28.
+
+  Если схемы владельца (2.11) попадут в `project_files/`, стрелку Data Reference ↔ RabbitMQ 1С исправить на
+  одностороннюю (Д4).
+- **О7. Запрос к 1С:УСК** (отправляет владелец, сразу):
+  - тип очередей, delivery-limit, DLX, версия RabbitMQ. **Действие по CA-05 до первого переноса в контур:** если очереди
+    1С — quorum, эксплуатация брокера 1С ставит политику delivery-limit=-1 (RabbitMQ 4.1, `quorum-queues/index.md:339-377`
+    в rabbitmq-website, versioned_docs/version-4.1) либо DLX с разбором;
+  - бывают ли в телах BOM и `\u0000`;
+  - единица creation-timestamp и можно ли по нему упорядочивать;
+  - ТЗ-8: полный ли набор контактов, что значит mode, что идёт в `_contact-information-changes-final` (OQ-28), какие
+    поля несут город (field3, field5) и ПДн физлиц;
+  - ТЗ-9: что значит «финализировалась последней»;
+  - ТЗ-5: правило одного активного основного договора (Р56) и привязка договора отделения к головной (Р57);
+  - округление цен с тремя знаками после запятой;
+  - GUID видов обращения РВЛ и их наименования (OQ-48); GUID вида деятельности и dms-product-type продового 1С (Р54);
+  - порядок первичной выгрузки;
+  - признак второго фильтра ТЗ-5 (OQ-24);
+  - всегда ли в ТЗ-1 заполнено ФИО;
+  - синтетический пример для ТЗ-01;
+  - кто формирует договор КМ и счёт (Р65).
+- **О8. Запросы к ИБ, Заявкам, Договорам и Ordering** (сразу, кроме Ordering — по Р68).
+  - ИБ: сетевая политика как единственная защита ручек с ПДн (межсервисной аутентификации нет, Д5), ПДн в R-05 (Р20),
+    события в cvm (ОВД-05, DN-19), ФИО сотрудников в документах (Р60).
+  - **Разработчик Договоров** (этап 1, Д3): контракт трёх GET — фичи Ш25a и примеры стенда Ш2a; путь проекции полиса
+    без ПДн (Р20); ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58); формат X-Request-Id (Р53 (а)); TTL кэша
+    (Р25).
+  - Разработчик Заявок: путь, формат ошибки, состав ручек (Р19, Р66), R-06 (Р23), валидация входа (Р53: X-Request-Id,
+    пределы query и codes), TTL кэша (Р25).
+  - Автор ТЗ Договоров и бизнес: ОВД-02 (правило подбора программы, К5), OQ-47 (Р58), кто формирует договор КМ и счёт
+    (Р65), приём платежей в пилоте (Р48).
+  - Команда Ordering (очередь «оплата»; срок — по Р68, рекомендация — в начале этапа 6): код продукта и канала, настройка
+    событий, клиент Keycloak и его версия, доступ к RabbitMQ маркетинга, публикация fixed (Р43), Swagger/AsyncAPI с точными
+    routing key, ОВД-04 (paymentTtl, К7), отмена после выставления счёта (Р63).
+  - 1С:УСК: ОВД-13 (base64-вложения и предельный размер при передаче оплаченного договора, К8).
+- **О9. Контур (инструкция развёртывания и эксплуатация).** Всё — до первого переноса в контур.
+  - **Мониторинг до Ш24.**
+    - Алерты по журналу (Инструкция, раздел 8): ERROR «потеряно», WARN «не соответствует контракту», WARN «передачи
+      прайсов не собрались», повторяющийся WARN «не сохранено, вернём источнику» (при Р51 = «да» — вместе с Ш1b).
+    - Периодический SQL-отчёт по inbound_message:
+      - FAILED за сутки — исчерпание лестницы в журнал до Ш28 не попадает;
+      - SKIPPED по потокам 3, 5, 8, 9, 10 — до Ш37 причина «нет родителя» неотличима от «не РВЛ», смотреть всплески;
+      - BUFFERED старше 1 ч;
+      - число строк в RETRY.
+    - Давность последнего PROCESSED при непустых NEW — признак зависшего планировщика (CA-07, до Ш14b).
+    - После Ш15a — перенастроить разбор журнала под новый формат.
+  - Временная переменная манифеста — уровень журнала категории Hibernate из Ш1a (имя — по правилам ослабленного
+    связывания Boot 4.0, сверить) до переноса Ш1a.
+  - До переноса Ш5: сверить все 11 имён ONEC_QUEUE_* со списком очередей брокера контура; решение Р62 записать в манифест.
+  - Одна реплика и Recreate (Р14).
+  - Сетевая политика: к /internal/v1 — только Заявки и Договоры, к /actuator/health — только kubelet, к
+    /actuator/prometheus (после Ш24) — только сборщик метрик. Межсервисной аутентификации нет (Д5), поэтому это единственная
+    защита ручек с ПДн: политику проверить на контуре до первого переноса (остаточный риск, 1.2).
+  - Маскирование query для `/internal/v1/policies*` в ingress и mesh; access-лог Tomcat без `%r` и `%q` (PH-07).
+  - Переменные манифестов:
+    - полный TLS-набор;
+    - `RABBITMQ_LISTENER_AUTO_STARTUP=true` (до Ш5 это обязательно) или явное false по Р62;
+    - `SPRING_LIQUIBASE_ANALYTICS_ENABLED=false` до переноса Ш1;
+    - имена RABBITMQ_*, а не RABBITMQ_1C_*.
+  - Право CREATE или предустановленный pg_trgm (CS-14); terminationGracePeriod больше 30 с.
+  - JDK 21 на агенте сборки контура: Gradle 8.14.3 не поддерживает JVM 25 (BUILD-11).
+  - TEST_POSTGRES_URL в контуре — только выделенная пустая база (tests-10).
+  - Регламент первичной загрузки: слушатели запущены до выгрузки, 1С выгружает потоки по порядку 7/4 → 3 → 8 → 5 → 10 →
+    9 → 6 → 2 → 1.
+  - Регламент ручной переобработки: SQL короткими транзакциями строго по received_at; тело полиса стирается через 30 суток.
+  - Сверить appeal_types контура с конфигурацией (DR-14).
+  - Nexus:
+    - 312 модулей сборки, дистрибутив Gradle и образы (BUILD-12). Образы профиля стенда Ш2a — те же, что у compose
+      (`postgres:16.10-alpine`, `eclipse-temurin:21-jre`);
+    - координаты новых зависимостей — **до начала** Ш24 (Р15), Ш43 (Р25), К6 (Р64), К7 (Р47).
+  - Проверить прежний репозиторий: не коммитился ли там пароль брокера.
+  - CI контура — пока не уведомляем (решение 7 PR #1).
+- **О10. Проверки по ходу серии.** В Ш25a — появился ли журнал хука mutationGate в `build/gauntlet/` после hardener'а
+  (INF-14). Один раз дать сессии истечь с незакоммиченным файлом и записать итог в README (INF-15).
+- **О11. Подключение `contract-service` к набору** (новая; DN-17; исполнитель — владелец или gauntlet-admin по
+  `gauntlet/INSTALL.md`). После мержа К1, до К2.
+  - Что сделать:
+    - оверлей `gauntlet/config/contract-service/` (basePackage, glue, exclude.classes);
+    - `module=data-reference,contract-service`;
+    - строгая политика архитектуры (`fail.on.cycles=true`; циклов в новом коде нет);
+    - блок подключения набора в `contract-service/build.gradle` (INSTALL.md, раздел 4);
+    - строки модуля в таблицах корневого `CLAUDE.md` и `gauntlet/CLAUDE.md`, стек в «Источниках документации».
+  - Проверка:
+    - по общему правилу О1 — `gauntlet --continue` в обоих модулях и selftest;
+    - плюс однократный прогон гейтов по всем файлам каркаса (как прогон scope=all в скане, без изменения `scope` в PR).
+      Иначе каркас К1 так и останется вне гейтов (DN-17). Красное — в отчёт и в задачу К1b.
+
+---
+
+## 7. Задачи для Jira
+
+### 7.1. Ш2a — первый шаг кода
+
+**Тема:** [data-reference] Стенд потребителя для сервиса Договоров: профиль docker compose с синтетическими данными 1С и
+примерами трёх GET
+
+**Описание.**
+
+Контекст. Разработчик сервиса Договоров хочет проверять свой клиент на живом data-reference (решение владельца
+2026-09-30, Д3). Контракт для Договоров — три GET:
+- `/internal/v1/policies/{id}`;
+- `/internal/v1/insurance-contracts/{id}`;
+- `/internal/v1/programs/{id}`.
+
+Они реализованы, 29 REST-тестов зелёные. Брокер 1С стенду не нужен: до подключения брокера сервис работает на сырье,
+положенном в `inbound_message` (`contract-service/CLAUDE.md`, вводная 8). Спецификации нет: ответы API, сообщения и
+журнал не меняются, Java main не меняется.
+
+Варианты закладки данных:
+- (а) сырьё в `inbound_message` одноразовым контейнером psql. Образ `postgres:16.10-alpine` уже есть в compose; закладка
+  идёт после того, как Liquibase создал схему, а разбирает её штатный планировщик. **Выбран этот вариант.**
+- (б) Публикация в брокер: нужны definitions 11 очередей и `RABBITMQ_LISTENER_AUTO_STARTUP=true`. Стенд стал бы зависеть
+  от брокера и от открытых дефектов приёма (CA-01, CA-05).
+- (в) psql прямо в таблицы справочников — отвергнут: обходит разбор и ломается при каждой миграции схемы.
+- (г) changeSet Liquibase с контекстом — отвергнут: правит main-ресурсы, и данные рискуют попасть в базу контура.
+
+Предусловия:
+- О4, часть 1 — зеркало образов (Р38) и setup script. Без него новый тест на Testcontainers и Stop-хук краснеют на 429
+  Docker Hub.
+- Строки Docker и Compose в «Источниках документации» (О1). docs.docker.com из облака закрыт, запасной путь —
+  raw-исходники docker/docs и moby/buildkit.
+- Р39 желателен: без него PR открывает человек.
+
+Что делается:
+1. `docker-compose.yml`, профиль `stand`:
+   - PostgreSQL и отдельный сервис data-reference (образ из Dockerfile) без `depends_on` на rabbitmq и с явным
+     `RABBITMQ_LISTENER_AUTO_STARTUP=false`; брокер со стендом не стартует;
+   - одноразовый сервис закладки. Он ждёт появления таблицы `inbound_message`, а не healthcheck образа сервиса;
+   - исправить комментарий `:4-5`.
+2. Синтетические сообщения 1С в конверте `{data, metadata}` по ТЗ-01…ТЗ-06 и мапперам. Все разбираются в PROCESSED.
+   - ТЗ-3: санаторий с GUID вида деятельности РВЛ из конфигурации и страхователь-юрлицо;
+   - ТЗ-2: договор страхования с dms-product-type из конфигурации;
+   - ТЗ-6: программа РВЛ со ссылкой на санаторий, со всеми полями, которые Ш35 сделает обязательными;
+   - ТЗ-1: полис по договору и программе.
+3. Закладка — SQL со строками сырья:
+   - status NEW;
+   - `received_at` по порядку родителей: ТЗ-3 → ТЗ-2 → ТЗ-6 → ТЗ-1;
+   - идемпотентно по `message_id`.
+
+   Файлы — в `data-reference/src/test/resources/stand/`, их читают и compose, и тест.
+4. Примеры запросов и ответов:
+   - поиск полиса и договора по `external_id` → `id` (механика стенда: `id` генерирует сервис; `id` программы — из ответа
+     полиса);
+   - три GET по `id`;
+   - 404 (неизвестный `id`);
+   - 400 (нечитаемый UUID; запрос без ключа);
+   - X-Request-Id — присланный и выданный, `error.request_id`.
+
+   Поля, которые генерирует сервис (`id`, выданный request_id), — плейсхолдерами с описанием формата.
+5. Тест в `src/test` (`@IntegrationTest`): те же файлы закладки → проход разбора вызовом планировщика → ответы трёх GET
+   через MockMvcTester совпадают с примерами. Генерируемые поля сверяются по формату UUID, остальное — сравнением JSON.
+   Новых зависимостей нет.
+6. `data-reference/.env.example`: все переменные (DB_*, RABBITMQ_*, ONEC_QUEUE_*, RABBITMQ_LISTENER_AUTO_STARTUP, JDK_IMAGE,
+   JRE_IMAGE, GRADLE_DISTRIBUTION_URL, PUBLIC_REPOSITORIES, JAR_SOURCE) — только плейсхолдеры, без паролей.
+7. `.gitignore`: `.env` и `hs_err_pid*.log`. Следующий шаг, Ш7, первым запускает PIT, а минионы PIT оставляют hs_err в
+   `data-reference/` (GA-6).
+8. Шапка `docker-compose.yml` — как запустить стенд:
+   - `./gradlew bootJar`;
+   - `docker compose --profile stand up --build`; в облаке — `JAR_SOURCE=host` и образы через зеркало;
+   - сброс — `docker compose down -v`.
+
+Критерии приёмки:
+- без спецификации: ответы API, сообщения и журнал не меняются; Java main не меняется, mutationGate пропускается;
+- `cd data-reference && ./gradlew gauntlet --continue` зелёный;
+- новый тест зелёный и краснеет, если пример расходится с ответом (проверено порчей одного поля в примере во временном
+  worktree);
+- `docker compose --profile stand up --build` поднимает стенд (в облаке — `JAR_SOURCE=host`, образы через зеркало):
+  - за минуту все строки сырья переходят в PROCESSED;
+  - запросы из примеров дают указанные ответы;
+  - повторный `up` не дублирует данные;
+- во временном worktree создан файл `data-reference/hs_err_pid1.log`, и ни `git status --porcelain`, ни
+  `./gradlew gauntletScope` его не показывают;
+- в данных, примерах, `.env.example` и журналах нет ПДн, секретов и внутренних адресов; ничего не скопировано из PDF
+  (PH-01, PH-02);
+- ревью — два раунда, blocker и major исправлены;
+- в PR — отчёт «Перенос в контур»:
+  - новые файлы и профиль compose;
+  - новых зависимостей и переменных сервиса нет;
+  - образы профиля (`postgres:16.10-alpine`, `eclipse-temurin:21-jre`) в контуре берутся из Nexus.
+
+**Трудозатраты:** 8–10 ч (1–1,25 дня):
+- контекст и сверка источников (Compose, psql, конверт 1С) — 0,5–1;
+- синтетические сообщения и проверка их разбора — 2–2,5;
+- профиль и закладка — 1–1,5;
+- примеры — 0,75;
+- тест сверки примеров — 1,5–2;
+- `.gitignore` и `.env.example` — 0,25;
+- прогон гейтов, проверка стенда в облаке и hs_err во временном worktree, отчёт и PR — 1;
+- ревью в два раунда — 1.
+
+### 7.2. Ш1 — первый шаг этапа 2
+
+**Тема:** [data-reference] Гигиена репозитория и образа: удаление .DS_Store, .gitattributes, .dockerignore, однозначный
+jar в Dockerfile, отключение аналитики Liquibase
+
+**Описание.**
+
+Контекст. Скан 2026-09-30 (HEAD 795e5ec) нашёл в репозитории и сборке мусор, который мешает переносу в контур.
+- В git лежат 5 `.DS_Store` (решение 5 PR #1).
+- Нет `.gitattributes` и `.dockerignore` (BUILD-06).
+- `Dockerfile:74` копирует jar по маске, и BuildKit молча берёт не тот файл (BUILD-03).
+- Liquibase 5.0.3 при каждом старте обращается к config.liquibase.com (BUILD-01).
+- Устарели комментарии `application.yml:90-92` и `build.gradle:22`.
+
+`.gitignore`, `.env.example` и комментарий `docker-compose.yml:4-5` сделаны в Ш2a.
+
+Предусловия:
+- О4, часть 1 (зеркало образов и setup script), иначе Stop-хук краснеет на 429 Docker Hub;
+- ответ Р9;
+- строки Docker в «Источниках документации» (О1);
+- Р55 желателен: без ответа берётся вариант, не меняющий имя bootJar.
+
+Что делается:
+1. Удалить из git 5 файлов `.DS_Store` (корень, `contract-service/`, `data-reference/`, `project_files/`,
+   `project_files/1C_data/`).
+2. `.gitattributes`: LF по умолчанию, CRLF для `*.bat`, binary для pdf/docx/png/jar. Перед этим проверить
+   `git ls-files --eol`.
+3. `data-reference/.dockerignore`: `.env`, `.gradle/`, `build/`, но с сохранением `build/libs` (синтаксис — по документации
+   Docker, запасной путь О1).
+4. Однозначный артефакт: отключить plain-jar, имя bootJar не менять (Р55). `Dockerfile:69` и `:74` копируют точный путь;
+   проверить `docker build --build-arg JAR_SOURCE=host`.
+5. `application.yml`: `spring.liquibase.analytics-enabled: false` (сверка по metadata spring-boot-liquibase 4.0.7 и sources
+   liquibase-core 5.0.3); исправить комментарий `:90-92` о dataVersion.
+6. Исправить описание в `build.gradle:22`.
+
+Критерии приёмки:
+- без спецификации: наблюдаемое приёмкой поведение не меняется;
+- `cd data-reference && ./gradlew gauntlet --continue` зелёный. PIT в этом PR не запускается: Java не меняется, и
+  mutationGate пропускается (`gauntlet.gradle:453-454`);
+- после `.gitattributes` `git ls-files --eol` не показывает перенормализованных файлов, кроме названных в PR;
+- `docker build --build-arg JAR_SOURCE=host` собирает образ ровно с одним jar, имя bootJar прежнее;
+- ревью — два раунда, blocker и major исправлены;
+- в журналах и конфигурации нет ПДн и значений секретов;
+- в PR — отчёт «Перенос в контур»:
+  - удалённые `.DS_Store` и новые файлы;
+  - изменённое умолчание `spring.liquibase.analytics-enabled` (в манифестах до переноса —
+    `SPRING_LIQUIBASE_ANALYTICS_ENABLED=false`);
+  - отключённый plain-jar.
+
+**Трудозатраты:** 4,5 ч (≈ 0,5 дня):
+- контекст и сверка источников — 0,5;
+- пп. 1–2 — 0,5;
+- п. 3 — 0,25;
+- п. 4 с проверкой `docker build` — 1;
+- пп. 5–6 — 0,25;
+- прогон гейтов, отчёт и PR — 1;
+- ревью в два раунда — 1.
+
+---
+
+## 8. Как проверялся план
+
+- **Критик** прочитал черновик и дал 21 замечание: пропущенные зависимости, сроки операционных задач, нижние границы оценок,
+  правила пакетов, проверяемость Ш30 и Ш31 и др. Все закрыты.
+- **Два независимых проверяющих** сверяли план с кодом HEAD `795e5ec`, отчётами гейтов scope=all и документами:
+  - первый — 18 замечаний (5 major: зависимости Ш11, Ш17, Ш22, место К1, пакеты и источники для аутентификации), все
+    закрыты;
+  - второй — 13 замечаний (2 major: цепочки общих файлов не записаны в «Зависит»; поиск программы по `external_id`, которого
+    нет), все закрыты в этой ревизии вместе с решением Д5.
+- **Скриптами проверено** (по итоговому тексту):
+  - суммы часов: оценки в шагах = таблица 3.2 = заголовки этапов = «Коротко» (этапы 1–4 — 360,5–366,5 ч, всего 555,5–561,5 ч);
+  - все ссылки на Ш, К, Р и О ведут на существующие шаги, решения и задачи; каждый Р определён один раз;
+  - в «Зависит» нет циклов; ни один шаг не зависит от шага более позднего этапа или стоящего позже в «Порядке» этапа
+    (кроме оговорённых условных: Ш34 → Ш21/Ш23 при хранении ключа колонкой, Ш38a);
+  - для каждой цепочки общих файлов 3.2 в «Зависит» шага стоит предыдущий шаг цепочки;
+  - шаг межсервисной аутентификации упоминается только в «Не делать» (3.11);
+  - правило красных файлов: каждый из 49 красных файлов (GA-1) закреплён за шагом рефакторинга, поведенческие шаги трогают
+    только зелёные файлы (второй проверяющий).
+- **Сверено по коду** (javap и чтение): `RestTestClient.bindToServer` и `MockRestServiceServer.bindTo(RestClient.Builder)` в
+  spring-test 7.0.8; ручки поиска по `external_id` есть только у полиса и договора страхования (`ReferenceController.java:95,126`);
+  LIKE-помощник — `PolicySearchService.escapeLike`.
+
+## 9. Отступления от заданного владельцем порядка и почему
+
+- **Ш3 и Ш4 — в этапе 1**, а не в гигиене и запуске на контуре: Ш7 — первый шаг с PIT, и при Р3 = «а» тег no-mutate нужен до
+  него; 503 из Ш41 без таймаутов Ш4 не защищает от зависшего запроса и не проверяется в приёмке.
+- **Ш8, Ш11, Ш25 — в этапе 3**, а не в сплошной серии рефакторинга: рефакторинг по касанию перед Ш27, Ш38, Ш40, Ш44.
+- **Ш43 (кэш) — в конце этапа 4**, а не в контракте с Заявками: событие применения сообщения публикуют ReferenceImportService и
+  InboundMessageService, которые приводят к лимитам Ш16 и Ш17.
+- **Ш38a** (если по Р19 нужны новые поля) — конец этапа 4 и поднимает Ш21, Ш23 из бэклога.
+- **Ш39 при Р20 = «б»** уходит из этапа 1 в этап 3, после Ш11 и Ш38.
+- **Ш2** (этап 2) идёт после Ш39 и Ш26 этапа 1: те же API-тесты.
+- **Запросы к Ordering** — раньше этапа 7 (Д1), по Р68: рекомендация — в начале этапа 6, из-за календарного риска.
+- **Этап 5 не держит этап 6** — толкование Д2, вопрос Р67.
