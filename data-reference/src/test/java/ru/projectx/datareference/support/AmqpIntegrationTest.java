@@ -30,6 +30,9 @@ import org.springframework.context.annotation.Import;
  * <p>Слушатели включены здесь явно по той же причине: умолчание в {@code application.yml}
  * их не стартует, потому что локальный брокер — не брокер 1С. Этому тесту слушатели
  * и нужны, а брокер у него свой.
+ *
+ * <p>Без Docker тест требует обоих внешних адресов, {@code TEST_RABBITMQ_URL} и
+ * {@code TEST_POSTGRES_URL}; иначе он падает, а не пропускается, см. {@link TestBroker}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -38,6 +41,5 @@ import org.springframework.context.annotation.Import;
         "spring.rabbitmq.ssl.enabled=false",
         "spring.rabbitmq.listener.simple.auto-startup=true"})
 @Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
-@EnabledIfBrokerAvailable
 public @interface AmqpIntegrationTest {
 }

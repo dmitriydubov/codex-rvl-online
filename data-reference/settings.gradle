@@ -3,24 +3,67 @@
  * BOM'а и модулей платформы здесь нет намеренно — соседние компоненты ProjectX живут
  * в своих репозиториях и общих артефактов с этим сервисом не имеют.
  *
- * Внутреннее зеркало Nexus объявлено первым — для корпоративной сети; публичные
- * репозитории следом, запасным вариантом (вне контура maven-group недоступен,
- * резолв падает на первом и уходит на них). pluginManagement {} обязан быть первым
- * выражением файла, поэтому URL здесь не вынесен в переменную.
+ * Репозитории зависят от того, где идёт сборка:
+ *   - облачная сессия Claude Code (CLAUDE_CODE_REMOTE) и GitHub Actions (GITHUB_ACTIONS) —
+ *     только публичные: портал плагинов Gradle и Maven Central;
+ *   - всё остальное, то есть рабочий контур, — только Nexus контура.
+ * Принудительно: -PpublicRepositories=true|false.
+ *
+ * Выбор хранится в gradle.ext: build.gradle по нему же решает, подключать ли набор
+ * gauntlet. pluginManagement {} обязан быть первым выражением файла и вычисляется
+ * отдельно от остального, поэтому переключатель объявлен внутри него, а адрес Nexus
+ * повторён ниже, а не вынесен в переменную.
  */
 pluginManagement {
+    gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.toBoolean() }
+            .getOrElse(System.getenv('CLAUDE_CODE_REMOTE') == 'true' || System.getenv('GITHUB_ACTIONS') == 'true')
     repositories {
-        maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
-        gradlePluginPortal()
-        mavenCentral()
+        if (gradle.ext.publicRepositories) {
+            gradlePluginPortal()
+            mavenCentral()
+        } else {
+            maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        }
     }
 }
 
 dependencyResolutionManagement {
     repositories {
-        maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
-        mavenCentral()
+        if (gradle.ext.publicRepositories) {
+            mavenCentral()
+        } else {
+            maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        }
     }
 }
+
+/*
+ * Рабочий контур без переключателя — только Nexus. Чтобы переключить вручную, замените
+ * оба блока выше этими (переключатель и gradle.ext тогда не нужны: без gradle.ext.publicRepositories
+ * build.gradle считает репозитории непубличными и набор gauntlet не подключает):
+ *
+ * pluginManagement {
+ *     repositories {
+ *         maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+ *     }
+ * }
+ *
+ * dependencyResolutionManagement {
+ *     repositories {
+ *         maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+ *     }
+ * }
+ */
+
+/*
+ * Набор gauntlet (гейты качества для работы Claude Code) подключается, когда каталог
+ * ../gauntlet лежит рядом и репозитории публичные: плагин мутаций PIT опубликован только
+ * на портале плагинов Gradle, которого в Nexus контура нет. В рабочий контур каталог
+ * gauntlet/ не переносится, так что там набор выключен в любом случае.
+ * Принудительно: -Pgauntlet=true|false.
+ */
+gradle.ext.gauntletEnabled = file('../gauntlet/gauntlet.gradle').isFile() &&
+        providers.gradleProperty('gauntlet').map { it.isEmpty() || it.toBoolean() }
+                .getOrElse(gradle.ext.has('publicRepositories') && gradle.ext.publicRepositories)
 
 rootProject.name = 'data-reference'

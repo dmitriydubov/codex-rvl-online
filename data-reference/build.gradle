@@ -1,3 +1,19 @@
+/*
+ * Плагин мутаций PIT нужен только набору gauntlet (см. settings.gradle) и опубликован
+ * только на портале плагинов Gradle. Поэтому он объявлен здесь, а не в plugins {}:
+ * без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
+ */
+buildscript {
+    if (gradle.ext.gauntletEnabled) {
+        repositories {
+            gradlePluginPortal()
+        }
+        dependencies {
+            classpath 'info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.19.0'
+        }
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version "${springBootVersion}"
@@ -99,4 +115,16 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     // Тот же mockito-core, что приходит со стартером тестов, — но как агент JVM.
     mockitoAgent('org.mockito:mockito-core') { transitive = false }
+}
+
+/*
+ * Набор gauntlet — гейты качества, приёмочные тесты на Cucumber (src/acceptanceTest,
+ * набор исходников создаёт сам набор) и мутационное тестирование. Подключается только
+ * в облаке Claude Code и в GitHub Actions (условие — в settings.gradle); ./gradlew build
+ * он не меняет, все проверки — задачи группы gauntlet. Без каталога ../gauntlet сборка
+ * о нём не знает.
+ */
+if (gradle.ext.gauntletEnabled) {
+    apply plugin: 'info.solidsoft.pitest'
+    apply from: '../gauntlet/gauntlet.gradle'
 }
