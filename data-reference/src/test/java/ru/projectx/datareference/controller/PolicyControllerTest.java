@@ -34,6 +34,8 @@ class PolicyControllerTest {
     private static final UUID CONTRACT_ID = UUID.fromString("9011c000-0000-4000-8000-000000000003");
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("9011c000-0000-4000-8000-000000000004");
     private static final String POLICY_NUMBER = "П-0001";
+    /** Отказ самого контроллера называет оба ключа; у пропущенного параметра Spring причина другая. */
+    private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_id";
 
     @Mock
     private ReferenceQueryService references;
@@ -87,6 +89,7 @@ class PolicyControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
         verifyNoInteractions(references, policySearch);
     }
 
@@ -96,6 +99,17 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
+        verifyNoInteractions(references, policySearch);
+    }
+
+    @Test
+    void contractWithoutNumber_isNotALookupByNumber() {
+        MvcTestResult result = mvc.get().uri(POLICIES + "?contract_id={contract}", CONTRACT_ID).exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
         verifyNoInteractions(references, policySearch);
     }
 
@@ -122,6 +136,26 @@ class PolicyControllerTest {
 
         assertThat(result).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly(POLICY_NUMBER);
         verifyNoInteractions(references);
+    }
+
+    @Test
+    void search_withoutContract_isValidationErrorNamingContract_withoutAskingService() {
+        MvcTestResult result = mvc.get().uri(POLICIES + "/search?query={query}", "П-00").exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
+        verifyNoInteractions(references, policySearch);
+    }
+
+    @Test
+    void search_withoutQuery_isValidationErrorNamingQuery_withoutAskingService() {
+        MvcTestResult result = mvc.get()
+                .uri(POLICIES + "/search?contract_external_id={contract}", CONTRACT_EXTERNAL_ID)
+                .exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("query");
+        verifyNoInteractions(references, policySearch);
     }
 
     private static PolicyResponse policy() {

@@ -71,6 +71,7 @@ class Mkb10ControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("query");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo("нужен query либо codes");
         verifyNoInteractions(mkb10);
     }
 

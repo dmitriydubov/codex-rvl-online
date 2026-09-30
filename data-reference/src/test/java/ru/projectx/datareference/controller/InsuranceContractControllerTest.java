@@ -62,6 +62,7 @@ class InsuranceContractControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo("нужен external_id");
         verifyNoInteractions(references);
     }
 
