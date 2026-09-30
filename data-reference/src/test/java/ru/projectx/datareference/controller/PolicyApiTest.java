@@ -27,7 +27,8 @@ import ru.projectx.datareference.support.IntegrationTest;
 /**
  * R-05 (полис целиком по трём ключам), R-04 (поиск по ФИО и номеру) и полис для сервиса Договоров
  * без ПДн ({@code contract-view}) поверх настоящей базы. Часы остановлены
- * на {@link ru.projectx.datareference.support.FixedClockConfig#NOW}: по Москве это 14.03.2026, и «действующий на сегодня» считается от этого дня.
+ * на {@link ru.projectx.datareference.support.FixedClockConfig#NOW}: по Москве это 14.03.2026,
+ * и «действующий на сегодня» считается от этого дня.
  */
 @IntegrationTest
 class PolicyApiTest {
