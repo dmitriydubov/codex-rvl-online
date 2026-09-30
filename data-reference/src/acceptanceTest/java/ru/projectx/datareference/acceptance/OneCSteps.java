@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Дано;
 import java.util.Map;
-import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
 /**
@@ -48,19 +47,17 @@ public class OneCSteps {
     }
 
     /**
-     * Разобрано — значит, ни одна строка не ждёт разбора и ни одна не ушла в отказ.
-     * Пропуск с причиной — штатный исход: страхователь ТЗ-3 санаторием не становится.
-     * Строк сырья ровно столько, сколько прислал сценарий: чужих строк в базе нет.
+     * Разобрано — значит, каждое сообщение закончилось своим исходом, в порядке приёма:
+     * справочник пополнился ({@code PROCESSED}), а страхователь ТЗ-3 ушёл в пропуск
+     * с причиной — санаторием он не стал. Строк сырья ровно столько, сколько прислал
+     * сценарий: чужих строк в базе нет.
      */
     @Дано("Дата-референс разобрал присланные сообщения")
     public void receivedMessagesImported() {
         scheduler.importPendingMessages();
 
         assertThat(inbox.statuses())
-                .as("статусы сырья после разбора")
-                .isNotEmpty()
-                .hasSize(inbox.received())
-                .allMatch(status -> status.equals(InboundStatus.PROCESSED.name())
-                        || status.equals(InboundStatus.SKIPPED.name()));
+                .as("статусы сырья после разбора, в порядке приёма")
+                .containsExactlyElementsOf(inbox.expectedStatuses());
     }
 }

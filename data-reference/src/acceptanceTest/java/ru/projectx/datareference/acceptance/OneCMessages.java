@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -17,7 +18,9 @@ import tools.jackson.databind.node.ObjectNode;
  * синтетикой, как на стенде потребителя ({@code src/test/resources/stand/seed.sql}):
  * ФИО и дата рождения полиса, тип продукта ДМС, вид деятельности РВЛ, лимит программы
  * полиса. Два значения — конфигурация контура из {@code application.yml}: без них санаторий
- * и договор не прошли бы фильтры потоков. Все значения вымышлены.
+ * и договор не прошли бы фильтры потоков: их расхождение с конфигурацией ловит шаг разбора,
+ * который ждёт у каждого сообщения свой исход ({@link OneCMessage#expected()}). Все значения
+ * вымышлены.
  *
  * <p>Строка таблицы, которой шаг не знает, и логическое значение не из «true»/«false» —
  * ошибка сценария, а не молча пропущенное или ложное поле.
@@ -41,7 +44,10 @@ final class OneCMessages {
     private OneCMessages() {
     }
 
-    /** ТЗ-3: контрагент без признака ЛПУ — страхователь. */
+    /**
+     * ТЗ-3: контрагент без признака ЛПУ — страхователь. Строка в справочнике страхователей
+     * создаётся, а сообщение уходит в пропуск с причиной: санаторием оно не стало.
+     */
     static OneCMessage insurer(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование", "полное наименование");
         ObjectNode data = JSON.createObjectNode()
@@ -50,7 +56,7 @@ final class OneCMessages {
                 .put("deleteMark", false)
                 .put("Наименование", required(table, "наименование"))
                 .put("НаименованиеПолное", required(table, "полное наименование"));
-        return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data);
+        return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.SKIPPED);
     }
 
     /** ТЗ-3: ЛПУ с видом деятельности РВЛ — санаторий. */
@@ -62,7 +68,7 @@ final class OneCMessages {
                 .put("deleteMark", false)
                 .put("Наименование", required(table, "наименование"));
         data.putArray("typesActivities").addObject().put("guidTypeActivities", RVL_ACTIVITY);
-        return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data);
+        return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /** ТЗ-2: договор страхования продукта ДМС; страхователь — если сценарий его назвал. */
@@ -76,7 +82,7 @@ final class OneCMessages {
                 .put("dateEndISO", required(table, "окончание"))
                 .put("notActive", false);
         Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addInsurer(data, insurer));
-        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data);
+        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /** ТЗ-6: программа РВЛ с одной строкой перечня {@code service[]}. */
@@ -99,7 +105,7 @@ final class OneCMessages {
                 .put("percentCopayment", new BigDecimal(required(table, "услуга: процент сооплаты")))
                 .put("r", flag(table, "услуга: рисковая часть"))
                 .put("d", flag(table, "услуга: депозитная часть"));
-        return new OneCMessage(OneCStream.PROGRAMS, PROGRAMS_QUEUE, data);
+        return new OneCMessage(OneCStream.PROGRAMS, PROGRAMS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /** ТЗ-1: полис со сроком действия; программа полиса — если сценарий её назвал. */
@@ -119,7 +125,7 @@ final class OneCMessages {
                 .put("endDate", required(table, "окончание"))
                 .put("availability", true);
         Optional.ofNullable(table.get("программа")).ifPresent(program -> addPolicyProgram(data, program, table));
-        return new OneCMessage(OneCStream.POLICIES, POLICIES_QUEUE, data);
+        return new OneCMessage(OneCStream.POLICIES, POLICIES_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     private static void addInsurer(ObjectNode contract, String insurer) {

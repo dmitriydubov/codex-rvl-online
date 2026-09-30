@@ -1,12 +1,14 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -15,23 +17,32 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * ({@code RANDOM_PORT}) и то, что потребитель помнит между шагами сценария, —
  * последний ответ и id, полученный на шаге «Дано».
  *
- * <p>Клиент — {@link RestTestClient#bindToServer()} из spring-test: автонастройка Boot
+ * <p>Клиент — {@code RestTestClient.bindToServer(ClientHttpRequestFactory)} из spring-test: автонастройка Boot
  * для него ({@code spring-boot-resttestclient}) — отдельный модуль, которого нет
  * на classpath и в Nexus контура.
+ *
+ * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
+ * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон
+ * приёмки до таймаута CI, не называя сценарий.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
 public class ContractsService {
 
-    /** Место id, полученного на шаге «Дано», в пути запроса сценария. */
+    /** Переменная URI-шаблона: id, полученный на шаге «Дано». */
     private static final String OBTAINED_ID = "{id}";
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
     private final RestTestClient client;
     private @Nullable ServiceResponse lastResponse;
     private @Nullable String obtainedId;
 
     public ContractsService(@LocalServerPort int port) {
-        this.client = RestTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
+        SimpleClientHttpRequestFactory requests = new SimpleClientHttpRequestFactory();
+        requests.setConnectTimeout(CONNECT_TIMEOUT);
+        requests.setReadTimeout(READ_TIMEOUT);
+        this.client = RestTestClient.bindToServer(requests).baseUrl("http://localhost:" + port).build();
     }
 
     public ServiceResponse request(String path) {
@@ -57,11 +68,12 @@ public class ContractsService {
     }
 
     private ServiceResponse exchange(String path, Consumer<HttpHeaders> headers) {
-        lastResponse = ServiceResponse.of(client.get().uri(withObtainedId(path)).headers(headers).exchange().returnResult());
+        lastResponse = ServiceResponse.of(
+                client.get().uri(path, uriVariables(path)).headers(headers).exchange().returnResult());
         return lastResponse;
     }
 
-    private String withObtainedId(String path) {
-        return path.contains(OBTAINED_ID) ? path.replace(OBTAINED_ID, obtainedId()) : path;
+    private Object[] uriVariables(String path) {
+        return path.contains(OBTAINED_ID) ? new Object[] {obtainedId()} : new Object[0];
     }
 }

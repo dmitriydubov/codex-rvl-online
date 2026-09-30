@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -26,26 +27,26 @@ public class OneCInbox {
     private static final String STATUSES = "select status from inbound_message order by received_at";
 
     private final JdbcClient jdbc;
-    private int received;
+    private final List<String> expectedStatuses = new ArrayList<>();
 
     public OneCInbox(JdbcClient jdbc) {
         this.jdbc = jdbc;
     }
 
     public void receive(OneCMessage message) {
-        received++;
+        expectedStatuses.add(message.expected().name());
         jdbc.sql(RECEIVE)
                 .param("messageId", message.messageId())
                 .param("stream", message.stream().name())
                 .param("queue", message.queue())
                 .param("payload", message.envelope())
-                .param("order", received)
+                .param("order", expectedStatuses.size())
                 .update();
     }
 
-    /** Сколько сообщений сценарий положил в сырьё. */
-    public int received() {
-        return received;
+    /** Статусы, которыми разбор обязан закончить присланные сообщения, в порядке приёма. */
+    public List<String> expectedStatuses() {
+        return List.copyOf(expectedStatuses);
     }
 
     /** Статусы всех строк сырья в порядке приёма. */
