@@ -32,7 +32,7 @@ import ru.projectx.datareference.support.IntegrationTest;
 @IntegrationTest
 class PolicyApiTest {
 
-    private static final String BASE = ReferenceController.BASE_PATH;
+    private static final String BASE = InternalApi.BASE_PATH;
     private static final LocalDate TODAY = LocalDate.of(2026, 3, 14);
     private static final UUID CONTRACT_EXT = UUID.fromString("5a1d0000-0000-4000-8000-0000000000c1");
     private static final UUID RVL_PROGRAM_EXT = UUID.fromString("5a1d0000-0000-4000-8000-0000000000b1");

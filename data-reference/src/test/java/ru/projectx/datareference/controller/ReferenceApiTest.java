@@ -38,7 +38,7 @@ import ru.projectx.datareference.support.IntegrationTest;
 @IntegrationTest
 class ReferenceApiTest {
 
-    private static final String BASE = ReferenceController.BASE_PATH;
+    private static final String BASE = InternalApi.BASE_PATH;
     private static final UUID PROGRAM_EXT = UUID.fromString("7d3a9e60-0000-4000-8000-0000000000a1");
     private static final UUID LPU_EXT = UUID.fromString("7d3a9e60-0000-4000-8000-0000000000a2");
     private static final UUID POLICY_EXT = UUID.fromString("7d3a9e60-0000-4000-8000-0000000000a3");

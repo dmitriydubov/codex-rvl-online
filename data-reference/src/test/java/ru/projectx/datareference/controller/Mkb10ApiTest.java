@@ -19,7 +19,7 @@ import ru.projectx.datareference.support.IntegrationTest;
 @IntegrationTest
 class Mkb10ApiTest {
 
-    private static final String BASE = ReferenceController.BASE_PATH;
+    private static final String BASE = InternalApi.BASE_PATH;
     private static final UUID Q06 = UUID.fromString("6b1d0000-0000-4000-8000-000000000001");
     private static final UUID Q06_0 = UUID.fromString("6b1d0000-0000-4000-8000-000000000002");
     private static final UUID I25_1 = UUID.fromString("6b1d0000-0000-4000-8000-000000000003");
