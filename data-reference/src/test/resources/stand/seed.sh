@@ -20,6 +20,8 @@ attempt=0
 until [ -n "$(psql -tAq -c "$schema_ready" 2>/dev/null)" ]; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge "$attempts" ]; then
+        # Последняя попытка — с выводом ошибок psql: причиной может быть подключение, а не схема.
+        psql -tAq -c "$schema_ready" >&2 || true
         echo "стенд: схема не готова после $((attempts * pause)) с — сервис не накатил её до конца (журнал: docker compose logs data-reference-stand)" >&2
         exit 1
     fi

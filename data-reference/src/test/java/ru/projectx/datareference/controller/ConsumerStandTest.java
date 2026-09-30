@@ -52,7 +52,7 @@ class ConsumerStandTest {
     private static final String PROGRAM_MESSAGE = "a1960bab-85db-47b4-bc2b-0cc4beb976a1";
     private static final String POLICY_MESSAGE = "fb9a7691-a49f-40a7-a675-715a4ba94617";
 
-    private static final String[] EXAMPLES = {
+    private static final List<String> EXAMPLES = List.of(
             "01-policy-by-external-id.json",
             "02-insurance-contract-by-external-id.json",
             "03-policy.json",
@@ -60,7 +60,7 @@ class ConsumerStandTest {
             "05-program.json",
             "06-policy-not-found.json",
             "07-malformed-id.json",
-            "08-insurance-contract-without-key.json"};
+            "08-insurance-contract-without-key.json");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
             "/response/status", "/response/headers", "/response/body");
@@ -127,7 +127,7 @@ class ConsumerStandTest {
     void examples_coverTheConsumerContract() {
         assertThat(StandExample.loadAll())
                 .extracting(StandExample::name)
-                .containsExactly(EXAMPLES);
+                .containsExactlyElementsOf(EXAMPLES);
     }
 
     /**
