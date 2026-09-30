@@ -9,8 +9,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
@@ -33,22 +34,29 @@ class AgedInboundMessagesTest {
     @Mock
     private InboundMessageRepository repository;
 
-    @Test
-    void withPayload_selectsRowsReceivedBeforeNowMinusAge() {
-        List<InboundMessage> expired = List.of(received(OneCStream.POLICIES));
+    /**
+     * Поток — параметр выборки, а не поток её сегодняшнего вызывающего: проверяется каждый,
+     * иначе зашитые в выборку полисы прошли бы этот тест незамеченными.
+     */
+    @ParameterizedTest
+    @EnumSource(OneCStream.class)
+    void withPayload_selectsRowsReceivedBeforeNowMinusAge(OneCStream stream) {
+        List<InboundMessage> expired = List.of(received(stream));
         when(repository.findByStreamAndPayloadIsNotNullAndReceivedAtLessThan(
-                OneCStream.POLICIES, NOW.minus(Duration.ofDays(30)), Limit.of(500))).thenReturn(expired);
+                stream, NOW.minus(Duration.ofDays(30)), Limit.of(500))).thenReturn(expired);
 
-        assertThat(agedMessages().withPayload(OneCStream.POLICIES, Duration.ofDays(30), 500)).isSameAs(expired);
+        assertThat(agedMessages().withPayload(stream, Duration.ofDays(30), 500)).isSameAs(expired);
     }
 
-    @Test
-    void inStatus_selectsRowsReceivedBeforeNowMinusAge() {
-        List<InboundMessage> stuck = List.of(received(OneCStream.PRICE_LISTS));
-        when(repository.findByStatusAndReceivedAtLessThan(InboundStatus.BUFFERED, NOW.minus(Duration.ofHours(1))))
-                .thenReturn(stuck);
+    /** Статус — параметр так же, как поток: зашитый {@code BUFFERED} прошёл бы проверку одним статусом. */
+    @ParameterizedTest
+    @EnumSource(InboundStatus.class)
+    void inStatus_selectsRowsReceivedBeforeNowMinusAge(InboundStatus status) {
+        List<InboundMessage> aged = List.of(received(OneCStream.PRICE_LISTS));
+        when(repository.findByStatusAndReceivedAtLessThan(status, NOW.minus(Duration.ofHours(1))))
+                .thenReturn(aged);
 
-        assertThat(agedMessages().inStatus(InboundStatus.BUFFERED, Duration.ofHours(1))).isSameAs(stuck);
+        assertThat(agedMessages().inStatus(status, Duration.ofHours(1))).isSameAs(aged);
     }
 
     private AgedInboundMessages agedMessages() {

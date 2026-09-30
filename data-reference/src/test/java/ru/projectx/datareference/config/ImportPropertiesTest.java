@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -45,11 +47,13 @@ class ImportPropertiesTest {
     /**
      * Отрицательную задержку {@code @Scheduled} молча принимает за нулевую, и первый тик
      * случается сразу на старте — ровно то, от чего задержка защищает. Поэтому такое значение
-     * не должно пускать сервис в работу вовсе.
+     * не должно пускать сервис в работу вовсе. Наносекунда ниже нуля — само место границы:
+     * ноль разрешён, всё меньше него — нет, и граница, сдвинутая на миллисекунду вниз, здесь видна.
      */
-    @Test
-    void negativeInitialDelay_failsStartup() {
-        context.withPropertyValues("projectx.import.initial-delay=-1s")
+    @ParameterizedTest
+    @ValueSource(strings = {"-1s", "-1ns"})
+    void negativeInitialDelay_failsStartup(String initialDelay) {
+        context.withPropertyValues("projectx.import.initial-delay=" + initialDelay)
                 .run(started -> assertThat(started).getFailure()
                         .hasRootCauseInstanceOf(BindValidationException.class)
                         .rootCause().hasMessageContaining("initialDelay"));
