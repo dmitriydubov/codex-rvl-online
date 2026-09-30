@@ -420,7 +420,8 @@ plugins.withId('info.solidsoft.pitest') {
         timestampedReports = false
         enableDefaultIncrementalAnalysis = true
         excludedGroups = listSetting('pit.excludedGroups', 'no-mutate') as Set
-        excludedClasses = excludedClassGlobs as Set
+        // nested classes too, as JaCoCo (jacocoExcludes) and CrapGate (outer class name) already do
+        excludedClasses = excludedClassGlobs.collectMany { [it, it + '$*'] } as Set
         // Uncle Bob's rule: every COVERED mutant is killed (PIT test strength). maxSurviving would also count
         // uncovered mutants; uncovered code is policed by coverageThreshold (line coverage of mutated classes).
         testStrengthThreshold = setting('pit.testStrengthThreshold', '100').toInteger()

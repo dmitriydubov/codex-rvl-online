@@ -4,7 +4,7 @@
  * без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
  */
 buildscript {
-    if (gradle.ext.gauntletEnabled) {
+    if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
         repositories {
             gradlePluginPortal()
         }
@@ -124,7 +124,7 @@ dependencies {
  * он не меняет, все проверки — задачи группы gauntlet. Без каталога ../gauntlet сборка
  * о нём не знает.
  */
-if (gradle.ext.gauntletEnabled) {
+if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
     apply plugin: 'info.solidsoft.pitest'
     apply from: '../gauntlet/gauntlet.gradle'
 }

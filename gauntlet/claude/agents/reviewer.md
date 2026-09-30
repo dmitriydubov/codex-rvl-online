@@ -15,7 +15,8 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 - The whole change, committed or not: `git diff $(git merge-base <base> HEAD)` (working tree against the
   merge base) plus the untracked files from `git ls-files --others --exclude-standard` - read those files
   directly. Base is given in your prompt; default `origin/main`.
-- The approved feature files touched by the change, and `gauntlet/config/architecture.properties`.
+- The approved feature files touched by the change, and the module's architecture policy `gauntlet/config/<module>/architecture.properties` (fallback: the common
+  template `gauntlet/config/architecture.properties`; `./gradlew gauntletInfo` shows which applies).
 - When the change relies on framework behaviour, property names or an API contract: the official
   reference for the versions the build resolves (Spring Boot 4.0 / Framework 7.0 / Spring AMQP 4.0 /
   Hibernate 7.2 / Jackson 3 / Java 21 - docs.spring.io, docs.hibernate.org, docs.oracle.com, Javadoc), or offline `META-INF/spring-configuration-metadata.json` and `javap` on the

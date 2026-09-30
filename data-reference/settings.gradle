@@ -15,7 +15,7 @@
  * повторён ниже, а не вынесен в переменную.
  */
 pluginManagement {
-    gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.toBoolean() }
+    gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
             .getOrElse(System.getenv('CLAUDE_CODE_REMOTE') == 'true' || System.getenv('GITHUB_ACTIONS') == 'true')
     repositories {
         if (gradle.ext.publicRepositories) {
@@ -39,8 +39,8 @@ dependencyResolutionManagement {
 
 /*
  * Рабочий контур без переключателя — только Nexus. Чтобы переключить вручную, замените
- * оба блока выше этими (переключатель и gradle.ext тогда не нужны: без gradle.ext.publicRepositories
- * build.gradle считает репозитории непубличными и набор gauntlet не подключает):
+ * оба блока выше этими. Строку gradle.ext.gauntletEnabled ниже оставьте как есть: без
+ * gradle.ext.publicRepositories она даёт false, и набор gauntlet не подключается:
  *
  * pluginManagement {
  *     repositories {

@@ -488,7 +488,7 @@ def multi_module_stop_tests(repo):
 def session_start_tests(repo):
     r = subprocess.run(["bash", os.path.join(repo, "gauntlet/hooks/session_start.sh")], cwd=repo, input="{}",
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true"))
+                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
     check("session_start reports active", r.returncode == 0 and "[gauntlet] active" in r.stdout, r.stdout + r.stderr)
     # base branch missing: simulate by pointing baseRef at a branch the remote does not have
     props = os.path.join(repo, "gauntlet/config/gauntlet.properties")
@@ -498,7 +498,7 @@ def session_start_tests(repo):
         f.write(original.replace("baseRef=origin/main", "baseRef=origin/nowhere"))
     r = subprocess.run(["bash", os.path.join(repo, "gauntlet/hooks/session_start.sh")], cwd=repo, input="{}",
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true"))
+                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
     check("session_start warns about missing base", r.returncode == 0 and "WARNING" in r.stdout, r.stdout + r.stderr)
     with open(props, "w") as f:
         f.write(original)
@@ -511,7 +511,7 @@ def session_start_tests(repo):
           and "origin/main" not in git(shallow, "branch", "-r"))
     r = subprocess.run(["bash", os.path.join(shallow, "gauntlet/hooks/session_start.sh")], cwd=shallow, input="{}",
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=shallow, CLAUDE_CODE_REMOTE="true"))
+                       env=dict(os.environ, CLAUDE_PROJECT_DIR=shallow, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
     check("session_start fetches the base in a shallow clone", "[gauntlet] active" in r.stdout, r.stdout + r.stderr)
 
 

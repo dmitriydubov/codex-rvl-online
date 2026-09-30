@@ -52,7 +52,7 @@ gauntlet/
   claude/, ci/            только до установки: install.sh переносит их в .claude/ и .github/workflows/
 ```
 
-После установки в корне появляются `CLAUDE.md` (одна строка `@gauntlet/CLAUDE.md`), `.claude/settings.json`
+После установки в корне появляются `CLAUDE.md` (описание модулей и строка `@gauntlet/CLAUDE.md`), `.claude/settings.json`
 (хуки и права), `.claude/agents/{specifier,hardener,reviewer}.md` и `.github/workflows/gauntlet.yml`.
 Роли живут в `.claude/agents/` репозитория: только они доходят до облачной сессии, пользовательские
 `~/.claude/agents/` остаются на машине. Всё остальное — в `gauntlet/`. Хук защищает и то, и другое.
@@ -138,7 +138,11 @@ rabbitmq.github.io, а www.rabbitmq.com отвечает 403 на страниц
 Docker они падают. Процессы в снимок окружения не попадают, поэтому демон поднимается в каждой сессии
 заново: это делает SessionStart-хук набора (`hooks/session_start.sh` запускает `dockerd` напрямую —
 `service docker start` в облачной VM падает на ulimit) и пишет `docker: up` в строке статуса. Вручную:
-`nohup dockerd --host=unix:///var/run/docker.sock &` и ждать `docker info`.
+`nohup dockerd --host=unix:///var/run/docker.sock > /tmp/dockerd.log 2>&1 &` и ждать `docker info`.
+
+**Локальная сессия** (не облако): набор подключается к сборке только при публичных репозиториях, поэтому
+перед запуском Claude Code задайте `ORG_GRADLE_PROJECT_publicRepositories=true`; иначе сборка пойдёт в Nexus
+контура, а Stop-хук не найдёт задач набора.
 
 Переменные окружения cloud environment попадают в процессы сессии, хуки их читают при запуске.
 Обычные фичи делайте в охраняемом окружении — там, где переменная `GAUNTLET_GUARD` не задана. Проверка —

@@ -29,18 +29,26 @@ printf '%s' "$input" | python3 gauntlet/hooks/stop_gate.py --record-start
 
 # Tests with a database or a broker run on Testcontainers and fail without Docker. In a cloud session the
 # daemon is not running after the container starts (processes are not part of the environment snapshot), and
-# `service docker start` fails on ulimit there, so start dockerd directly and wait briefly for it.
+# `service docker start` fails on ulimit there, so start dockerd directly (it needs root) and wait at most
+# about 30 s for it. GAUNTLET_DOCKER=off skips the start (the hooks' selftest sets it).
+docker_up() { timeout 5 docker info >/dev/null 2>&1; }
 docker_status=unavailable
-if docker info >/dev/null 2>&1; then
+if docker_up; then
   docker_status=up
-elif [ "$CLAUDE_CODE_REMOTE" = "true" ] && command -v dockerd >/dev/null 2>&1; then
+elif pgrep -x dockerd >/dev/null 2>&1; then
+  docker_status="starting (dockerd is running but not answering yet)"
+elif [ "$CLAUDE_CODE_REMOTE" = "true" ] && [ "${GAUNTLET_DOCKER:-on}" != "off" ] && [ "$(id -u)" = 0 ] \
+    && command -v dockerd >/dev/null 2>&1 && command -v setsid >/dev/null 2>&1; then
   # setsid + closed stdio: the daemon outlives the hook and does not hold its output open
-  setsid nohup dockerd --host=unix:///var/run/docker.sock </dev/null >/tmp/dockerd.log 2>&1 &
-  for _ in $(seq 1 30); do
-    if docker info >/dev/null 2>&1; then docker_status=up; break; fi
+  setsid nohup dockerd --host=unix:///var/run/docker.sock </dev/null >>/tmp/dockerd.log 2>&1 &
+  daemon=$!
+  docker_status="not started (see /tmp/dockerd.log)"
+  deadline=$((SECONDS + 30))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if docker_up; then docker_status=up; break; fi
+    kill -0 "$daemon" 2>/dev/null || break
     sleep 1
   done
-  [ "$docker_status" = up ] || docker_status="starting (see /tmp/dockerd.log)"
 fi
 
 if reachable; then

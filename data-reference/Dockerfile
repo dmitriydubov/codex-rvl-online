@@ -7,7 +7,9 @@
 # Откуда берётся jar, выбирает JAR_SOURCE:
 #   build — собрать обёрткой Gradle внутри образа JDK. Так собирает CI: образ
 #           воспроизводим из одного репозитория. Контейнеру нужна сеть до Nexus
-#           и до дистрибутива Gradle.
+#           и до дистрибутива Gradle. Вне контура — PUBLIC_REPOSITORIES=true: зависимости
+#           тогда берутся из Maven Central (переключатель — в settings.gradle; переменные
+#           окружения облака и GitHub Actions внутрь docker build не попадают).
 #   host  — взять готовый из build/libs, собранный на машине командой ./gradlew bootJar.
 #           Для локальной проверки образа там, где у контейнера нет выхода наружу:
 #           образу нужен только JRE.
@@ -40,6 +42,9 @@ ARG JAR_SOURCE=build
 FROM ${JDK_IMAGE} AS build
 WORKDIR /workspace
 
+# Репозитории зависимостей: false — Nexus контура, true — Maven Central.
+ARG PUBLIC_REPOSITORIES=false
+
 RUN --mount=type=bind,source=certs,target=/certs sh /certs/import-ca.sh /certs
 
 # Сначала только описание сборки: пока не меняются build.gradle и settings.gradle,
@@ -56,11 +61,11 @@ RUN if [ -n "${GRADLE_DISTRIBUTION_URL}" ]; then \
     fi
 
 RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew --no-daemon --console=plain --quiet dependencies
+    ./gradlew --no-daemon --console=plain --quiet -PpublicRepositories=${PUBLIC_REPOSITORIES} dependencies
 
 COPY src src
 RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew --no-daemon --console=plain bootJar -x test \
+    ./gradlew --no-daemon --console=plain -PpublicRepositories=${PUBLIC_REPOSITORIES} bootJar -x test \
     && cp build/libs/data-reference-*.jar application.jar
 
 # ---------- 1b. Jar, собранный на машине ----------
