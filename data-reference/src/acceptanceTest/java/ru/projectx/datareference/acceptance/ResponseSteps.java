@@ -64,12 +64,16 @@ public class ResponseSteps {
         assertThat(actual.isArray() && actual.isEmpty()).as("поле %s — пустой список: %s", field, actual).isTrue();
     }
 
-    /** Поля нет вовсе — не «есть и пусто»: {@code null} в ответе тоже раскрыл бы, что поле существует. */
+    /**
+     * Поля нет вовсе — не «есть и пусто»: {@code null} в ответе тоже раскрыл бы, что поле существует.
+     * Тело при этом — объект JSON: в пустом теле или списке путь тоже ничего не находит, и проверка
+     * прошла бы вхолостую.
+     */
     @Тогда("поля {string} в ответе нет")
     public void fieldAbsent(String field) {
-        ServiceResponse response = contracts.lastResponse();
-        assertThat(response.field(field).isMissingNode())
-                .as("поля %s нет в ответе: %s", field, response.body())
+        JsonNode body = objectBody();
+        assertThat(contracts.lastResponse().field(field).isMissingNode())
+                .as("поля %s нет в ответе: %s", field, body)
                 .isTrue();
     }
 
@@ -79,8 +83,7 @@ public class ResponseSteps {
      */
     @Тогда("ответ состоит ровно из полей {string}")
     public void responseHasExactlyFields(String fields) {
-        JsonNode body = contracts.lastResponse().body();
-        assertThat(body.isObject()).as("тело ответа — объект JSON: %s", body).isTrue();
+        JsonNode body = objectBody();
         assertThat(body.propertyNames())
                 .as("поля верхнего уровня ответа: %s", body)
                 .containsExactlyInAnyOrder(FIELD_LIST.split(fields.strip()));
@@ -112,6 +115,12 @@ public class ResponseSteps {
                 .singleElement(InstanceOfAssertFactories.STRING)
                 .isNotBlank()
                 .actual();
+    }
+
+    private JsonNode objectBody() {
+        JsonNode body = contracts.lastResponse().body();
+        assertThat(body.isObject()).as("тело ответа — объект JSON: %s", body).isTrue();
+        return body;
     }
 
     private String presentString(String field) {
