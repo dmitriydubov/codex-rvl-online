@@ -1,0 +1,32 @@
+{
+  "description": "Договор страхования по id data-reference: номер, external_id, наименование организации-страхователя.",
+  "placeholders": {
+    "insurance_contract_id": "UUID, id договора страхования у data-reference; из примера 01",
+    "insurer_id": "UUID, id страхователя у data-reference; из примера 02"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/insurance-contracts/{insurance_contract_id}",
+    "headers": { "X-Request-Id": "stand-04" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-04" },
+    "body": {
+      "id": "{insurance_contract_id}",
+      "external_id": "77ff17b5-e659-4720-b57f-e8a19c00fcea",
+      "number": "СТЕНД-ДМС-0001",
+      "begin_date": "2026-01-01",
+      "end_date": "2030-12-31",
+      "is_archive": false,
+      "insurer": {
+        "id": "{insurer_id}",
+        "external_id": "d23f3088-f547-4755-b93e-ae192a89d166",
+        "name": "ООО «Тестовый страхователь»",
+        "full_name": "Общество с ограниченной ответственностью «Тестовый страхователь»",
+        "inn": "7700000002",
+        "kpp": "770001002"
+      }
+    }
+  }
+}
