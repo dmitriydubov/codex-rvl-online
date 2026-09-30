@@ -27,6 +27,34 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/data_reference}
     username: ${DB_USERNAME:data_reference}
     password: ${DB_PASSWORD:data_reference}
+    # Таймауты соединений пула приложения. Без них запрос, упёршийся в чужую блокировку
+    # или в оборванную сеть, висит бесконечно, а три планировщика делят один поток:
+    # вместе с импортом встают стирание ПДн и алерт. Отказ по таймауту — обычное
+    # исключение: планировщик пишет «временная ошибка» и повторит, слушатель вернёт
+    # сообщение в очередь. Миграциям эти ограничения не достаются: у Liquibase свой
+    # DataSource, см. spring.liquibase ниже.
+    hikari:
+      data-source-properties:
+        # Параметры сеанса PostgreSQL в стартовом пакете соединения (pgjdbc: options,
+        # «-c имя=значение» через пробел) — действуют с первого запроса, без лишнего
+        # обмена с сервером. Значения — с единицами PostgreSQL (ms, s, min).
+        #   lock_timeout — ожидание одной блокировки (SQLSTATE 55P03). Чтения и записи
+        #     сервиса берут блокировки на миллисекунды; секунды ожидания — это чужая
+        #     долгая транзакция или ручной SQL, и ждать её дальше незачем.
+        #   statement_timeout — один оператор целиком (57014). Самое тяжёлое — пакет
+        #     ТЗ-6 на ~1000 строк: пакетная вставка отмеряется по каждому Execute
+        #     отдельно, так что 30 с — запас на порядки.
+        #   idle_in_transaction_session_timeout — транзакция открыта, а запросов нет
+        #     (25P03, сеанс закрывается, пул заменит соединение). Транзакции сервиса
+        #     не ждут внешних систем, а брошенная держит блокировки и мешает VACUUM.
+        options: >-
+          -c lock_timeout=${DB_LOCK_TIMEOUT:5s}
+          -c statement_timeout=${DB_STATEMENT_TIMEOUT:30s}
+          -c idle_in_transaction_session_timeout=${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+        # Таймаут чтения сокета драйвером, в секундах (pgjdbc: socketTimeout). Последний
+        # рубеж на случай, когда сервер не ответит вовсе, даже отменой по
+        # statement_timeout: поэтому больше него. Соединение после него закрывается.
+        socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:60}
 
   jpa:
     # Схему ведёт Liquibase. Hibernate её не трогает: ddl-auto на живой базе — это
@@ -98,6 +126,14 @@ spring:
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+    # Своё соединение для миграций, не из пула: таймауты пула (spring.datasource.hikari)
+    # оборвали бы долгую миграцию — построение индексов pg_trgm на полной таблице
+    # или ожидание блокировки на живой базе. Заданный url велит Boot собрать
+    # Liquibase отдельный DataSource из этих трёх свойств (без пула и без таймаутов);
+    # пароль при этом из spring.datasource не наследуется, поэтому задан здесь же.
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
 
 server:
   # См. spring.lifecycle: без этого Tomcat обрывает соединения в момент SIGTERM.
