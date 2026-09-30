@@ -1,0 +1,59 @@
+{
+  "description": "Полис по id data-reference: номер, external_id, период действия (то, что берёт сервис Договоров), плюс остальные поля ответа R-05.",
+  "placeholders": {
+    "policy_id": "UUID, id полиса у data-reference; из примера 01",
+    "insurance_contract_id": "UUID, id договора страхования у data-reference; из примера 01",
+    "program_id": "UUID, id программы у data-reference; из примера 01"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/policies/{policy_id}",
+    "headers": { "X-Request-Id": "stand-03" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-03" },
+    "body": {
+      "id": "{policy_id}",
+      "external_id": "9e6ee30d-2275-417d-a44c-039d3b8c2ac5",
+      "number": "СТЕНД-0001",
+      "last_name": "Тестов",
+      "first_name": "Тест",
+      "middle_name": "Тестович",
+      "date_of_birth": "1990-01-01",
+      "gender": "М",
+      "email": "insured@example.com",
+      "begin_date": "2026-01-01",
+      "end_date": "2026-12-31",
+      "availability": true,
+      "is_archive": false,
+      "contract": {
+        "id": "{insurance_contract_id}",
+        "external_id": "77ff17b5-e659-4720-b57f-e8a19c00fcea",
+        "number": "СТЕНД-ДМС-0001"
+      },
+      "programs": [
+        {
+          "program": {
+            "id": "{program_id}",
+            "external_id": "995448e7-dd5b-499a-8a4e-97b363d06dd3",
+            "name": "Стенд: восстановительное лечение"
+          },
+          "limit_amount": 150000.00,
+          "begin_date": "2026-01-01",
+          "end_date": "2026-12-31",
+          "availability": true,
+          "services": [
+            {
+              "layer_number": 1,
+              "copayment": 20.00,
+              "begin_date": "2026-01-01",
+              "end_date": "2026-12-31",
+              "availability": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

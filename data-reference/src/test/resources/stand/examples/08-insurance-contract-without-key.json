@@ -1,0 +1,21 @@
+{
+  "description": "400 на запрос без ключа: договор ищется по id в пути либо по external_id параметром.",
+  "placeholders": {},
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/insurance-contracts",
+    "headers": { "X-Request-Id": "stand-08" }
+  },
+  "response": {
+    "status": 400,
+    "headers": { "X-Request-Id": "stand-08" },
+    "body": {
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "нарушен формат запроса",
+        "details": [ { "field": "external_id", "reason": "нужен external_id" } ],
+        "request_id": "stand-08"
+      }
+    }
+  }
+}

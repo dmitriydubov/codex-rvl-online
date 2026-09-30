@@ -7,3 +7,9 @@ build/
 *.iml
 .vscode/
 .DS_Store
+
+# Локальные переменные docker compose: шаблон — data-reference/.env.example
+.env
+
+# Аварийные журналы JVM (минионы PIT оставляют их в каталоге модуля)
+hs_err_pid*.log

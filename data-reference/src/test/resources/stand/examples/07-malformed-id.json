@@ -1,0 +1,23 @@
+{
+  "description": "400 на нечитаемый UUID в пути. X-Request-Id не прислан — сервис выдаёт свой и возвращает его в заголовке и в error.request_id.",
+  "placeholders": {
+    "issued_request_id": "UUID, X-Request-Id, выданный сервисом, когда вызывающий его не прислал"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/programs/not-a-uuid",
+    "headers": {}
+  },
+  "response": {
+    "status": 400,
+    "headers": { "X-Request-Id": "{issued_request_id}" },
+    "body": {
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "нарушен формат запроса",
+        "details": [ { "field": "id", "reason": "ожидается UUID" } ],
+        "request_id": "{issued_request_id}"
+      }
+    }
+  }
+}

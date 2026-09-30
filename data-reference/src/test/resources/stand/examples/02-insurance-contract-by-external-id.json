@@ -1,0 +1,32 @@
+{
+  "description": "Договор страхования по external_id (GUID 1С). Страхователь подтягивается по логической связи из справочника контрагентов (ТЗ-3).",
+  "placeholders": {
+    "insurance_contract_id": "UUID, id договора страхования у data-reference; генерирует сервис",
+    "insurer_id": "UUID, id страхователя у data-reference; генерирует сервис"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea",
+    "headers": { "X-Request-Id": "stand-02" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-02" },
+    "body": {
+      "id": "{insurance_contract_id}",
+      "external_id": "77ff17b5-e659-4720-b57f-e8a19c00fcea",
+      "number": "СТЕНД-ДМС-0001",
+      "begin_date": "2026-01-01",
+      "end_date": "2026-12-31",
+      "is_archive": false,
+      "insurer": {
+        "id": "{insurer_id}",
+        "external_id": "d23f3088-f547-4755-b93e-ae192a89d166",
+        "name": "ООО «Тестовый страхователь»",
+        "full_name": "Общество с ограниченной ответственностью «Тестовый страхователь»",
+        "inn": "7700000002",
+        "kpp": "770001002"
+      }
+    }
+  }
+}
