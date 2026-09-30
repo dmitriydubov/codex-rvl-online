@@ -62,7 +62,8 @@ public class ReferenceImportScheduler {
      * это побочные эффекты по определению, и стрим здесь только притворялся бы
      * декларативностью.
      */
-    @Scheduled(fixedDelayString = "${projectx.import.poll-interval:10s}")
+    @Scheduled(fixedDelayString = "${projectx.import.poll-interval:10s}",
+            initialDelayString = ImportProperties.INITIAL_DELAY)
     public void importPendingMessages() {
         List<InboundMessage> due = repository.findDueForImport(clock.instant(), Limit.of(properties.batchSize()));
         for (InboundMessage message : due) {
