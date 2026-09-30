@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -33,9 +34,23 @@ import org.springframework.context.annotation.Import;
  *
  * <p>Базу даёт Docker (контейнер) либо {@code TEST_POSTGRES_URL}. Нет ни того, ни другого —
  * тест падает, а не пропускается, см. {@link TestDatabase}.
+ *
+ * <p><b>Мутационное тестирование эти тесты не запускает</b>: тег {@code no-mutate} они
+ * наследуют через мета-аннотацию, а набор gauntlet, если подключён, исключает его через
+ * {@code pit.excludedGroups}. Процесс PIT подменяет мутантами класс в одной JVM, а контекст
+ * Spring с контейнером поднимается и кэшируется раньше, ещё при поиске тестов. Поэтому мутант
+ * в коде, который работает только при сборке контекста, ложно выживает. А мутанты, чьи тесты
+ * не уложились в тайм-аут из-за подъёма контекста, уходят в TIMED_OUT, и PIT засчитывает их
+ * как убитые.
+ *
+ * <p>Код, покрытый только этими тестами, PIT считает непокрытым. Логику класса нужно покрыть
+ * unit-тестами: мутанты, которых убивали только эти тесты, при касании класса станут
+ * непокрытыми или выжившими и уронят mutationGate.
+ * {@code ./gradlew test} по-прежнему гоняет эти тесты все.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
+@Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.import.poll-interval=1h",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
