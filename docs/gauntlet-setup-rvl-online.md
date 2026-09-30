@@ -524,8 +524,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 10. кластеры сущностей;
 11. пары DTO.
 
-Поведенческие шаги идут после рефакторинга тех файлов, которые трогают. Первый из них (405/406 и каркас приёмки) трогает только
-зелёные файлы. Полный граф — в плане.
+Поведенческие шаги идут после рефакторинга тех файлов, которые трогают. Первый из них — исполняемая спецификация действующего
+контракта трёх GET для Договоров вместе с каркасом приёмки (план, Ш25a): код сервиса он не меняет. Полный граф — в плане.
 
 **Архитектура.** Против направления четыре ребра, все объявлены в `architecture.properties`, `archTest` зелёный.
 - `mapper → service`: 29 импортов в 10 файлах — `StreamMapper`, `ImportResult`, `OneCValues`;
@@ -533,8 +533,13 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - `dto → repository`: `Mkb10Response` строится из `Mkb10Row`;
 - `exception → dto`: исключения несут `ErrorResponse.Detail`.
 
-Снятие цикла — перенос трёх классов из `service.onec` в `mapper`, затем `fail.on.cycles=true` (решение 1 PR #1). Новые классы
-не класть в `config` со ссылками на `service` или `repository`: `allowed.config` пуст.
+Снятие цикла — перенос трёх классов из `service.onec` в `mapper`, затем `fail.on.cycles=true` (решение 1 PR #1).
+
+Куда класть новые классы:
+- `allowed.config` пуст, то есть `config` не может зависеть ни от одного пакета модуля. Там лежат только фабрики бинов из
+  классов JDK, Spring и библиотек.
+- `forbidden.config` запрещает Spring AMQP и клиент RabbitMQ. Фабрики контейнеров слушателей и программная регистрация точек
+  приёма — в `service.integration`.
 
 **Кандидаты в `exclude.classes`.** Новых нет: `*Repository*` и `PolicySpecifications` уже исключены, остальные тонкие адаптеры
 покрыты тестами. Record-классы без логики — только поштучно и по решению владельца (п. 4).
