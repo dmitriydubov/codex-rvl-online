@@ -43,6 +43,11 @@ public class OneCInbox {
                 .update();
     }
 
+    /** Сколько сообщений сценарий положил в сырьё. */
+    public int received() {
+        return received;
+    }
+
     /** Статусы всех строк сырья в порядке приёма. */
     public List<String> statuses() {
         return jdbc.sql(STATUSES).query(String.class).list();

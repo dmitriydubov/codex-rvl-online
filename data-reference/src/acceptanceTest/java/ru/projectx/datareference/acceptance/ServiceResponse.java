@@ -1,6 +1,6 @@
 package ru.projectx.datareference.acceptance;
 
-import java.util.Optional;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.client.ExchangeResult;
 import tools.jackson.databind.JsonNode;
@@ -29,7 +29,11 @@ record ServiceResponse(int status, HttpHeaders headers, JsonNode body) {
         return body.at("/" + path.replace("]", "").replace('[', '.').replace('.', '/'));
     }
 
-    Optional<String> requestId() {
-        return Optional.ofNullable(headers.getFirst(REQUEST_ID));
+    /**
+     * Все значения заголовка {@code X-Request-Id}: не только первое, чтобы второй заголовок
+     * (присланный и выданный сервисом разом) не прятался за первым.
+     */
+    List<String> requestIds() {
+        return headers.getOrEmpty(REQUEST_ID);
     }
 }

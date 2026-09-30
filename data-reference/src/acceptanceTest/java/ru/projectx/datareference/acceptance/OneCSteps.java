@@ -50,6 +50,7 @@ public class OneCSteps {
     /**
      * Разобрано — значит, ни одна строка не ждёт разбора и ни одна не ушла в отказ.
      * Пропуск с причиной — штатный исход: страхователь ТЗ-3 санаторием не становится.
+     * Строк сырья ровно столько, сколько прислал сценарий: чужих строк в базе нет.
      */
     @Дано("Дата-референс разобрал присланные сообщения")
     public void receivedMessagesImported() {
@@ -58,6 +59,7 @@ public class OneCSteps {
         assertThat(inbox.statuses())
                 .as("статусы сырья после разбора")
                 .isNotEmpty()
+                .hasSize(inbox.received())
                 .allMatch(status -> status.equals(InboundStatus.PROCESSED.name())
                         || status.equals(InboundStatus.SKIPPED.name()));
     }

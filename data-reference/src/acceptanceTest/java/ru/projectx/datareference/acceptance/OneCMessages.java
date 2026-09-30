@@ -3,6 +3,8 @@ package ru.projectx.datareference.acceptance;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -16,6 +18,9 @@ import tools.jackson.databind.node.ObjectNode;
  * ФИО и дата рождения полиса, тип продукта ДМС, вид деятельности РВЛ, лимит программы
  * полиса. Два значения — конфигурация контура из {@code application.yml}: без них санаторий
  * и договор не прошли бы фильтры потоков. Все значения вымышлены.
+ *
+ * <p>Строка таблицы, которой шаг не знает, и логическое значение не из «true»/«false» —
+ * ошибка сценария, а не молча пропущенное или ложное поле.
  */
 final class OneCMessages {
 
@@ -38,6 +43,7 @@ final class OneCMessages {
 
     /** ТЗ-3: контрагент без признака ЛПУ — страхователь. */
     static OneCMessage insurer(Map<String, String> table) {
+        onlyKnown(table, "external_id", "наименование", "полное наименование");
         ObjectNode data = JSON.createObjectNode()
                 .put("guid", required(table, "external_id"))
                 .put("thisIsLPU", false)
@@ -49,6 +55,7 @@ final class OneCMessages {
 
     /** ТЗ-3: ЛПУ с видом деятельности РВЛ — санаторий. */
     static OneCMessage sanatorium(Map<String, String> table) {
+        onlyKnown(table, "external_id", "наименование");
         ObjectNode data = JSON.createObjectNode()
                 .put("guid", required(table, "external_id"))
                 .put("thisIsLPU", true)
@@ -60,6 +67,7 @@ final class OneCMessages {
 
     /** ТЗ-2: договор страхования продукта ДМС; страхователь — если сценарий его назвал. */
     static OneCMessage insuranceContract(Map<String, String> table) {
+        onlyKnown(table, "external_id", "номер", "страхователь", "начало", "окончание");
         ObjectNode data = JSON.createObjectNode()
                 .put("contractId", required(table, "external_id"))
                 .put("number", required(table, "номер"))
@@ -73,6 +81,9 @@ final class OneCMessages {
 
     /** ТЗ-6: программа РВЛ с одной строкой перечня {@code service[]}. */
     static OneCMessage program(Map<String, String> table) {
+        onlyKnown(table, "external_id", "наименование", "услуга: санаторий", "услуга: вид обращения",
+                "услуга: начало", "услуга: окончание", "услуга: слой", "услуга: прямое прикрепление",
+                "услуга: процент сооплаты", "услуга: рисковая часть", "услуга: депозитная часть");
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("rvl", true)
@@ -84,15 +95,16 @@ final class OneCMessages {
                 .put("beginDate", required(table, "услуга: начало"))
                 .put("endDate", required(table, "услуга: окончание"))
                 .put("numberLayer", Integer.parseInt(required(table, "услуга: слой")))
-                .put("directAttachment", Boolean.parseBoolean(required(table, "услуга: прямое прикрепление")))
+                .put("directAttachment", flag(table, "услуга: прямое прикрепление"))
                 .put("percentCopayment", new BigDecimal(required(table, "услуга: процент сооплаты")))
-                .put("r", Boolean.parseBoolean(required(table, "услуга: рисковая часть")))
-                .put("d", Boolean.parseBoolean(required(table, "услуга: депозитная часть")));
+                .put("r", flag(table, "услуга: рисковая часть"))
+                .put("d", flag(table, "услуга: депозитная часть"));
         return new OneCMessage(OneCStream.PROGRAMS, PROGRAMS_QUEUE, data);
     }
 
     /** ТЗ-1: полис со сроком действия; программа полиса — если сценарий её назвал. */
     static OneCMessage policy(Map<String, String> table) {
+        onlyKnown(table, "external_id", "номер", "договор", "программа", "начало", "окончание");
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("idContract", required(table, "договор"))
@@ -127,6 +139,22 @@ final class OneCMessages {
                 .put("endDate", required(table, "окончание"))
                 .put("limit", POLICY_PROGRAM_LIMIT)
                 .put("availability", true);
+    }
+
+    private static void onlyKnown(Map<String, String> table, String... keys) {
+        Set<String> unknown = new TreeSet<>(table.keySet());
+        unknown.removeAll(Set.of(keys));
+        if (!unknown.isEmpty()) {
+            throw new IllegalArgumentException("в таблице шага строки, которых шаг не знает: " + unknown);
+        }
+    }
+
+    private static boolean flag(Map<String, String> table, String key) {
+        String value = required(table, key);
+        if (!Set.of("true", "false").contains(value)) {
+            throw new IllegalArgumentException("строка «" + key + "» — не true и не false: " + value);
+        }
+        return Boolean.parseBoolean(value);
     }
 
     private static String required(Map<String, String> table, String key) {

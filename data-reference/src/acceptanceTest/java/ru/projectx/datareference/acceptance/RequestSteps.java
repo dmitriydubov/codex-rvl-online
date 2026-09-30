@@ -46,6 +46,7 @@ public class RequestSteps {
 
         JsonNode id = response.field(field);
         assertThat(id.isString()).as("поле %s ответа на %s — строка: %s", field, path, response.body()).isTrue();
+        assertThat(id.asString()).as("поле %s ответа на %s", field, path).isNotBlank();
         contracts.obtainId(id.asString());
     }
 }

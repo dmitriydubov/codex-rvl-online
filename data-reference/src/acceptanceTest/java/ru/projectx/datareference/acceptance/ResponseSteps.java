@@ -3,18 +3,25 @@ package ru.projectx.datareference.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Тогда;
+import java.util.Set;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import tools.jackson.databind.JsonNode;
 
 /**
  * Проверки ответа Дата-референса: статус, поля тела JSON и заголовок {@code X-Request-Id}.
  *
- * <p>Значение поля сравнивается по его типу в JSON: число — по величине ({@code 10.00}
- * и {@code 10.0} равны), {@code null} — только со словом «null», прочее — как текст.
- * Отсутствующее поле не равно ничему, в том числе «null».
+ * <p>Значение поля сравнивается с учётом его типа в JSON: число — по величине ({@code 10.00}
+ * и {@code 10.0} равны); слова «null», «true», «false» — только с JSON-литералом
+ * ({@code null}, логическим значением), а не со строкой из тех же букв; прочее — только
+ * со строкой JSON. Объект или список не равен ничему. Отсутствующее поле не равно ничему,
+ * в том числе «null».
+ *
+ * <p>Заголовок {@code X-Request-Id} ожидается ровно один: второй значением не считается.
  */
 public class ResponseSteps {
 
     private static final String NULL = "null";
+    private static final Set<String> JSON_LITERALS = Set.of(NULL, "true", "false");
 
     private final ContractsService contracts;
 
@@ -35,14 +42,16 @@ public class ResponseSteps {
             assertThat(actual.decimalValue()).as("поле %s", field).isEqualByComparingTo(expected);
             return;
         }
+        assertThat(actual.isValueNode()).as("поле %s — значение, а не объект или список: %s", field, actual).isTrue();
+        assertThat(actual.isString())
+                .as("поле %s — строка JSON, если ожидается не null/true/false: %s", field, actual)
+                .isEqualTo(!JSON_LITERALS.contains(expected));
         assertThat(actual.isNull() ? NULL : actual.asString()).as("поле %s", field).isEqualTo(expected);
     }
 
     @Тогда("поле {string} ответа заполнено")
     public void fieldFilled(String field) {
-        JsonNode actual = presentField(field);
-        assertThat(actual.isString()).as("поле %s — строка: %s", field, actual).isTrue();
-        assertThat(actual.asString()).as("поле %s", field).isNotBlank();
+        assertThat(presentString(field)).as("поле %s", field).isNotBlank();
     }
 
     @Тогда("поле {string} ответа — пустой список")
@@ -53,26 +62,36 @@ public class ResponseSteps {
 
     @Тогда("поле {string} ответа равно полученному id")
     public void fieldEqualsObtainedId(String field) {
-        assertThat(presentField(field).asString()).as("поле %s", field).isEqualTo(contracts.obtainedId());
+        assertThat(presentString(field)).as("поле %s", field).isEqualTo(contracts.obtainedId());
     }
 
     @Тогда("заголовок X-Request-Id ответа равен {string}")
     public void requestIdEquals(String expected) {
-        assertThat(contracts.lastResponse().requestId()).as("заголовок X-Request-Id").hasValue(expected);
+        assertThat(contracts.lastResponse().requestIds()).as("заголовок X-Request-Id").containsExactly(expected);
     }
 
     @Тогда("заголовок X-Request-Id ответа заполнен")
     public void requestIdFilled() {
-        assertThat(contracts.lastResponse().requestId())
-                .as("заголовок X-Request-Id")
-                .hasValueSatisfying(requestId -> assertThat(requestId).isNotBlank());
+        soleRequestId();
     }
 
     @Тогда("поле {string} ответа равно заголовку X-Request-Id ответа")
     public void fieldEqualsRequestId(String field) {
-        String header = contracts.lastResponse().requestId()
-                .orElseThrow(() -> new AssertionError("в ответе нет заголовка X-Request-Id"));
-        assertThat(presentField(field).asString()).as("поле %s", field).isEqualTo(header);
+        assertThat(presentString(field)).as("поле %s", field).isEqualTo(soleRequestId());
+    }
+
+    private String soleRequestId() {
+        return assertThat(contracts.lastResponse().requestIds())
+                .as("заголовок X-Request-Id — ровно один")
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .isNotBlank()
+                .actual();
+    }
+
+    private String presentString(String field) {
+        JsonNode actual = presentField(field);
+        assertThat(actual.isString()).as("поле %s — строка: %s", field, actual).isTrue();
+        return actual.asString();
     }
 
     private JsonNode presentField(String field) {
