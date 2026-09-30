@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Тогда;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import tools.jackson.databind.JsonNode;
 
@@ -23,6 +24,8 @@ public class ResponseSteps {
 
     private static final String NULL = "null";
     private static final Set<String> JSON_LITERALS = Set.of(NULL, "true", "false");
+    /** Перечень полей в шаге: имена через запятую, пробелы вокруг запятой не значимы. */
+    private static final Pattern FIELD_LIST = Pattern.compile("\\s*,\\s*");
 
     private final ContractsService contracts;
 
@@ -59,6 +62,28 @@ public class ResponseSteps {
     public void fieldIsEmptyList(String field) {
         JsonNode actual = presentField(field);
         assertThat(actual.isArray() && actual.isEmpty()).as("поле %s — пустой список: %s", field, actual).isTrue();
+    }
+
+    /** Поля нет вовсе — не «есть и пусто»: {@code null} в ответе тоже раскрыл бы, что поле существует. */
+    @Тогда("поля {string} в ответе нет")
+    public void fieldAbsent(String field) {
+        ServiceResponse response = contracts.lastResponse();
+        assertThat(response.field(field).isMissingNode())
+                .as("поля %s нет в ответе: %s", field, response.body())
+                .isTrue();
+    }
+
+    /**
+     * Поля верхнего уровня тела — ровно названные, в любом порядке: лишнее поле (в том числе
+     * {@code null}) проваливает проверку так же, как недостающее.
+     */
+    @Тогда("ответ состоит ровно из полей {string}")
+    public void responseHasExactlyFields(String fields) {
+        JsonNode body = contracts.lastResponse().body();
+        assertThat(body.isObject()).as("тело ответа — объект JSON: %s", body).isTrue();
+        assertThat(body.propertyNames())
+                .as("поля верхнего уровня ответа: %s", body)
+                .containsExactlyInAnyOrder(FIELD_LIST.split(fields.strip()));
     }
 
     @Тогда("поле {string} ответа равно полученному id")

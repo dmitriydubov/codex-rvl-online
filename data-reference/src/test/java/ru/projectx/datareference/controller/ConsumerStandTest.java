@@ -60,7 +60,9 @@ class ConsumerStandTest {
             "05-program.json",
             "06-policy-not-found.json",
             "07-malformed-id.json",
-            "08-insurance-contract-without-key.json");
+            "08-insurance-contract-without-key.json",
+            "09-policy-contract-view-by-external-id.json",
+            "10-policy-contract-view.json");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
             "/response/status", "/response/headers", "/response/body");
