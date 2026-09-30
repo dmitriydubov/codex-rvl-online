@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -33,9 +34,18 @@ import org.springframework.context.annotation.Import;
  *
  * <p>Базу даёт Docker (контейнер) либо {@code TEST_POSTGRES_URL}. Нет ни того, ни другого —
  * тест падает, а не пропускается, см. {@link TestDatabase}.
+ *
+ * <p><b>Мутационное тестирование эти тесты не запускает</b> — тег {@code no-mutate}
+ * ({@code pit.excludedGroups} в настройках gauntlet), унаследованный через мета-аннотацию.
+ * PIT гоняет тесты в своих процессах по каждому мутанту: контекст Spring с контейнером там
+ * поднимается минутами, мутанты уходят в TIMED_OUT, а мутант, внесённый после того, как
+ * кэшированный контекст уже создал нужные бины, выживает ложно. Логику поэтому проверяют
+ * обычные unit-тесты; код, покрытый только этими тестами, PIT считает непокрытым.
+ * {@code ./gradlew test} по-прежнему гоняет их все.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
+@Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.import.poll-interval=1h",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})

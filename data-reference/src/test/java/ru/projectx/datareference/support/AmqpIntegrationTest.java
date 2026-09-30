@@ -4,6 +4,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -33,9 +34,13 @@ import org.springframework.context.annotation.Import;
  *
  * <p>Без Docker тест требует обоих внешних адресов, {@code TEST_RABBITMQ_URL} и
  * {@code TEST_POSTGRES_URL}; иначе он падает, а не пропускается, см. {@link TestBroker}.
+ *
+ * <p>Мутационное тестирование его не запускает — тег {@code no-mutate}, по той же
+ * причине, что и у {@link IntegrationTest}: два контейнера на контекст в каждом процессе PIT.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
+@Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.import.poll-interval=1h",
         "spring.rabbitmq.ssl.enabled=false",
