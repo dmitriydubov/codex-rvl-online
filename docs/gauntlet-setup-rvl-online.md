@@ -443,7 +443,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   уронить `mutationGate` по покрытию: порог суммарный (см. выше).
 
 **Код и конфигурация data-reference**
-- **Лимит PMD TooManyMethods (12).** `ReferenceController` (15 методов) и `OneCQueueListener` (15) краснеют при любой правке.
+- **Лимит PMD TooManyMethods (12).** `OneCQueueListener` (15 методов) краснеет при любой правке. `ReferenceController`
+  (15) разделён на контроллеры по ресурсам в Ш7 (PR #7).
   У `PriceListTransferAssembler` 12 — на пределе, у `ApiExceptionHandler` 9.
 - **Два бина `ObjectMapper`.** snake_case наружу даёт только `@Primary` `jsonMapper` Boot. Бин из `JacksonConfig` никуда не
   внедряется. Настраивать REST-JSON через свойства или customizer Boot.
@@ -501,7 +502,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | Пакет | Файлы |
 |---|---|
 | `config` | `Jackson3JsonFormatMapper` |
-| `controller` | `ReferenceController` |
+| `controller` | — (`ReferenceController` разделён в Ш7, PR #7) |
 | `dto` | `LpuServicesResponse`, `Mkb10Response`, `PolicyResponse`, `PolicySearchResponse` |
 | `entity` | 15 сущностей, кроме `InboundStatus`, `InboxEntry`, `OneCStream` |
 | `exception` | 3 исключения REST |

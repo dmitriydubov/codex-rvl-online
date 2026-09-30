@@ -77,6 +77,9 @@
   (3) критерий Ш2a: у страхователя ТЗ-3 — SKIPPED с причиной, остальные PROCESSED — формулировка исправлена; (4) `pull` и
   `tag` образов compose (`postgres:16.10-alpine`, `eclipse-temurin:21-jre`) — в setup script (Инструкция, 1.3). Правки 1–4
   по поручению владельца («сделай сам по своему усмотрению») внёс координатор; setup script в окружениях вставляет владелец.
+- 2026-09-30, PR #7 (Ш7), ответ «1) да 2) да 3) да»: (1) правка четырёх API-тестов (только ссылка на `InternalApi.BASE_PATH`)
+  принята; (2) устаревшие упоминания единственного контроллера в `contract-service/CLAUDE.md` и Инструкции поправлены
+  координатором; (3) долг ISP/DIP контроллеров записан в Ш11.
 - 2026-09-30, PR #5 (Ш3), ответ «1) да 2) да 3) да 4) да»: (1) входные данные Ш13 — по пробе Ш3: OneCValues
   surv 2 (@77, 92) и nocov 5 (@51, 70, 86, 87, 97), мутант @92 и все пять nocov убивали только контекстные тесты;
   OneCEnvelopeParser surv 2 (@41, 46) без изменений; unit-покрытие строк ≥ 80 % у обоих сохраняется; оценка Ш13 5 → 6 ч;
@@ -1081,6 +1084,10 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   - `service/RvlAppealTypes.java` (красн.: surv 1 — ложный выживший «stream() → null» из GA-5 в warnIfMissing:60;
     unit-тест его честно убивает; после Ш3: nocov 9, в том числе :60, cov 0/16).
 
+  Долг ISP/DIP из Ш7 (решение 3 владельца по PR #7): `ProgramController`, `InsuranceContractController` и `PolicyController`
+  зависят от всего конкретного `ReferenceQueryService` (6 методов), а вызывают 1, 2 и 3 — разделить сервис по ресурсам или
+  ввести узкие интерфейсы; контроллеры при этом правятся (они зелёные после Ш7).
+
   CA-16: null и boolean-переключатель на пути R-03 (`LpuCatalogService.java:107-125`, `LpuServicesResponse.java:45-51`,
   `ReferenceQueryService.java:116-119,139-144`) заменить двумя методами сервиса или стратегией. Reviewer по правилу 13
   отметит этот переключатель при любом касании. Javadoc о несуществующем R-06 в `LpuServicesResponse.java:61` (DR-10)
@@ -1919,7 +1926,8 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 | 0 | scan: инструкция и план | `claude/hopeful-brown-c5i29y`, session_01NGcFQBukkn1fjszvj8xCbd | #2 | смержен 2026-09-30 | — | — |
 | 1 | Ш2a Стенд потребителя для Договоров | `claude/sh2a-consumer-stand`, session_014YxPDLFDeSELu92c9FfnxR | #3 | смержен 2026-09-30 | ~0,6 агента | план задал файлы и варианты, main не менялся, тестовая инфраструктура готова; для человека оценка 8–10 ч в силе |
 | 1 | Ш3 Контекстные тесты вне PIT | `claude/sh3-no-mutate-context-tests`, session_01TPjZjPbQFvgWy78xNzzwem | #5 | смержен 2026-09-30 | ~1,5 агента | −1,5 ч к оценке 3 ч (ещё ≈1 ч вне оценки — решение 4, PIT scope=all с тегом, и эти правки документов); правка — `@Tag("no-mutate")` на двух составных аннотациях `support/`, как задал план; классов 20, а не 19 (ConsumerStandTest из Ш2a) |
-| 1 | Ш7 Разделить ReferenceController | session_01HrmyF14divUhMBRTsW8bJp | — | в работе | | оценка поднята с 5 до 7 ч: после Ш3 unit-тесты контроллеров обязательны |
+| 1 | Ш7 Разделить ReferenceController | `claude/sh7-split-reference-controller`, session_01HrmyF14divUhMBRTsW8bJp | #7 | смержен 2026-09-30 | ~0,8 агента | оценка 7 ч; обработчики перенесены дословно, гейты прошли почти с первого раза |
+| 1 | Ш25a Спецификация контракта для Договоров | session_01JuxDm7EmPFmyTPPrfxjAdu | — | в работе (остановка на утверждение спецификации) | | |
 
 ---
 
