@@ -112,7 +112,7 @@ class PolicyApiTest {
     @Test
     void contractView_archivedPolicyWithOpenEnd_isOnlyKeysPeriodAndArchiveFlag() {
         LocalDate begin = TODAY.minusMonths(1);
-        Policy policy = savePolicy("П-000004", "Петров", "Иван", "Сергеевич", begin, null,
+        Policy policy = savePolicy("П-000004", "Заглушкин", "Шаг", "Проекциевич", begin, null,
                 List.of(RVL_PROGRAM_EXT), true);
         String expected = """
                 {"id": "%s", "external_id": "%s", "number": "П-000004",

@@ -18,9 +18,11 @@ import ru.projectx.datareference.service.ReferenceQueryService;
  * по нашему {@code id}, по {@code external_id} или по номеру в договоре, — и полис для сервиса
  * Договоров без персональных данных ({@code contract-view}, решение Р20 (а)).
  *
- * <p>Единственное, что контроллер решает сам, — что запрос без ключа неверен: у Spring
- * на такой путь нашёлся бы только «не найдено», а вызывающему нужно «нет параметра».
- * Путь {@code /policies/contract-view} не читается как {@code /policies/{id}}, как и {@code search}:
+ * <p>Единственное, что контроллер решает сам, — что запрос без ключа неверен, и говорит об этом
+ * сам на обоих путях: без своих ручек на {@code /policies} у Spring нашлось бы только «не найдено»,
+ * а {@code /policies/contract-view} ушёл бы в {@code /policies/{id}} и получил бы отказ по полю
+ * {@code id} — вызывающему же нужно «нет параметра {@code external_id}». Путь
+ * {@code /policies/contract-view}, как и {@code search}, не читается как {@code /policies/{id}}:
  * Spring сначала ищет обработчик с точно таким путём без шаблонов и только без него перебирает шаблоны.
  */
 @InternalApi

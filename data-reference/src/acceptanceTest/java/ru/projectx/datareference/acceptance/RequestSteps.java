@@ -29,7 +29,7 @@ public class RequestSteps {
     }
 
     @Когда("сервис Заявок запрашивает {string}")
-    public void requestsServiceReads(String path) {
+    public void applicationsServiceRequests(String path) {
         contracts.request(path);
     }
 

@@ -1,7 +1,7 @@
 {
   "description": "Полис для сервиса Договоров по id data-reference, без персональных данных (решение Р20 (а), шаг Ш39): номер, external_id и период действия — то, что сервис Договоров берёт по полису, — плюс наш id и признак архива.",
   "placeholders": {
-    "policy_id": "UUID, id полиса у data-reference; из примера 01"
+    "policy_id": "UUID, id полиса у data-reference; из примера 09"
   },
   "request": {
     "method": "GET",

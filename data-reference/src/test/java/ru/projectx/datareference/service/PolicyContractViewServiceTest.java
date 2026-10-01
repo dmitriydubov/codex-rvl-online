@@ -14,19 +14,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
 
 /**
- * Полис для сервиса Договоров: выборка идёт сразу в проекцию без ПДн, по {@code id} и по {@code external_id},
- * а ненайденный полис — {@code POLICY_NOT_FOUND}, как у R-05.
+ * Полис для сервиса Договоров: строка без ПДн из репозитория переходит в ответ поле в поле, по {@code id}
+ * и по {@code external_id}, а ненайденный полис — {@code POLICY_NOT_FOUND}, как у R-05. Значения полей
+ * разные, а полис архивный: перепутанные поля или потерянный признак архива тест не пропустит.
  */
 @ExtendWith(MockitoExtension.class)
 class PolicyContractViewServiceTest {
 
     private static final UUID POLICY_ID = UUID.fromString("c0de0000-0000-4000-8000-000000000001");
     private static final UUID POLICY_EXTERNAL_ID = UUID.fromString("c0de0000-0000-4000-8000-000000000002");
-    private static final PolicyContractView VIEW = new PolicyContractView(POLICY_ID, POLICY_EXTERNAL_ID, "П-0001",
-            LocalDate.of(2026, 1, 1), null, false);
+    private static final String NUMBER = "П-0001";
+    private static final LocalDate BEGIN = LocalDate.of(2026, 1, 1);
+    private static final LocalDate END = LocalDate.of(2030, 12, 31);
+    private static final PolicyContractRow ARCHIVED_ROW =
+            new PolicyContractRow(POLICY_ID, POLICY_EXTERNAL_ID, NUMBER, BEGIN, END, true);
+    private static final PolicyContractView ARCHIVED_VIEW =
+            new PolicyContractView(POLICY_ID, POLICY_EXTERNAL_ID, NUMBER, BEGIN, END, true);
 
     @Mock
     private PolicyContractViewRepository policies;
@@ -39,15 +46,24 @@ class PolicyContractViewServiceTest {
     }
 
     @Test
-    void byId_returnsProjectionFoundById() {
-        when(policies.findContractViewById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.of(VIEW));
+    void byId_returnsRowFoundById_fieldForField() {
+        when(policies.findContractViewById(POLICY_ID)).thenReturn(Optional.of(ARCHIVED_ROW));
 
-        assertThat(service.byId(POLICY_ID)).isSameAs(VIEW);
+        assertThat(service.byId(POLICY_ID)).isEqualTo(ARCHIVED_VIEW);
+    }
+
+    @Test
+    void byId_keepsOpenEndAndActivePolicy() {
+        var activeOpenEnded = new PolicyContractRow(POLICY_ID, POLICY_EXTERNAL_ID, NUMBER, BEGIN, null, false);
+        when(policies.findContractViewById(POLICY_ID)).thenReturn(Optional.of(activeOpenEnded));
+
+        assertThat(service.byId(POLICY_ID))
+                .isEqualTo(new PolicyContractView(POLICY_ID, POLICY_EXTERNAL_ID, NUMBER, BEGIN, null, false));
     }
 
     @Test
     void byId_unknown_isPolicyNotFoundNamingId() {
-        when(policies.findContractViewById(POLICY_ID, PolicyContractView.class)).thenReturn(Optional.empty());
+        when(policies.findContractViewById(POLICY_ID)).thenReturn(Optional.empty());
 
         ReferenceNotFoundException notFound =
                 catchThrowableOfType(ReferenceNotFoundException.class, () -> service.byId(POLICY_ID));
@@ -57,17 +73,15 @@ class PolicyContractViewServiceTest {
     }
 
     @Test
-    void byExternalId_returnsProjectionFoundByExternalId() {
-        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class))
-                .thenReturn(Optional.of(VIEW));
+    void byExternalId_returnsRowFoundByExternalId_fieldForField() {
+        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID)).thenReturn(Optional.of(ARCHIVED_ROW));
 
-        assertThat(service.byExternalId(POLICY_EXTERNAL_ID)).isSameAs(VIEW);
+        assertThat(service.byExternalId(POLICY_EXTERNAL_ID)).isEqualTo(ARCHIVED_VIEW);
     }
 
     @Test
     void byExternalId_unknown_isPolicyNotFoundNamingExternalId() {
-        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID, PolicyContractView.class))
-                .thenReturn(Optional.empty());
+        when(policies.findContractViewByExternalId(POLICY_EXTERNAL_ID)).thenReturn(Optional.empty());
 
         ReferenceNotFoundException notFound = catchThrowableOfType(ReferenceNotFoundException.class,
                 () -> service.byExternalId(POLICY_EXTERNAL_ID));
