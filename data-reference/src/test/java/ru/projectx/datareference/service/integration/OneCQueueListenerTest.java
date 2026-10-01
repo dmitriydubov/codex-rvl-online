@@ -1,10 +1,15 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIOException;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -15,13 +20,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.transaction.TransactionSystemException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.JacksonConfig;
 import ru.projectx.datareference.entity.OneCStream;
@@ -164,6 +172,122 @@ class OneCQueueListenerTest {
 
         assertThat(Thread.interrupted()).isTrue();
         verify(channel).basicNack(DELIVERY_TAG, false, true);
+    }
+
+    /**
+     * Подтверждение — только после того, как приём зафиксирован: подтверждённое, но
+     * не сохранённое сообщение брокер больше не отдаст, и оно потеряно.
+     */
+    @Test
+    void storedMessage_isAcknowledgedOnlyAfterItIsStored() throws IOException {
+        when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
+
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        InOrder storageThenBroker = inOrder(ingestService, channel);
+        storageThenBroker.verify(ingestService).receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any());
+        storageThenBroker.verify(channel).basicAck(DELIVERY_TAG, false);
+    }
+
+    /**
+     * Пауза стоит <b>между</b> отказом хранения и возвратом, а не после возврата: возврат,
+     * отправленный сразу, брокер передоставит немедленно, и пауза уже ничего не сдержит.
+     * Поэтому замеряется промежуток от самого отказа до самого {@code nack}.
+     */
+    @Test
+    void storageFailure_returnsMessageOnlyAfterThePause() throws IOException {
+        Duration backoff = Duration.ofMillis(50);
+        AtomicLong failedAt = new AtomicLong();
+        AtomicLong returnedAt = new AtomicLong();
+        when(ingestService.receive(any(), any(), any(), any())).thenAnswer(invocation -> {
+            failedAt.set(System.nanoTime());
+            throw new CannotAcquireLockException("база недоступна");
+        });
+        doAnswer(invocation -> {
+            returnedAt.set(System.nanoTime());
+            return null;
+        }).when(channel).basicNack(DELIVERY_TAG, false, true);
+
+        listener(backoff).receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        assertThat(returnedAt.get()).as("сообщение возвращено в очередь").isNotZero();
+        assertThat(Duration.ofNanos(returnedAt.get() - failedAt.get())).isGreaterThanOrEqualTo(backoff);
+    }
+
+    /**
+     * «Сразу» — значит, не досиживая паузу: прерывание означает остановку контейнера,
+     * и полная пауза на каждом сообщении задержала бы её. Пауза здесь — час; тест,
+     * который её досидит, оборвётся по таймауту.
+     */
+    @Test
+    void interruptedPause_returnsMessageWithoutWaitingOutTheBackoff() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new CannotAcquireLockException("база недоступна"));
+        OneCQueueListener listener = listener(Duration.ofHours(1));
+        Message message = delivery(envelope(MESSAGE_ID));
+
+        boolean interruptKept = assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+            Thread.currentThread().interrupt();
+            listener.receive(OneCStream.MKB10, message, channel);
+            return Thread.interrupted();
+        });
+
+        assertThat(interruptKept).isTrue();
+        verify(channel).basicNack(DELIVERY_TAG, false, true);
+    }
+
+    /**
+     * Сырьё — тот же текст, что прислала 1С, и кириллица в нём тоже: тело читается
+     * как UTF-8. Не та кодировка превратила бы наименования в мусор без единой ошибки.
+     */
+    @Test
+    void cyrillicBody_isStoredAsSent() throws IOException {
+        String body = """
+                {"data":{"code":"A00","name":"Холера"},\
+                "metadata":{"message-id":"%s","producer":"1c-usk"}}"""
+                .formatted(MESSAGE_ID);
+
+        listener().receive(OneCStream.MKB10, delivery(body), channel);
+
+        verify(ingestService).receive(MESSAGE_ID, OneCStream.MKB10, QUEUE, body);
+    }
+
+    /**
+     * Сорвавшийся коммит, который Spring не переводит в исключение доступа к данным, приходит
+     * как {@link TransactionSystemException} — не {@code DataAccessException}. Сообщение
+     * и тогда возвращается в очередь: ловить одни исключения доступа к данным было бы мало.
+     */
+    @Test
+    void commitFailure_returnsMessageToQueue() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new TransactionSystemException("коммит не удался"));
+
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        verify(channel).basicNack(DELIVERY_TAG, false, true);
+    }
+
+    /**
+     * Сбой канала на подтверждении — не сбой хранения: сырьё уже лежит в базе. Ошибка
+     * уходит контейнеру, а возврата в очередь нет — неподтверждённое сообщение брокер
+     * передоставит сам, и дедупликация примет его как дубль.
+     */
+    @Test
+    void failedAcknowledgement_isNotTakenForStorageFailure() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any())).thenReturn(true);
+        doThrow(new IOException("канал закрыт")).when(channel).basicAck(DELIVERY_TAG, false);
+
+        assertThatIOException().isThrownBy(
+                () -> listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel));
+
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+    }
+
+    private OneCQueueListener listener(Duration storageUnavailableBackoff) {
+        return new OneCQueueListener(
+                new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
+                ingestService,
+                new IngestProperties(storageUnavailableBackoff));
     }
 
     private static String envelope(UUID messageId) {

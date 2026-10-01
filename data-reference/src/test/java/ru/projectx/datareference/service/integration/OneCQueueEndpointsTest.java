@@ -85,6 +85,17 @@ class OneCQueueEndpointsTest {
     }
 
     /**
+     * Идентификатор точки — имя её очереди: по нему контейнер достают из
+     * {@code RabbitListenerEndpointRegistry.getListenerContainer(id)}, чтобы остановить
+     * или проверить приём из конкретной очереди.
+     */
+    @Test
+    void endpointId_isItsQueueName() {
+        assertThat(registeredEndpoints())
+                .allSatisfy(endpoint -> assertThat(endpoint.getId()).isEqualTo(onlyQueueOf(endpoint)));
+    }
+
+    /**
      * Подтверждение вручную, один потребитель, prefetch, автостарт и реакция на отсутствующую
      * очередь задаются в {@code spring.rabbitmq.listener.simple}. Точка, которая задала бы
      * хоть одно из них сама, молча перекрыла бы конфигурацию контура.

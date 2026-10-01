@@ -16,8 +16,8 @@ import ru.projectx.datareference.service.InboxService;
 
 /**
  * Приём одного сообщения: отметка во входящих решает, сохранять ли сырьё. Общую транзакцию
- * этих двух записей unit-тест не видит — её проверяет путь через брокер
- * ({@code OneCQueueIngestTest}); здесь — порядок решения и исход для слушателя.
+ * этих двух записей unit-тест не видит — её проверяет {@link OneCIngestServiceTransactionTest}
+ * на настоящей базе; здесь — порядок решения и исход для слушателя.
  */
 @ExtendWith(MockitoExtension.class)
 class OneCIngestServiceTest {

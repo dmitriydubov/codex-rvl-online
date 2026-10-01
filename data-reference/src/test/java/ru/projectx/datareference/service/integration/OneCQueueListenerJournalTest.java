@@ -1,7 +1,11 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIOException;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -25,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.JacksonConfig;
@@ -46,6 +51,10 @@ class OneCQueueListenerJournalTest {
     /** Похоже на ПДн из полиса — ровно то, чего в журнале быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна";
 
+    /** Ключ MDC, который положил не слушатель — например, трассировка. */
+    private static final String FOREIGN_MDC_KEY = "traceId";
+    private static final String FOREIGN_MDC_VALUE = "0af7651916cd43dd8448eb211c80319c";
+
     @Mock
     private OneCIngestService ingestService;
 
@@ -66,6 +75,11 @@ class OneCQueueListenerJournalTest {
         listenerLog().detachAppender(logged);
         listenerLog().setLevel(null);
         logged.stop();
+    }
+
+    @AfterEach
+    void releaseForeignMdcKey() {
+        MDC.remove(FOREIGN_MDC_KEY);
     }
 
     @Test
@@ -143,6 +157,62 @@ class OneCQueueListenerJournalTest {
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
 
         assertThat(logged.list).isEmpty();
+    }
+
+    /**
+     * Канал может отказать и на подтверждении — оборвалось соединение с брокером. Ошибка
+     * уходит контейнеру, но ключи сообщения с потока всё равно снимаются: иначе следующее
+     * сообщение этого потока писало бы в журнал чужой {@code messageId}.
+     */
+    @Test
+    void mdc_isClearedWhenAcknowledgementFails() throws IOException {
+        doThrow(new IOException("канал закрыт")).when(channel).basicAck(anyLong(), anyBoolean());
+
+        assertThatIOException().isThrownBy(
+                () -> listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel));
+
+        assertNoMessageKeysInMdc();
+    }
+
+    @Test
+    void mdc_isClearedWhenReturnToQueueFails() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new CannotAcquireLockException("база недоступна"));
+        doThrow(new IOException("канал закрыт")).when(channel).basicNack(anyLong(), anyBoolean(), anyBoolean());
+
+        assertThatIOException().isThrownBy(
+                () -> listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel));
+
+        assertNoMessageKeysInMdc();
+    }
+
+    @Test
+    void mdc_isClearedWhenDroppingUnreadableMessageFails() throws IOException {
+        doThrow(new IOException("канал закрыт")).when(channel).basicAck(anyLong(), anyBoolean());
+
+        assertThatIOException().isThrownBy(
+                () -> listener().receive(OneCStream.POLICIES, delivery("не JSON"), channel));
+
+        assertNoMessageKeysInMdc();
+    }
+
+    /**
+     * Слушатель снимает только свои ключи: то, что положили в MDC до него (контейнер,
+     * трассировка), остаётся на месте.
+     */
+    @Test
+    void foreignMdcKeys_surviveProcessing() throws IOException {
+        MDC.put(FOREIGN_MDC_KEY, FOREIGN_MDC_VALUE);
+
+        listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
+
+        assertThat(MDC.get(FOREIGN_MDC_KEY)).isEqualTo(FOREIGN_MDC_VALUE);
+    }
+
+    private static void assertNoMessageKeysInMdc() {
+        assertThat(MDC.get(OneCQueueListener.MDC_MESSAGE_ID)).isNull();
+        assertThat(MDC.get(OneCQueueListener.MDC_STREAM)).isNull();
+        assertThat(MDC.get(OneCQueueListener.MDC_QUEUE)).isNull();
     }
 
     private ILoggingEvent onlyEvent(Level level) {
