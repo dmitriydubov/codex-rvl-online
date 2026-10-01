@@ -264,6 +264,7 @@ PDF читаются инструментом Read (страницами). До�
 | Jackson 3.1 (`tools.jackson`) | javadoc.io/doc/tools.jackson.core/jackson-databind/<версия>; миграция: raw.githubusercontent.com/FasterXML/jackson/main/jackson3/MIGRATING_TO_JACKSON_3.md | javadoc-jar, `javap` |
 | JSpecify 1.0 | jspecify.dev/docs/user-guide/ | javadoc-jar |
 | Tomcat 11.0 (встроенный) | tomcat.apache.org/tomcat-11.0-doc/ | javadoc-jar |
+| HikariCP 7.0.2 (пул соединений, версия из BOM Boot 4.0.7) | README по тегу: raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.0.2/README.md (свойства пула, единицы и умолчания) | sources-jar и javadoc-jar `com.zaxxer:HikariCP:7.0.2` |
 | SLF4J 2.0, Logback 1.5 | www.slf4j.org/manual.html, www.slf4j.org/api/; logback.qos.ch/manual/ | `javap` |
 | Micrometer 1.16 | docs.micrometer.io/micrometer/reference/1.16/ | javadoc-jar, `javap` |
 | JUnit 6.0.3 | docs.junit.org — **закрыт** | исходники руководства по тегу: raw.githubusercontent.com/junit-team/junit-framework/r6.0.3/documentation/modules/ROOT/pages/ (оглавление — …/modules/ROOT/nav.adoc); javadoc-jar |
