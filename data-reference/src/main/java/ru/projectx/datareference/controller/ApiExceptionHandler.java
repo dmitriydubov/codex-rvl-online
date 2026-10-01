@@ -6,7 +6,14 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.RecoverableDataAccessException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -23,7 +30,19 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
  * Все отказы REST — в одном формате {@link ErrorResponse}. Исходы: запрос неверен
  * по форме или по смыслу (400 с полем), записи нет (404 с кодом справочника), данные 1С
  * неоднозначны (409 с перечнем записей), данных 1С не хватает для ответа (422),
- * такого пути нет (404), всё остальное — 500.
+ * такого пути нет (404), база временно недоступна или не ответила вовремя (503),
+ * всё остальное — 500.
+ *
+ * <p>503 ({@code SERVICE_UNAVAILABLE}, решение Р24) — отказ, после которого тот же запрос
+ * стоит повторить: вызывающие повторяют GET ограниченное число раз. По иерархии Spring
+ * Framework 7.0.8 это: соединения нет при входе в транзакцию
+ * ({@link CannotCreateTransactionException}); соединение оборвалось или его не дал пул
+ * ({@link DataAccessResourceFailureException}, {@link RecoverableDataAccessException});
+ * временный отказ — таймаут оператора, ожидание блокировки ({@link TransientDataAccessException});
+ * истёк лимит времени транзакции чтения ({@link TransactionTimedOutException} от Spring, а от
+ * Hibernate — {@link JpaSystemException} с {@code org.hibernate.TransactionException} в причине:
+ * его Spring ни во что точнее не переводит). Прочие ошибки доступа к данным — неверный SQL,
+ * нарушение ограничений — постоянные: повтор их не исправит, это 500.
  *
  * <p>409 и 422 — это проблема данных в 1С, а не вызывающего, поэтому они пишутся в журнал
  * на уровне WARN: по таким записям собирается очередь на исправление. В журнал идут
@@ -42,6 +61,7 @@ public class ApiExceptionHandler {
     private static final String VALIDATION_ERROR = "VALIDATION_ERROR";
     private static final String NOT_FOUND = "NOT_FOUND";
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    private static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
 
     @ExceptionHandler(InvalidRequestException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -93,6 +113,32 @@ public class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse unknownPath(NoResourceFoundException noResource) {
         return ErrorResponse.of(NOT_FOUND, "ресурс не найден: " + noResource.getResourcePath(), requestId());
+    }
+
+    /**
+     * В журнал — тип отказа и идентификатор запроса. Текст исключения туда не идёт: в нём SQL
+     * и сообщение драйвера, а с ними могут прийти значения строки.
+     */
+    @ExceptionHandler({
+            CannotCreateTransactionException.class,
+            TransactionTimedOutException.class,
+            DataAccessResourceFailureException.class,
+            RecoverableDataAccessException.class,
+            TransientDataAccessException.class})
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ErrorResponse databaseUnavailable(RuntimeException outage) {
+        log.warn("база недоступна или не ответила вовремя: {}, request_id={}",
+                outage.getClass().getSimpleName(), requestId());
+        return ErrorResponse.of(SERVICE_UNAVAILABLE, "сервис временно недоступен, повторите запрос позже", requestId());
+    }
+
+    /** Истёкший лимит транзакции Hibernate — временный отказ; любая другая системная ошибка JPA — 500. */
+    @ExceptionHandler(JpaSystemException.class)
+    public ResponseEntity<ErrorResponse> jpaSystemFailure(JpaSystemException failure) {
+        if (failure.getCause() instanceof org.hibernate.TransactionException) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(databaseUnavailable(failure));
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(unexpected(failure));
     }
 
     @ExceptionHandler(Exception.class)

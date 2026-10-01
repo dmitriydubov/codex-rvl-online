@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
@@ -62,7 +65,9 @@ class ConsumerStandTest {
             "07-malformed-id.json",
             "08-insurance-contract-without-key.json",
             "09-policy-contract-view-by-external-id.json",
-            "10-policy-contract-view.json");
+            "10-policy-contract-view.json",
+            "11-policy-contract-view-not-found.json",
+            "12-service-unavailable.json");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
             "/response/status", "/response/headers", "/response/body");
@@ -156,11 +161,10 @@ class ConsumerStandTest {
                 .map(example -> dynamicTest(example.name(), () -> verify(example, placeholders)));
     }
 
-    private void verify(StandExample example, StandPlaceholders placeholders) throws UnsupportedEncodingException {
-        MvcTestResult result = mvc.method(example.method())
-                .uri(placeholders.resolve(example.path()))
-                .headers(headers -> example.requestHeaders().forEach(headers::add))
-                .exchange();
+    private void verify(StandExample example, StandPlaceholders placeholders)
+            throws UnsupportedEncodingException, SQLException {
+
+        MvcTestResult result = exchangeUnderCondition(example, placeholders);
 
         assertThat(result).hasStatus(example.status());
         example.responseHeaders().forEach((name, expected) -> {
@@ -172,6 +176,35 @@ class ConsumerStandTest {
         JsonNode body = JSON.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         placeholders.bind(example.body(), body);
         assertThat(body).isEqualTo(placeholders.resolve(example.body()));
+    }
+
+    /**
+     * Условие примера держит другой сеанс: блокировка взята до запроса и снимается откатом
+     * сразу после ответа, чтобы следующие примеры шли по доступной базе.
+     */
+    private MvcTestResult exchangeUnderCondition(StandExample example, StandPlaceholders placeholders)
+            throws SQLException {
+
+        if (example.lockedTable().isEmpty()) {
+            return exchange(example, placeholders);
+        }
+        try (Connection lockingSession = dataSource.getConnection()) {
+            lockingSession.setAutoCommit(false);
+            try (Statement statement = lockingSession.createStatement()) {
+                statement.execute("LOCK TABLE " + example.lockedTable().get() + " IN ACCESS EXCLUSIVE MODE");
+                return exchange(example, placeholders);
+            }
+            finally {
+                lockingSession.rollback();
+            }
+        }
+    }
+
+    private MvcTestResult exchange(StandExample example, StandPlaceholders placeholders) {
+        return mvc.method(example.method())
+                .uri(placeholders.resolve(example.path()))
+                .headers(headers -> example.requestHeaders().forEach(headers::add))
+                .exchange();
     }
 
     private void seed() {

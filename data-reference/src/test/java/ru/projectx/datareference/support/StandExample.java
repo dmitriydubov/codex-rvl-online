@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.core.io.Resource;
@@ -75,6 +76,16 @@ public record StandExample(String name, String text, JsonNode root) {
 
     public JsonNode body() {
         return root.path("response").path("body");
+    }
+
+    /**
+     * Таблица, которую на время запроса держит под ACCESS EXCLUSIVE другой сеанс
+     * (раздел {@code condition.locked_table}): так пример показывает 503 при базе,
+     * не ответившей вовремя. У остальных примеров условия нет.
+     */
+    public Optional<String> lockedTable() {
+        JsonNode table = root.path("condition").path("locked_table");
+        return table.isMissingNode() ? Optional.empty() : Optional.of(table.asString());
     }
 
     /** Плейсхолдеры, которые пример описал в разделе {@code placeholders}. */
