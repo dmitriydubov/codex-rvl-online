@@ -19,8 +19,8 @@
 #
 # Базовые образы и дистрибутив Gradle в сети без выхода наружу берутся из зеркала Nexus
 # аргументами сборки; compose читает их из .env, см. .env.example:
-#   docker build --build-arg JDK_IMAGE=<зеркало>/eclipse-temurin:21-jdk \
-#                --build-arg JRE_IMAGE=<зеркало>/eclipse-temurin:21-jre \
+#   docker build --build-arg JDK_IMAGE=<зеркало>/eclipse-temurin:21.0.12.1_1-jdk \
+#                --build-arg JRE_IMAGE=<зеркало>/eclipse-temurin:21.0.12.1_1-jre \
 #                --build-arg GRADLE_DISTRIBUTION_URL=<зеркало>/gradle-8.14.3-bin.zip .
 # Локально из готового jar: ./gradlew bootJar && docker build --build-arg JAR_SOURCE=host .
 #
@@ -34,8 +34,10 @@
 # Тесты на этапе сборки не запускаются намеренно: им нужны Docker для Testcontainers
 # и внешние базы, а сборка образа — не место для них. Их прогоняет CI до сборки образа.
 
-ARG JDK_IMAGE=eclipse-temurin:21-jdk
-ARG JRE_IMAGE=eclipse-temurin:21-jre
+# Базовые образы — с точной версией JDK, а не плавающим «21-jre»: тот же Dockerfile через
+# месяц собирает тот же Java. Обновление JDK — правкой этих строк, отдельным изменением.
+ARG JDK_IMAGE=eclipse-temurin:21.0.12.1_1-jdk
+ARG JRE_IMAGE=eclipse-temurin:21.0.12.1_1-jre
 ARG JAR_SOURCE=build
 
 # ---------- 1a. Jar из исходников ----------
@@ -53,7 +55,9 @@ COPY gradlew settings.gradle build.gradle gradle.properties ./
 COPY gradle gradle
 
 # Дистрибутив Gradle обёртка качает с services.gradle.org. Пусто — адрес из
-# gradle-wrapper.properties как есть; задано — подменяется на зеркало.
+# gradle-wrapper.properties как есть; задано — подменяется на зеркало. Контрольная сумма
+# (distributionSha256Sum там же) не подменяется: зеркало обязано отдать тот же zip,
+# иначе обёртка остановит сборку.
 ARG GRADLE_DISTRIBUTION_URL
 RUN if [ -n "${GRADLE_DISTRIBUTION_URL}" ]; then \
       sed -i "s#^distributionUrl=.*#distributionUrl=${GRADLE_DISTRIBUTION_URL}#" \
@@ -109,6 +113,7 @@ EXPOSE 8080
 # Переменную читает только запускаемая java, и Kubernetes может её переопределить.
 ENV JDK_JAVA_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
-# Всё остальное — адрес базы, брокер 1С:УСК, TLS, RABBITMQ_LISTENER_AUTO_STARTUP=true —
-# приходит переменными окружения из манифестов и секретов, см. application.yml.
+# Всё остальное — адрес и пароль базы, брокер 1С:УСК с паролем, TLS — приходит
+# переменными окружения из манифестов и секретов, см. application.yml. Умолчаний
+# у паролей нет; слушатели очередей 1С стартуют, если их явно не выключили.
 ENTRYPOINT ["java", "-jar", "application.jar"]

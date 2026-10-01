@@ -58,6 +58,17 @@ configurations {
     mockitoAgent
 }
 
+/*
+ * Тесты исполняются на тех же версиях библиотек, что и сервис. Без этого тестовые
+ * зависимости поднимают общие с продом: assertj-core требует byte-buddy 1.18.3, и Gradle
+ * выбирал его для тестов, а Hibernate в проде работает на 1.17.8 из BOM. Здесь версии
+ * всего, что есть в runtimeClasspath, берутся из его результата как strictly и
+ * побеждают более высокие требования тестовых библиотек. Своей версии сборка не задаёт —
+ * источник по-прежнему BOM. (Gradle 8.14.3, Configuration.shouldResolveConsistentlyWith,
+ * incubating с 6.8.)
+ */
+configurations.testRuntimeClasspath.shouldResolveConsistentlyWith(configurations.runtimeClasspath)
+
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
     /*

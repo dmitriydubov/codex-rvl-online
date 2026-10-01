@@ -32,7 +32,12 @@ import ru.projectx.datareference.config.OneCQueueProperties;
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {
 
-    private static final String IMAGE = "rabbitmq:4.1-alpine";
+    /**
+     * Та же версия, что у брокера 1С:УСК на тестовом и продовом контуре (RabbitMQ 4.1.2,
+     * Erlang 27.3.4.2): поведение подтверждений и возврата в очередь проверяется на ней,
+     * а не на последней 4.1.x, которую принёс бы плавающий тег.
+     */
+    private static final String IMAGE = "rabbitmq:4.1.2-alpine";
 
     @Bean
     @ServiceConnection
