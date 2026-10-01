@@ -47,7 +47,7 @@
   - не-GET и `/mkb10?query&codes` отвечают 500;
   - ПДн уходят в журнал через Hibernate и в `last_error`;
   - срок хранения стирает тело только у потока полисов;
-  - у PostgreSQL нет таймаутов, а три планировщика делят один поток;
+  - три планировщика делят один поток (таймауты PostgreSQL — с Ш4, PR #15);
   - слушатели 1С по умолчанию выключены, проверка TLS брокера тоже.
 
   Подробности и шаги исправления — в плане.
@@ -458,9 +458,14 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Проверка TLS-сертификата и имени хоста брокера по умолчанию выключена** (в Boot 4.0.7 включена).
   - `RABBITMQ_SSL_ENABLED=true` без `RABBITMQ_PORT=5671` даёт TLS на порт 5672.
   - При `validate-certificate=false` флаг `verify-hostname` в spring-rabbit 4.0.4 ничего не делает.
-- **У PostgreSQL нет таймаутов.** `socketTimeout` 0, `statement_timeout` и `lock_timeout` 0, транзакционного таймаута нет.
-  Три `@Scheduled` при виртуальных потоках выполняются одним потоком `SimpleAsyncTaskScheduler`: зависший запрос останавливает
-  импорт, стирание ПДн и алерт одновременно (воспроизведено).
+- **Таймауты PostgreSQL — с Ш4 (PR #15), только на пуле приложения.** `lock_timeout` 5s, `statement_timeout` 30s,
+  `idle_in_transaction_session_timeout` 1min (стартовый параметр `options` pgjdbc), `socketTimeout` 60 с; переменные
+  `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`, `DB_SOCKET_TIMEOUT_SECONDS`. У первых трёх
+  единица обязательна: число без неё PostgreSQL читает как миллисекунды. Liquibase открывает своё соединение без таймаутов
+  (`spring.liquibase.url/user/password`). Ловушки: пулер в режиме transaction pooling (PgBouncer, Odyssey) отвергает или
+  молча выбрасывает `options`; `?options=`/`?socketTimeout=` в `DB_URL` перекрывают свойства; `ALTER ROLE … SET
+  statement_timeout` ограничил бы и миграции. Три `@Scheduled` при виртуальных потоках по-прежнему выполняются одним потоком
+  `SimpleAsyncTaskScheduler` (Ш14b): зависший запрос теперь обрывается через 30 с, но до этого держит и стирание ПДн, и алерт.
 - **Приём при сбое базы.**
   - Слушатель любой сбой записи считает недоступностью базы: 5 с паузы, затем nack с возвратом. Тело, которое Jackson
     принимает, а `jsonb` нет (`\u0000`, UTF-8 BOM, UTF-16), крутится бесконечно.
