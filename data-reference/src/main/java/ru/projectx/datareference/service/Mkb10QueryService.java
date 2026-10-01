@@ -8,6 +8,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.repository.Mkb10Repository;
@@ -71,7 +72,7 @@ public class Mkb10QueryService implements Mkb10Reads {
 
     private static Mkb10Response response(List<Mkb10Row> rows) {
         return new Mkb10Response(rows.stream()
-                .map(row -> new Mkb10Response.Item(row.id(), row.externalId(), row.code(), row.name(),
+                .map(row -> new Mkb10Code(row.id(), row.externalId(), row.code(), row.name(),
                         row.hierarchyLevel(), row.parentCode(), row.isArchive()))
                 .toList());
     }

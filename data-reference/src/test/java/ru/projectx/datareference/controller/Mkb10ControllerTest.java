@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.service.Mkb10Reads;
 
@@ -87,6 +88,6 @@ class Mkb10ControllerTest {
 
     private static Mkb10Response codes(String code) {
         return new Mkb10Response(List.of(
-                new Mkb10Response.Item(CODE_ID, CODE_EXTERNAL_ID, code, "Наименование кода", 2, null, false)));
+                new Mkb10Code(CODE_ID, CODE_EXTERNAL_ID, code, "Наименование кода", 2, null, false)));
     }
 }

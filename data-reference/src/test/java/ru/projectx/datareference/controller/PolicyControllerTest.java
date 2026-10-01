@@ -20,7 +20,7 @@ import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.service.PolicyContractViews;
 import ru.projectx.datareference.service.PolicySearchReads;
-import ru.projectx.datareference.service.ReferenceQueryService;
+import ru.projectx.datareference.service.PolicyReads;
 
 /**
  * R-05: полис по нашему {@code id}, по {@code external_id}, по номеру в договоре и запрос
@@ -45,7 +45,7 @@ class PolicyControllerTest {
     private static final String MISSING_VALUE_REASON = "обязательный параметр";
 
     @Mock
-    private ReferenceQueryService references;
+    private PolicyReads policies;
 
     @Mock
     private PolicySearchReads policySearch;
@@ -57,12 +57,12 @@ class PolicyControllerTest {
 
     @BeforeEach
     void setUp() {
-        mvc = StandaloneMvc.of(new PolicyController(references, policySearch, contractViews));
+        mvc = StandaloneMvc.of(new PolicyController(policies, policySearch, contractViews));
     }
 
     @Test
     void policyById_returnsPolicyFoundByService_asJson() {
-        when(references.policy(POLICY_ID)).thenReturn(policy());
+        when(policies.byId(POLICY_ID)).thenReturn(policy());
 
         MvcTestResult result = mvc.get().uri(POLICIES + "/{id}", POLICY_ID).exchange();
 
@@ -72,7 +72,7 @@ class PolicyControllerTest {
 
     @Test
     void policyByExternalId_returnsPolicyFoundByService() {
-        when(references.policyByExternalId(POLICY_EXTERNAL_ID)).thenReturn(policy());
+        when(policies.byExternalId(POLICY_EXTERNAL_ID)).thenReturn(policy());
 
         MvcTestResult result = mvc.get().uri(POLICIES + "?external_id={external}", POLICY_EXTERNAL_ID).exchange();
 
@@ -82,7 +82,7 @@ class PolicyControllerTest {
 
     @Test
     void policyByNumber_passesNumberAndContract() {
-        when(references.policyByNumber(POLICY_NUMBER, CONTRACT_ID)).thenReturn(policy());
+        when(policies.byNumber(POLICY_NUMBER, CONTRACT_ID)).thenReturn(policy());
 
         MvcTestResult result = mvc.get()
                 .uri(POLICIES + "?number={number}&contract_id={contract}", POLICY_NUMBER, CONTRACT_ID)
@@ -100,7 +100,7 @@ class PolicyControllerTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -110,7 +110,7 @@ class PolicyControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -120,7 +120,7 @@ class PolicyControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -145,7 +145,7 @@ class PolicyControllerTest {
                 .exchange();
 
         assertThat(result).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly(POLICY_NUMBER);
-        verifyNoInteractions(references);
+        verifyNoInteractions(policies);
     }
 
     @Test
@@ -154,7 +154,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -165,7 +165,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("query");
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
@@ -175,7 +175,7 @@ class PolicyControllerTest {
                 .exchange();
 
         assertThat(result).hasStatus(406);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -186,7 +186,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatusOk().hasContentTypeCompatibleWith(MediaType.APPLICATION_JSON);
         assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(POLICY_ID.toString());
-        verifyNoInteractions(references, policySearch);
+        verifyNoInteractions(policies, policySearch);
     }
 
     /** Литерал {@code contract-view} выигрывает у {@code /policies/{id}}: он не читается как id полиса R-05. */
@@ -200,7 +200,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatusOk().hasContentTypeCompatibleWith(MediaType.APPLICATION_JSON);
         assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(POLICY_ID.toString());
-        verifyNoInteractions(references, policySearch);
+        verifyNoInteractions(policies, policySearch);
     }
 
     @Test
@@ -211,7 +211,7 @@ class PolicyControllerTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_EXTERNAL_ID_REASON);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     /**
@@ -225,7 +225,7 @@ class PolicyControllerTest {
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -234,7 +234,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("id");
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
@@ -243,7 +243,7 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
-        verifyNoInteractions(references, policySearch, contractViews);
+        verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     private static PolicyContractView contractView() {

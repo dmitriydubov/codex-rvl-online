@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
+import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.repository.Mkb10Repository;
@@ -112,8 +113,8 @@ class Mkb10QueryServiceTest {
         verifyNoInteractions(mkb10);
     }
 
-    private static Mkb10Response.Item item(Mkb10Row row) {
-        return new Mkb10Response.Item(row.id(), row.externalId(), row.code(), row.name(), row.hierarchyLevel(),
+    private static Mkb10Code item(Mkb10Row row) {
+        return new Mkb10Code(row.id(), row.externalId(), row.code(), row.name(), row.hierarchyLevel(),
                 row.parentCode(), row.isArchive());
     }
 }
