@@ -2,7 +2,7 @@ package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static ru.projectx.datareference.support.OneCMessages.mkb10Message;
+import static ru.projectx.datareference.support.OneCMessages.messageWithId;
 
 import java.time.Duration;
 import java.util.List;
@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.support.AmqpIntegrationTest;
 import ru.projectx.datareference.support.DatabaseCleaner;
+import ru.projectx.datareference.support.RunningListeners;
 
 /**
  * Порядок записи сырья, когда запись одного сообщения не удалась, — на настоящем брокере
@@ -118,12 +119,7 @@ class OneCQueueOrderTest {
     /** Без работающих слушателей ожидание ниже кончилось бы таймаутом, не назвав причину. */
     @BeforeEach
     void listenersAreRunning() {
-        assertThat(listeners.getListenerContainerIds())
-                .as("контейнеры слушателей очередей 1С")
-                .isNotEmpty()
-                .allSatisfy(id -> assertThat(listeners.getListenerContainer(id).isRunning())
-                        .as("слушатель %s не запущен: auto-startup выключен или контейнер остановлен", id)
-                        .isTrue());
+        RunningListeners.assertAllRunning(listeners);
     }
 
     @AfterEach
@@ -137,7 +133,7 @@ class OneCQueueOrderTest {
         List<UUID> queueOrder = Stream.generate(UUID::randomUUID).limit(MESSAGES).toList();
         failFirstWriteOf(queueOrder.getFirst());
 
-        queueOrder.forEach(messageId -> rabbitTemplate.convertAndSend(queues.mkb10(), mkb10Message(messageId)));
+        queueOrder.forEach(messageId -> rabbitTemplate.convertAndSend(queues.mkb10(), messageWithId(messageId)));
 
         await().atMost(ALL_WRITTEN_TIMEOUT)
                 .untilAsserted(() -> assertThat(writtenInOrder()).hasSizeGreaterThanOrEqualTo(MESSAGES));

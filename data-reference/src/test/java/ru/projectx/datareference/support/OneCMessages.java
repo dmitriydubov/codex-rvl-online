@@ -27,10 +27,11 @@ public final class OneCMessages {
     }
 
     /**
-     * Сообщение ТЗ-4 (МКБ-10) целиком, с заданным {@code message-id} — для тестов приёма
-     * из очереди, где сообщения различает только он.
+     * Сообщение целиком, с заданным {@code message-id} — для тестов приёма из очереди, где
+     * сообщения различает только он. Тело — строка МКБ-10 в любой очереди нарочно: при приёме
+     * тело не разбирается, а поток определяет очередь, и тест это и доказывает.
      */
-    public static String mkb10Message(UUID messageId) {
+    public static String messageWithId(UUID messageId) {
         return """
                 {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001","code":"A00"},\
                 "metadata":{"message-id":"%s","topic":"","producer":"1c-usk"}}"""
