@@ -101,12 +101,13 @@ spring:
       enabled: ${RABBITMQ_SSL_ENABLED:false}
       # С включённым TLS сертификат брокера и имя хоста в нём проверяются всегда, если
       # контур явно не сказал иначе: без проверки TLS шифрует канал, но не говорит, с кем.
-      # Самоподписанному сертификату тестового контура доверяют, положив его центр
-      # в certs/ при сборке образа (см. Dockerfile): без ssl.bundle клиент берёт хранилище
-      # доверия JVM. Имя хоста (RABBITMQ_HOST) должно быть в сертификате. verify-hostname
-      # действует только вместе с validate-server-certificate: при false клиент доверяет
-      # любому сертификату и имя не сверяет. Выключать проверку переменными — только
-      # осознанно: клиент RabbitMQ тогда печатает на старте SECURITY ALERT.
+      # Сертификату доверяют через хранилище JVM: без ssl.bundle клиент берёт его, а центр
+      # сертификации кладётся в certs/ при сборке образа (см. Dockerfile); имя хоста
+      # (RABBITMQ_HOST) должно быть в сертификате. Тестовый контур — исключение: сертификат
+      # там самоподписанный и без имени хоста, поэтому его манифест выключает проверку явно
+      # (RABBITMQ_SSL_VALIDATE_CERTIFICATE=false), и клиент RabbitMQ печатает на старте
+      # SECURITY ALERT. verify-hostname действует только вместе с validate-server-certificate:
+      # при false клиент доверяет любому сертификату и имя не сверяет.
       validate-server-certificate: ${RABBITMQ_SSL_VALIDATE_CERTIFICATE:true}
       verify-hostname: ${RABBITMQ_SSL_VERIFY_HOSTNAME:true}
     # Очереди на брокере заведены со стороны 1С:УСК. Свой AmqpAdmin не нужен
