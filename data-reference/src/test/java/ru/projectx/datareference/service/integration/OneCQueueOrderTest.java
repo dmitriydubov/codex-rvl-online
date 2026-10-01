@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static ru.projectx.datareference.support.OneCMessages.mkb10Message;
 
 import java.time.Duration;
 import java.util.List;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import ru.projectx.datareference.config.OneCQueueProperties;
@@ -33,6 +35,11 @@ import ru.projectx.datareference.support.DatabaseCleaner;
  * попыток — последовательность: {@code nextval} не откатывается вместе с транзакцией, а строка
  * протокола откатывается — в нём остаются только записи, дошедшие до коммита, в порядке записи.
  * Всё это лежит в отдельной схеме, чтобы не попасть под очистку базы и не пережить тест.
+ *
+ * <p>Очереди здесь classic ({@code RabbitTestcontainer}): у них, как и у quorum-очереди
+ * с {@code delivery-limit}, возвращённое сообщение встаёт на прежнее место. Quorum-очередь
+ * без лимита ставит его в конец — там порядок не держит никакой prefetch, и этот тест
+ * такой случай не покрывает.
  */
 @AmqpIntegrationTest
 class OneCQueueOrderTest {
@@ -55,12 +62,18 @@ class OneCQueueOrderTest {
                 message_id uuid not null
             )""";
 
+    /**
+     * Вложенный {@code if}, а не {@code and}: порядок вычисления условий SQL не задан,
+     * а счётчик должен считать попытки только первого сообщения.
+     */
     private static final String FAIL_FIRST_THEN_LOG = """
             create function order_probe.fail_first_then_log() returns trigger
             language plpgsql as $$
             begin
-                if new.message_id = tg_argv[0]::uuid and nextval('order_probe.attempts') = 1 then
-                    raise exception 'проверка порядка: отказ записи сырья';
+                if new.message_id = tg_argv[0]::uuid then
+                    if nextval('order_probe.attempts') = 1 then
+                        raise exception 'проверка порядка: отказ записи сырья';
+                    end if;
                 end if;
                 insert into order_probe.written (message_id) values (new.message_id);
                 return new;
@@ -77,6 +90,11 @@ class OneCQueueOrderTest {
 
     private static final String WRITTEN_IN_ORDER = "select message_id from order_probe.written order by position";
 
+    private static final String FIRST_MESSAGE_ATTEMPTS = "select last_value from order_probe.attempts";
+
+    /** Попытки записи первого сообщения: отказ и удачная повторная. */
+    private static final long FAILED_THEN_WRITTEN = 2;
+
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
@@ -89,9 +107,23 @@ class OneCQueueOrderTest {
     @Autowired
     private DatabaseCleaner databaseCleaner;
 
+    @Autowired
+    private RabbitListenerEndpointRegistry listeners;
+
     @BeforeEach
     void clearTables() {
         databaseCleaner.clear();
+    }
+
+    /** Без работающих слушателей ожидание ниже кончилось бы таймаутом, не назвав причину. */
+    @BeforeEach
+    void listenersAreRunning() {
+        assertThat(listeners.getListenerContainerIds())
+                .as("контейнеры слушателей очередей 1С")
+                .isNotEmpty()
+                .allSatisfy(id -> assertThat(listeners.getListenerContainer(id).isRunning())
+                        .as("слушатель %s не запущен: auto-startup выключен или контейнер остановлен", id)
+                        .isTrue());
     }
 
     @AfterEach
@@ -105,10 +137,12 @@ class OneCQueueOrderTest {
         List<UUID> queueOrder = Stream.generate(UUID::randomUUID).limit(MESSAGES).toList();
         failFirstWriteOf(queueOrder.getFirst());
 
-        queueOrder.forEach(messageId -> rabbitTemplate.convertAndSend(queues.mkb10(), envelope(messageId)));
+        queueOrder.forEach(messageId -> rabbitTemplate.convertAndSend(queues.mkb10(), mkb10Message(messageId)));
 
-        await().atMost(ALL_WRITTEN_TIMEOUT).until(() -> writtenInOrder().size() == MESSAGES);
+        await().atMost(ALL_WRITTEN_TIMEOUT)
+                .untilAsserted(() -> assertThat(writtenInOrder()).hasSizeGreaterThanOrEqualTo(MESSAGES));
         assertThat(writtenInOrder()).containsExactlyElementsOf(queueOrder);
+        assertThat(firstMessageAttempts()).as("отказ первой записи был внедрён").isEqualTo(FAILED_THEN_WRITTEN);
     }
 
     private void failFirstWriteOf(UUID messageId) {
@@ -120,10 +154,7 @@ class OneCQueueOrderTest {
         return jdbc.sql(WRITTEN_IN_ORDER).query(UUID.class).list();
     }
 
-    private static String envelope(UUID messageId) {
-        return """
-                {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001","code":"A00"},\
-                "metadata":{"message-id":"%s","topic":"","producer":"1c-usk"}}"""
-                .formatted(messageId);
+    private long firstMessageAttempts() {
+        return jdbc.sql(FIRST_MESSAGE_ATTEMPTS).query(Long.class).single();
     }
 }

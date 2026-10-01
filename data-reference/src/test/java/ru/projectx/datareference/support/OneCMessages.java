@@ -27,6 +27,17 @@ public final class OneCMessages {
     }
 
     /**
+     * Сообщение ТЗ-4 (МКБ-10) целиком, с заданным {@code message-id} — для тестов приёма
+     * из очереди, где сообщения различает только он.
+     */
+    public static String mkb10Message(UUID messageId) {
+        return """
+                {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001","code":"A00"},\
+                "metadata":{"message-id":"%s","topic":"","producer":"1c-usk"}}"""
+                .formatted(messageId);
+    }
+
+    /**
      * Сообщение ТЗ-3, из которого получается санаторий. Нужно почти всем потокам
      * со связями: договоры, программы и адреса цепляются именно к нему.
      */
