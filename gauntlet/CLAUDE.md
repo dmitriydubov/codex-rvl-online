@@ -277,6 +277,7 @@ PDF читаются инструментом Read (страницами). До�
 | Docker Compose v5.1.1 (CLI) и спецификация compose-файла (`docker-compose.yml`) | docs.docker.com — **закрыт** | CLI — по тегу версии: raw.githubusercontent.com/docker/compose/v5.1.1/docs/reference/<команда>.md (compose.md, compose_up.md, compose_down.md …); файл — raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/<раздел>.md (services.md, build.md, fragments.md) и raw.githubusercontent.com/compose-spec/compose-spec/main/<NN>-<раздел>.md; руководства — raw…/docker/docs/main/content/manuals/compose/…; у docker/docs и compose-spec тегов под версию нет — ветка main, поведение проверять `docker compose … config` |
 | Dockerfile и BuildKit (`Dockerfile` модуля: `RUN --mount`, `FROM ${ARG}`) | docs.docker.com — **закрыт** | raw.githubusercontent.com/moby/buildkit/master/frontend/dockerfile/docs/reference.md; руководства — raw…/docker/docs/main/content/manuals/build/…; поведение проверять `docker build` локально |
 | Гейты: PIT 1.22.1, gradle-pitest-plugin 1.19.0, ArchUnit 1.5.1, Checkstyle 12.3.1, PMD 7.27.0, JaCoCo 0.8.15 | pitest.org; gradle-pitest-plugin.solidsoft.info; www.archunit.org/userguide/; checkstyle.org; docs.pmd-code.org/pmd-doc-7.27.0/; www.jacoco.org/jacoco/trunk/doc/ | по тегу версии на raw.githubusercontent.com: hcoles/pitest/1.22.1/README.md; szpak/gradle-pitest-plugin/release/1.19.0/README.md; TNG/ArchUnit/v1.5.1/docs/userguide/; checkstyle/checkstyle/checkstyle-12.3.1/src/site/xdoc/checks/; pmd/pmd/pmd_releases/7.27.0/pmd-java/src/main/resources/category/java/; jacoco/jacoco/v0.8.15/org.jacoco.doc/docroot/doc/ |
+| Git (`.gitattributes`, `.gitignore`; версия — `git --version` в сессии, сейчас 2.43.0) | git-scm.com/docs — **закрыт** (и без версии) | по тегу версии: raw.githubusercontent.com/git/git/v<версия>/Documentation/<страница>.txt (например, gitattributes.txt); поведение проверять `git ls-files --eol`, `git check-attr` |
 | Хуки и сабагенты Claude Code (правки `.claude/settings.json`, `.claude/agents/`, `gauntlet/hooks/`) | code.claude.com/docs/en/hooks, code.claude.com/docs/en/sub-agents — без версии: сверять с версией Claude Code в сессии (`claude --version`, в облаке — строка статуса или метаданные сессии) | поведение проверять `python3 gauntlet/hooks/selftest.py` и журналом хука в `build/gauntlet/` |
 
 - Адрес без версии показывает последнюю ветку, а не нашу: у docs.spring.io, docs.hibernate.org,
@@ -284,6 +285,11 @@ PDF читаются инструментом Read (страницами). До�
   проверь по метатегу `version` страницы. Сайты без версий (docs.liquibase.com, java.testcontainers.org,
   assertj.github.io, cucumber.io) — источник, только если страница не расходится с исходниками по тегу
   нужной версии; в отчёт тогда идёт ссылка на тег.
+- Страница с major.minor в пути может расходиться с кодом и нашей, и последней версии. Пример (Ш4, PR #15): how-to
+  Boot 4.0 «Database Initialization» обещает наследование незаданных `spring.liquibase.*` из `spring.datasource.*`,
+  а spring-boot-liquibase 4.0.7 (`LiquibaseAutoConfiguration.getMigrationDataSource`) при заданном
+  `spring.liquibase.url` их не наследует. При расхождении прав код нужной версии (sources-jar, `javap`); в «Сверку
+  по документации» идут оба источника.
 - Универсальная замена недоступного сайта: javadoc-jar и sources-jar нужной версии на repo.maven.apache.org
   (зеркало — javadoc.io), исходники документации по тегу версии на raw.githubusercontent.com; последний
   рубеж — jar в кэше Gradle (`~/.gradle/caches/modules-2/files-2.1/`).
