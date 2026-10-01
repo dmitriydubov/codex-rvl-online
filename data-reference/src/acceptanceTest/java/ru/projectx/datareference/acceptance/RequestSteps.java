@@ -7,11 +7,13 @@ import io.cucumber.java.ru.Когда;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Запросы сервиса Договоров. {@code {id}} в пути — id, полученный на шаге «Дано»:
+ * Запросы сервисов Договоров и Заявок. {@code {id}} в пути — id, полученный на шаге «Дано»:
  * так потребитель и работает — хранит наш id и адресует им запись.
  *
- * <p>Сервис Заявок ходит тем же HTTP-клиентом: для Дата-референса потребители неразличимы —
- * межсервисной аутентификации нет (Д5), и отличаются они только тем, какую ручку читают.
+ * <p>Оба потребителя ходят одним HTTP-клиентом и одними шагами («сервис Договоров/Заявок» —
+ * альтернатива Cucumber Expressions): для Дата-референса они неразличимы — межсервисной
+ * аутентификации нет (Д5), и отличаются они только тем, какую ручку читают. Имя потребителя
+ * в сценарии говорит читателю, чья это ручка.
  */
 public class RequestSteps {
 
@@ -23,27 +25,22 @@ public class RequestSteps {
         this.contracts = contracts;
     }
 
-    @Когда("сервис Договоров запрашивает {string}")
+    @Когда("сервис Договоров/Заявок запрашивает {string}")
     public void requests(String path) {
         contracts.request(path);
     }
 
-    @Когда("сервис Заявок запрашивает {string}")
-    public void applicationsServiceRequests(String path) {
-        contracts.request(path);
-    }
-
-    @Когда("сервис Договоров запрашивает {string} с X-Request-Id {string}")
+    @Когда("сервис Договоров/Заявок запрашивает {string} с X-Request-Id {string}")
     public void requestsWithRequestId(String path, String requestId) {
         contracts.request(path, requestId);
     }
 
-    @Дано("сервис Договоров получил id из ответа на {string}")
+    @Дано("сервис Договоров/Заявок получил id из ответа на {string}")
     public void obtainedId(String path) {
         obtainIdFrom("id", path);
     }
 
-    @Дано("сервис Договоров получил id из поля {string} ответа на {string}")
+    @Дано("сервис Договоров/Заявок получил id из поля {string} ответа на {string}")
     public void obtainedIdFromField(String field, String path) {
         obtainIdFrom(field, path);
     }

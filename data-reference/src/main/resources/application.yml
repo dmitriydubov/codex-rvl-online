@@ -52,10 +52,11 @@ spring:
         #   idle_in_transaction_session_timeout — транзакция открыта, а запросов нет
         #     (25P03, сеанс закрывается, пул заменит соединение). Транзакции сервиса
         #     не ждут внешних систем, а брошенная держит блокировки и мешает VACUUM.
+        # Значения — из projectx.database.session-timeouts ниже: там же их сверяет проверка при старте.
         options: >-
-          -c lock_timeout=${DB_LOCK_TIMEOUT:5s}
-          -c statement_timeout=${DB_STATEMENT_TIMEOUT:30s}
-          -c idle_in_transaction_session_timeout=${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+          -c lock_timeout=${projectx.database.session-timeouts.lock-timeout}
+          -c statement_timeout=${projectx.database.session-timeouts.statement-timeout}
+          -c idle_in_transaction_session_timeout=${projectx.database.session-timeouts.idle-in-transaction-session-timeout}
         # Таймаут чтения сокета драйвером, в секундах (pgjdbc: socketTimeout). Последний
         # рубеж на случай, когда сервер не ответит вовсе, даже отменой по
         # statement_timeout: поэтому больше него. Соединение после него закрывается.
@@ -175,6 +176,17 @@ management:
         enabled: true
 
 projectx:
+  database:
+    # Таймауты сеанса пула приложения (Ш4), в записи PostgreSQL с единицей: ms, s, min, h, d.
+    # Уходят в стартовый options пула (spring.datasource.hikari выше). При старте сервис читает
+    # их на соединении пула и сверяет с этими значениями, а на соединении миграций ждёт 0 (Ш41):
+    # расхождение — WARN по параметру, старт не прерывается. Так видны пулер, молча выбросивший
+    # options, и таймаут на роли или базе, доставшийся миграциям.
+    session-timeouts:
+      lock-timeout: ${DB_LOCK_TIMEOUT:5s}
+      statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
+      idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+
   api:
     # Календарный день для правила «действует на сегодня» (ТЗ на API): сервис живёт
     # в UTC, а день считается московский, иначе три часа в сутки договоры отставали бы
@@ -188,6 +200,11 @@ projectx:
     rvl-appeal-types:
       - РВЛ и СКЛ
       - РВЛ в России
+    # Лимит времени REST-чтения, целые секунды (Ш41): чтение, не уложившееся в него, отвечает 503
+    # SERVICE_UNAVAILABLE, и потребитель повторяет запрос. Меньше lock_timeout пула (5 с), чтобы под
+    # чужой блокировкой REST отказывал первым и отдавал соединение; чтения по ключу занимают миллисекунды.
+    # Hibernate отдаёт оператору остаток лимита в целых секундах, не меньше одной.
+    read-timeout-seconds: ${API_READ_TIMEOUT_SECONDS:3}
 
   onec:
     contract:

@@ -7,11 +7,12 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.repository.Mkb10Repository;
+import ru.projectx.datareference.repository.Mkb10Row;
 
 /**
  * МКБ-10 для R-07 в двух режимах: подсказка по строке и батч по перечню кодов.
@@ -23,7 +24,7 @@ import ru.projectx.datareference.repository.Mkb10Repository;
  * ни одним потоком ({@code OQ-25}).
  */
 @Service
-public class Mkb10QueryService {
+public class Mkb10QueryService implements Mkb10Reads {
 
     private static final Pattern CODE_START = Pattern.compile("^[A-Za-z][0-9]");
 
@@ -35,20 +36,19 @@ public class Mkb10QueryService {
         this.api = api;
     }
 
-    @Transactional(readOnly = true)
+    @Override
+    @RestReadTransaction
     public Mkb10Response search(String rawQuery, @Nullable Integer requestedLimit) {
-        Limit limit = Limit.of(limitOf(requestedLimit));
+        Limit limit = Limit.of(ResultLimits.resolve(requestedLimit, api.mkb10().defaultLimit(), api.mkb10().maxLimit()));
         String query = rawQuery.trim();
         if (query.length() < api.mkb10().minQueryLength()) {
             throw new InvalidRequestException("query", "не короче " + api.mkb10().minQueryLength() + " символов");
         }
-        String escaped = PolicySearchService.escapeLike(query);
-        return Mkb10Response.of(CODE_START.matcher(query).lookingAt()
-                ? mkb10.findActiveByCodePrefix(escaped.toUpperCase(Locale.ROOT) + "%", limit)
-                : mkb10.findActiveByNamePattern("%" + escaped.toLowerCase(Locale.ROOT) + "%", limit));
+        return response(CODE_START.matcher(query).lookingAt() ? byCodePrefix(query, limit) : byName(query, limit));
     }
 
-    @Transactional(readOnly = true)
+    @Override
+    @RestReadTransaction
     public Mkb10Response byCodes(List<String> rawCodes) {
         List<String> codes = rawCodes.stream()
                 .map(String::trim)
@@ -59,14 +59,21 @@ public class Mkb10QueryService {
         if (codes.isEmpty()) {
             throw new InvalidRequestException("codes", "хотя бы один код");
         }
-        return Mkb10Response.of(mkb10.findByCodes(codes));
+        return response(mkb10.findByCodes(codes));
     }
 
-    private int limitOf(@Nullable Integer requested) {
-        int limit = requested == null ? api.mkb10().defaultLimit() : requested;
-        if (limit < 1 || limit > api.mkb10().maxLimit()) {
-            throw new InvalidRequestException("limit", "от 1 до " + api.mkb10().maxLimit());
-        }
-        return limit;
+    private List<Mkb10Row> byCodePrefix(String query, Limit limit) {
+        return mkb10.findActiveByCodePrefix(LikePatterns.prefix(query.toUpperCase(Locale.ROOT)), limit);
+    }
+
+    private List<Mkb10Row> byName(String query, Limit limit) {
+        return mkb10.findActiveByNamePattern(LikePatterns.substring(query.toLowerCase(Locale.ROOT)), limit);
+    }
+
+    private static Mkb10Response response(List<Mkb10Row> rows) {
+        return new Mkb10Response(rows.stream()
+                .map(row -> new Mkb10Code(row.id(), row.externalId(), row.code(), row.name(),
+                        row.hierarchyLevel(), row.parentCode(), row.isArchive()))
+                .toList());
     }
 }

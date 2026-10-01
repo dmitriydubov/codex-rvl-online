@@ -9,12 +9,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 import liquibase.integration.spring.SpringLiquibase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.NestedExceptionUtils;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
@@ -43,6 +46,12 @@ class DatabaseTimeoutsTest {
     @Autowired
     private InboundMessageRepository inboundMessageRepository;
 
+    @Autowired
+    private SessionSettingsRepository sessionSettings;
+
+    @Autowired
+    private DatabaseSessionTimeouts configured;
+
     @Test
     void applicationConnection_carriesSessionAndSocketTimeouts() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -51,6 +60,24 @@ class DatabaseTimeoutsTest {
             assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
             assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
         }
+    }
+
+    /**
+     * Проверка при старте (Ш41) читает то же, что {@code SHOW}, — в миллисекундах из {@code pg_settings};
+     * у пула это значения настройки, у миграций — нули.
+     */
+    @Test
+    void sessionSettings_readPoolValuesAndZeroForMigrations() {
+        List<String> parameters = List.copyOf(configured.byParameter().keySet());
+
+        assertThat(sessionSettings.durations(dataSource, parameters)).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "lock_timeout", Duration.ofSeconds(5),
+                "statement_timeout", Duration.ofSeconds(30),
+                "idle_in_transaction_session_timeout", Duration.ofMinutes(1)));
+        assertThat(sessionSettings.durations(liquibase.getDataSource(), parameters)).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "lock_timeout", Duration.ZERO,
+                "statement_timeout", Duration.ZERO,
+                "idle_in_transaction_session_timeout", Duration.ZERO));
     }
 
     /** Долгая миграция на живой базе не должна обрываться ни по одному из таймаутов пула. */

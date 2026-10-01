@@ -21,19 +21,12 @@ import ru.projectx.datareference.entity.PriceListItem;
  * С {@code need_prices} услуга без актуальных цен остаётся в списке с пустым массивом:
  * это диагностически важно — такая услуга потом даст {@code 422} в расчёте стоимости.
  */
-public record LpuServicesResponse(LpuRef lpu, PriceContractRef priceContract, List<Service> services) {
+public record LpuServicesResponse(NamedRef lpu, PriceContractRef priceContract, List<Service> services) {
 
     public static LpuServicesResponse of(
             Lpu lpu, LpuContract priceContract, PriceContractRef.Kind kind, List<Service> services) {
 
-        return new LpuServicesResponse(LpuRef.of(lpu), PriceContractRef.of(priceContract, kind), services);
-    }
-
-    public record LpuRef(UUID id, UUID externalId, String name) {
-
-        static LpuRef of(Lpu lpu) {
-            return new LpuRef(lpu.id(), lpu.externalId(), lpu.name());
-        }
+        return new LpuServicesResponse(NamedRef.of(lpu, lpu.name()), PriceContractRef.of(priceContract, kind), services);
     }
 
     public record Service(
@@ -41,20 +34,19 @@ public record LpuServicesResponse(LpuRef lpu, PriceContractRef priceContract, Li
             UUID externalId,
             @Nullable String code,
             String name,
-            AppealTypeRef appealType,
+            NamedRef appealType,
             @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable List<Price> prices) {
 
-        /** {@code prices == null} — цены не запрашивали; пустой список — запрашивали, но их нет. */
-        public static Service of(ContragentService service, AppealType appealType, @Nullable List<PriceListItem> prices) {
+        /** Цены не запрашивали: поля {@code prices} в ответе нет. */
+        public static Service withoutPrices(ContragentService service, AppealType appealType) {
             return new Service(service.id(), service.externalId(), service.code(), service.name(),
-                    AppealTypeRef.of(appealType), prices == null ? null : prices.stream().map(Price::of).toList());
+                    NamedRef.of(appealType, appealType.name()), null);
         }
-    }
 
-    public record AppealTypeRef(UUID id, UUID externalId, String name) {
-
-        static AppealTypeRef of(AppealType appealType) {
-            return new AppealTypeRef(appealType.id(), appealType.externalId(), appealType.name());
+        /** Цены запрашивали: пустой перечень — актуальных цен у услуги нет. */
+        public static Service withPrices(ContragentService service, AppealType appealType, List<PriceListItem> prices) {
+            return new Service(service.id(), service.externalId(), service.code(), service.name(),
+                    NamedRef.of(appealType, appealType.name()), prices.stream().map(Price::of).toList());
         }
     }
 

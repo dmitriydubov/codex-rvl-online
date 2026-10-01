@@ -15,7 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
-import ru.projectx.datareference.service.ReferenceQueryService;
+import ru.projectx.datareference.service.InsuranceContractReads;
 
 /** R-08: договор страхования по нашему {@code id}, по {@code external_id} и запрос без ключа. */
 @ExtendWith(MockitoExtension.class)
@@ -26,18 +26,18 @@ class InsuranceContractControllerTest {
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("1c0d0000-0000-4000-8000-000000000002");
 
     @Mock
-    private ReferenceQueryService references;
+    private InsuranceContractReads insuranceContracts;
 
     private MockMvcTester mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = StandaloneMvc.of(new InsuranceContractController(references));
+        mvc = StandaloneMvc.of(new InsuranceContractController(insuranceContracts));
     }
 
     @Test
     void contractById_returnsContractFoundByService_asJson() {
-        when(references.insuranceContract(CONTRACT_ID)).thenReturn(contract());
+        when(insuranceContracts.byId(CONTRACT_ID)).thenReturn(contract());
 
         MvcTestResult result = mvc.get().uri(CONTRACTS + "/{id}", CONTRACT_ID).exchange();
 
@@ -47,7 +47,7 @@ class InsuranceContractControllerTest {
 
     @Test
     void contractByExternalId_returnsContractFoundByService() {
-        when(references.insuranceContractByExternalId(CONTRACT_EXTERNAL_ID)).thenReturn(contract());
+        when(insuranceContracts.byExternalId(CONTRACT_EXTERNAL_ID)).thenReturn(contract());
 
         MvcTestResult result = mvc.get().uri(CONTRACTS + "?external_id={external}", CONTRACT_EXTERNAL_ID).exchange();
 
@@ -63,7 +63,7 @@ class InsuranceContractControllerTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo("нужен external_id");
-        verifyNoInteractions(references);
+        verifyNoInteractions(insuranceContracts);
     }
 
     /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
@@ -73,7 +73,7 @@ class InsuranceContractControllerTest {
                 .exchange();
 
         assertThat(result).hasStatus(406);
-        verifyNoInteractions(references);
+        verifyNoInteractions(insuranceContracts);
     }
 
     private static InsuranceContractResponse contract() {

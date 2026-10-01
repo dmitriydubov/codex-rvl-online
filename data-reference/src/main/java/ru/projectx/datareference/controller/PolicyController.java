@@ -10,8 +10,8 @@ import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicySearchService;
-import ru.projectx.datareference.service.ReferenceQueryService;
+import ru.projectx.datareference.service.PolicySearchReads;
+import ru.projectx.datareference.service.PolicyReads;
 
 /**
  * Полисы: подсказка среди действующих полисов договора (R-04), полис целиком (R-05) —
@@ -29,14 +29,14 @@ import ru.projectx.datareference.service.ReferenceQueryService;
 @InternalApi
 public class PolicyController {
 
-    private final ReferenceQueryService references;
-    private final PolicySearchService policySearch;
+    private final PolicyReads policies;
+    private final PolicySearchReads policySearch;
     private final PolicyContractViews contractViews;
 
     public PolicyController(
-            ReferenceQueryService references, PolicySearchService policySearch, PolicyContractViews contractViews) {
+            PolicyReads policies, PolicySearchReads policySearch, PolicyContractViews contractViews) {
 
-        this.references = references;
+        this.policies = policies;
         this.policySearch = policySearch;
         this.contractViews = contractViews;
     }
@@ -44,17 +44,17 @@ public class PolicyController {
     /** R-05: полис целиком. */
     @GetMapping("/policies/{id}")
     public PolicyResponse policy(@PathVariable UUID id) {
-        return references.policy(id);
+        return policies.byId(id);
     }
 
     @GetMapping(path = "/policies", params = "external_id")
     public PolicyResponse policyByExternalId(@RequestParam("external_id") UUID externalId) {
-        return references.policyByExternalId(externalId);
+        return policies.byExternalId(externalId);
     }
 
     @GetMapping(path = "/policies", params = {"number", "contract_id"})
     public PolicyResponse policyByNumber(@RequestParam String number, @RequestParam("contract_id") UUID contractId) {
-        return references.policyByNumber(number, contractId);
+        return policies.byNumber(number, contractId);
     }
 
     @GetMapping("/policies")

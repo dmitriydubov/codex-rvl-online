@@ -18,8 +18,11 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.dto.LpuServicesResponse;
+import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.PriceContractRef;
-import ru.projectx.datareference.service.LpuCatalogService;
+import ru.projectx.datareference.service.LpuCardReads;
+import ru.projectx.datareference.service.LpuCatalogReads;
+import ru.projectx.datareference.service.LpuServiceReads;
 
 /** R-01…R-03: каталог ЛПУ договора, карточка ЛПУ и услуги с ценами и без. */
 @ExtendWith(MockitoExtension.class)
@@ -33,18 +36,24 @@ class LpuControllerTest {
     private static final String LPU_NAME = "Санаторий";
 
     @Mock
-    private LpuCatalogService lpuCatalog;
+    private LpuCatalogReads catalogs;
+
+    @Mock
+    private LpuCardReads cards;
+
+    @Mock
+    private LpuServiceReads services;
 
     private MockMvcTester mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = StandaloneMvc.of(new LpuController(lpuCatalog));
+        mvc = StandaloneMvc.of(new LpuController(catalogs, cards, services));
     }
 
     @Test
     void catalog_returnsLpuOfContract_asJson() {
-        when(lpuCatalog.catalog(CONTRACT_EXTERNAL_ID)).thenReturn(new LpuCatalogResponse(
+        when(catalogs.catalog(CONTRACT_EXTERNAL_ID)).thenReturn(new LpuCatalogResponse(
                 List.of(new LpuCatalogResponse.Item(LPU_ID, LPU_EXTERNAL_ID, LPU_NAME, null, null, null)), List.of()));
 
         MvcTestResult result = mvc.get().uri(LPU + "?contract_external_id={contract}", CONTRACT_EXTERNAL_ID).exchange();
@@ -59,12 +68,12 @@ class LpuControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
-        verifyNoInteractions(lpuCatalog);
+        verifyNoInteractions(catalogs, cards, services);
     }
 
     @Test
     void card_returnsLpuFoundByService() {
-        when(lpuCatalog.card(LPU_ID)).thenReturn(
+        when(cards.card(LPU_ID)).thenReturn(
                 new LpuCardResponse(LPU_ID, LPU_EXTERNAL_ID, LPU_NAME, null, null, null, null, priceContract()));
 
         MvcTestResult result = mvc.get().uri(LPU + "/{id}", LPU_ID).exchange();
@@ -75,7 +84,7 @@ class LpuControllerTest {
 
     @Test
     void services_withoutNeedPrices_askWithoutPrices() {
-        when(lpuCatalog.services(LPU_ID, false)).thenReturn(services());
+        when(services.withoutPrices(LPU_ID)).thenReturn(services());
 
         MvcTestResult result = mvc.get().uri(LPU + "/{id}/services", LPU_ID).exchange();
 
@@ -85,7 +94,7 @@ class LpuControllerTest {
 
     @Test
     void services_withNeedPrices_askWithPrices() {
-        when(lpuCatalog.services(LPU_ID, true)).thenReturn(services());
+        when(services.withPrices(LPU_ID)).thenReturn(services());
 
         MvcTestResult result = mvc.get().uri(LPU + "/{id}/services?need_prices=true", LPU_ID).exchange();
 
@@ -99,12 +108,12 @@ class LpuControllerTest {
         MvcTestResult result = mvc.get().uri(LPU + "/{id}", LPU_ID).accept(MediaType.APPLICATION_XML).exchange();
 
         assertThat(result).hasStatus(406);
-        verifyNoInteractions(lpuCatalog);
+        verifyNoInteractions(catalogs, cards, services);
     }
 
     private static LpuServicesResponse services() {
         return new LpuServicesResponse(
-                new LpuServicesResponse.LpuRef(LPU_ID, LPU_EXTERNAL_ID, LPU_NAME), priceContract(), List.of());
+                new NamedRef(LPU_ID, LPU_EXTERNAL_ID, LPU_NAME), priceContract(), List.of());
     }
 
     private static PriceContractRef priceContract() {
