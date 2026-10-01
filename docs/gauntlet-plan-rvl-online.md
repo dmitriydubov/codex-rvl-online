@@ -89,12 +89,12 @@
 - 2026-10-01, PR #15 (Ш4), список «Нужно решение человека» самой сессии Ш4 (описание PR), ответ «1) PR закрыл, но можешь
   сделать новый 2) да 3) да 4) да 5) нет 6) нет 7) да». П. 1 списка — «Значения по умолчанию»: умолчания приняты ответом
   (1) координатору выше; п. 2–4 по существу совпадают с его (2)–(4); п. 7 — предложения сессии по документам (Инструкцию
-  и HikariCP в «Источниках» уже поправил координатор, расхождение how-to Boot с кодом 4.0.7 — в карточке Ш4, 3.4). Новые
-  факты о контуре — п. 5 и 6: пулера PgBouncer или Odyssey в режиме transaction pooling между сервисом и PostgreSQL нет;
-  `ALTER ROLE … SET statement_timeout/lock_timeout` у роли БД не задан. Требований к базе и ролям это не добавляет. Уровни
-  базы и сервера (`ALTER DATABASE … SET`, `postgresql.conf`) не подтверждались и, как `ALTER ROLE`, ограничили бы
-  соединение миграций без `options` (Р13); путь к базе может смениться — ловушки Инструкции (раздел 6) и ручная проверка
-  остаются (О9).
+  и HikariCP в «Источниках» уже поправил координатор, расхождение how-to Boot с кодом 4.0.7 — в карточке Ш4, 3.4). П. 5
+  и 6 — вопросы о контуре; ответ «нет» сессия читает как факты (толкование — на подтверждение владельцу в PR этих
+  правок): пулера PgBouncer или Odyssey в режиме transaction pooling между сервисом и PostgreSQL нет; `ALTER ROLE … SET
+  statement_timeout/lock_timeout` у роли БД не задан. Требований к базе и ролям это не добавляет. Уровни базы и сервера
+  (`ALTER DATABASE … SET`, `postgresql.conf`) не подтверждались и, как `ALTER ROLE`, ограничили бы соединение миграций
+  без `options` (Р13); путь к базе может смениться — ловушки Инструкции (раздел 6) и ручная проверка остаются (О9).
 - 2026-10-01, PR #13 (А+Ш14a), ответ «1) да 2) да 3) да 4) да»: (1) прод-умолчание `projectx.import.initial-delay=30s`;
   (2) `0s` разрешён как «без задержки»; (3) остаточный риск явно пустого значения принят до Ш14b; (4) Ш14b — 7 → 6 ч и
   правило ISP для `AgedInboundMessages` (3.7). Итоги: этап 4 — 202–206 ч, этапы 1–4 — 362,5–368,5 ч, всего 557,5–563,5 ч.
@@ -243,7 +243,7 @@
 | CS-01 | `application.yml:79` меняет умолчание auto-startup на false: без `RABBITMQ_LISTENER_AUTO_STARTUP=true` сервис здоров по пробам, но 1С не читает и в журнал об этом ничего не пишет | major / confirmed | Зонд сессии scan: jar HEAD с PostgreSQL 16.10 без RABBITMQ_* — liveness и readiness UP, о слушателях в журнале ни строки |
 | CS-02 | Проверка сертификата и имени хоста брокера выключена по умолчанию (`application.yml:66-67`), хотя в Boot 4.0.7 она включена | major / partly | spring-rabbit 4.0.4 setUpSSL → TrustEverythingTrustManager; amqp-client пишет WARN «SECURITY ALERT», запуск продолжается |
 | CS-15 | SSL без `RABBITMQ_PORT=5671` ведёт к TLS на порт 5672 (`application.yml:53`) | minor / confirmed | RabbitProperties.determinePort (sources 4.0.7); рукопожатие не прогонялось |
-| CA-07 | Все три @Scheduled — fixedDelay и выполняются на одном потоке SimpleAsyncTaskScheduler (виртуальные потоки, `application.yml:7-9`): зависший запрос останавливает и импорт, и стирание ПДн, и алерт (`ReferenceImportScheduler.java:65`, `PersonalDataRetention.java:53`, `StuckTransferAlert.java:44`) | major / confirmed; **закрыт Ш4 (PR #15) в части зависания**: запрос больше не держит поток бесконечно — ожидание блокировки обрывается через 5 с (lock_timeout, 55P03), оператор — через 30 с (statement_timeout), молчащий сокет — через 60 с (socketTimeout). Но в проходе разбора (до 100 сообщений, `projectx.import.batch-size`) ожидания складываются: при занятой чужой блокировкой таблице справочника — до ~8 мин (100 × 5 с), при долгом операторе или молчащей сети — десятки минут; всё это время по-прежнему стоят все три планировщика — общий поток снимает Ш14b | Зонд сессии scan: ACCESS EXCLUSIVE на inbound_message на 25 с — единственный поток scheduling-1 висит в findDueForImport (дамп потоков jcmd). После Ш4: при ACCESS EXCLUSIVE на inbound_message `inboundMessageRepository.count()` отказывает с 55P03 через ~5 с (`DatabaseTimeoutsTest.tableLockedByAnotherSession_queryFailsAfterLockTimeout`) |
+| CA-07 | Все три @Scheduled — fixedDelay и выполняются на одном потоке SimpleAsyncTaskScheduler (виртуальные потоки, `application.yml:7-9`): зависший запрос останавливает и импорт, и стирание ПДн, и алерт (`ReferenceImportScheduler.java:65`, `PersonalDataRetention.java:53`, `StuckTransferAlert.java:44`) | major / confirmed; **закрыт Ш4 (PR #15) в части зависания**: запрос больше не держит поток бесконечно — ожидание блокировки обрывается через 5 с (lock_timeout, 55P03), оператор — через 30 с (statement_timeout), молчащий сокет — через 60 с (socketTimeout). Но в проходе разбора (до 100 сообщений, `projectx.import.batch-size`) ожидания складываются: при занятой чужой блокировкой таблице справочника — до ~8 мин (100 × 5 с), при долгом операторе — до ~50 мин (100 × 30 с); при молчащей сети запись RETRY тоже отказывает (connectionTimeout), и проход обрывается на первом сообщении — около 1,5 мин на тик, проход повторяется; всё это время по-прежнему стоят все три планировщика — общий поток снимает Ш14b | Зонд сессии scan: ACCESS EXCLUSIVE на inbound_message на 25 с — единственный поток scheduling-1 висит в findDueForImport (дамп потоков jcmd). После Ш4: при ACCESS EXCLUSIVE на inbound_message `inboundMessageRepository.count()` отказывает с 55P03 через ~5 с (`DatabaseTimeoutsTest.tableLockedByAnotherSession_queryFailsAfterLockTimeout`) |
 | CS-04 | У запросов к PostgreSQL нет таймаутов: socketTimeout 0, statement_timeout и lock_timeout 0, транзакционный таймаут не задан (`application.yml:26-29`) | major / confirmed; **закрыт Ш4 (PR #15)**: на пуле приложения lock_timeout 5s, statement_timeout 30s, idle_in_transaction_session_timeout 1min (стартовый `options` pgjdbc) и socketTimeout 60 с; миграции Liquibase — своим соединением без таймаутов (Р13). Транзакционного таймаута Spring по-прежнему нет: короткий лимит REST-чтений — Ш41 (решение 4 владельца по PR #15) | PGProperty (sources pgjdbc 42.7.11); SHOW в postgres:16.10. После Ш4: `DatabaseTimeoutsTest` — SHOW на соединении пула 5s / 30s / 1min и `getNetworkTimeout()` 60000, на соединении миграций — 0 |
 | CS-08 | Логин и пароль локального контура стоят умолчаниями в `application.yml:28-29,55-56`; порты compose открыты на всех интерфейсах (`docker-compose.yml:28-29,45-50`) | minor / partly | Без DB_PASSWORD старт падает с «password authentication failed» — не тихо, но диагностика хуже |
 | CS-03, DOM1C-07 | Имя очереди ТЗ-2: `contract-service/CLAUDE.md:274,284-286,303-306` пишет его через подчёркивание («ещё нет»), `application.yml:162-165` и `OneCQueueProperties.java:13-16` — через дефис («заведена 23.09.2026»). Документы вопрос не решают; при missing-queues-fatal неверное имя роняет старт | major / confirmed | Сверка текстов и PDF ТЗ-01…ТЗ-10 |
@@ -689,7 +689,7 @@
 - конфигурация и сборка: Ш4 (сразу, параллельно Ш39) → после Ш39: Ш1+Ш1a → Ш1b+Ш5+Ш6. Цепочка `application.yml`
   (3.2): Ш41+Ш26 правит `application.yml` только в этих случаях — connectionTimeout по Р24, свойство лимита REST-чтений
   (решение 4 владельца по PR #15) или стартовой проверки таймаутов. Ш1+Ш1a уже смержен (PR #18), поэтому в этом случае
-  Ш41+Ш26 и Ш1b+Ш5+Ш6 идут не параллельно: второй из них ставит первый в «Зависит»;
+  Ш41+Ш26 и Ш1b+Ш5+Ш6 идут не параллельно: Ш1b+Ш5+Ш6 ждёт мержа Ш41+Ш26 (цепочка 3.2);
 - приём из 1С: А+Ш14a (сейчас) → Ш13 (после Ш39) → дальше этап 4 по порядку выше. Ш14b ждёт Ш4 и Ш5.
 
 ### 3.3. Этап 0 — окружение и решения первой очереди (без кода, вне итога)
@@ -1000,16 +1000,23 @@ API, сообщения и журнал не меняются, Java main не м
     `CannotCreateTransactionException` (javap spring-orm 7.0.8: соединение для readOnly берёт
     `HibernateJpaDialect.beginTransaction`, любой отказ оборачивает `JpaTransactionManager.doBegin`), это
     `TransactionException`, а не `DataAccessException`; обрыв посреди запроса — `DataAccessResourceFailureException`,
-    наследник `NonTransientDataAccessResourceException`; превышение лимита REST-чтений — в зависимости от механизма
-    `QueryTimeoutException` (57014) или `TransactionTimedOutException` (тоже `TransactionException`; javap spring-tx
-    7.0.8). 503 только на `TransientDataAccessException` пропустит первые два; набор исключений сверяет сам Ш41
-    (разобранный перевод Hibernate — в карточке Ш28);
+    наследник `NonTransientDataAccessResourceException`; превышение одного и того же `@Transactional(timeout)` — в
+    зависимости от пути вызова `QueryTimeoutException` (57014), `TransactionTimedOutException` (тоже
+    `TransactionException`; javap spring-tx 7.0.8) или `JpaSystemException` (NonTransient): `HibernateJpaDialect`
+    передаёт таймаут в `org.hibernate.Transaction.setTimeout`, а Hibernate 7.2.19 по его истечении бросает
+    `org.hibernate.TransactionException` без причины-SQLException (`JdbcCoordinatorImpl`, javap), которую
+    `HibernateExceptionTranslator` переводит в `JpaSystemException`. 503 только на `TransientDataAccessException`
+    пропустит все, кроме `QueryTimeoutException`; набор исключений сверяет сам Ш41 (разобранный перевод Hibernate — в
+    карточке Ш28);
   - **лимит REST-чтений и красные файлы.** `@Transactional(readOnly = true)` чтений REST стоит в красных
     ReferenceQueryService, LpuCatalogService (Ш11), PolicySearchService, Mkb10QueryService (Ш10); зелёный — только
     `PolicyContractViewService` из Ш39. Поведенческий шаг трогает только зелёные файлы (3.1), а GET Договоров
     `insurance-contracts/{id}` и `programs/{id}` идут через красный ReferenceQueryService. Механизм лимита выбрать без
     правки красных файлов (сверить по Spring Framework 7.0.8 и Spring Boot 4.0.7); если без них нельзя — вопрос владельцу
-    на остановке спецификации Ш41+Ш26: перенос части лимита в этап 3 меняет решение 4 по PR #15;
+    на остановке спецификации Ш41+Ш26, два варианта: (а) по правилу «Рефакторинг — по касанию» (3.1) перенести в этап 1
+    рефакторинг красных сервисов чтения — Ш11 (10 ч) для ReferenceQueryService и LpuCatalogService, единицу Ш10+Ш12
+    (16 ч) для PolicySearchService и Mkb10QueryService; (б) лимит на них — в этапе 3, после этих шагов (меняет решение 4
+    по PR #15);
   - Hikari connectionTimeout вместе с лимитом REST-чтений должны быть меньше таймаута чтения клиента Договоров (К2a),
     иначе клиент оборвёт запрос раньше, чем придёт 503 (согласовать в О8). Где лимита ещё нет, вместо него действует
     `statement_timeout` 30 с на оператор; при молчащей сети отмена по лимиту до сервера не доходит (pgjdbc отменяет запрос
@@ -1410,7 +1417,8 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
     не на пачку, — а транзакция пачки не должна простаивать между операторами дольше idle_in_transaction_session_timeout
     1 мин; размер пачки выбирать с этим запасом. Выборки StuckTransferAlert (без предела) и стирания ПДн на большом
     `inbound_message` в Ш4 против 30 с не измерялись (остаточный риск PR #15) — замерить здесь. Отказ по таймауту
-    стирание и алерт повторяют на следующем тике (комментарий `application.yml:30-38`).
+    стирание и алерт повторяют на следующем тике (комментарий над `spring.datasource.hikari`, `application.yml:30-38` на
+    `1aeefa1`).
 
 **Ш15. OneCQueueListener и OneCIngestService** — тип: рефакторинг.
 - Файлы → гейты:
@@ -1576,21 +1584,21 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 - Файлы → гейты:
   - `service/schedulers/ReferenceImportScheduler.java` (зел.†, после Ш14b): постоянными считать
     NonTransientDataAccessException и JacksonException; **отказы по таймаутам Ш4 (PR #15) остаются временными** —
-    лестница и FAILED только по её исчерпанию, как обещает комментарий `application.yml:30-38`. Это lock_timeout (55P03),
-    statement_timeout (57014), закрытие сеанса по idle_in_transaction_session_timeout (25P03) и обрыв по socketTimeout.
-    Обрыв соединения Spring переводит в `DataAccessResourceFailureException`, а это наследник
-    `NonTransientDataAccessResourceException`: правило «NonTransient = постоянная» без исключения для него и для 25P03
-    отправит в FAILED сообщения при сетевом сбое и при сеансе, закрытом по простою. Сверено: javap spring-tx 7.0.8 —
-    `DataAccessResourceFailureException` → `NonTransientDataAccessResourceException`, `CannotAcquireLockException` (через
-    `PessimisticLockingFailureException`, `ConcurrencyFailureException`) и `QueryTimeoutException` →
-    `TransientDataAccessException`; sources spring-orm 7.0.8, `HibernateExceptionTranslator:152-153` —
-    `JDBCConnectionException` → `DataAccessResourceFailureException`, там же `LockAcquisitionException` →
-    `CannotAcquireLockException`, `QueryTimeoutException` Hibernate → `QueryTimeoutException` Spring, остальное —
-    `JpaSystemException` (`:219-223`). javap hibernate-core 7.2.19: `PostgreSQLDialect` — 55P03 → `LockTimeoutException`
-    (наследник `LockAcquisitionException`), 57014 → `QueryTimeoutException`; класса 25 нет ни там, ни в
-    `SQLStateConversionDelegate` — 25P03 станет `GenericJDBCException` → `JpaSystemException`
-    (`UncategorizedDataAccessException`), тоже NonTransient. Обёртку этих исключений на пути JPA (Spring Data, коммит) не
-    сверяли — сверить и закрепить unit-тестом классификации;
+    лестница и FAILED только по её исчерпанию, как обещает комментарий над `spring.datasource.hikari`
+    (`application.yml:30-38` на `1aeefa1`). Это lock_timeout (55P03), statement_timeout (57014), закрытие сеанса по
+    idle_in_transaction_session_timeout (25P03) и обрыв по socketTimeout. Обрыв соединения Spring переводит в
+    `DataAccessResourceFailureException`, а это наследник `NonTransientDataAccessResourceException`: правило
+    «NonTransient = постоянная» без исключения для него и для 25P03 отправит в FAILED сообщения при сетевом сбое и при
+    сеансе, закрытом по простою. Сверено: javap spring-tx 7.0.8 — `DataAccessResourceFailureException` →
+    `NonTransientDataAccessResourceException`, `CannotAcquireLockException` (через `PessimisticLockingFailureException`,
+    `ConcurrencyFailureException`) и `QueryTimeoutException` → `TransientDataAccessException`; sources spring-orm 7.0.8,
+    `HibernateExceptionTranslator:152-153` — `JDBCConnectionException` → `DataAccessResourceFailureException`, там же
+    `LockAcquisitionException` → `CannotAcquireLockException`, `QueryTimeoutException` Hibernate →
+    `QueryTimeoutException` Spring, остальное — `JpaSystemException` (`:219-223`). javap hibernate-core 7.2.19:
+    `PostgreSQLDialect` — 55P03 → `LockTimeoutException` (наследник `LockAcquisitionException`), 57014 →
+    `QueryTimeoutException`; класса 25 нет ни там, ни в `SQLStateConversionDelegate` — 25P03 станет
+    `GenericJDBCException` → `JpaSystemException` (`UncategorizedDataAccessException`), тоже NonTransient. Обёртку этих
+    исключений на пути JPA (Spring Data, коммит) не сверяли — сверить и закрепить unit-тестом классификации;
   - `service/InboundMessageService.java` (после Ш17): ERROR с messageId, потоком, числом попыток и типом;
   - длина ИНН и КПП в `ContragentMapper` (после Ш18);
   - шаги приёмки: вставка сырья в inbound_message и явный запуск разбора из шага приёмки, без брокера (Р6). Каркас
@@ -1811,10 +1819,10 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 
 | № | Шаг | Тип | Файлы и гейты | Зависит | Оценка |
 |---|---|---|---|---|---|
-| К1 | Каркас `contract-service` в **Default, без правок `gauntlet/`**: settings.gradle с переключателем репозиториев, build.gradle, обёртка, класс приложения, application.yml, PostgreSQL и Liquibase (таймауты на пуле и отдельное соединение миграций — по образцу Ш4: `spring.datasource.hikari.data-source-properties`, `spring.liquibase.url/user/password` в `data-reference`), тест старта контекста, CucumberSpringConfiguration и `features/.gitkeep`. Логики нет. Блок подключения набора в build.gradle (INSTALL.md, раздел 4) добавляет О11 вместе с оверлеем: без оверлея archTest набора упал бы на шаблонном `base.package` | инфраструктура, без спецификации | всё новое. Модуль ещё не в `module=`, поэтому Stop-хук и CI его не проверяют (DN-17). Проверка — `./gradlew build` в сессии и сборка в режиме контура, итог — в отчёт | Д2 (после этапа 4), Р49, Р37, О2 (свой CLAUDE.md) | 8 ч |
+| К1 | Каркас `contract-service` в **Default, без правок `gauntlet/`**: settings.gradle с переключателем репозиториев, build.gradle, обёртка, класс приложения, application.yml, PostgreSQL и Liquibase (рекомендация, решения владельца нет — Р13 касается data-reference: таймауты на пуле и отдельное соединение миграций по образцу Ш4, `spring.datasource.hikari.data-source-properties` и `spring.liquibase.url/user/password` в `data-reference`, правило 14 `gauntlet/CLAUDE.md`; часы К1 не меняет — вопрос владельцу при постановке К1), тест старта контекста, CucumberSpringConfiguration и `features/.gitkeep`. Логики нет. Блок подключения набора в build.gradle (INSTALL.md, раздел 4) добавляет О11 вместе с оверлеем: без оверлея archTest набора упал бы на шаблонном `base.package` | инфраструктура, без спецификации | всё новое. Модуль ещё не в `module=`, поэтому Stop-хук и CI его не проверяют (DN-17). Проверка — `./gradlew build` в сессии и сборка в режиме контура, итог — в отчёт | Д2 (после этапа 4), Р49, Р37, О2 (свой CLAUDE.md) | 8 ч |
 | — | **О11** (владелец или gauntlet-admin): подключение к набору по INSTALL.md и прогон гейтов по всем файлам каркаса (раздел 6) | — | — | К1 | вне итога |
 | К2 | Подключения RabbitMQ: брокер 1С и межсервисный (брокер «Оплата» / маркетинга перенесён в К7, Д1) | инфраструктура, без спецификации | новые, @ConfigurationProperties, Testcontainers. Схема владельца (2.11) подтверждает три брокера (DN-16); как Boot 4.0 и Spring AMQP 4.0 держат несколько ConnectionFactory, сверить | К1, О11; сверка Boot 4.0 и Spring AMQP 4.0.4 | 8 ч |
-| К2a | Клиент к REST `data-reference` (контракт этапа 1): три GET по нашим `id`, которые Договоры хранят сами (`contract-service/CLAUDE.md:475-477`), и поиск по `external_id` только для только что выпущенного полиса (OQ-47, Р58); без аутентификации (Д5); RestClient из spring-web без новых зависимостей; таймауты (таймаут чтения клиента — больше, чем data-reference идёт к 503: Hikari connectionTimeout (Р24) плюс лимит REST-чтений (Ш41; где его ещё нет — `statement_timeout` 30 с; при обрыве сети — socketTimeout 60 с); иначе клиент оборвёт запрос раньше, чем придёт 503; значения согласовать в О8); ограниченные ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58) — стандартным механизмом Spring Framework 7.0 (resilience: `@Retryable`/`RetryTemplate`), сверить; сквозной X-Request-Id | инфраструктура, без спецификации (адаптер; наблюдаемое поведение — в сценариях К3 и К6) | новые. Тесты — `MockRestServiceServer.bindTo(RestClient.Builder)` из spring-test 7.0.8 (сверено javap) на примерах стенда Ш2a: копия в тестовых ресурсах contract-service, расхождение с сервисом ловит тест Ш2a на стороне data-reference | К1, О11; Ш39, Ш41, Ш26 (этап 1); Р58, Р24 | 8 ч |
+| К2a | Клиент к REST `data-reference` (контракт этапа 1): три GET по нашим `id`, которые Договоры хранят сами (`contract-service/CLAUDE.md:475-477`), и поиск по `external_id` только для только что выпущенного полиса (OQ-47, Р58); без аутентификации (Д5); RestClient из spring-web без новых зависимостей; таймауты (таймаут чтения клиента — больше, чем data-reference идёт к 503: Hikari connectionTimeout (Р24) плюс лимит REST-чтений (Ш41; где его ещё нет — `statement_timeout` 30 с на каждый оператор, а чтение из нескольких операторов идёт дольше; при обрыве сети — socketTimeout 60 с); иначе клиент оборвёт запрос раньше, чем придёт 503; значения согласовать в О8); ограниченные ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58) — стандартным механизмом Spring Framework 7.0 (resilience: `@Retryable`/`RetryTemplate`), сверить; сквозной X-Request-Id | инфраструктура, без спецификации (адаптер; наблюдаемое поведение — в сценариях К3 и К6) | новые. Тесты — `MockRestServiceServer.bindTo(RestClient.Builder)` из spring-test 7.0.8 (сверено javap) на примерах стенда Ш2a: копия в тестовых ресурсах contract-service, расхождение с сервисом ловит тест Ш2a на стороне data-reference | К1, О11; Ш39, Ш41, Ш26 (этап 1); Р58, Р24 | 8 ч |
 | К3 | ДГ-01, ДГ-02: приём и отмена задачи на выпуск | со спецификацией | новые | К2, К2a, ОВД-05 (ИБ, О8), Р65 | 22 ч |
 | К4 | ДГ-03: публикация состояния через outbox | со спецификацией | новые | К3 | 12 ч |
 | К5 | ДГ-06, ДГ-07: полисы ЛМ через 1С | со спецификацией | новые | К3, ОВД-02 (правило подбора программы, О8) | 12 ч |
@@ -2283,10 +2291,11 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 - **О8. Запросы к ИБ, Заявкам, Договорам и Ordering** (сразу, кроме Ordering — по Р68).
   - ИБ: сетевая политика как единственная защита ручек с ПДн (межсервисной аутентификации нет, Д5), ПДн в R-05 (Р20),
     события в cvm (ОВД-05, DN-19), ФИО сотрудников в документах (Р60).
-  - **Разработчик Договоров** (этап 1, Д3): контракт трёх GET — фичи Ш25a и примеры стенда Ш2a; путь проекции полиса
-    без ПДн (Р20); ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58); формат X-Request-Id (Р53 (а)); таймаут
+  - **Разработчик Договоров** (этап 1, Д3): контракт трёх GET — фичи Ш25a и примеры стенда Ш2a; путь проекции полиса без
+    ПДн (Р20); ретраи на 503 (Р24) и на 404 ещё не пришедшего полиса (Р58); формат X-Request-Id (Р53 (а)); таймаут
     чтения клиента К2a — больше времени data-reference до 503 (Hikari connectionTimeout по Р24 плюс лимит REST-чтений
-    Ш41; где его ещё нет — `statement_timeout` 30 с; при обрыве сети — socketTimeout 60 с); TTL кэша (Р25).
+    Ш41; где его ещё нет — `statement_timeout` 30 с на каждый оператор, чтение из нескольких операторов дольше; при
+    обрыве сети — socketTimeout 60 с); TTL кэша (Р25).
   - Разработчик Заявок: путь, формат ошибки, состав ручек (Р19, Р66), R-06 (Р23), валидация входа (Р53: X-Request-Id,
     пределы query и codes), TTL кэша (Р25).
   - Автор ТЗ Договоров и бизнес: ОВД-02 (правило подбора программы, К5), OQ-47 (Р58), кто формирует договор КМ и счёт
@@ -2326,7 +2335,9 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
       в нём; `?options=` и `?socketTimeout=` в нём не задавать — URL перекрывает свойства пула и достаётся миграциям.
   - Таймауты PostgreSQL задаёт только пул приложения, стартовым параметром `options` (Ш4); базу и роли контура серия не
     меняет, ответы владельца о пулере и роли БД — в 1.2. После первого развёртывания и при каждой смене пути к базе —
-    ручная проверка только чтением (Инструкция, раздел 6), пока не смержена стартовая проверка Ш41+Ш26.
+    ручная проверка только чтением (Инструкция, раздел 6): для пула — пока не смержена стартовая проверка Ш41+Ш26, для
+    соединения миграций (тот же `SHOW` без `options`, ожидается `0`) — и после неё: стартовая проверка читает только
+    пул.
   - Право CREATE или предустановленный pg_trgm (CS-14); terminationGracePeriod больше 30 с.
   - JDK 21 на агенте сборки контура: Gradle 8.14.3 не поддерживает JVM 25 (BUILD-11).
   - TEST_POSTGRES_URL в контуре — только выделенная пустая база (tests-10).

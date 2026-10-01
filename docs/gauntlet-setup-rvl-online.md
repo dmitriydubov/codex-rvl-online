@@ -466,37 +466,40 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - При `validate-certificate=false` флаг `verify-hostname` в spring-rabbit 4.0.4 ничего не делает.
 - **Таймауты PostgreSQL — с Ш4 (PR #15), только на пуле приложения.** `lock_timeout` 5s, `statement_timeout` 30s,
   `idle_in_transaction_session_timeout` 1min (стартовый параметр `options` pgjdbc), `socketTimeout` 60 с
-  (`application.yml:30-62`); переменные `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`,
-  `DB_SOCKET_TIMEOUT_SECONDS` (раздел 9). У первых трёх единица обязательна: число без неё PostgreSQL читает как
-  миллисекунды. Liquibase открывает своё соединение без таймаутов (`spring.liquibase.url/user/password`). Ловушки:
-  пулер в режиме transaction pooling (PgBouncer, Odyssey) отвергает или молча выбрасывает `options`;
-  `?options=`/`?socketTimeout=` в `DB_URL` перекрывают свойства; `ALTER ROLE … SET statement_timeout` ограничил бы и
-  миграции. Базу и роли контура серия не меняет (ответ владельца по PR #15). Факты пути к базе владелец подтвердил
-  отдельно (список самой сессии Ш4 по PR #15 — в 1.2 плана): PgBouncer или Odyssey в режиме transaction pooling между
-  сервисом и PostgreSQL сейчас нет, `ALTER ROLE … SET statement_timeout/lock_timeout` у роли БД не задан. Уровни базы и
-  сервера (`ALTER DATABASE … SET`, `postgresql.conf`) не подтверждались. У пула их, как и роль, перекрывает `options`:
-  параметр клиента старше (только по исходникам: порядок `GucSource` в `src/include/utils/guc.h`, PostgreSQL
-  REL_16_STABLE). Поэтому они задели бы только миграции, а ручная проверка с `PGOPTIONS` ниже их не покажет: для
-  соединения миграций — тот же `SHOW` без `PGOPTIONS`, ожидается `0`. Путь к базе может смениться, так что ловушки и
-  ручная проверка остаются.
+  (`application.yml:30-62` на `1aeefa1`); переменные `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`,
+  `DB_IDLE_IN_TRANSACTION_TIMEOUT`, `DB_SOCKET_TIMEOUT_SECONDS` (раздел 9). У первых трёх единица обязательна: число без
+  неё PostgreSQL читает как миллисекунды. Liquibase открывает своё соединение без таймаутов
+  (`spring.liquibase.url/user/password`). Ловушки: пулер в режиме transaction pooling (PgBouncer, Odyssey) отвергает или
+  молча выбрасывает `options`; `?options=`/`?socketTimeout=` в `DB_URL` перекрывают свойства; `ALTER ROLE … SET
+  statement_timeout` ограничил бы и миграции. Базу и роли контура серия не меняет (ответ владельца по PR #15). О пути к
+  базе владелец ответил «нет» на вопросы 5 и 6 самой сессии Ш4 (1.2 плана; толкование — на подтверждении): PgBouncer или
+  Odyssey в режиме transaction pooling между сервисом и PostgreSQL сейчас нет, `ALTER ROLE … SET
+  statement_timeout/lock_timeout` у роли БД не задан. Уровни базы и сервера (`ALTER DATABASE … SET`, `postgresql.conf`)
+  не подтверждались. У пула их, как и роль, перекрывает `options`: параметр клиента старше (документация PostgreSQL 16
+  порядок прямо не называет; порядок `GucSource` в `src/include/utils/guc.h`, REL_16_STABLE, и зонд на
+  `postgres:16.10-alpine` 2026-10-01: при `ALTER ROLE … SET statement_timeout='7s'` и `ALTER DATABASE … SET
+  lock_timeout='9s'` соединение с `options` показало 30s/5s, без `options` — 7s/9s). Поэтому они задели бы только
+  миграции, а ручная проверка с `PGOPTIONS` ниже их не покажет: для соединения миграций — тот же `SHOW` без `PGOPTIONS`,
+  ожидается `0`. Путь к базе может смениться, так что ловушки и ручная проверка остаются.
   **Сами по себе эти ловушки не видны:** пулер, который отвергает `options`, роняет подключение сразу, но пулер с
   `ignore_startup_parameters` выбрасывает его молча — запросы идут без ограничений, а журнал чист; таймауты на роли
   проявятся только на долгой миграции. Проверки действующих значений в приложении нет (только `DatabaseTimeoutsTest`).
-  Поэтому после первого развёртывания на контуре и при каждой смене пути к базе — **ручная проверка только чтением**: тем
-  же путём, что приложение (через пулер, если он есть, той же ролью), с теми же параметрами, например
-  `PGOPTIONS='-c lock_timeout=5s -c statement_timeout=30s -c idle_in_transaction_session_timeout=1min' psql … -c 'SHOW
+  Поэтому после первого развёртывания на контуре и при каждой смене пути к базе — **ручная проверка только чтением**:
+  тем же путём, что приложение (через пулер, если он есть, той же ролью), с теми же параметрами, например `PGOPTIONS='-c
+  lock_timeout=5s -c statement_timeout=30s -c idle_in_transaction_session_timeout=1min' psql … -c 'SHOW
   statement_timeout'` (и так же `lock_timeout`, `idle_in_transaction_session_timeout`; `PGOPTIONS` равнозначен параметру
-  `options`, postgresql.org/docs/16/libpq-envars.html). Значения должны совпасть с настройками сервиса; база и роли при этом
-  не меняются. Расхождение — повод пересмотреть способ задания таймаутов. Проверку при старте в самом сервисе (WARN при
-  расхождении) добавляет шаг Ш41+Ш26 (решение владельца 2026-10-01); до его мержа — только ручная проверка. Три
+  `options`, postgresql.org/docs/16/libpq-envars.html). Значения должны совпасть с настройками сервиса; база и роли при
+  этом не меняются. Расхождение — повод пересмотреть способ задания таймаутов. Проверку при старте в самом сервисе (WARN
+  при расхождении) добавляет шаг Ш41+Ш26 (решение владельца 2026-10-01); до его мержа — только ручная проверка. Три
   `@Scheduled` при виртуальных потоках по-прежнему выполняются одним потоком `SimpleAsyncTaskScheduler` (Ш14b): зависший
-  запрос теперь обрывается через 30 с, но до этого держит и стирание ПДн, и алерт.
-  - **Миграции** (`application.yml:135-144`). При заданном `spring.liquibase.url` spring-boot-liquibase 4.0.7 собирает
-    Liquibase `SimpleDriverDataSource` через `DataSourceBuilder.create()` и берёт `user` и `password` только из
-    `spring.liquibase.*`, из `spring.datasource` не наследует
+  запрос теперь обрывается (ожидание блокировки — через 5 с, оператор — через 30 с, молчащий сокет — через 60 с), но до
+  этого держит и стирание ПДн, и алерт.
+  - **Миграции** (блок `spring.liquibase`, `application.yml:135-144` на `1aeefa1`). При заданном `spring.liquibase.url`
+    spring-boot-liquibase 4.0.7 собирает Liquibase `SimpleDriverDataSource` через `DataSourceBuilder.create()` и берёт
+    `user` и `password` только из `spring.liquibase.*`, из `spring.datasource` не наследует
     (`LiquibaseAutoConfiguration.LiquibaseConfiguration.getMigrationDataSource`, `javap` jar 4.0.7). How-to «Database
-    Initialization» (`how-to/data-initialization.html`) пишет, что незаданные свойства берутся из `spring.datasource.*`, —
-    так и в 4.0.7 (тег `v4.0.7`, `how-to/pages/data-initialization.adoc`), и на сайте (4.0.8), а код обеих версий
+    Initialization» (`how-to/data-initialization.html`) пишет, что незаданные свойства берутся из `spring.datasource.*`,
+    — так и в 4.0.7 (тег `v4.0.7`, `how-to/pages/data-initialization.adoc`), и на сайте (4.0.8), а код обеих версий
     одинаков: это расхождение документации с кодом, а не версий, и прав код. Поэтому заданы все три свойства, `user` и
     `password` не убирать. Отсюда и правило для `DB_URL`: параметры драйвера, нужные и пулу, и миграциям, — только в нём
     (раздел 9).
