@@ -2,11 +2,10 @@ package ru.projectx.datareference.service.onec;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 
@@ -38,25 +37,24 @@ public final class OneCValues {
     private static final UUID ZERO_GUID = new UUID(0L, 0L);
     private static final LocalDate UNSET_DATE = LocalDate.of(1, 1, 1);
     private static final LocalDate OPEN_DATE = LocalDate.of(3000, 1, 1);
+    private static final String MISSING_GUID = "нет обязательного GUID в поле ";
+    private static final String MISSING_DATE = "нет обязательной даты в поле ";
+    private static final String MISSING_TEXT = "нет обязательного поля ";
 
     /** GUID поля; нулевой и пустой — «ссылки нет». */
     public static Optional<UUID> uuid(JsonNode data, String field) {
-        return text(data, field)
-                .flatMap(raw -> parseUuid(raw, field))
-                .filter(value -> !ZERO_GUID.equals(value));
+        return parsed(data, field, OneCRawParser::uuid, value -> !ZERO_GUID.equals(value));
     }
 
     /** Обязательный GUID — как правило, {@code external_id} записи. */
     public static UUID requiredUuid(JsonNode data, String field) {
-        return uuid(data, field)
-                .orElseThrow(() -> new OneCFieldException("нет обязательного GUID в поле " + field));
+        return required(uuid(data, field), MISSING_GUID, field);
     }
 
     /** Дата поля; заглушка и открытая дата — пусто. */
     public static Optional<LocalDate> date(JsonNode data, String field) {
-        return text(data, field)
-                .flatMap(raw -> parseDate(raw, field))
-                .filter(value -> !UNSET_DATE.equals(value) && !OPEN_DATE.equals(value));
+        return parsed(data, field, OneCRawParser::date,
+                value -> !UNSET_DATE.equals(value) && !OPEN_DATE.equals(value));
     }
 
     /**
@@ -67,24 +65,25 @@ public final class OneCValues {
      * незаполненным — это невалидное сообщение, а не «дата открыта».
      */
     public static LocalDate requiredDate(JsonNode data, String field) {
-        return date(data, field)
-                .orElseThrow(() -> new OneCFieldException("нет обязательной даты в поле " + field));
+        return required(date(data, field), MISSING_DATE, field);
     }
 
-    /** Строка с обрезкой пробелов; пустая — пусто (коды приходят дополненными до длины). */
+    /**
+     * Строка с обрезкой пробелов; пустая — пусто (коды приходят дополненными до длины).
+     *
+     * <p>Объект, массив и отсутствующее поле — пусто. JSON {@code null} отдельно не
+     * проверяется: его строковое представление в Jackson 3 — пустая строка.
+     */
     public static Optional<String> text(JsonNode data, String field) {
-        JsonNode value = data.path(field);
-        if (!value.isValueNode() || value.isNull()) {
-            return Optional.empty();
-        }
-        String raw = value.asString().trim();
-        return raw.isEmpty() ? Optional.empty() : Optional.of(raw);
+        return Optional.of(data.path(field))
+                .filter(JsonNode::isValueNode)
+                .map(value -> value.asString().trim())
+                .filter(raw -> !raw.isEmpty());
     }
 
     /** Обязательная строка: её отсутствие — невалидное сообщение, а не пустое значение. */
     public static String requiredText(JsonNode data, String field) {
-        return text(data, field)
-                .orElseThrow(() -> new OneCFieldException("нет обязательного поля " + field));
+        return required(text(data, field), MISSING_TEXT, field);
     }
 
     /** Отсутствующий флаг — это {@code false}: контракт не различает «нет» и «не задано». */
@@ -107,58 +106,17 @@ public final class OneCValues {
         return value.isNumber() ? Optional.of(new BigDecimal(value.asString())) : Optional.empty();
     }
 
-    private static Optional<UUID> parseUuid(String raw, String field) {
-        try {
-            return Optional.of(UUID.fromString(raw));
-        }
-        catch (IllegalArgumentException notAGuid) {
-            throw new OneCFieldException("поле " + field + " не является GUID", notAGuid);
-        }
+    /** Непустой текст поля, разобранный {@code parser}; не прошедшее {@code meaningful} — пусто. */
+    private static <T> Optional<T> parsed(JsonNode data, String field,
+                                          BiFunction<String, String, T> parser, Predicate<T> meaningful) {
+        return text(data, field)
+                .map(raw -> parser.apply(raw, field))
+                .filter(meaningful);
     }
 
-    /**
-     * 1С отдаёт даты моментом со смещением ({@code 2024-10-10T00:00:00+03:00}), но
-     * присылает и голую дату.
-     *
-     * <p>Смещение <b>отбрасывается</b>, а не переводится в UTC: это календарная дата
-     * договора, и сдвиг на день назад для полуночи в +03:00 — ровно та ошибка, которую
-     * здесь легко не заметить.
-     */
-    /**
-     * Дата приходит в трёх видах, и все три встречаются в контракте:
-     * момент со смещением ({@code 2024-10-10T00:00:00+03:00}, ТЗ-5),
-     * момент без смещения ({@code 2026-05-07T00:00:00}, ТЗ-2) и голая дата
-     * ({@code 2024-01-01}).
-     *
-     * <p>Во всех трёх нужен календарный день, и берётся он <b>как написан</b>. Смещение
-     * отбрасывается, а не переводится в UTC: это дата договора, а не момент времени,
-     * и сдвиг полуночи в +03:00 на день назад — ровно та ошибка, которую не замечают.
-     */
-    private static Optional<LocalDate> parseDate(String raw, String field) {
-        try {
-            return Optional.of(OffsetDateTime.parse(raw).toLocalDate());
-        }
-        catch (DateTimeParseException notAnOffsetDateTime) {
-            return parseWithoutOffset(raw, field);
-        }
-    }
-
-    private static Optional<LocalDate> parseWithoutOffset(String raw, String field) {
-        try {
-            return Optional.of(LocalDateTime.parse(raw).toLocalDate());
-        }
-        catch (DateTimeParseException notALocalDateTime) {
-            return parsePlainDate(raw, field);
-        }
-    }
-
-    private static Optional<LocalDate> parsePlainDate(String raw, String field) {
-        try {
-            return Optional.of(LocalDate.parse(raw));
-        }
-        catch (DateTimeParseException notADate) {
-            throw new OneCFieldException("поле " + field + " не является датой", notADate);
-        }
+    /** Текст исключения собирается, только когда значения нет: в нём имя поля, но не значение. */
+    private static <T> T required(Optional<T> value, String missingPrefix, String field) {
+        return value.orElseThrow(() -> new OneCFieldException(missingPrefix + field));
     }
 
     private OneCValues() {

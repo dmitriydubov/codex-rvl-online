@@ -73,6 +73,27 @@ class OneCEnvelopeParserTest {
                 .hasMessageContaining("message-id");
     }
 
+    /** metadata не объект — это конверт без metadata, а не metadata без message-id. */
+    @Test
+    void metadataThatIsNotObject_isRejectedAsMissingMetadata() {
+        assertThatThrownBy(() -> parser.messageIdOf(bytes("""
+                {"data":{},"metadata":"message-id"}""")))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в конверте нет объекта metadata");
+    }
+
+    /** Пустой и пробельный message-id — отсутствующий, а не «не GUID». */
+    @ParameterizedTest
+    @ValueSource(strings = {"\"\"", "\"   \"", "null"})
+    void blankMessageId_isRejectedAsMissing(String messageId) {
+        String body = """
+                {"data":{},"metadata":{"message-id":%s}}""".formatted(messageId);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в metadata нет обязательного message-id");
+    }
+
     @Test
     void messageIdThatIsNotGuid_isRejected() {
         assertThatThrownBy(() -> parser.messageIdOf(bytes("""

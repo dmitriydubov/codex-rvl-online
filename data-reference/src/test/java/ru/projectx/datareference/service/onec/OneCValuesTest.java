@@ -140,6 +140,108 @@ class OneCValuesTest {
                 .contains(new BigDecimal("4999.95"));
     }
 
+    @Test
+    void requiredGuid_isRead() {
+        ObjectNode data = node("{\"id\":\"f3876c53-c7d8-4620-b364-9538164ba5d4\"}");
+
+        assertThat(OneCValues.requiredUuid(data, "id"))
+                .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
+    }
+
+    /** Нулевой GUID в обязательном поле — «ссылки нет», то есть поле не заполнено. */
+    @Test
+    void requiredGuid_rejectsZeroGuid() {
+        ObjectNode data = node("{\"id\":\"00000000-0000-0000-0000-000000000000\"}");
+
+        assertThatThrownBy(() -> OneCValues.requiredUuid(data, "id"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного GUID в поле id");
+    }
+
+    /** Текст исключения доезжает до лога: в нём имя поля, но не значение. */
+    @Test
+    void unparsableGuid_namesFieldButNotValue() {
+        assertThatThrownBy(() -> OneCValues.uuid(node("{\"guid\":\"не-гуид-42\"}"), "guid"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле guid не является GUID")
+                .hasCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void requiredDate_isRead() {
+        assertThat(OneCValues.requiredDate(node("{\"beginDate\":\"2024-10-10\"}"), "beginDate"))
+                .isEqualTo(LocalDate.of(2024, 10, 10));
+    }
+
+    @Test
+    void missingRequiredDate_namesField() {
+        assertThatThrownBy(() -> OneCValues.requiredDate(node("{}"), "beginDate"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательной даты в поле beginDate");
+    }
+
+    /** Значение — возможно, дата рождения из полиса — в текст исключения не попадает. */
+    @Test
+    void unparsableDate_namesFieldButNotValue() {
+        assertThatThrownBy(() -> OneCValues.date(node("{\"birthDate\":\"17.05.1980\"}"), "birthDate"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле birthDate не является датой");
+    }
+
+    @Test
+    void missingText_isEmpty() {
+        assertThat(OneCValues.text(node("{}"), "code")).isEmpty();
+    }
+
+    /** JSON {@code null} — то же, что отсутствующее значение, а не строка «null». */
+    @Test
+    void nullText_isEmpty() {
+        assertThat(OneCValues.text(node("{\"code\":null}"), "code")).isEmpty();
+    }
+
+    @Test
+    void objectInsteadOfText_isEmpty() {
+        assertThat(OneCValues.text(node("{\"code\":{\"value\":\"A00\"}}"), "code")).isEmpty();
+    }
+
+    @Test
+    void numberAsText_isItsTextForm() {
+        assertThat(OneCValues.text(node("{\"code\":123}"), "code")).contains("123");
+    }
+
+    @Test
+    void requiredText_isRead() {
+        assertThat(OneCValues.requiredText(node("{\"name\":\" Терапия \"}"), "name")).isEqualTo("Терапия");
+    }
+
+    @Test
+    void missingRequiredText_namesField() {
+        assertThatThrownBy(() -> OneCValues.requiredText(node("{\"name\":\"  \"}"), "name"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля name");
+    }
+
+    @Test
+    void presentFlag_isRead() {
+        assertThat(OneCValues.flag(node("{\"deleteMark\":true}"), "deleteMark")).isTrue();
+    }
+
+    @Test
+    void integer_isRead() {
+        assertThat(OneCValues.integer(node("{\"rowNumber\":7}"), "rowNumber")).contains(7);
+    }
+
+    /** Число строкой — не число: контракт передаёт числа числами. */
+    @Test
+    void integerAsText_isEmpty() {
+        assertThat(OneCValues.integer(node("{\"rowNumber\":\"7\"}"), "rowNumber")).isEmpty();
+    }
+
+    @Test
+    void amountAsText_isEmpty() {
+        assertThat(OneCValues.amount(node("{\"price\":\"4999.95\"}"), "price")).isEmpty();
+    }
+
     private static ObjectNode node(String json) {
         return (ObjectNode) JSON.readTree(json);
     }

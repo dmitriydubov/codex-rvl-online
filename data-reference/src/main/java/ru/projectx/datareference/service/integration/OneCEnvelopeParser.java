@@ -37,16 +37,23 @@ public class OneCEnvelopeParser {
      *         он не GUID — такое сообщение невозможно ни дедуплицировать, ни сохранить
      */
     public UUID messageIdOf(byte[] body) {
-        JsonNode metadata = readTree(body).path(METADATA);
+        return parse(messageIdText(metadataOf(readTree(body))));
+    }
+
+    private static JsonNode metadataOf(JsonNode envelope) {
+        JsonNode metadata = envelope.path(METADATA);
         if (!metadata.isObject()) {
             throw new OneCEnvelopeException("в конверте нет объекта metadata");
         }
+        return metadata;
+    }
 
+    private static String messageIdText(JsonNode metadata) {
         String raw = metadata.path(MESSAGE_ID).asString(null);
         if (raw == null || raw.isBlank()) {
             throw new OneCEnvelopeException("в metadata нет обязательного message-id");
         }
-        return parse(raw);
+        return raw;
     }
 
     private JsonNode readTree(byte[] body) {
