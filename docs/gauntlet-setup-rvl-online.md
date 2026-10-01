@@ -472,8 +472,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   (`spring.liquibase.url/user/password`). Ловушки: пулер в режиме transaction pooling (PgBouncer, Odyssey) отвергает или
   молча выбрасывает `options`; `?options=`/`?socketTimeout=` в `DB_URL` перекрывают свойства; `ALTER ROLE … SET
   statement_timeout` ограничил бы и миграции. Базу и роли контура серия не меняет (ответ владельца по PR #15). О пути к
-  базе владелец ответил «нет» на вопросы 5 и 6 самой сессии Ш4 (1.2 плана; толкование — на подтверждении): PgBouncer или
-  Odyssey в режиме transaction pooling между сервисом и PostgreSQL сейчас нет, `ALTER ROLE … SET
+  базе владелец ответил «нет» на вопросы 5 и 6 самой сессии Ш4 (1.2 плана; толкование подтверждено по PR #22): PgBouncer
+  или Odyssey в режиме transaction pooling между сервисом и PostgreSQL сейчас нет, `ALTER ROLE … SET
   statement_timeout/lock_timeout` у роли БД не задан. Уровни базы и сервера (`ALTER DATABASE … SET`, `postgresql.conf`)
   не подтверждались. У пула их, как и роль, перекрывает `options`: параметр клиента старше (документация PostgreSQL 16
   порядок прямо не называет; порядок `GucSource` в `src/include/utils/guc.h`, REL_16_STABLE, и зонд на
@@ -490,10 +490,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   statement_timeout'` (и так же `lock_timeout`, `idle_in_transaction_session_timeout`; `PGOPTIONS` равнозначен параметру
   `options`, postgresql.org/docs/16/libpq-envars.html). Значения должны совпасть с настройками сервиса; база и роли при
   этом не меняются. Расхождение — повод пересмотреть способ задания таймаутов. Проверку при старте в самом сервисе (WARN
-  при расхождении) добавляет шаг Ш41+Ш26 (решение владельца 2026-10-01); до его мержа — только ручная проверка. Три
-  `@Scheduled` при виртуальных потоках по-прежнему выполняются одним потоком `SimpleAsyncTaskScheduler` (Ш14b): зависший
-  запрос теперь обрывается (ожидание блокировки — через 5 с, оператор — через 30 с, молчащий сокет — через 60 с), но до
-  этого держит и стирание ПДн, и алерт.
+  при расхождении) добавляет шаг Ш41+Ш26 (решение владельца 2026-10-01; по PR #22 — и на соединении миграций, ожидается
+  `0`); до его мержа — только ручная проверка. Три `@Scheduled` при виртуальных потоках по-прежнему выполняются одним
+  потоком `SimpleAsyncTaskScheduler` (Ш14b): зависший запрос теперь обрывается (ожидание блокировки — через 5 с,
+  оператор — через 30 с, молчащий сокет — через 60 с), но до этого держит и стирание ПДн, и алерт.
   - **Миграции** (блок `spring.liquibase`, `application.yml:135-144` на `1aeefa1`). При заданном `spring.liquibase.url`
     spring-boot-liquibase 4.0.7 собирает Liquibase `SimpleDriverDataSource` через `DataSourceBuilder.create()` и берёт
     `user` и `password` только из `spring.liquibase.*`, из `spring.datasource` не наследует
