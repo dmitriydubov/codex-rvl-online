@@ -2,16 +2,18 @@
 # через Testcontainers и в этом файле не нуждаются.
 #
 # Значения базы и брокера захардкожены нарочно: это локальный контур, секретов здесь нет.
+# Порты опубликованы только на 127.0.0.1: известные пароли локального контура не должны
+# открывать базу и брокер всей сети, в которой стоит машина.
 # Переменные сервиса и аргументы сборки образа — из .env (шаблон .env.example, сам .env
 # в git не попадает); без .env действуют умолчания application.yml и Dockerfile.
 #
 # Запуск: docker compose up -d
 # Вместе с самим сервисом из Dockerfile: docker compose --profile app up -d
 #
-# Брокер здесь изображает межсервисный брокер контура, а не брокер 1С:УСК, и этот
-# сервис к нему по умолчанию не подключается: слушатели очередей 1С локально
-# не стартуют (spring.rabbitmq.listener.simple.auto-startup). Проверить на нём приём
-# и подтверждение всё же можно: RABBITMQ_LISTENER_AUTO_STARTUP=true и очереди 1С,
+# Брокер здесь изображает межсервисный брокер контура, а не брокер 1С:УСК, и очередей 1С
+# в нём нет. Поэтому слушатели очередей 1С в compose выключены (RABBITMQ_LISTENER_AUTO_STARTUP
+# по умолчанию false ниже; в application.yml умолчание — включены). Проверить на нём приём
+# и подтверждение всё же можно: RABBITMQ_LISTENER_AUTO_STARTUP=true в .env и очереди 1С,
 # заведённые через панель; данных 1С в нём всё равно нет.
 #
 # ---------------------------------------------------------------------------------------
@@ -31,7 +33,10 @@
 # Стенд готов, когда закладка напечатала «сырьё 1С заложено» и прошёл опрос планировщика
 # (раз в 10 с): строки inbound_message — PROCESSED, кроме страхователя: у него SKIPPED
 # с причиной, так ТЗ-3 помечает контрагента, ставшего страхователем, а не санаторием.
-# Сервис — http://localhost:8080 (порт тот же, что у профиля app: вместе их не поднимать).
+# Сервис — http://localhost:8080 (порт тот же, что у профиля app: вместе их не поднимать),
+# только с самой машины: порт опубликован на 127.0.0.1. Клиенту в контейнере на Linux
+# host.docker.internal его не покажет — такой клиент подключают к сети этого compose
+# (data-reference_default, адрес http://data-reference-stand:8080) или запускают с network_mode: host.
 # /actuator/health отвечает UP, как только сервис поднят, — раньше, чем данные заложены
 # и разобраны. Данные готовы, когда запрос примера 09 — полис для сервиса Договоров без ПДн
 # (/internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5) — отвечает 200.
@@ -41,11 +46,11 @@
 # после down без -v.
 #
 # В облачной сессии Claude Code контейнеры не выходят в сеть, а Docker Hub отвечает 429:
-# в .env — JAR_SOURCE=host и JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21-jre,
+# в .env — JAR_SOURCE=host и JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jre,
 # образ базы — заранее из зеркала:
 #   docker pull mirror.gcr.io/library/postgres:16.10-alpine
 #   docker tag mirror.gcr.io/library/postgres:16.10-alpine postgres:16.10-alpine
-# В рабочем контуре образы postgres:16.10-alpine и eclipse-temurin:21-jre — из Nexus.
+# В рабочем контуре образы postgres:16.10-alpine и eclipse-temurin:21.0.12.1_1-jre — из Nexus.
 # ---------------------------------------------------------------------------------------
 
 name: data-reference
@@ -60,7 +65,7 @@ services:
       POSTGRES_USER: data_reference
       POSTGRES_PASSWORD: data_reference
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -70,18 +75,19 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:4.1-management-alpine
+    # Та же версия, что у брокера 1С:УСК на контуре (RabbitMQ 4.1.2, Erlang 27.3.4.2).
+    image: rabbitmq:4.1.2-management-alpine
     container_name: data-reference-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: data_reference
       RABBITMQ_DEFAULT_PASS: data_reference
     ports:
       # 5672 — AMQP; тестовый контур слушает 5671 (TLS), локально TLS не нужен.
-      - "5672:5672"
+      - "127.0.0.1:5672:5672"
       # Панель управления на http://localhost:15672 — оттуда и создаются очереди,
       # если слушателей включили: сервис их не объявляет (spring.rabbitmq.dynamic: false),
       # потому что на контуре они заведены со стороны 1С:УСК.
-      - "15672:15672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -113,11 +119,18 @@ services:
     env_file:
       - path: .env
         required: false
+    # Пароли — локального контура выше: в application.yml у них умолчаний нет. TLS выключен
+    # явно — у локального брокера его нет. Слушатели 1С — false, если .env не задал иначе
+    # (подстановка ${...:-false} читает .env рядом с этим файлом).
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/data_reference
+      DB_PASSWORD: data_reference
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PASSWORD: data_reference
+      RABBITMQ_SSL_ENABLED: "false"
+      RABBITMQ_LISTENER_AUTO_STARTUP: ${RABBITMQ_LISTENER_AUTO_STARTUP:-false}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,8 +138,8 @@ services:
         condition: service_healthy
 
   # Стенд потребителя, см. шапку. Тот же образ, что у профиля app, но без брокера: нет
-  # depends_on на rabbitmq, слушатели 1С выключены явно — чтобы смена умолчания
-  # RABBITMQ_LISTENER_AUTO_STARTUP в application.yml стенд не изменила. Переменные
+  # depends_on на rabbitmq, слушатели 1С выключены явно — умолчание в application.yml
+  # их включает. Пароль базы — тоже явно, умолчания у него нет. Переменные
   # сервиса из .env (env_file) сюда не подключаются — стенд не зависит от локальных
   # настроек профиля app; аргументы сборки образа те же, что у app. Проверка здоровья
   # брокера выключена: брокера у стенда нет, и /actuator/health иначе отвечал бы DOWN.
@@ -136,10 +149,11 @@ services:
     container_name: data-reference-stand
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/data_reference
+      DB_PASSWORD: data_reference
       RABBITMQ_LISTENER_AUTO_STARTUP: "false"
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy

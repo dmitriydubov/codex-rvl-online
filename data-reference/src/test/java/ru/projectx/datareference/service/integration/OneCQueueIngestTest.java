@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static ru.projectx.datareference.support.OneCMessages.messageWithId;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -18,6 +19,7 @@ import ru.projectx.datareference.repository.InboxRepository;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.support.AmqpIntegrationTest;
 import ru.projectx.datareference.support.DatabaseCleaner;
+import ru.projectx.datareference.support.RunningListeners;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -72,18 +74,13 @@ class OneCQueueIngestTest {
      */
     @BeforeEach
     void listenersAreRunning() {
-        assertThat(listeners.getListenerContainerIds())
-                .as("контейнеры слушателей очередей 1С")
-                .isNotEmpty()
-                .allSatisfy(id -> assertThat(listeners.getListenerContainer(id).isRunning())
-                        .as("слушатель %s не запущен: auto-startup выключен или контейнер остановлен", id)
-                        .isTrue());
+        RunningListeners.assertAllRunning(listeners);
     }
 
     @Test
     void messageFromQueue_isStoredAsRawWithItsStream() {
         UUID messageId = UUID.randomUUID();
-        String body = envelope(messageId);
+        String body = messageWithId(messageId);
 
         rabbitTemplate.convertAndSend(queues.mkb10(), body);
 
@@ -103,7 +100,7 @@ class OneCQueueIngestTest {
     @Test
     void storedPayload_isTheWholeMessage() {
         UUID messageId = UUID.randomUUID();
-        String body = envelope(messageId);
+        String body = messageWithId(messageId);
 
         rabbitTemplate.convertAndSend(queues.mkb10(), body);
 
@@ -125,9 +122,9 @@ class OneCQueueIngestTest {
         UUID repeated = UUID.randomUUID();
         UUID next = UUID.randomUUID();
 
-        rabbitTemplate.convertAndSend(queues.mkb10(), envelope(repeated));
-        rabbitTemplate.convertAndSend(queues.mkb10(), envelope(repeated));
-        rabbitTemplate.convertAndSend(queues.mkb10(), envelope(next));
+        rabbitTemplate.convertAndSend(queues.mkb10(), messageWithId(repeated));
+        rabbitTemplate.convertAndSend(queues.mkb10(), messageWithId(repeated));
+        rabbitTemplate.convertAndSend(queues.mkb10(), messageWithId(next));
 
         // Потребитель у очереди один, порядок сохраняется: дождались последнего —
         // значит, оба повтора уже разобраны.
@@ -145,7 +142,7 @@ class OneCQueueIngestTest {
     void insuranceContractQueue_isBoundToItsOwnStream() {
         UUID messageId = UUID.randomUUID();
 
-        rabbitTemplate.convertAndSend(queues.insuranceContracts(), envelope(messageId));
+        rabbitTemplate.convertAndSend(queues.insuranceContracts(), messageWithId(messageId));
 
         assertThat(awaitStored(messageId))
                 .extracting(InboundMessage::stream, InboundMessage::sourceQueue)
@@ -162,8 +159,8 @@ class OneCQueueIngestTest {
         UUID batch = UUID.randomUUID();
         UUID last = UUID.randomUUID();
 
-        rabbitTemplate.convertAndSend(queues.priceLists(), envelope(batch));
-        rabbitTemplate.convertAndSend(queues.priceListsFinal(), envelope(last));
+        rabbitTemplate.convertAndSend(queues.priceLists(), messageWithId(batch));
+        rabbitTemplate.convertAndSend(queues.priceListsFinal(), messageWithId(last));
 
         assertThat(awaitStored(batch))
                 .extracting(InboundMessage::stream, InboundMessage::sourceQueue)
@@ -177,12 +174,5 @@ class OneCQueueIngestTest {
         await().atMost(DELIVERY_TIMEOUT)
                 .until(() -> inboundMessageRepository.findById(messageId).isPresent());
         return inboundMessageRepository.findById(messageId).orElseThrow();
-    }
-
-    private static String envelope(UUID messageId) {
-        return """
-                {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001","code":"A00"},\
-                "metadata":{"message-id":"%s","topic":"","producer":"1c-usk"}}"""
-                .formatted(messageId);
     }
 }
