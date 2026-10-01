@@ -16,6 +16,8 @@ import org.springframework.context.annotation.Import;
  * разбирает положенное этим тестом сырьё и меняет статусы, которые тест как раз
  * собирался проверить. Тесту самого шедулера это не мешает: он вызывает проход
  * напрямую, что вдобавок делает его детерминированным — без ожиданий и таймаутов.
+ * Усыплён и первый тик всех трёх планировщиков сырья: без задержки он случался бы прямо
+ * на старте контекста, то есть перед первым тестом класса или посреди него.
  *
  * <p><b>Брокера в этом контексте нет вовсе</b> — автоконфигурация AMQP исключена.
  * Раньше здесь стояло {@code spring.rabbitmq.listener.simple.auto-startup=false}, и этого
@@ -53,6 +55,7 @@ import org.springframework.context.annotation.Import;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.import.poll-interval=1h",
+        "projectx.import.initial-delay=1h",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
 public @interface IntegrationTest {

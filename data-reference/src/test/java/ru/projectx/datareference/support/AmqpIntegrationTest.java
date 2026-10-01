@@ -17,8 +17,8 @@ import org.springframework.context.annotation.Import;
  * аннотацию значит замедлить весь прогон ради проверки, которая к остальным тестам
  * отношения не имеет.
  *
- * <p>Шедулер разбора и здесь усыплён: проверяется приём, а не то, что произойдёт
- * с принятым сырьём дальше.
+ * <p>Шедулер разбора и здесь усыплён, вместе с первым тиком всех планировщиков сырья:
+ * проверяется приём, а не то, что произойдёт с принятым сырьём дальше.
  *
  * <p><b>TLS выключен явно, и это не мелочь.</b> Адрес, порт и учётные данные тесту
  * подставляет {@code @ServiceConnection} контейнера, а вот {@code ssl.enabled} берётся
@@ -43,6 +43,7 @@ import org.springframework.context.annotation.Import;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.import.poll-interval=1h",
+        "projectx.import.initial-delay=1h",
         "spring.rabbitmq.ssl.enabled=false",
         "spring.rabbitmq.listener.simple.auto-startup=true"})
 @Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})

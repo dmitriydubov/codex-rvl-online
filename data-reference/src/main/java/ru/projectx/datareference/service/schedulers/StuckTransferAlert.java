@@ -1,7 +1,5 @@
 package ru.projectx.datareference.service.schedulers;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -12,7 +10,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.repository.InboundMessageRepository;
 
 /**
  * «Передача ждёт своих частей дольше положенного» — обязательный присмотр за ТЗ-9.
@@ -31,20 +28,18 @@ public class StuckTransferAlert {
 
     private static final Logger log = LoggerFactory.getLogger(StuckTransferAlert.class);
 
-    private final InboundMessageRepository repository;
+    private final AgedInboundMessages agedMessages;
     private final ImportProperties properties;
-    private final Clock clock;
 
-    public StuckTransferAlert(InboundMessageRepository repository, ImportProperties properties, Clock clock) {
-        this.repository = repository;
+    public StuckTransferAlert(AgedInboundMessages agedMessages, ImportProperties properties) {
+        this.agedMessages = agedMessages;
         this.properties = properties;
-        this.clock = clock;
     }
 
-    @Scheduled(fixedDelayString = "${projectx.import.stuck-transfer-poll-interval:15m}")
+    @Scheduled(fixedDelayString = "${projectx.import.stuck-transfer-poll-interval:15m}",
+            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     public void reportStuckTransfers() {
-        Instant threshold = clock.instant().minus(properties.stuckTransferThreshold());
-        List<InboundMessage> stuck = repository.findByStatusAndReceivedAtLessThan(InboundStatus.BUFFERED, threshold);
+        List<InboundMessage> stuck = agedMessages.inStatus(InboundStatus.BUFFERED, properties.stuckTransferThreshold());
         if (stuck.isEmpty()) {
             return;
         }

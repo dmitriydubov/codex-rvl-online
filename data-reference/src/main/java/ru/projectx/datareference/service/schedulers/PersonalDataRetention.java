@@ -1,11 +1,8 @@
 package ru.projectx.datareference.service.schedulers;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Limit;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,22 +37,24 @@ public class PersonalDataRetention {
 
     private static final Logger log = LoggerFactory.getLogger(PersonalDataRetention.class);
 
+    private final AgedInboundMessages agedMessages;
     private final InboundMessageRepository repository;
     private final ImportProperties properties;
-    private final Clock clock;
 
-    public PersonalDataRetention(InboundMessageRepository repository, ImportProperties properties, Clock clock) {
+    public PersonalDataRetention(
+            AgedInboundMessages agedMessages, InboundMessageRepository repository, ImportProperties properties) {
+
+        this.agedMessages = agedMessages;
         this.repository = repository;
         this.properties = properties;
-        this.clock = clock;
     }
 
-    @Scheduled(fixedDelayString = "${projectx.import.retention-poll-interval:1h}")
+    @Scheduled(fixedDelayString = "${projectx.import.retention-poll-interval:1h}",
+            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     @Transactional
     public void forgetExpiredPayloads() {
-        Instant threshold = clock.instant().minus(properties.payloadTtl());
-        List<InboundMessage> expired = repository.findByStreamAndPayloadIsNotNullAndReceivedAtLessThan(
-                OneCStream.POLICIES, threshold, Limit.of(properties.retentionBatchSize()));
+        List<InboundMessage> expired = agedMessages.withPayload(
+                OneCStream.POLICIES, properties.payloadTtl(), properties.retentionBatchSize());
         if (expired.isEmpty()) {
             return;
         }
