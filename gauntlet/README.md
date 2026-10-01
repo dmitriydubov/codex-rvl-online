@@ -69,7 +69,7 @@ gauntlet/
 | `archTest` | ArchUnit 1.5.1 | разрешённые рёбра, без циклов | `config/architecture.properties` |
 | `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное, **ни одного skipped**, при наличии фич исполнен хотя бы один сценарий; судятся только результаты этого прогона | — |
 | `crapGate` | свой (`CrapGate.java`) по JaCoCo XML, формула crap4java | **8** | `crap.threshold`, `config/crap-allowlist.txt` |
-| `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются) | `dry.*` |
+| `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются; `dry.exclude` — пути вне поиска, у data-reference `entity/`) | `dry.*` |
 | `mutationGate` | PIT 1.22 + gradle-pitest-plugin 1.19.0 | **все покрытые мутанты убиты** (test strength 100 %), покрытие мутируемых классов ≥ 80 % | `pit.*` |
 | `gherkinMutation` | свой (`GherkinMutator.java`) | 0 выживших мутантов значений Examples | — |
 
