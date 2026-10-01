@@ -4,7 +4,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.PolicyContractRow;
@@ -18,7 +17,7 @@ import ru.projectx.datareference.repository.PolicyContractViewRepository;
  * <p>Транзакция {@code readOnly} — на весь класс: здесь только чтение.
  */
 @Service
-@Transactional(readOnly = true)
+@RestReadTransaction
 public class PolicyContractViewService implements PolicyContractViews {
 
     private final PolicyContractViewRepository policies;

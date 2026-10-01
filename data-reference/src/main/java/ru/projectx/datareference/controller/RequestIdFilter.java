@@ -7,7 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -20,6 +20,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * без идентификатора нет ни следа в журнале, ни способа его найти — а вызвавший
  * не узнает даже, что забыл заголовок.
  *
+ * <p>Присланный идентификатор принимается, только если он из латинских букв, цифр, точки,
+ * подчёркивания и дефиса длиной от 1 до 64 символов (решение Р53 (а)). Он уходит в журнал
+ * и в заголовок ответа, поэтому произвольный текст сюда не пускается — ни переводы строк,
+ * подделывающие запись журнала, ни мегабайт в каждой строке. Недопустимый заменяется новым
+ * UUID, а не отклоняется: вызывающие сервисы присылают кто что, и отказ из-за трассировки
+ * остановил бы им работу.
+ *
  * <p>MDC чистится в {@code finally}: на виртуальных потоках запрос обрабатывается своим
  * потоком, но привычка не оставлять чужой идентификатор в контексте стоит одной строки.
  */
@@ -29,13 +36,15 @@ public class RequestIdFilter extends OncePerRequestFilter {
     public static final String HEADER = "X-Request-Id";
     public static final String MDC_KEY = "requestId";
 
+    private static final Pattern ACCEPTABLE = Pattern.compile("[A-Za-z0-9._-]{1,64}");
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
         String requestId = Optional.ofNullable(request.getHeader(HEADER))
-                .filter(Predicate.not(String::isBlank))
+                .filter(sent -> ACCEPTABLE.matcher(sent).matches())
                 .orElseGet(() -> UUID.randomUUID().toString());
 
         response.setHeader(HEADER, requestId);

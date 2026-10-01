@@ -4,8 +4,10 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.LpuContract;
@@ -63,17 +65,23 @@ public class PriceContractResolver {
     }
 
     private static Resolution choose(List<LpuContract> active) {
-        List<LpuContract> supplementsWithOwnPrices = active.stream()
-                .filter(contract -> contract.mainContractExternalId() != null && !contract.usePricesMainContract())
-                .toList();
-        List<LpuContract> candidates = supplementsWithOwnPrices.isEmpty()
-                ? active.stream().filter(contract -> contract.mainContractExternalId() == null).toList()
-                : supplementsWithOwnPrices;
+        List<LpuContract> candidates = Optional.of(active.stream().filter(PriceContractResolver::hasOwnPrices).toList())
+                .filter(Predicate.not(List::isEmpty))
+                .orElseGet(() -> active.stream().filter(PriceContractResolver::isMain).toList());
         return switch (candidates.size()) {
             case 0 -> new Resolution.None();
             case 1 -> new Resolution.Found(PriceContract.of(candidates.getFirst()));
             default -> new Resolution.Ambiguous(candidates.stream().map(LpuContract::id).toList());
         };
+    }
+
+    /** Допсоглашение со своими ценами: ссылается на главный договор и цены с него не берёт. */
+    private static boolean hasOwnPrices(LpuContract contract) {
+        return !isMain(contract) && !contract.usePricesMainContract();
+    }
+
+    private static boolean isMain(LpuContract contract) {
+        return contract.mainContractExternalId() == null;
     }
 
     /** Исход логики B по одному учреждению. */

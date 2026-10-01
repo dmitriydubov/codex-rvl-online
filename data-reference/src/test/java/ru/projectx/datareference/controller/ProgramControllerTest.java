@@ -15,7 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.ProgramResponse;
-import ru.projectx.datareference.service.ReferenceQueryService;
+import ru.projectx.datareference.service.ProgramReads;
 
 /** R-09: программа по нашему {@code id}. */
 @ExtendWith(MockitoExtension.class)
@@ -26,18 +26,18 @@ class ProgramControllerTest {
     private static final UUID PROGRAM_EXTERNAL_ID = UUID.fromString("0a9e0000-0000-4000-8000-000000000002");
 
     @Mock
-    private ReferenceQueryService references;
+    private ProgramReads programs;
 
     private MockMvcTester mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = StandaloneMvc.of(new ProgramController(references));
+        mvc = StandaloneMvc.of(new ProgramController(programs));
     }
 
     @Test
     void programById_returnsProgramFoundByService_asJson() {
-        when(references.program(PROGRAM_ID)).thenReturn(
+        when(programs.byId(PROGRAM_ID)).thenReturn(
                 new ProgramResponse(PROGRAM_ID, PROGRAM_EXTERNAL_ID, "Программа РВЛ", null, false, List.of()));
 
         MvcTestResult result = mvc.get().uri(PROGRAMS, PROGRAM_ID).exchange();
@@ -52,7 +52,7 @@ class ProgramControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("id");
-        verifyNoInteractions(references);
+        verifyNoInteractions(programs);
     }
 
     /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
@@ -61,6 +61,6 @@ class ProgramControllerTest {
         MvcTestResult result = mvc.get().uri(PROGRAMS, PROGRAM_ID).accept(MediaType.APPLICATION_XML).exchange();
 
         assertThat(result).hasStatus(406);
-        verifyNoInteractions(references);
+        verifyNoInteractions(programs);
     }
 }

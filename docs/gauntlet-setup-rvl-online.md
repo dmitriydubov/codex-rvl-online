@@ -449,16 +449,19 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   уронить `mutationGate` по покрытию: порог суммарный (см. выше).
 
 **Код и конфигурация data-reference**
-- **Лимит PMD TooManyMethods (12).** `OneCQueueListener` (15 методов) краснеет при любой правке. `ReferenceController`
-  (15) разделён на контроллеры по ресурсам в Ш7 (PR #7).
+- **Лимит PMD TooManyMethods (12).** `OneCQueueListener` (15 методов) разделён в Ш15 (PR #23): 11 точек приёма
+  регистрирует `OneCQueueEndpoints`, у слушателя один публичный `receive`. `ReferenceController` (15) разделён на
+  контроллеры по ресурсам в Ш7 (PR #7).
   У `PriceListTransferAssembler` 12 — на пределе, у `ApiExceptionHandler` 9.
 - **Два бина `ObjectMapper`.** snake_case наружу даёт только `@Primary` `jsonMapper` Boot. Бин из `JacksonConfig` никуда не
   внедряется. Настраивать REST-JSON через свойства или customizer Boot.
 - **`TestRestTemplate` в тестовых jar Boot 4.0.7 нет** — есть `RestTestClient` из spring-test.
   `spring-boot-starter-webmvc-test` в Nexus контура нет: срез `@WebMvcTest` недоступен, unit-тесты веб-слоя —
   `MockMvcBuilders.standaloneSetup`.
-- **`missing-queues-fatal=true`.** Неверное имя любой из 11 очередей роняет старт. Имена сверять со списком брокера, а не с ТЗ:
-  у ТЗ-2 `application.yml` (дефис) и `contract-service/CLAUDE.md` (подчёркивание) расходятся.
+- **`missing-queues-fatal=true`.** Неверное имя любой из 11 очередей роняет старт. Имена сверять со списком брокера, а не с ТЗ
+  (у ТЗ-2 на брокере дефис, в ТЗ — подчёркивание; `contract-service/CLAUDE.md` исправлен по Р34). С Ш15 (PR #23) старт
+  роняют и два одинаковых имени: id точки приёма равен имени очереди, и реестр Spring AMQP второй такой точки не
+  принимает, даже при `RABBITMQ_LISTENER_AUTO_STARTUP=false`.
 - **Слушатели 1С по умолчанию выключены** (`RABBITMQ_LISTENER_AUTO_STARTUP=false`). Сервис здоров по пробам, но 1С не читает,
   и в журнале об этом ни строки.
 - **Проверка TLS-сертификата и имени хоста брокера по умолчанию выключена** (в Boot 4.0.7 включена).
@@ -515,6 +518,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Приём при сбое базы.**
   - Слушатель любой сбой записи считает недоступностью базы: 5 с паузы, затем nack с возвратом. Тело, которое Jackson
     принимает, а `jsonb` нет (`\u0000`, UTF-8 BOM, UTF-16), крутится бесконечно.
+  - До Ш31 WARN «не сохранено» бывает и при сбое ack уже сохранённого сообщения (закрытый канал: `IllegalStateException`
+    прокси `CachingConnectionFactory`) — данные не теряются, сообщение вернётся при закрытии канала и пройдёт дублем.
   - На quorum-очереди RabbitMQ ≥ 4.0 (delivery-limit по умолчанию 20) сообщение будет потеряно.
   - При prefetch 20 возврат переставляет сообщения: порядок записи [2, 3, 4, 5, 1].
   - С Ш4 (PR #15) сбоем записи стала и чужая блокировка: таблица приёма (`inbound_message`, `inbox`), занятая дольше 5 с,
@@ -572,8 +577,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | `exception` | 3 исключения REST |
 | `mapper` | все 10 мапперов |
 | `service` | `InboundMessageService`, `LpuCatalogService`, `Mkb10QueryService`, `PolicySearchService`, `PriceContractResolver`, `ReferenceQueryService`, `RvlAppealTypes` |
-| `service.integration` | `OneCEnvelopeParser`, `OneCQueueListener` |
-| `service.onec` | `OneCIngestService`, `OneCValues`, `PriceListTransferAssembler`, `ReferenceImportService` |
+| `service.integration` | `OneCEnvelopeParser`, `OneCQueueListener` (приведён к лимитам в Ш15, PR #23) |
+| `service.onec` | `OneCIngestService` (закалён в Ш15, PR #23), `OneCValues` (Ш13, PR #20), `PriceListTransferAssembler`, `ReferenceImportService` |
 | `service.schedulers` | `PersonalDataRetention`, `StuckTransferAlert` |
 
 **44 файла зелёные:** `DataReferenceApplication`, остальные `config`, `ApiExceptionHandler`, `RequestIdFilter`, шесть DTO, три
@@ -610,7 +615,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 3. сервисы с CC 4;
 4. `OneCValues` и `OneCEnvelopeParser`;
 5. планировщики;
-6. `OneCQueueListener`;
+6. `OneCQueueListener` (сделано, Ш15);
 7. `PriceListTransferAssembler`;
 8. кластер мапперов;
 9. разрыв цикла `mapper ↔ service`;
@@ -751,7 +756,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | `RABBITMQ_SSL_ENABLED` | `false` | `true` |
 | `RABBITMQ_SSL_VALIDATE_CERTIFICATE`, `RABBITMQ_SSL_VERIFY_HOSTNAME` | `false` | `true`; доверие сертификату брокера — через `certs/` |
 | `RABBITMQ_LISTENER_AUTO_STARTUP` | `false` | **обязательно `true`**, иначе сервис 1С не читает |
-| `ONEC_QUEUE_*` (11 шт.) | имена тестового брокера `1c-usk_to_rvl-online_…` | сверить со списком брокера контура; неверное имя роняет старт |
+| `ONEC_QUEUE_*` (11 шт.) | имена тестового брокера `1c-usk_to_rvl-online_…` | сверить со списком брокера контура; неверное или повторённое имя роняет старт (с Ш15) |
 | `SPRING_LIQUIBASE_ANALYTICS_ENABLED` | не задано | `false` до переноса Ш1 |
 | `JDK_JAVA_OPTIONS` | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` (образ) | по необходимости |
 

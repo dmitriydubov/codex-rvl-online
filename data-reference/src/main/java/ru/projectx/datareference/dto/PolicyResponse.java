@@ -71,7 +71,7 @@ public record PolicyResponse(
 
     /** Программа полиса ({@code policy_programs}) с условиями обслуживания по ней. */
     public record ProgramLine(
-            ProgramRef program,
+            NamedRef program,
             BigDecimal limitAmount,
             LocalDate beginDate,
             @Nullable LocalDate endDate,
@@ -83,17 +83,11 @@ public record PolicyResponse(
                     .filter(line -> row.externalProgramId().equals(line.externalProgramId()))
                     .map(ServiceLine::of)
                     .toList();
-            return new ProgramLine(ProgramRef.of(program), row.limitAmount(), row.beginDate(), row.endDate(),
+            return new ProgramLine(NamedRef.of(program, program.name()), row.limitAmount(), row.beginDate(), row.endDate(),
                     row.availability(), services);
         }
     }
 
-    public record ProgramRef(UUID id, UUID externalId, String name) {
-
-        static ProgramRef of(Program program) {
-            return new ProgramRef(program.id(), program.externalId(), program.name());
-        }
-    }
 
     /** Условие обслуживания ({@code policy_services}): слой, процент сооплаты, срок. */
     public record ServiceLine(

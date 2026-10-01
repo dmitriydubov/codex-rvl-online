@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.Policy;
@@ -14,13 +13,12 @@ import ru.projectx.datareference.entity.Policy;
  * Полисы застрахованных. Единственный репозиторий сервиса, за которым лежат
  * персональные данные.
  *
- * <p>Поиск для R-04 идёт через {@link JpaSpecificationExecutor} с условиями из
- * {@link PolicySpecifications}: число токенов ФИО заранее неизвестно, и статическим
- * запросом их не выразить. Ранжирование и предел выдачи — в сервисе: правило ранжирования
- * читается на Java, а кандидатов у одного договора немного.
+ * <p>Поиск для R-04 — фрагмент {@link PolicySearchRepository}: отбор по условиям
+ * {@link PolicySpecifications}, ранжирование и предел выдачи — одним запросом в базе (Ш12):
+ * число токенов ФИО заранее неизвестно, и статическим запросом их не выразить.
  */
 @Repository
-public interface PolicyRepository extends JpaRepository<Policy, UUID>, JpaSpecificationExecutor<Policy> {
+public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySearchRepository {
 
     Optional<Policy> findByExternalId(UUID externalId);
 

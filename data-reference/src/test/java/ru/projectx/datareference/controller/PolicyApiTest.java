@@ -245,6 +245,26 @@ class PolicyApiTest {
         assertThat(result).bodyJson().extractingPath("$.items[0].last_name").isEqualTo("Соколов");
     }
 
+    /**
+     * Предел режет уже ранжированный список (Ш12: ранг и предел — в одном запросе): «Андреев Сокол»
+     * по алфавиту первый, но совпало только имя, а у «Соколова» — фамилия.
+     */
+    @Test
+    void search_limitAppliesAfterRanking_notAlphabet() {
+        savePolicy("П-000040", "Андреев", "Сокол", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000041", "Соколов", "Иван", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000016039", "Борисов", "Олег", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("16039", "Яковлев", "Олег", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+
+        MvcTestResult byName = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}&limit=1",
+                CONTRACT_EXT, "сокол").exchange();
+        MvcTestResult byNumber = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}&limit=1",
+                CONTRACT_EXT, "16039").exchange();
+
+        assertThat(byName).bodyJson().extractingPath("$.items[*].last_name").asArray().containsExactly("Соколов");
+        assertThat(byNumber).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly("16039");
+    }
+
     private Policy savePolicy(String number, String lastName, String firstName, @Nullable String middleName,
             LocalDate beginDate, @Nullable LocalDate endDate, List<UUID> programExternalIds) {
         return savePolicy(number, lastName, firstName, middleName, beginDate, endDate, programExternalIds, false);

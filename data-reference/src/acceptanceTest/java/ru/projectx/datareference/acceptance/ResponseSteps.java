@@ -24,6 +24,9 @@ public class ResponseSteps {
 
     private static final String NULL = "null";
     private static final Set<String> JSON_LITERALS = Set.of(NULL, "true", "false");
+    /** UUID, каким его выдаёт сервис: 8-4-4-4-12 шестнадцатеричных цифр в нижнем регистре. */
+    private static final Pattern ISSUED_UUID =
+            Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     /** Перечень полей в шаге: имена через запятую, пробелы вокруг запятой не значимы. */
     private static final Pattern FIELD_LIST = Pattern.compile("\\s*,\\s*");
 
@@ -102,6 +105,16 @@ public class ResponseSteps {
     @Тогда("заголовок X-Request-Id ответа заполнен")
     public void requestIdFilled() {
         soleRequestId();
+    }
+
+    /**
+     * Сервис выдал свой идентификатор: ровно один заголовок, и в нём UUID. Присланное значение,
+     * возвращённое как есть, эту проверку не проходит: недопустимые значения сценариев на UUID
+     * не похожи (см. request_id.feature).
+     */
+    @Тогда("заголовок X-Request-Id ответа — новый UUID")
+    public void requestIdIsIssuedUuid() {
+        assertThat(soleRequestId()).as("заголовок X-Request-Id").matches(ISSUED_UUID);
     }
 
     @Тогда("поле {string} ответа равно заголовку X-Request-Id ответа")
