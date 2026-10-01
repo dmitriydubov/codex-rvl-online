@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.service.Mkb10QueryService;
+import ru.projectx.datareference.service.Mkb10Reads;
 
 /**
  * Справочник МКБ-10 (R-07): подсказка по коду или наименованию и раскрытие перечня кодов.
@@ -15,9 +15,9 @@ import ru.projectx.datareference.service.Mkb10QueryService;
 @InternalApi
 public class Mkb10Controller {
 
-    private final Mkb10QueryService mkb10;
+    private final Mkb10Reads mkb10;
 
-    public Mkb10Controller(Mkb10QueryService mkb10) {
+    public Mkb10Controller(Mkb10Reads mkb10) {
         this.mkb10 = mkb10;
     }
 

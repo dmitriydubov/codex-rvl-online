@@ -19,7 +19,7 @@ import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicySearchService;
+import ru.projectx.datareference.service.PolicySearchReads;
 import ru.projectx.datareference.service.ReferenceQueryService;
 
 /**
@@ -48,7 +48,7 @@ class PolicyControllerTest {
     private ReferenceQueryService references;
 
     @Mock
-    private PolicySearchService policySearch;
+    private PolicySearchReads policySearch;
 
     @Mock
     private PolicyContractViews contractViews;

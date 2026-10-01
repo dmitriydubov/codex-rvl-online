@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.ProgramResponse;
@@ -60,28 +59,28 @@ public class ReferenceQueryService {
         this.insurers = insurers;
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public ProgramResponse program(UUID id) {
         return programs.findWithServicesById(id)
                 .map(ProgramResponse::of)
                 .orElseThrow(() -> ReferenceNotFoundException.program(id));
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public PolicyResponse policy(UUID id) {
         return policies.findById(id)
                 .map(this::assemble)
                 .orElseThrow(() -> ReferenceNotFoundException.policy(id));
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public PolicyResponse policyByExternalId(UUID externalId) {
         return policies.findByExternalId(externalId)
                 .map(this::assemble)
                 .orElseThrow(() -> ReferenceNotFoundException.policyByExternalId(externalId));
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public PolicyResponse policyByNumber(String number, UUID contractId) {
         InsuranceContract contract = insuranceContracts.findById(contractId)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContract(contractId));
@@ -94,14 +93,14 @@ public class ReferenceQueryService {
                 .orElseThrow(() -> ReferenceNotFoundException.policyByNumber(contractId));
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public InsuranceContractResponse insuranceContract(UUID id) {
         InsuranceContract contract = insuranceContracts.findById(id)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContract(id));
         return InsuranceContractResponse.of(contract, insurerOf(contract));
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public InsuranceContractResponse insuranceContractByExternalId(UUID externalId) {
         InsuranceContract contract = insuranceContracts.findByExternalId(externalId)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContractByExternalId(externalId));

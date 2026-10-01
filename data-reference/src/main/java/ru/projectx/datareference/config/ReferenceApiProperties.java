@@ -27,11 +27,16 @@ import org.springframework.validation.annotation.Validated;
  * значения справочника контура. Придут GUID от 1С ({@code OQ-48}) — их место здесь же,
  * сравнение по строке уйдёт.
  *
+ * <p><b>Лимит времени чтения</b> — сколько секунд REST-чтение может ждать базу, прежде чем
+ * ответить 503 (Ш41). Сюда он попадает ради проверки на старте; применяет его аннотация
+ * транзакции чтения, которая читает то же свойство.
+ *
  * @param zone           календарный день для правила «действует на сегодня»
  * @param rvlAppealTypes наименования видов обращения РВЛ; сравниваются без учёта
  *                       регистра и краевых пробелов, см. {@code RvlAppealTypes}
  * @param search         пределы поиска полисов (R-04)
  * @param mkb10          пределы поиска по МКБ-10 (R-07)
+ * @param readTimeoutSeconds лимит времени REST-чтения, целые секунды
  */
 @Validated
 @ConfigurationProperties("projectx.api")
@@ -39,7 +44,8 @@ public record ReferenceApiProperties(
         @DefaultValue("Europe/Moscow") ZoneId zone,
         @NotEmpty List<@NotBlank String> rvlAppealTypes,
         @Valid @DefaultValue Search search,
-        @Valid @DefaultValue Mkb10 mkb10) {
+        @Valid @DefaultValue Mkb10 mkb10,
+        @Min(1) int readTimeoutSeconds) {
 
     /**
      * Пределы подсказки для поля «найти сотрудника»: короче {@code minQueryLength} —

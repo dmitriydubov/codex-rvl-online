@@ -10,7 +10,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.dto.LpuServicesResponse;
@@ -76,7 +75,7 @@ public class LpuCatalogService {
         this.calendar = calendar;
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public LpuCatalogResponse catalog(UUID contractExternalId) {
         insuranceContracts.findByExternalIdAndArchiveFalse(contractExternalId)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContractByExternalId(contractExternalId));
@@ -97,14 +96,14 @@ public class LpuCatalogService {
         return new LpuCatalogResponse(items, skipped);
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public LpuCardResponse card(UUID lpuId) {
         Lpu lpu = activeLpu(lpuId);
         PriceContract priceContract = priceContracts.resolve(lpuId, calendar.today());
         return LpuCardResponse.of(lpu, priceContract.contract(), priceContract.kind());
     }
 
-    @Transactional(readOnly = true)
+    @RestReadTransaction
     public LpuServicesResponse services(UUID lpuId, boolean needPrices) {
         Lpu lpu = activeLpu(lpuId);
         LocalDate today = calendar.today();

@@ -10,7 +10,7 @@ import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicySearchService;
+import ru.projectx.datareference.service.PolicySearchReads;
 import ru.projectx.datareference.service.ReferenceQueryService;
 
 /**
@@ -30,11 +30,11 @@ import ru.projectx.datareference.service.ReferenceQueryService;
 public class PolicyController {
 
     private final ReferenceQueryService references;
-    private final PolicySearchService policySearch;
+    private final PolicySearchReads policySearch;
     private final PolicyContractViews contractViews;
 
     public PolicyController(
-            ReferenceQueryService references, PolicySearchService policySearch, PolicyContractViews contractViews) {
+            ReferenceQueryService references, PolicySearchReads policySearch, PolicyContractViews contractViews) {
 
         this.references = references;
         this.policySearch = policySearch;

@@ -49,17 +49,30 @@ public final class PolicySpecifications {
 
     /** Номер: {@code pattern} — уже экранированная подстрока в нижнем регистре, с {@code %} по краям. */
     public static Specification<Policy> numberContains(String pattern) {
-        return (policy, query, cb) -> cb.like(cb.lower(policy.get("number")), pattern, ESCAPE);
+        return (policy, query, cb) -> like(cb, cb.lower(policy.get("number")), pattern);
     }
 
-    /** ФИО: каждый токен — префикс фамилии, имени или отчества; {@code ё} с обеих сторон читается как {@code е}. */
-    public static Specification<Policy> namesPrefixedBy(List<String> tokens) {
-        return (policy, query, cb) -> cb.and(tokens.stream()
-                .map(token -> cb.or(
-                        prefixed(cb, policy.get("lastName"), token),
-                        prefixed(cb, policy.get("firstName"), token),
-                        prefixed(cb, cb.coalesce(policy.<String>get("middleName"), ""), token)))
+    /**
+     * ФИО: каждый шаблон-префикс (экранированный токен с {@code %} в конце) подходит к фамилии,
+     * имени или отчеству; {@code ё} с обеих сторон читается как {@code е}.
+     */
+    public static Specification<Policy> namesPrefixedBy(List<String> prefixes) {
+        return (policy, query, cb) -> cb.and(prefixes.stream()
+                .map(prefix -> cb.or(
+                        like(cb, normalized(cb, policy.get("lastName")), prefix),
+                        like(cb, normalized(cb, policy.get("firstName")), prefix),
+                        like(cb, normalized(cb, cb.coalesce(policy.<String>get("middleName"), "")), prefix)))
                 .toArray(Predicate[]::new));
+    }
+
+    /** Имя в нижнем регистре, {@code ё} читается как {@code е} — так нормализована и строка поиска. */
+    static Expression<String> normalized(CriteriaBuilder cb, Expression<String> name) {
+        return cb.function("replace", String.class, cb.lower(name), cb.literal(YO), cb.literal(YE));
+    }
+
+    /** {@code like} с символом экранирования {@code !}, которым экранирует вызывающий сервис. */
+    static Predicate like(CriteriaBuilder cb, Expression<String> value, String pattern) {
+        return cb.like(value, pattern, ESCAPE);
     }
 
     private static Subquery<UUID> rvlServiceLine(
@@ -74,11 +87,6 @@ public final class PolicySpecifications {
                 openOrAfter(cb, line.get("endDate"), today),
                 cb.equal(program.get("externalId"), line.get("externalProgramId")),
                 cb.isFalse(program.<Boolean>get("archive")));
-    }
-
-    private static Predicate prefixed(CriteriaBuilder cb, Expression<String> name, String token) {
-        Expression<String> normalized = cb.function("replace", String.class, cb.lower(name), cb.literal(YO), cb.literal(YE));
-        return cb.like(normalized, token + "%", ESCAPE);
     }
 
     private static Predicate openOrAfter(CriteriaBuilder cb, Path<LocalDate> date, LocalDate today) {
