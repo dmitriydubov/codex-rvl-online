@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -240,6 +242,58 @@ class OneCValuesTest {
     @Test
     void amountAsText_isEmpty() {
         assertThat(OneCValues.amount(node("{\"price\":\"4999.95\"}"), "price")).isEmpty();
+    }
+
+    /** Пустая ссылка — «ссылки нет», как и нулевой GUID, а не нарушение контракта. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void blankGuid_meansNoReference(String blank) {
+        assertThat(OneCValues.uuid(node("{\"parentId\":\"%s\"}".formatted(blank)), "parentId")).isEmpty();
+    }
+
+    /**
+     * Заглушка и открытая дата узнаются по календарному дню, в каком бы из трёх видов дата
+     * ни пришла. Сравнение текста с «3000-01-01» пропустило бы открытую дату моментом
+     * (ТЗ-5, ТЗ-2), и договор действовал бы тысячу лет.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"3000-01-01T00:00:00+03:00", "3000-01-01T00:00:00",
+            "0001-01-01T00:00:00+03:00", "0001-01-01T00:00:00"})
+    void placeholderAndOpenDate_asMoment_areEmpty(String unset) {
+        assertThat(OneCValues.date(node("{\"endDate\":\"%s\"}".formatted(unset)), "endDate")).isEmpty();
+    }
+
+    /** В обязательном поле заглушка и открытая дата — незаполненное поле, а не нечитаемая дата. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0001-01-01", "3000-01-01T00:00:00+03:00"})
+    void requiredDate_reportsPlaceholderAndOpenDateAsMissing(String unset) {
+        ObjectNode data = node("{\"beginDate\":\"%s\"}".formatted(unset));
+
+        assertThatThrownBy(() -> OneCValues.requiredDate(data, "beginDate"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательной даты в поле beginDate");
+    }
+
+    /**
+     * Календарный день «как написан» — не «первые десять символов»: момент с невозможным
+     * временем — не дата, и оседать в базе днём 2024-10-10 он не должен.
+     */
+    @Test
+    void momentWithImpossibleTime_isContractViolation() {
+        assertThatThrownBy(() -> OneCValues.date(node("{\"beginDate\":\"2024-10-10T25:00:00\"}"), "beginDate"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле beginDate не является датой");
+    }
+
+    @Test
+    void arrayInsteadOfText_isEmpty() {
+        assertThat(OneCValues.text(node("{\"code\":[\"A00\"]}"), "code")).isEmpty();
+    }
+
+    /** Флаг читается по значению, а не по присутствию поля: deleteMark=false — запись не в архиве. */
+    @Test
+    void explicitlyFalseFlag_isFalse() {
+        assertThat(OneCValues.flag(node("{\"deleteMark\":false}"), "deleteMark")).isFalse();
     }
 
     private static ObjectNode node(String json) {
