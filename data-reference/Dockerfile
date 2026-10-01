@@ -63,15 +63,22 @@ RUN if [ -n "${GRADLE_DISTRIBUTION_URL}" ]; then \
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon --console=plain --quiet -PpublicRepositories=${PUBLIC_REPOSITORIES} dependencies
 
+# Jar берётся по точному имени: <rootProject.name>-<version из gradle.properties>.jar,
+# как его называет bootJar. Маска data-reference-*.jar при нескольких совпадениях молча
+# взяла бы не тот файл, а нет файла с точным именем — сборка падает на cp.
 COPY src src
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon --console=plain -PpublicRepositories=${PUBLIC_REPOSITORIES} bootJar -x test \
-    && cp build/libs/data-reference-*.jar application.jar
+    && cp "build/libs/data-reference-$(sed -n 's/^version=//p' gradle.properties).jar" application.jar
 
 # ---------- 1b. Jar, собранный на машине ----------
+# В build/libs на машине копятся jar-ы прежних версий, поэтому и здесь — точное имя
+# по текущей версии, а не маска.
 FROM ${JRE_IMAGE} AS host
 WORKDIR /workspace
-COPY build/libs/data-reference-*.jar application.jar
+COPY gradle.properties ./
+COPY build/libs build/libs
+RUN cp "build/libs/data-reference-$(sed -n 's/^version=//p' gradle.properties).jar" application.jar
 
 # ---------- 2. Слои Spring Boot ----------
 # Имя jar-а зафиксировано выше: в слое application он лежит под тем же именем,

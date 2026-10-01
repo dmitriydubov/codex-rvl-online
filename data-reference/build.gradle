@@ -19,7 +19,17 @@ plugins {
     id 'org.springframework.boot' version "${springBootVersion}"
 }
 
-description = 'РВЛ ОНЛАЙН — справочники, полисы и заявки личного кабинета застрахованного'
+description = 'РВЛ ОНЛАЙН — сервис справочных данных: справочники и полисы из 1С:УСК для сервисов Заявок и Договоров'
+
+/*
+ * Артефакт сервиса один — исполняемый jar от bootJar. Обычный jar (classifier plain)
+ * плагин Spring Boot собирает рядом, в тот же build/libs, и маска data-reference-*.jar
+ * находила бы два файла. Задача jar не нужна ни сборке образа, ни тестам: они берут
+ * классы из каталогов сборки.
+ */
+tasks.named('jar') {
+    enabled = false
+}
 
 java {
     // Стек зафиксирован на Java 21 (LTS).
