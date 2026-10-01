@@ -458,7 +458,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **`TestRestTemplate` в тестовых jar Boot 4.0.7 нет** — есть `RestTestClient` из spring-test.
   `spring-boot-starter-webmvc-test` в Nexus контура нет: срез `@WebMvcTest` недоступен, unit-тесты веб-слоя —
   `MockMvcBuilders.standaloneSetup`.
-- **`missing-queues-fatal=true`.** Неверное имя любой из 11 очередей роняет старт. Имена сверять со списком брокера, а не с ТЗ
+- **`missing-queues-fatal=true`.** Неверное имя любой из 11 очередей роняет старт — при включённых слушателях
+  (`RABBITMQ_LISTENER_AUTO_STARTUP=true`): очередь ищется при старте контейнера, четыре попытки с паузой 5 с; при
+  выключенных сервис поднимается, и ошибка всплывёт, когда контейнер запустят. Имена сверять со списком брокера, а не с ТЗ
   (у ТЗ-2 на брокере дефис, в ТЗ — подчёркивание; `contract-service/CLAUDE.md` исправлен по Р34). С Ш15 (PR #23) старт
   роняют и два одинаковых имени: id точки приёма равен имени очереди, и реестр Spring AMQP второй такой точки не
   принимает, даже при `RABBITMQ_LISTENER_AUTO_STARTUP=false`.
@@ -520,6 +522,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     принимает, а `jsonb` нет (`\u0000`, UTF-8 BOM, UTF-16), крутится бесконечно.
   - До Ш31 WARN «не сохранено» бывает и при сбое ack уже сохранённого сообщения (закрытый канал: `IllegalStateException`
     прокси `CachingConnectionFactory`) — данные не теряются, сообщение вернётся при закрытии канала и пройдёт дублем.
+    Через 5 с к WARN добавляется ERROR «Shutdown Signal» с кодом 406 (unknown delivery tag): nack ушёл в новый канал,
+    который прокси открыл сам. Это тот же сбой ack, а не второй отказ.
   - На quorum-очереди RabbitMQ ≥ 4.0 (delivery-limit по умолчанию 20) сообщение будет потеряно.
   - При prefetch 20 возврат переставляет сообщения: порядок записи [2, 3, 4, 5, 1].
   - С Ш4 (PR #15) сбоем записи стала и чужая блокировка: таблица приёма (`inbound_message`, `inbox`), занятая дольше 5 с,
@@ -577,9 +581,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | `exception` | 3 исключения REST |
 | `mapper` | все 10 мапперов |
 | `service` | `InboundMessageService`, `LpuCatalogService`, `Mkb10QueryService`, `PolicySearchService`, `PriceContractResolver`, `ReferenceQueryService`, `RvlAppealTypes` |
-| `service.integration` | `OneCEnvelopeParser`, `OneCQueueListener` (приведён к лимитам в Ш15, PR #23) |
+| `service.integration` | `OneCEnvelopeParser` (Ш13, PR #20), `OneCQueueListener` (приведён к лимитам в Ш15, PR #23) |
 | `service.onec` | `OneCIngestService` (закалён в Ш15, PR #23), `OneCValues` (Ш13, PR #20), `PriceListTransferAssembler`, `ReferenceImportService` |
-| `service.schedulers` | `PersonalDataRetention`, `StuckTransferAlert` |
+| `service.schedulers` | `PersonalDataRetention`, `StuckTransferAlert` (Ш14a, PR #13) |
 
 **44 файла зелёные:** `DataReferenceApplication`, остальные `config`, `ApiExceptionHandler`, `RequestIdFilter`, шесть DTO, три
 перечисления и сущности inbox, три исключения 1С, все `repository`, `InboxService`, `PriceContract`, `ReferenceCalendar`,
@@ -613,8 +617,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 1. гигиена;
 2. мелкие изолированные: исключения, Jackson, разделение `ReferenceController`;
 3. сервисы с CC 4;
-4. `OneCValues` и `OneCEnvelopeParser`;
-5. планировщики;
+4. `OneCValues` и `OneCEnvelopeParser` (сделано, Ш13);
+5. планировщики (под лимиты — Ш14a; Ш14b впереди);
 6. `OneCQueueListener` (сделано, Ш15);
 7. `PriceListTransferAssembler`;
 8. кластер мапперов;
@@ -667,8 +671,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 
     Удаление из HEAD историю не чистит, а переписывать историю агентам запрещено: это решение и работа владельца.
 - **Запросы к 1С:УСК.**
-  - Тип очередей (classic или quorum), delivery-limit, DLX, версия RabbitMQ. Если очереди quorum — поставить политику
-    `delivery-limit=-1` или DLX с разбором до запуска приёма.
+  - Тип очередей (classic или quorum), delivery-limit, DLX (версия известна: RabbitMQ 4.1.2, Erlang 27.3.4.2). Если
+    очереди quorum — до запуска приёма delivery-limit (не -1) и DLX с разбором: без лимита возвращённое сообщение quorum
+    уходит в конец очереди и порядок потока теряется, с лимитом после него сообщение уходит в DLX (RabbitMQ 4.1,
+    `quorum-queues/index.md`). Classic — действия не нужно.
   - Бывают ли в телах BOM и `\u0000`.
   - Единица `creation-timestamp`.
   - ТЗ-8: полный ли набор контактов в сообщении.
