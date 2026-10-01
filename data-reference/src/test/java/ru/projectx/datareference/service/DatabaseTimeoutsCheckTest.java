@@ -169,6 +169,29 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output).contains("лимит REST-чтения PT3S не меньше lock_timeout PT3S");
     }
 
+    @Test
+    void lockTimeoutDisabled_doesNotWarnAboutReadLimit(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        check = check(new DatabaseSessionTimeouts("0", "30s", "1min"));
+
+        check.run(null);
+
+        assertThat(output).doesNotContain("лимит REST-чтения");
+    }
+
+    @Test
+    void liquibaseWithoutDataSource_warnsSo(CapturedOutput output) {
+        when(liquibaseProvider.getIfAvailable()).thenReturn(liquibase);
+        when(liquibase.getDataSource()).thenReturn(null);
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+
+        check.run(null);
+
+        assertThat(output).contains("соединение миграций не проверено: у Liquibase нет DataSource");
+    }
+
     private void withMigrations() {
         when(liquibaseProvider.getIfAvailable()).thenReturn(liquibase);
         when(liquibase.getDataSource()).thenReturn(migrations);

@@ -33,8 +33,9 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
  * <p>Проверка — наблюдение, а не условие старта: не прочиталось соединение (сбой базы, права
  * на {@code pg_settings}) — WARN с типом исключения, без его текста; Liquibase в контексте нет
  * (миграции в контуре идут отдельно) — WARN, что соединение миграций не проверено. Заодно —
- * WARN, если лимит REST-чтения не меньше {@code lock_timeout}: тогда под чужой блокировкой REST
- * не отказывает первым.
+ * WARN, если лимит REST-чтения не меньше включённого {@code lock_timeout}: тогда под чужой
+ * блокировкой REST не отказывает первым ({@code lock_timeout} 0 — ожидание блокировок без предела,
+ * и первым отказывает как раз лимит чтения).
  *
  * <p>{@link ApplicationRunner}: Spring Boot вызывает его после старта контекста и до готовности
  * принимать трафик — миграции к этому моменту прошли, их соединение открыто заново.
@@ -100,10 +101,11 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
     }
 
     private Optional<DataSource> migrationsSource() {
-        Optional<DataSource> source = Optional.ofNullable(connections.liquibase().getIfAvailable())
-                .map(SpringLiquibase::getDataSource);
+        Optional<SpringLiquibase> liquibase = Optional.ofNullable(connections.liquibase().getIfAvailable());
+        Optional<DataSource> source = liquibase.map(SpringLiquibase::getDataSource);
         if (source.isEmpty()) {
-            log.warn("проверка таймаутов PostgreSQL: соединение миграций не проверено: Liquibase в контексте нет");
+            log.warn("проверка таймаутов PostgreSQL: соединение миграций не проверено: {}",
+                    liquibase.isPresent() ? "у Liquibase нет DataSource" : "Liquibase в контексте нет");
         }
         return source;
     }
@@ -111,7 +113,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
     private void warnIfReadLimitNotBelowLockTimeout() {
         Duration readLimit = Duration.ofSeconds(api.readTimeoutSeconds());
         PostgresDurations.parse(configured.lockTimeout())
-                .filter(lockTimeout -> readLimit.compareTo(lockTimeout) >= 0)
+                .filter(lockTimeout -> lockTimeout.isPositive() && readLimit.compareTo(lockTimeout) >= 0)
                 .ifPresent(lockTimeout -> log.warn("лимит REST-чтения {} не меньше lock_timeout {}: под чужой "
                         + "блокировкой REST не отказывает первым", readLimit, lockTimeout));
     }
