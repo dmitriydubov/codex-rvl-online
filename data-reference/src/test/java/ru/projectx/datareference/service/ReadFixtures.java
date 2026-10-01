@@ -6,11 +6,16 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.datareference.entity.AppealType;
+import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Insurer;
+import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
+import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.entity.Program;
 
 /** Синтетические записи справочников для unit-тестов сервисов чтения: те же фабрики, что у разбора 1С. */
@@ -33,6 +38,31 @@ final class ReadFixtures {
 
     static Program program(UUID externalId, boolean archived) {
         return Program.create(externalId, new Program.Details(null, null, "Программа РВЛ", null, archived), NOW);
+    }
+
+    static Lpu lpu(UUID externalId, boolean archived) {
+        return Lpu.create(externalId, new Lpu.Details("Санаторий", null, null, null, null, null, archived), NOW);
+    }
+
+    /** Главный договор — без ссылки на главный; допсоглашение — со ссылкой и признаком «цены с главного». */
+    static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId, boolean usePricesMainContract) {
+        return LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details("Д-1", null,
+                mainContractExternalId, usePricesMainContract, false, BEGIN, null, false), NOW);
+    }
+
+    static AppealType appealType(UUID externalId, String name) {
+        return AppealType.create(externalId,
+                new AppealType.Details(null, null, name, null, null, null, false, false, false), NOW);
+    }
+
+    static ContragentService service(LpuContract contract, UUID externalAppealTypeId) {
+        return ContragentService.create(UUID.randomUUID(), contract,
+                new ContragentService.Details(externalAppealTypeId, "У-1", "Размещение", false), NOW);
+    }
+
+    static PriceListItem price(ContragentService service, String amount) {
+        return PriceListItem.of(service,
+                new PriceListItem.Row(null, null, null, new BigDecimal(amount), null, BEGIN, null), NOW);
     }
 
     static Policy policy(UUID externalContractId, List<UUID> programIds, List<UUID> serviceLineProgramIds) {

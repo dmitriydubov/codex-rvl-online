@@ -32,17 +32,17 @@ public class InsuranceContractQueryService implements InsuranceContractReads {
     @Override
     @RestReadTransaction
     public InsuranceContractResponse byId(UUID id) {
-        return insuranceContracts.findById(id)
-                .map(this::withInsurer)
+        InsuranceContract contract = insuranceContracts.findById(id)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContract(id));
+        return withInsurer(contract);
     }
 
     @Override
     @RestReadTransaction
     public InsuranceContractResponse byExternalId(UUID externalId) {
-        return insuranceContracts.findByExternalId(externalId)
-                .map(this::withInsurer)
+        InsuranceContract contract = insuranceContracts.findByExternalId(externalId)
                 .orElseThrow(() -> ReferenceNotFoundException.insuranceContractByExternalId(externalId));
+        return withInsurer(contract);
     }
 
     private InsuranceContractResponse withInsurer(InsuranceContract contract) {
