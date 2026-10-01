@@ -73,6 +73,27 @@ class OneCEnvelopeParserTest {
                 .hasMessageContaining("message-id");
     }
 
+    /** metadata не объект — это конверт без metadata, а не metadata без message-id. */
+    @Test
+    void metadataThatIsNotObject_isRejectedAsMissingMetadata() {
+        assertThatThrownBy(() -> parser.messageIdOf(bytes("""
+                {"data":{},"metadata":"message-id"}""")))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в конверте нет объекта metadata");
+    }
+
+    /** Пустой и пробельный message-id — отсутствующий, а не «не GUID». */
+    @ParameterizedTest
+    @ValueSource(strings = {"\"\"", "\"   \"", "null"})
+    void blankMessageId_isRejectedAsMissing(String messageId) {
+        String body = """
+                {"data":{},"metadata":{"message-id":%s}}""".formatted(messageId);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в metadata нет обязательного message-id");
+    }
+
     @Test
     void messageIdThatIsNotGuid_isRejected() {
         assertThatThrownBy(() -> parser.messageIdOf(bytes("""
@@ -109,6 +130,47 @@ class OneCEnvelopeParserTest {
         assertThatThrownBy(() -> parser.messageIdOf(bytes("""
                 {"data":{"guid":"1a2b3c4d-0000-4000-8000-0000""")))
                 .isInstanceOf(OneCEnvelopeException.class);
+    }
+
+    /**
+     * Нечитаемое тело — возможно, полис. Jackson называет в своей ошибке токен, на котором
+     * споткнулся ({@code Unrecognized token '…'}), поэтому её текст в отказ не идёт:
+     * отказ — фиксированная фраза, без содержимого тела.
+     */
+    @Test
+    void unreadableBody_isRejectedWithoutQuotingIt() {
+        String brokenPolicy = """
+                {"data":{"surname":Testova},"metadata":{"message-id":"%s"}}""".formatted(MESSAGE_ID);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(brokenPolicy)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("тело сообщения не является читаемым JSON");
+    }
+
+    /**
+     * Пустое тело отклоняется как неопознаваемое сообщение, а не роняет разбор другим
+     * исключением: приём перехватывает только {@link OneCEnvelopeException}.
+     */
+    @Test
+    void emptyBody_isRejected() {
+        assertThatThrownBy(() -> parser.messageIdOf(new byte[0]))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в конверте нет объекта metadata");
+    }
+
+    /**
+     * message-id объектом или массивом — не текст: такой конверт отклоняется как
+     * неопознаваемый, а не роняет разбор исключением Jackson о приведении типа.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "[]"})
+    void messageIdThatIsNotText_isRejected(String messageId) {
+        String body = """
+                {"data":{},"metadata":{"message-id":%s}}""".formatted(messageId);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в metadata нет обязательного message-id");
     }
 
     private static byte[] bytes(String body) {
