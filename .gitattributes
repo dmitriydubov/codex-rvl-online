@@ -1,0 +1,13 @@
+# Концы строк в репозитории — LF, независимо от core.autocrlf на машине разработчика:
+# иначе checkout на Windows с autocrlf=true кладёт в рабочую копию CRLF, и shell-скрипты
+# (gradlew, certs/import-ca.sh) падают внутри Linux-контейнера на «\r».
+* text=auto eol=lf
+
+# Скрипты Windows — CRLF в рабочей копии: cmd.exe с LF разбирает метки и переходы неверно.
+*.bat text eol=crlf
+
+# Двоичные файлы — без преобразования концов строк, без текстового diff и слияния.
+*.pdf binary
+*.docx binary
+*.png binary
+*.jar binary

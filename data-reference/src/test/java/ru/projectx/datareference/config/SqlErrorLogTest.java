@@ -1,0 +1,127 @@
+package ru.projectx.datareference.config;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static ru.projectx.datareference.support.OneCMessages.envelope;
+
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.NestedExceptionUtils;
+import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
+import ru.projectx.datareference.support.DatabaseCleaner;
+import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.TestJdbc;
+
+/**
+ * Текст SQL-ошибки не попадает в журнал: PostgreSQL кладёт в него Detail и Where со значениями
+ * отвергнутой строки или тела, а через те же пути записи идут полисы с персональными данными.
+ *
+ * <p>Ошибки даёт настоящая база, на месте ПДн — синтетическое значение. Первая — при разборе:
+ * на время теста на справочник МКБ-10 ставится CHECK, который отвергает один код. Вторая —
+ * при записи сырья: тело, которое не принимает jsonb. Журнал проверяется весь, что бы и кто бы
+ * в него ни написал: Hibernate, драйвер, Spring или сам сервис. Тип отказа в журнале
+ * планировщика остаётся, иначе сбой нечем было бы диагностировать.
+ */
+@IntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
+class SqlErrorLogTest {
+
+    private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
+    private static final String CONSTRAINT = "ck_test_sql_error_log";
+    private static final String REJECTED_CODE = "Z99.9";
+    /**
+     * Синтетическое значение на месте ПДн. Короткое намеренно: Where PostgreSQL показывает
+     * тело не целиком, а последние десятки символов перед ошибкой.
+     */
+    private static final String PERSONAL_DATA = "Ксения Тестовна";
+    private static final String FAILURE_TYPE = "org.springframework.dao.DataIntegrityViolationException";
+
+    @Autowired
+    private DatabaseCleaner databaseCleaner;
+
+    @Autowired
+    private TestJdbc testJdbc;
+
+    @Autowired
+    private ReferenceImportScheduler scheduler;
+
+    @Autowired
+    private InboundMessageService inboundMessageService;
+
+    @Autowired
+    private InboundMessageRepository inboundMessageRepository;
+
+    /**
+     * Ограничение снимается и перед установкой: оборванный прогон на постоянной базе
+     * ({@code TEST_POSTGRES_URL}) иначе оставил бы его, и следующий упал бы на «already exists».
+     */
+    @BeforeEach
+    void rejectOneCode() {
+        databaseCleaner.clear();
+        restoreSchema();
+        testJdbc.update("ALTER TABLE mkb10 ADD CONSTRAINT " + CONSTRAINT + " CHECK (code <> '" + REJECTED_CODE + "')");
+    }
+
+    @AfterEach
+    void restoreSchema() {
+        testJdbc.update("ALTER TABLE mkb10 DROP CONSTRAINT IF EXISTS " + CONSTRAINT);
+    }
+
+    /** Нарушение CHECK при разборе: PostgreSQL печатает отвергнутую строку целиком (Detail). */
+    @Test
+    void rejectedRow_leavesOnlyFailureTypeInLog(CapturedOutput log) {
+        UUID messageId = store(mkb10(REJECTED_CODE, PERSONAL_DATA));
+
+        scheduler.importPendingMessages();
+
+        assertThat(lastErrorOf(messageId)).contains(CONSTRAINT, PERSONAL_DATA);
+        assertThat(log.getAll())
+                .contains("временная ошибка разбора сообщения " + messageId + " потока MKB10: " + FAILURE_TYPE)
+                .doesNotContain(PERSONAL_DATA)
+                .doesNotContain(CONSTRAINT)
+                .doesNotContain("Failing row contains");
+    }
+
+    /**
+     * Тело, которое jsonb не принимает ({@code \u0000} в строке), при записи сырья: PostgreSQL
+     * печатает в Where тело до места ошибки — со всем, что в нём стояло раньше.
+     */
+    @Test
+    void rejectedPayload_leavesNoPayloadTextInLog(CapturedOutput log) {
+        String poisonedName = PERSONAL_DATA + "\\u0000";
+
+        Throwable failure = catchThrowable(() -> store(mkb10("A00", poisonedName)));
+
+        assertThat(NestedExceptionUtils.getMostSpecificCause(failure)).hasMessageContaining(PERSONAL_DATA);
+        assertThat(log.getAll())
+                .doesNotContain(PERSONAL_DATA)
+                .doesNotContain("JSON data");
+    }
+
+    /** @return message-id строки сырья — по нему тест находит её исход */
+    private UUID store(String data) {
+        UUID messageId = UUID.randomUUID();
+        inboundMessageService.store(messageId, OneCStream.MKB10, QUEUE, envelope(data));
+        return messageId;
+    }
+
+    /** Полный текст ошибки остаётся в строке сырья — значит, ПДн в ошибке действительно были. */
+    private String lastErrorOf(UUID messageId) {
+        return inboundMessageRepository.findById(messageId).orElseThrow().lastError();
+    }
+
+    private static String mkb10(String code, String name) {
+        return """
+                {"id":"%s","code":"%s","name":"%s"}"""
+                .formatted(UUID.randomUUID(), code, name);
+    }
+}
