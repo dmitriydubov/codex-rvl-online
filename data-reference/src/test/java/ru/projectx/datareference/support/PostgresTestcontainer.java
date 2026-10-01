@@ -2,7 +2,6 @@ package ru.projectx.datareference.support;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.DynamicPropertyRegistrar;
@@ -13,9 +12,16 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * ради которого этот сервис существует, — уникальные ключи, {@code jsonb}, поведение
  * Liquibase — на встроенной базе либо работает иначе, либо не работает вовсе.
  *
- * <p>Обычно это контейнер Testcontainers: адрес и учётные данные подставляет в контекст
- * {@link ServiceConnection}. Если задан {@code TEST_POSTGRES_URL}, контейнер не поднимается,
- * а датасорс смотрит на внешнюю базу — для машин без Docker, см. {@link TestDatabase}.
+ * <p>Обычно это контейнер Testcontainers. Если задан {@code TEST_POSTGRES_URL}, контейнер
+ * не поднимается, а датасорс смотрит на внешнюю базу — для машин без Docker, см. {@link TestDatabase}.
+ *
+ * <p>В обоих случаях адрес и учётные данные приходят в контекст свойствами
+ * {@code spring.datasource.*} — так же, как в контуре. {@code @ServiceConnection} здесь
+ * намеренно нет: он отдаёт Liquibase собственные данные подключения к контейнеру, и тесты
+ * не видели бы, с какими настройками соединения миграции идут на самом деле. А они
+ * отличаются от пула приложения: см. {@code spring.liquibase} в {@code application.yml}.
+ * Приёмка ({@code CucumberSpringConfiguration}) свой {@code @ServiceConnection} сохраняет:
+ * она проверяет ответы сервиса, а не настройки соединений, и в контур не переносится.
  *
  * <p>Контейнер живёт как бин контекста, а не статическим полем теста: контексты Spring
  * кэшируются между тестовыми классами, и вместе с контекстом переиспользуется контейнер.
@@ -29,10 +35,20 @@ public class PostgresTestcontainer {
     private static final String LOCAL_CREDENTIAL = "data_reference";
 
     @Bean
-    @ServiceConnection
     @ConditionalOnExpression("'${" + TestDatabase.URL_PROPERTY + ":}'.isEmpty()")
     public PostgreSQLContainer postgresContainer() {
         return new PostgreSQLContainer(IMAGE);
+    }
+
+    /** Контейнер к этому моменту запущен: Boot стартует его при создании бина. */
+    @Bean
+    @ConditionalOnExpression("'${" + TestDatabase.URL_PROPERTY + ":}'.isEmpty()")
+    public DynamicPropertyRegistrar containerPostgres(PostgreSQLContainer container) {
+        return registry -> {
+            registry.add("spring.datasource.url", container::getJdbcUrl);
+            registry.add("spring.datasource.username", container::getUsername);
+            registry.add("spring.datasource.password", container::getPassword);
+        };
     }
 
     @Bean
