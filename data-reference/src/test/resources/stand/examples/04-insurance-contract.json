@@ -1,7 +1,7 @@
 {
   "description": "Договор страхования по id data-reference: номер, external_id, наименование организации-страхователя.",
   "placeholders": {
-    "insurance_contract_id": "UUID, id договора страхования у data-reference; из примера 01",
+    "insurance_contract_id": "UUID, id договора страхования у data-reference; из примера 02",
     "insurer_id": "UUID, id страхователя у data-reference; из примера 02"
   },
   "request": {
