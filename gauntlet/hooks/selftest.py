@@ -176,6 +176,26 @@ def guard_tests(repo):
     expect_allow(repo, "switch existing", "main", "Bash", command="git switch main")
     expect_deny(repo, "gh -R pr merge", "main", "Bash", command="gh -R o/r pr merge 12 --squash")
     expect_deny(repo, "gh --repo pr merge", "main", "Bash", command="gh --repo o/r pr merge 12")
+    # --- PR #25, decision 5: `gauntlet` as a Gradle task or under build/ is not the kit
+    expect_allow(repo, "rm build/gauntlet log with $?", "main", "Bash", command=f"rm -f {M}build/gauntlet/x.log; echo $?")
+    expect_allow(repo, "rm missing file then gradlew gauntlet", "main", "Bash",
+                 command="rm -f out.log && ./gradlew gauntlet --continue > out.log 2>&1")
+    expect_allow(repo, "gradlew gauntlet | tee $VAR", "main", "Bash", command='./gradlew gauntlet --continue 2>&1 | tee "$TMPDIR/run.log"')
+    expect_allow(repo, "mkdir $VAR then gradlew gauntlet", "main", "Bash", command='mkdir -p "$SCRATCH" && ./gradlew gauntlet')
+    expect_allow(repo, "python -c reads build/gauntlet", "main", "Bash",
+                 command=f"python3 -c \"print(open('{M}build/gauntlet/gauntletFast-hook.log').read())\"")
+    expect_deny(repo, "rm $VAR with gauntlet assigned", "main", "Bash", command="D=gauntlet; rm -rf $D")
+    expect_deny(repo, "rm $VAR next to gradlew gauntlet", "main", "Bash", command="./gradlew gauntlet; X=gauntlet/config; rm -rf $X")
+    expect_deny(repo, "echo gauntlet | xargs rm next to gradlew gauntlet", "main", "Bash",
+                command="./gradlew gauntlet; echo gauntlet | xargs rm -rf")
+    expect_deny(repo, "rm $VAR next to gradlew -p gauntlet", "main", "Bash", command="./gradlew -p gauntlet tasks; rm -rf $X")
+    expect_deny(repo, "rm via build/.. back into gauntlet", "main", "Bash", command="rm -rf $P/build/../gauntlet")
+    expect_deny(repo, "for ... do rm", "main", "Bash", command='for f in gauntlet/config/*; do rm "$f"; done')
+    expect_deny(repo, "then rm", "main", "Bash", command="if true; then rm -rf gauntlet; fi")
+    expect_deny(repo, "brace group rm", "main", "Bash", command="{ rm -rf .claude; }")
+    expect_deny(repo, "negated rm", "main", "Bash", command="! rm -f CLAUDE.md")
+    expect_deny(repo, "do sed -i", "main", "Bash", command="while false; do sed -i 's/8/80/' gauntlet/config/gauntlet.properties; done")
+    expect_deny(repo, "then git push --force", "main", "Bash", command="if true; then git push --force; fi")
     expect_deny(repo, "rm via $PWD", "main", "Bash", command="rm -rf $PWD/gauntlet")
     expect_deny(repo, "rm via $CLAUDE_PROJECT_DIR", "main", "Bash", command='rm -rf "$CLAUDE_PROJECT_DIR/.claude"')
     expect_deny(repo, "xargs rm", "main", "Bash", command="git ls-files gauntlet/config | xargs rm -f")

@@ -54,6 +54,10 @@ GIT_READ_ONLY_FORMS = {"branch": ("--show-current", "--list", "-l", "-a", "-r", 
 HISTORY_REWRITING = {"rebase", "filter-branch", "filter-repo", "update-ref", "replace", "revert"}
 INTERPRETERS = {"python", "python3", "node", "ruby", "bash", "sh", "zsh"}   # with -c / -e inline code
 WRAPPERS = {"sudo", "command", "exec", "nohup", "time", "env", "timeout", "nice"}
+SHELL_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{"}   # `then rm x` runs rm
+GRADLE = {"gradlew", "gradle"}
+GRADLE_PATH_OPTIONS = {"-p", "--project-dir", "-g", "--gradle-user-home", "--project-cache-dir", "-b", "--build-file",
+                       "-c", "--settings-file", "-I", "--init-script", "--include-build"}
 PERL_WRITES = re.compile(r"\b(open|unlink|rename|system|exec|qx|mkdir|rmdir|truncate|chmod|chown|symlink|link|"
                          r"utime|syswrite|sysopen)\b|`")
 REDIRECT = re.compile(r"(?<!>)>>?\|?\s*([^\s;&|<>()]+)")
@@ -231,7 +235,7 @@ def command_violation(agent, command, ctx):
         # paths the tokens cannot resolve (`python -c ...`, $VAR, `...`, xargs, no path at all): match the text -
         # the whole command for inline code, otherwise outside quotes (a commit or stash message is not a path)
         if not tokens or unresolvable(segment, command):
-            text = command if inline_code(words) else QUOTED.sub("''", command)
+            text = command if inline_code(words) else without_gradle_tasks(QUOTED.sub("''", command))
             hit = next((p for p in protected if mentions(text, p)), None)
             if hit:
                 return protected_reason(agent, hit, ctx)
@@ -391,7 +395,8 @@ def words_of(segment):
         words = shlex.split(segment, posix=True)
     except ValueError:
         words = segment.split()
-    while words and (re.match(r"^\w+=", words[0]) or words[0] in WRAPPERS or words[0] == "xargs"):
+    while words and (re.match(r"^\w+=", words[0]) or words[0] in WRAPPERS or words[0] in SHELL_KEYWORDS
+                     or words[0] == "xargs"):
         wrapper = words.pop(0)
         if wrapper in ("xargs", "timeout", "nice"):
             while words and words[0].startswith("-"):
@@ -415,8 +420,25 @@ def short_flags(args):
 
 
 def mentions(command, path):
-    """The command names this path as a whole segment ('gauntlet' matches 'gauntlet/x', not 'gauntletFast')."""
-    return re.search(r"(?<![\w.-])" + re.escape(path) + r"(?![\w-])", command) is not None
+    """The command names this path as a whole segment ('gauntlet' matches 'gauntlet/x', not 'gauntletFast');
+    a name inside a Gradle output directory ('build/gauntlet/x.log') is not the protected path."""
+    return re.search(r"(?<![\w.-])(?<!build/)(?<!\.gradle/)" + re.escape(path) + r"(?![\w-])", command) is not None
+
+
+def without_gradle_tasks(text):
+    """`./gradlew gauntlet` names a task, not the directory: drop task names (bare words of a Gradle call that are
+    neither options nor option values) before the text match; everything else of the command stays."""
+    for segment in segments(text):
+        words = words_of(segment)
+        if not words or os.path.basename(words[0]) not in GRADLE:
+            continue
+        tasks = {w for i, w in enumerate(words[1:], 1)
+                 if not w.startswith("-") and "/" not in w and words[i - 1] not in GRADLE_PATH_OPTIONS}
+        cleaned = segment
+        for task in tasks:
+            cleaned = re.sub(r"(?<!\S)" + re.escape(task) + r"(?!\S)", " ", cleaned)
+        text = text.replace(segment, cleaned, 1)     # only inside the Gradle call itself
+    return text
 
 
 def inline_code(words):
