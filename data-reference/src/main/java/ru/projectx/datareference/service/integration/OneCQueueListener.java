@@ -14,8 +14,8 @@ import ru.projectx.datareference.exception.OneCEnvelopeException;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
- * Вход из брокера 1С:УСК. Какая очередь какому потоку принадлежит, решает регистрация
- * точек — {@link OneCQueueEndpoints}; сюда доставка приходит уже с потоком.
+ * Вход из брокера 1С:УСК. Какая очередь какому потоку принадлежит, задаёт {@link OneCQueue},
+ * точки приёма регистрирует {@link OneCQueueEndpoints}; сюда доставка приходит уже с потоком.
  *
  * <p>Подтверждение брокеру уходит <b>только после</b> того, как приём зафиксирован
  * в базе. При автоматическом подтверждении сообщение считалось бы обработанным
@@ -65,7 +65,7 @@ public class OneCQueueListener {
         MDC.put(MDC_STREAM, stream.name());
         MDC.put(MDC_QUEUE, delivery.queue());
         try {
-            identify(delivery);
+            accept(delivery);
         }
         finally {
             MDC.remove(MDC_STREAM);
@@ -73,7 +73,7 @@ public class OneCQueueListener {
         }
     }
 
-    private void identify(OneCDelivery delivery) throws IOException {
+    private void accept(OneCDelivery delivery) throws IOException {
         UUID messageId;
         try {
             messageId = envelopeParser.messageIdOf(delivery.body());
@@ -93,8 +93,9 @@ public class OneCQueueListener {
 
     /**
      * Возврат в очередь здесь ничем не ограничен, и это не недосмотр: сохранение —
-     * запись байтов, которые только что разобрались как JSON, и постоянной ошибки
-     * у неё быть не может. Недоступная база — может, и она проходит сама. Повтор
+     * запись байтов, которые только что разобрались как JSON, и постоянная ошибка у неё
+     * известна одна: тело, которое не принимает колонка {@code jsonb} (например, с нулевым
+     * символом U+0000), — CA-01, его закрывает Ш30. Недоступная база проходит сама. Повтор
      * не превращается в горячий цикл из-за паузы перед возвратом.
      */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {

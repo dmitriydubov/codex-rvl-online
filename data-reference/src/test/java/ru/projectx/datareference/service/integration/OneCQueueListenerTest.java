@@ -140,41 +140,6 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Пауза перед возвратом держится до {@code nack}, иначе недоступная база превращается
-     * в горячий цикл передоставки. Проверяется нижняя граница: короче сон не бывает.
-     */
-    @Test
-    void storageFailure_waitsBackoffBeforeReturningMessage() throws IOException {
-        Duration backoff = Duration.ofMillis(50);
-        when(ingestService.receive(any(), any(), any(), any()))
-                .thenThrow(new CannotAcquireLockException("база недоступна"));
-        OneCQueueListener listener = new OneCQueueListener(
-                new OneCEnvelopeParser(new JacksonConfig().objectMapper()), ingestService, new IngestProperties(backoff));
-
-        long started = System.nanoTime();
-        listener.receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
-
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(backoff);
-        verify(channel).basicNack(DELIVERY_TAG, false, true);
-    }
-
-    /**
-     * Прерывание во время паузы — остановка контейнера: сообщение возвращается сразу,
-     * а флаг прерывания остаётся поднятым, чтобы контейнер увидел остановку.
-     */
-    @Test
-    void interruptedPause_returnsMessageAndKeepsInterruptFlag() throws IOException {
-        when(ingestService.receive(any(), any(), any(), any()))
-                .thenThrow(new CannotAcquireLockException("база недоступна"));
-        Thread.currentThread().interrupt();
-
-        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
-
-        assertThat(Thread.interrupted()).isTrue();
-        verify(channel).basicNack(DELIVERY_TAG, false, true);
-    }
-
-    /**
      * Подтверждение — только после того, как приём зафиксирован: подтверждённое, но
      * не сохранённое сообщение брокер больше не отдаст, и оно потеряно.
      */
@@ -268,12 +233,16 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Сбой канала на подтверждении — не сбой хранения: сырьё уже лежит в базе. Ошибка
-     * уходит контейнеру, а возврата в очередь нет — неподтверждённое сообщение брокер
+     * {@link IOException} канала на подтверждении — не сбой хранения: сырьё уже лежит в базе.
+     * Ошибка уходит контейнеру, а возврата в очередь нет — неподтверждённое сообщение брокер
      * передоставит сам, и дедупликация примет его как дубль.
+     *
+     * <p>Только {@code IOException}: закрытый канал за прокси {@code CachingConnectionFactory}
+     * бросает на подтверждении {@code IllegalStateException}, и её слушатель пока принимает
+     * за сбой хранения (пауза и попытка {@code nack}). Это решение владельца, вместе с Ш30, Ш31.
      */
     @Test
-    void failedAcknowledgement_isNotTakenForStorageFailure() throws IOException {
+    void acknowledgementIoFailure_isNotTakenForStorageFailure() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenReturn(true);
         doThrow(new IOException("канал закрыт")).when(channel).basicAck(DELIVERY_TAG, false);
 

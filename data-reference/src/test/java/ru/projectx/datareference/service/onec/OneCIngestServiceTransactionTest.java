@@ -3,7 +3,11 @@ package ru.projectx.datareference.service.onec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatRuntimeException;
 
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +35,13 @@ class OneCIngestServiceTransactionTest {
     /** Тело, которое колонка {@code jsonb} не примет. */
     private static final String UNSTORABLE_PAYLOAD = "это не JSON";
 
+    /**
+     * SQLSTATE отказа PostgreSQL на тексте, который не JSON: {@code invalid_text_representation}
+     * (PostgreSQL 16, приложение A «Коды ошибок»). Иначе тест принял бы и отказ, случившийся
+     * до отметки во входящих.
+     */
+    private static final String NOT_JSON = "22P02";
+
     @Autowired
     private DatabaseCleaner databaseCleaner;
 
@@ -57,7 +68,8 @@ class OneCIngestServiceTransactionTest {
         UUID messageId = UUID.randomUUID();
 
         assertThatRuntimeException().isThrownBy(
-                () -> ingestService.receive(messageId, OneCStream.MKB10, QUEUE, UNSTORABLE_PAYLOAD));
+                        () -> ingestService.receive(messageId, OneCStream.MKB10, QUEUE, UNSTORABLE_PAYLOAD))
+                .satisfies(failure -> assertThat(sqlStatesOf(failure)).contains(NOT_JSON));
 
         assertThat(inboxRepository.findById(messageId)).isEmpty();
         assertThat(inboundMessageRepository.findById(messageId)).isEmpty();
@@ -68,12 +80,20 @@ class OneCIngestServiceTransactionTest {
     void redeliveryAfterFailedStorage_isStoredAsNew() {
         UUID messageId = UUID.randomUUID();
         assertThatRuntimeException().isThrownBy(
-                () -> ingestService.receive(messageId, OneCStream.MKB10, QUEUE, UNSTORABLE_PAYLOAD));
+                        () -> ingestService.receive(messageId, OneCStream.MKB10, QUEUE, UNSTORABLE_PAYLOAD))
+                .satisfies(failure -> assertThat(sqlStatesOf(failure)).contains(NOT_JSON));
 
         boolean stored = ingestService.receive(messageId, OneCStream.MKB10, QUEUE, PAYLOAD);
 
         assertThat(stored).isTrue();
         assertThat(inboundMessageRepository.findById(messageId)).isPresent();
         assertThat(inboxRepository.findById(messageId)).isPresent();
+    }
+
+    private static List<String> sqlStatesOf(Throwable failure) {
+        return Stream.iterate(failure, Objects::nonNull, Throwable::getCause)
+                .filter(SQLException.class::isInstance)
+                .map(cause -> ((SQLException) cause).getSQLState())
+                .toList();
     }
 }
