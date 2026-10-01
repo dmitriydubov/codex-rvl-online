@@ -1,7 +1,7 @@
 {
   "description": "Программа по id data-reference: наименование, external_id, перечень услуг (учреждения программы, ТЗ-6). Дата 3000-01-01 источника — открытая дата, в ответе null.",
   "placeholders": {
-    "program_id": "UUID, id программы у data-reference; из примера 01",
+    "program_id": "UUID, id программы у data-reference; в прогоне стенда — из примера 01 (R-05); сервис Договоров хранит id программы у себя и полис с ПДн для этого не читает",
     "lpu_id": "UUID, id санатория у data-reference; генерирует сервис"
   },
   "request": {

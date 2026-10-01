@@ -15,10 +15,10 @@ import tools.jackson.databind.node.ObjectNode;
  * и ТЗ-6 по-русски, значение — как его прислала бы 1С.
  *
  * <p>Обязательные поля контракта, которых сценарий не называет, заполняются здесь
- * синтетикой, как на стенде потребителя ({@code src/test/resources/stand/seed.sql}):
- * ФИО и дата рождения полиса, тип продукта ДМС, вид деятельности РВЛ, лимит программы
- * полиса. Два значения — конфигурация контура из {@code application.yml}: без них санаторий
- * и договор не прошли бы фильтры потоков: их расхождение с конфигурацией ловит шаг разбора,
+ * синтетикой: ФИО и дата рождения полиса (заглушками, см. {@link #policy}), тип продукта ДМС,
+ * вид деятельности РВЛ, лимит программы полиса. Два значения — конфигурация контура
+ * из {@code application.yml}: без них санаторий и договор не прошли бы фильтры потоков:
+ * их расхождение с конфигурацией ловит шаг разбора,
  * который ждёт у каждого сообщения свой исход ({@link OneCMessage#expected()}). Все значения
  * вымышлены.
  *
@@ -33,6 +33,11 @@ final class OneCMessages {
     private static final String DMS_PRODUCT = "Личное страхование";
     private static final String INSURER_ROLE = "Страхователь";
     private static final BigDecimal POLICY_PROGRAM_LIMIT = new BigDecimal("150000.00");
+    /** {@code projectx.onec.policy.email-property} — умолчание {@code PolicyContractProperties}. */
+    private static final String EMAIL_PROPERTY = "Адрес элпочты застрахованного";
+    private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
+    private static final String PLACEHOLDER_FIRST_NAME = "Шаг";
+    private static final String PLACEHOLDER_DATE_OF_BIRTH = "1985-06-15";
 
     private static final String CONTRAGENTS_QUEUE = "1c-usk_to_rvl-online_contragents-ul-changes";
     private static final String CONTRACTS_QUEUE = "1c-usk_to_rvl-online_contracts-changes";
@@ -108,17 +113,20 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.PROGRAMS, PROGRAMS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /** ТЗ-1: полис со сроком действия; программа полиса — если сценарий её назвал. */
+    /**
+     * ТЗ-1: полис со сроком действия; программа полиса, отчество, пол, e-mail и пометка удаления —
+     * если сценарий их назвал. Фамилия, имя и дата рождения обязательны в контракте: не названные
+     * сценарием заполняются заглушками.
+     */
     static OneCMessage policy(Map<String, String> table) {
-        onlyKnown(table, "external_id", "номер", "договор", "программа", "начало", "окончание");
+        onlyKnown(table, "external_id", "номер", "договор", "программа", "начало", "окончание",
+                "фамилия", "имя", "отчество", "дата рождения", "пол", "e-mail", "пометка удаления");
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("idContract", required(table, "договор"))
                 .put("number", required(table, "номер"))
-                .put("deleteMark", false)
-                .put("lastName", "Тестов")
-                .put("firstName", "Тест")
-                .put("dateOfBirth", "1990-01-01");
+                .put("deleteMark", table.containsKey("пометка удаления") && flag(table, "пометка удаления"));
+        addInsured(data, table);
         data.putArray("header").addObject()
                 .put("rowNumber", 1)
                 .put("beginDate", required(table, "начало"))
@@ -126,6 +134,22 @@ final class OneCMessages {
                 .put("availability", true);
         Optional.ofNullable(table.get("программа")).ifPresent(program -> addPolicyProgram(data, program, table));
         return new OneCMessage(OneCStream.POLICIES, POLICIES_QUEUE, data, InboundStatus.PROCESSED);
+    }
+
+    /**
+     * Застрахованный полиса. Заглушки нарочно не совпадают со значениями сценариев: шаг,
+     * который забыл бы взять ФИО из таблицы, иначе выглядел бы как правильный. Почта в ТЗ-1 —
+     * не поле, а дополнительное свойство полиса с именем из конфигурации контура.
+     */
+    private static void addInsured(ObjectNode policy, Map<String, String> table) {
+        policy.put("lastName", table.getOrDefault("фамилия", PLACEHOLDER_LAST_NAME))
+                .put("firstName", table.getOrDefault("имя", PLACEHOLDER_FIRST_NAME))
+                .put("dateOfBirth", table.getOrDefault("дата рождения", PLACEHOLDER_DATE_OF_BIRTH));
+        Optional.ofNullable(table.get("отчество")).ifPresent(middleName -> policy.put("middleName", middleName));
+        Optional.ofNullable(table.get("пол")).ifPresent(gender -> policy.put("gender", gender));
+        Optional.ofNullable(table.get("e-mail")).ifPresent(email -> policy.putArray("extProperties").addObject()
+                .put("propertyName", EMAIL_PROPERTY)
+                .putObject("value").put("value", email));
     }
 
     private static void addInsurer(ObjectNode contract, String insurer) {

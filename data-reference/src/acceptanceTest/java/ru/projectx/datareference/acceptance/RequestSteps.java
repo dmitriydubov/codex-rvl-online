@@ -9,6 +9,9 @@ import tools.jackson.databind.JsonNode;
 /**
  * Запросы сервиса Договоров. {@code {id}} в пути — id, полученный на шаге «Дано»:
  * так потребитель и работает — хранит наш id и адресует им запись.
+ *
+ * <p>Сервис Заявок ходит тем же HTTP-клиентом: для Дата-референса потребители неразличимы —
+ * межсервисной аутентификации нет (Д5), и отличаются они только тем, какую ручку читают.
  */
 public class RequestSteps {
 
@@ -22,6 +25,11 @@ public class RequestSteps {
 
     @Когда("сервис Договоров запрашивает {string}")
     public void requests(String path) {
+        contracts.request(path);
+    }
+
+    @Когда("сервис Заявок запрашивает {string}")
+    public void applicationsServiceRequests(String path) {
         contracts.request(path);
     }
 

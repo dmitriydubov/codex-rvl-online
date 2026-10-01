@@ -1,0 +1,23 @@
+{
+  "description": "Полис для сервиса Договоров по external_id (GUID 1С), без персональных данных (решение Р20 (а), шаг Ш39): наш id, external_id, номер, период действия и признак архива — и ничего больше. Так сервис Договоров находит наш id выпущенного полиса, о котором ему сообщила 1С:УСК.",
+  "placeholders": {
+    "policy_id": "UUID, id полиса у data-reference; генерирует сервис, сервису Договоров его выдаёт этот пример (тот же id, что у полиса R-05 в примере 01)"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5",
+    "headers": { "X-Request-Id": "stand-09" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-09" },
+    "body": {
+      "id": "{policy_id}",
+      "external_id": "9e6ee30d-2275-417d-a44c-039d3b8c2ac5",
+      "number": "СТЕНД-0001",
+      "begin_date": "2026-01-01",
+      "end_date": "2030-12-31",
+      "is_archive": false
+    }
+  }
+}

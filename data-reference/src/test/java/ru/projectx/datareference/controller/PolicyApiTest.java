@@ -25,9 +25,10 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * R-05 (полис целиком по трём ключам) и R-04 (поиск по ФИО и номеру) поверх настоящей
- * базы. Часы остановлены на {@link ru.projectx.datareference.support.FixedClockConfig#NOW}:
- * по Москве это 14.03.2026, и «действующий на сегодня» считается от этого дня.
+ * R-05 (полис целиком по трём ключам), R-04 (поиск по ФИО и номеру) и полис для сервиса Договоров
+ * без ПДн ({@code contract-view}) поверх настоящей базы. Часы остановлены
+ * на {@link ru.projectx.datareference.support.FixedClockConfig#NOW}: по Москве это 14.03.2026,
+ * и «действующий на сегодня» считается от этого дня.
  */
 @IntegrationTest
 class PolicyApiTest {
@@ -99,6 +100,34 @@ class PolicyApiTest {
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(policy.id().toString());
+    }
+
+    /**
+     * Полис для сервиса Договоров (Р20 (а)) выбирается из базы проекцией: архивный отдаётся с признаком,
+     * а не как «не найден», открытая дата — пустая, а ФИО, дата рождения, пол и почта, которые у полиса
+     * есть, не попадают в ответ ни по {@code id}, ни по {@code external_id}. Сравнение строгое: лишнее поле
+     * роняет тест так же, как неверное значение. Неархивный полис с датой окончания закреплён примерами
+     * стенда 09 и 10 ({@link ConsumerStandTest}).
+     */
+    @Test
+    void contractView_archivedPolicyWithOpenEnd_isOnlyKeysPeriodAndArchiveFlag() {
+        LocalDate begin = TODAY.minusMonths(1);
+        Policy policy = savePolicy("П-000004", "Заглушкин", "Шаг", "Проекциевич", begin, null,
+                List.of(RVL_PROGRAM_EXT), true);
+        String expected = """
+                {"id": "%s", "external_id": "%s", "number": "П-000004",
+                 "begin_date": "%s", "end_date": null, "is_archive": true}
+                """.formatted(policy.id(), policy.externalId(), begin);
+
+        MvcTestResult byId = mvc.get().uri(BASE + "/policies/{id}/contract-view", policy.id()).exchange();
+        MvcTestResult byExternalId = mvc.get()
+                .uri(BASE + "/policies/contract-view?external_id={ext}", policy.externalId())
+                .exchange();
+
+        assertThat(byId).hasStatusOk();
+        assertThat(byId).bodyJson().isStrictlyEqualTo(expected);
+        assertThat(byExternalId).hasStatusOk();
+        assertThat(byExternalId).bodyJson().isStrictlyEqualTo(expected);
     }
 
     @Test
