@@ -23,6 +23,7 @@ import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.RecoverableDataAccessException;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
@@ -33,8 +34,10 @@ import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
+import ru.projectx.datareference.exception.ReferenceNotFoundException;
 
 /**
  * Единый формат отказов на настоящем стеке MVC: заглушка-контроллер бросает исключение,
@@ -149,6 +152,33 @@ class ApiExceptionHandlerTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NO_ACTIVE_PRICE_CONTRACT");
     }
 
+    /** Записи справочника нет: 404 с кодом справочника, его текстом и идентификатором запроса. */
+    @Test
+    void referenceNotFound_isNotFound_withReferenceCode() {
+        UUID programId = UUID.fromString("0a9e0000-0000-4000-8000-000000000007");
+        controller.failWith(ReferenceNotFoundException.program(programId));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(404);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("PROGRAM_NOT_FOUND");
+        assertThat(result).bodyJson().extractingPath("$.error.message")
+                .isEqualTo("программа страхования " + programId + " не найдена");
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().isEmpty();
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+    }
+
+    /** Такого пути нет: 404 NOT_FOUND с путём в тексте и идентификатором запроса. */
+    @Test
+    void unknownPath_isNotFound_namingPath() {
+        MvcTestResult result = mvc.get().uri("/no-resource").header(RequestIdFilter.HEADER, REQUEST_ID).exchange();
+
+        assertThat(result).hasStatus(404);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NOT_FOUND");
+        assertThat(result).bodyJson().extractingPath("$.error.message").isEqualTo("ресурс не найден: api/unknown");
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+    }
+
     @Test
     void missingParameter_isValidationError_namingParameter() {
         MvcTestResult result = mvc.get().uri("/with-parameter").header(RequestIdFilter.HEADER, REQUEST_ID).exchange();
@@ -175,6 +205,11 @@ class ApiExceptionHandlerTest {
         @GetMapping(FAILING)
         String fail() {
             throw failure;
+        }
+
+        @GetMapping("/no-resource")
+        String noResource() throws NoResourceFoundException {
+            throw new NoResourceFoundException(HttpMethod.GET, "/no-resource", "api/unknown");
         }
 
         @GetMapping("/with-parameter")
