@@ -151,9 +151,6 @@ server:
   # См. spring.lifecycle: без этого Tomcat обрывает соединения в момент SIGTERM.
   shutdown: graceful
 
-# Пробы Kubernetes на том же порту, что и API: /actuator/health/liveness и /readiness.
-# Наружу открыт только health. Группы liveness и readiness отвечают состоянием самого
-# приложения, а не базы и брокера: перезапуск пода недоступную базу не починит.
 logging:
   level:
     # Сюда Hibernate пишет текст каждой SQL-ошибки (HHH000247 и сообщение драйвера) —
@@ -164,6 +161,9 @@ logging:
     # без них YAML читает off как false.
     org.hibernate.orm.jdbc.error: "off"
 
+# Пробы Kubernetes на том же порту, что и API: /actuator/health/liveness и /readiness.
+# Наружу открыт только health. Группы liveness и readiness отвечают состоянием самого
+# приложения, а не базы и брокера: перезапуск пода недоступную базу не починит.
 management:
   endpoints:
     web:

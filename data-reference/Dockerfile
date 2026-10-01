@@ -64,16 +64,16 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon --console=plain --quiet -PpublicRepositories=${PUBLIC_REPOSITORIES} dependencies
 
 # Jar берётся по точному имени: <rootProject.name>-<version из gradle.properties>.jar,
-# как его называет bootJar. Маска data-reference-*.jar при нескольких совпадениях молча
-# взяла бы не тот файл, а нет файла с точным именем — сборка падает на cp.
+# как его называет bootJar, — то же правило, что у этапа host ниже. Нет файла с этим
+# именем — сборка падает на cp, а не берёт что-то похожее.
 COPY src src
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon --console=plain -PpublicRepositories=${PUBLIC_REPOSITORIES} bootJar -x test \
     && cp "build/libs/data-reference-$(sed -n 's/^version=//p' gradle.properties).jar" application.jar
 
 # ---------- 1b. Jar, собранный на машине ----------
-# В build/libs на машине копятся jar-ы прежних версий, поэтому и здесь — точное имя
-# по текущей версии, а не маска.
+# В build/libs на машине копятся jar-ы прежних версий, а COPY по маске при нескольких
+# совпадениях молча берёт один из них. Поэтому — точное имя по текущей версии.
 FROM ${JRE_IMAGE} AS host
 WORKDIR /workspace
 COPY gradle.properties ./
