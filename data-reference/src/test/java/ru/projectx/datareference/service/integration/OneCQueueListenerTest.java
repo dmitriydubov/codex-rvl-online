@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -62,7 +63,7 @@ class OneCQueueListenerTest {
     void storedMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
 
-        listener().onMkb10(delivery(envelope(MESSAGE_ID)), channel);
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
 
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
@@ -73,7 +74,7 @@ class OneCQueueListenerTest {
     void duplicateMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(false);
 
-        listener().onMkb10(delivery(envelope(MESSAGE_ID)), channel);
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
 
         verify(channel).basicAck(DELIVERY_TAG, false);
     }
@@ -83,7 +84,7 @@ class OneCQueueListenerTest {
     void storedMessage_keepsRawBody() throws IOException {
         String body = envelope(MESSAGE_ID);
 
-        listener().onMkb10(delivery(body), channel);
+        listener().receive(OneCStream.MKB10, delivery(body), channel);
 
         verify(ingestService).receive(MESSAGE_ID, OneCStream.MKB10, QUEUE, body);
     }
@@ -97,7 +98,7 @@ class OneCQueueListenerTest {
         when(ingestService.receive(any(), any(), any(), any()))
                 .thenThrow(new CannotAcquireLockException("база недоступна"));
 
-        listener().onMkb10(delivery(envelope(MESSAGE_ID)), channel);
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
 
         verify(channel).basicNack(DELIVERY_TAG, false, true);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
@@ -109,7 +110,7 @@ class OneCQueueListenerTest {
      */
     @Test
     void unreadableEnvelope_isAcknowledgedAndDropped() throws IOException {
-        listener().onMkb10(delivery("{\"data\":{},\"metadata\":{}}"), channel);
+        listener().receive(OneCStream.MKB10, delivery("{\"data\":{},\"metadata\":{}}"), channel);
 
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
@@ -125,9 +126,44 @@ class OneCQueueListenerTest {
     void priceListFinal_isStoredWithItsOwnQueue() throws IOException {
         String queue = "1c-usk_to_rvl-online_pricelists-contragents-changes-final";
 
-        listener().onPriceListFinal(delivery(queue, envelope(MESSAGE_ID)), channel);
+        listener().receive(OneCStream.PRICE_LISTS, delivery(queue, envelope(MESSAGE_ID)), channel);
 
         verify(ingestService).receive(eq(MESSAGE_ID), eq(OneCStream.PRICE_LISTS), eq(queue), any());
+    }
+
+    /**
+     * Пауза перед возвратом держится до {@code nack}, иначе недоступная база превращается
+     * в горячий цикл передоставки. Проверяется нижняя граница: короче сон не бывает.
+     */
+    @Test
+    void storageFailure_waitsBackoffBeforeReturningMessage() throws IOException {
+        Duration backoff = Duration.ofMillis(50);
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new CannotAcquireLockException("база недоступна"));
+        OneCQueueListener listener = new OneCQueueListener(
+                new OneCEnvelopeParser(new JacksonConfig().objectMapper()), ingestService, new IngestProperties(backoff));
+
+        long started = System.nanoTime();
+        listener.receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(backoff);
+        verify(channel).basicNack(DELIVERY_TAG, false, true);
+    }
+
+    /**
+     * Прерывание во время паузы — остановка контейнера: сообщение возвращается сразу,
+     * а флаг прерывания остаётся поднятым, чтобы контейнер увидел остановку.
+     */
+    @Test
+    void interruptedPause_returnsMessageAndKeepsInterruptFlag() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new CannotAcquireLockException("база недоступна"));
+        Thread.currentThread().interrupt();
+
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        assertThat(Thread.interrupted()).isTrue();
+        verify(channel).basicNack(DELIVERY_TAG, false, true);
     }
 
     private static String envelope(UUID messageId) {

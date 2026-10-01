@@ -2,12 +2,11 @@ package ru.projectx.datareference.service.integration;
 
 import com.rabbitmq.client.Channel;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.entity.OneCStream;
@@ -15,8 +14,8 @@ import ru.projectx.datareference.exception.OneCEnvelopeException;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
- * Вход из брокера 1С:УСК. По методу на очередь — так связь «очередь → поток» видно
- * глазами, а не через таблицу соответствий, которую надо держать в голове.
+ * Вход из брокера 1С:УСК. Какая очередь какому потоку принадлежит, решает регистрация
+ * точек — {@link OneCQueueEndpoints}; сюда доставка приходит уже с потоком.
  *
  * <p>Подтверждение брокеру уходит <b>только после</b> того, как приём зафиксирован
  * в базе. При автоматическом подтверждении сообщение считалось бы обработанным
@@ -30,9 +29,21 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  *   <li>конверт нечитаем — {@code ack}, и сообщение <b>теряется</b>. См.
  *       {@link #dropUnidentifiable}.</li>
  * </ul>
+ *
+ * <p>На время обработки в MDC лежат поток, очередь и, когда он прочитан, {@code message-id}:
+ * по ним строка журнала находит своё сообщение.
  */
 @Component
 public class OneCQueueListener {
+
+    /** Ключ MDC: {@code message-id} обрабатываемого сообщения. */
+    public static final String MDC_MESSAGE_ID = "messageId";
+
+    /** Ключ MDC: поток 1С, имя константы {@link OneCStream}. */
+    public static final String MDC_STREAM = "stream";
+
+    /** Ключ MDC: очередь, из которой пришло сообщение. */
+    public static final String MDC_QUEUE = "queue";
 
     private static final Logger log = LoggerFactory.getLogger(OneCQueueListener.class);
 
@@ -48,75 +59,36 @@ public class OneCQueueListener {
         this.properties = properties;
     }
 
-    @RabbitListener(queues = "${projectx.onec.queues.policies}")
-    public void onPolicies(Message message, Channel channel) throws IOException {
-        receive(OneCStream.POLICIES, message, channel);
+    /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
+    public void receive(OneCStream stream, Message message, Channel channel) throws IOException {
+        OneCDelivery delivery = new OneCDelivery(stream, message, channel);
+        MDC.put(MDC_STREAM, stream.name());
+        MDC.put(MDC_QUEUE, delivery.queue());
+        try {
+            identify(delivery);
+        }
+        finally {
+            MDC.remove(MDC_STREAM);
+            MDC.remove(MDC_QUEUE);
+        }
     }
 
-    @RabbitListener(queues = "${projectx.onec.queues.insurance-contracts}")
-    public void onInsuranceContracts(Message message, Channel channel) throws IOException {
-        receive(OneCStream.INSURANCE_CONTRACTS, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.contragents}")
-    public void onContragents(Message message, Channel channel) throws IOException {
-        receive(OneCStream.CONTRAGENTS, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.mkb10}")
-    public void onMkb10(Message message, Channel channel) throws IOException {
-        receive(OneCStream.MKB10, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.lpu-contracts}")
-    public void onLpuContracts(Message message, Channel channel) throws IOException {
-        receive(OneCStream.LPU_CONTRACTS, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.programs}")
-    public void onPrograms(Message message, Channel channel) throws IOException {
-        receive(OneCStream.PROGRAMS, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.appeal-types}")
-    public void onAppealTypes(Message message, Channel channel) throws IOException {
-        receive(OneCStream.APPEAL_TYPES, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.lpu-contacts}")
-    public void onLpuContacts(Message message, Channel channel) throws IOException {
-        receive(OneCStream.LPU_CONTACTS, message, channel);
-    }
-
-    /** Пакет строк прайса. Применяется не поодиночке, а в составе собранной передачи. */
-    @RabbitListener(queues = "${projectx.onec.queues.price-lists}")
-    public void onPriceListBatch(Message message, Channel channel) throws IOException {
-        receive(OneCStream.PRICE_LISTS, message, channel);
-    }
-
-    /** Финальное сообщение передачи прайса — то, что несёт счётчики. Поток тот же. */
-    @RabbitListener(queues = "${projectx.onec.queues.price-lists-final}")
-    public void onPriceListFinal(Message message, Channel channel) throws IOException {
-        receive(OneCStream.PRICE_LISTS, message, channel);
-    }
-
-    @RabbitListener(queues = "${projectx.onec.queues.contragent-services}")
-    public void onContragentServices(Message message, Channel channel) throws IOException {
-        receive(OneCStream.CONTRAGENT_SERVICES, message, channel);
-    }
-
-    private void receive(OneCStream stream, Message message, Channel channel) throws IOException {
-        String queue = message.getMessageProperties().getConsumerQueue();
-
+    private void identify(OneCDelivery delivery) throws IOException {
         UUID messageId;
         try {
-            messageId = envelopeParser.messageIdOf(message.getBody());
+            messageId = envelopeParser.messageIdOf(delivery.body());
         }
         catch (OneCEnvelopeException unidentifiable) {
-            dropUnidentifiable(stream, queue, message, channel, unidentifiable);
+            dropUnidentifiable(delivery, unidentifiable);
             return;
         }
-        store(stream, queue, messageId, message, channel);
+        MDC.put(MDC_MESSAGE_ID, messageId.toString());
+        try {
+            store(delivery, messageId);
+        }
+        finally {
+            MDC.remove(MDC_MESSAGE_ID);
+        }
     }
 
     /**
@@ -125,17 +97,13 @@ public class OneCQueueListener {
      * у неё быть не может. Недоступная база — может, и она проходит сама. Повтор
      * не превращается в горячий цикл из-за паузы перед возвратом.
      */
-    private void store(OneCStream stream, String queue, UUID messageId, Message message, Channel channel)
-            throws IOException {
-
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
+    private void store(OneCDelivery delivery, UUID messageId) throws IOException {
         try {
-            boolean stored = ingestService.receive(
-                    messageId, stream, queue, new String(message.getBody(), StandardCharsets.UTF_8));
+            boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
             if (!stored) {
-                log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, queue);
+                log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
             }
-            channel.basicAck(deliveryTag, false);
+            delivery.acknowledge();
         }
         catch (RuntimeException storageUnavailable) {
             // Тип, но не текст: сообщение об ошибке вставки печатает параметры запроса,
@@ -144,7 +112,7 @@ public class OneCQueueListener {
                     messageId, properties.storageUnavailableBackoff(),
                     storageUnavailable.getClass().getName());
             pauseBeforeRedelivery();
-            channel.basicNack(deliveryTag, false, true);
+            delivery.returnToQueue();
         }
     }
 
@@ -162,14 +130,11 @@ public class OneCQueueListener {
      * может оказаться полис. Случай почти наверняка означает поломку контракта или чужую
      * очередь, то есть касается не одного сообщения, а всех.
      */
-    private void dropUnidentifiable(
-            OneCStream stream, String queue, Message message, Channel channel, OneCEnvelopeException cause)
-            throws IOException {
-
+    private static void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
         log.error("сообщение потока {} из очереди {} потеряно: {} ({} байт). "
                         + "Принять его нельзя — в конверте нет пригодного message-id",
-                stream, queue, cause.getMessage(), message.getBody().length);
-        channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+                delivery.stream(), delivery.queue(), cause.getMessage(), delivery.body().length);
+        delivery.acknowledge();
     }
 
     /**
