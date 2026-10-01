@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 
@@ -37,9 +38,9 @@ public final class OneCValues {
     private static final UUID ZERO_GUID = new UUID(0L, 0L);
     private static final LocalDate UNSET_DATE = LocalDate.of(1, 1, 1);
     private static final LocalDate OPEN_DATE = LocalDate.of(3000, 1, 1);
-    private static final String MISSING_GUID = "нет обязательного GUID в поле ";
-    private static final String MISSING_DATE = "нет обязательной даты в поле ";
-    private static final String MISSING_TEXT = "нет обязательного поля ";
+    private static final String NO_REQUIRED_GUID_MESSAGE = "нет обязательного GUID в поле ";
+    private static final String NO_REQUIRED_DATE_MESSAGE = "нет обязательной даты в поле ";
+    private static final String NO_REQUIRED_TEXT_MESSAGE = "нет обязательного поля ";
 
     /** GUID поля; нулевой и пустой — «ссылки нет». */
     public static Optional<UUID> uuid(JsonNode data, String field) {
@@ -48,7 +49,7 @@ public final class OneCValues {
 
     /** Обязательный GUID — как правило, {@code external_id} записи. */
     public static UUID requiredUuid(JsonNode data, String field) {
-        return required(uuid(data, field), MISSING_GUID, field);
+        return uuid(data, field).orElseThrow(missing(NO_REQUIRED_GUID_MESSAGE, field));
     }
 
     /** Дата поля; заглушка и открытая дата — пусто. */
@@ -65,14 +66,16 @@ public final class OneCValues {
      * незаполненным — это невалидное сообщение, а не «дата открыта».
      */
     public static LocalDate requiredDate(JsonNode data, String field) {
-        return required(date(data, field), MISSING_DATE, field);
+        return date(data, field).orElseThrow(missing(NO_REQUIRED_DATE_MESSAGE, field));
     }
 
     /**
      * Строка с обрезкой пробелов; пустая — пусто (коды приходят дополненными до длины).
      *
      * <p>Объект, массив и отсутствующее поле — пусто. JSON {@code null} отдельно не
-     * проверяется: его строковое представление в Jackson 3 — пустая строка.
+     * проверяется: {@link JsonNode#asString()} в Jackson 3 (сверено по 3.1.4) отдаёт для него
+     * пустую строку. В Jackson 2 {@code asText()} давал {@code "null"} — при смене версии
+     * это место перепроверить.
      */
     public static Optional<String> text(JsonNode data, String field) {
         return Optional.of(data.path(field))
@@ -83,7 +86,7 @@ public final class OneCValues {
 
     /** Обязательная строка: её отсутствие — невалидное сообщение, а не пустое значение. */
     public static String requiredText(JsonNode data, String field) {
-        return required(text(data, field), MISSING_TEXT, field);
+        return text(data, field).orElseThrow(missing(NO_REQUIRED_TEXT_MESSAGE, field));
     }
 
     /** Отсутствующий флаг — это {@code false}: контракт не различает «нет» и «не задано». */
@@ -115,8 +118,8 @@ public final class OneCValues {
     }
 
     /** Текст исключения собирается, только когда значения нет: в нём имя поля, но не значение. */
-    private static <T> T required(Optional<T> value, String missingPrefix, String field) {
-        return value.orElseThrow(() -> new OneCFieldException(missingPrefix + field));
+    private static Supplier<OneCFieldException> missing(String messagePrefix, String field) {
+        return () -> new OneCFieldException(messagePrefix + field);
     }
 
     private OneCValues() {

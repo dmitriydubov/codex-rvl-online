@@ -154,7 +154,8 @@ class OneCEnvelopeParserTest {
     @Test
     void emptyBody_isRejected() {
         assertThatThrownBy(() -> parser.messageIdOf(new byte[0]))
-                .isInstanceOf(OneCEnvelopeException.class);
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в конверте нет объекта metadata");
     }
 
     /**
@@ -168,7 +169,8 @@ class OneCEnvelopeParserTest {
                 {"data":{},"metadata":{"message-id":%s}}""".formatted(messageId);
 
         assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
-                .isInstanceOf(OneCEnvelopeException.class);
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в metadata нет обязательного message-id");
     }
 
     private static byte[] bytes(String body) {

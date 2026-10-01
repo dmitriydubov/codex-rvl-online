@@ -37,7 +37,18 @@ public class OneCEnvelopeParser {
      *         он не GUID — такое сообщение невозможно ни дедуплицировать, ни сохранить
      */
     public UUID messageIdOf(byte[] body) {
-        return parse(messageIdText(metadataOf(readTree(body))));
+        JsonNode envelope = readTree(body);
+        JsonNode metadata = metadataOf(envelope);
+        return parse(messageIdText(metadata));
+    }
+
+    private JsonNode readTree(byte[] body) {
+        try {
+            return json.readTree(body);
+        }
+        catch (JacksonException malformed) {
+            throw new OneCEnvelopeException("тело сообщения не является читаемым JSON", malformed);
+        }
     }
 
     private static JsonNode metadataOf(JsonNode envelope) {
@@ -54,15 +65,6 @@ public class OneCEnvelopeParser {
             throw new OneCEnvelopeException("в metadata нет обязательного message-id");
         }
         return raw;
-    }
-
-    private JsonNode readTree(byte[] body) {
-        try {
-            return json.readTree(body);
-        }
-        catch (JacksonException malformed) {
-            throw new OneCEnvelopeException("тело сообщения не является читаемым JSON", malformed);
-        }
     }
 
     /**
