@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +69,8 @@ class ConsumerStandTest {
             "10-policy-contract-view.json",
             "11-policy-contract-view-not-found.json",
             "12-service-unavailable.json");
+    /** Таблицы, которые пример стенда может держать под блокировкой: значение из файла в SQL идёт только отсюда. */
+    private static final Set<String> LOCKABLE_TABLES = Set.of("policies", "insurance_contracts", "programs");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
             "/response/status", "/response/headers", "/response/body");
@@ -188,10 +191,12 @@ class ConsumerStandTest {
         if (example.lockedTable().isEmpty()) {
             return exchange(example, placeholders);
         }
+        String table = example.lockedTable().get();
+        assertThat(LOCKABLE_TABLES).as("таблица условия примера %s", example.name()).contains(table);
         try (Connection lockingSession = dataSource.getConnection()) {
             lockingSession.setAutoCommit(false);
             try (Statement statement = lockingSession.createStatement()) {
-                statement.execute("LOCK TABLE " + example.lockedTable().get() + " IN ACCESS EXCLUSIVE MODE");
+                statement.execute("LOCK TABLE " + table + " IN ACCESS EXCLUSIVE MODE");
                 return exchange(example, placeholders);
             }
             finally {

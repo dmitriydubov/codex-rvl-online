@@ -9,10 +9,13 @@ import liquibase.integration.spring.SpringLiquibase;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
+import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 
 /**
@@ -27,6 +30,12 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
  * ловушки Ш4: пулер, молча выбросивший {@code options}, и таймаут на роли или базе, который
  * достаётся и миграциям.
  *
+ * <p>Проверка — наблюдение, а не условие старта: не прочиталось соединение (сбой базы, права
+ * на {@code pg_settings}) — WARN с типом исключения, без его текста; Liquibase в контексте нет
+ * (миграции в контуре идут отдельно) — WARN, что соединение миграций не проверено. Заодно —
+ * WARN, если лимит REST-чтения не меньше {@code lock_timeout}: тогда под чужой блокировкой REST
+ * не отказывает первым.
+ *
  * <p>{@link ApplicationRunner}: Spring Boot вызывает его после старта контекста и до готовности
  * принимать трафик — миграции к этому моменту прошли, их соединение открыто заново.
  */
@@ -39,40 +48,72 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
     private static final String MIGRATIONS = "миграции";
 
     private final DatabaseSessionTimeouts configured;
-    private final SessionSettingsRepository sessionSettings;
-    private final DataSource pool;
-    private final SpringLiquibase liquibase;
+    private final ReferenceApiProperties api;
+    private final Connections connections;
+    private final List<String> parameters;
 
-    public DatabaseTimeoutsCheck(
-            DatabaseSessionTimeouts configured,
-            SessionSettingsRepository sessionSettings,
-            DataSource pool,
-            SpringLiquibase liquibase) {
-
+    public DatabaseTimeoutsCheck(DatabaseSessionTimeouts configured, ReferenceApiProperties api, Connections connections) {
         this.configured = configured;
-        this.sessionSettings = sessionSettings;
-        this.pool = pool;
-        this.liquibase = liquibase;
+        this.api = api;
+        this.connections = connections;
+        this.parameters = List.copyOf(configured.byParameter().keySet());
     }
 
     @Override
     public void run(@Nullable ApplicationArguments arguments) {
-        List<String> parameters = List.copyOf(configured.byParameter().keySet());
-        Map<String, Duration> poolActual = sessionSettings.durations(pool, parameters);
-        Map<String, Duration> migrationsActual = sessionSettings.durations(liquibase.getDataSource(), parameters);
+        read(POOL, connections.pool()).ifPresent(this::checkPool);
+        migrationsSource().flatMap(source -> read(MIGRATIONS, source)).ifPresent(this::checkMigrations);
+        warnIfReadLimitNotBelowLockTimeout();
+    }
+
+    private void checkPool(Map<String, Duration> actual) {
         for (Map.Entry<String, String> setting : configured.byParameter().entrySet()) {
-            checkPool(setting.getKey(), setting.getValue(), poolActual);
-            warnIfDiffers(MIGRATIONS, setting.getKey(), Duration.ZERO, migrationsActual);
+            checkPoolParameter(setting.getKey(), setting.getValue(), actual);
         }
     }
 
-    private void checkPool(String parameter, String configuredValue, Map<String, Duration> actual) {
+    private void checkMigrations(Map<String, Duration> actual) {
+        for (String parameter : parameters) {
+            warnIfDiffers(MIGRATIONS, parameter, Duration.ZERO, actual);
+        }
+    }
+
+    private void checkPoolParameter(String parameter, String configuredValue, Map<String, Duration> actual) {
         Optional<Duration> expected = PostgresDurations.parse(configuredValue);
         if (expected.isEmpty()) {
             log.warn("проверка таймаутов PostgreSQL: настройка {} не разобрана, параметр не проверен", parameter);
             return;
         }
         warnIfDiffers(POOL, parameter, expected.get(), actual);
+    }
+
+    /** Граница системы: сбой чтения — WARN с типом исключения (текст несёт SQL), проверка идёт дальше. */
+    private Optional<Map<String, Duration>> read(String connection, DataSource source) {
+        try {
+            return Optional.of(connections.sessionSettings().durations(source, parameters));
+        }
+        catch (DataAccessException failure) {
+            log.warn("проверка таймаутов PostgreSQL: соединение={} не прочитано: {}",
+                    connection, failure.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<DataSource> migrationsSource() {
+        Optional<DataSource> source = Optional.ofNullable(connections.liquibase().getIfAvailable())
+                .map(SpringLiquibase::getDataSource);
+        if (source.isEmpty()) {
+            log.warn("проверка таймаутов PostgreSQL: соединение миграций не проверено: Liquibase в контексте нет");
+        }
+        return source;
+    }
+
+    private void warnIfReadLimitNotBelowLockTimeout() {
+        Duration readLimit = Duration.ofSeconds(api.readTimeoutSeconds());
+        PostgresDurations.parse(configured.lockTimeout())
+                .filter(lockTimeout -> readLimit.compareTo(lockTimeout) >= 0)
+                .ifPresent(lockTimeout -> log.warn("лимит REST-чтения {} не меньше lock_timeout {}: под чужой "
+                        + "блокировкой REST не отказывает первым", readLimit, lockTimeout));
     }
 
     private static void warnIfDiffers(String connection, String parameter, Duration expected, Map<String, Duration> actual) {
@@ -82,5 +123,15 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
                     + "ожидается={}, фактически={}", connection, parameter, expected,
                     found.map(Duration::toString).orElse("неизвестно"));
         }
+    }
+
+    /**
+     * Откуда читать: чтение параметров сеанса, пул приложения и Liquibase — если он есть в контексте.
+     *
+     * @param liquibase провайдер, а не бин: при {@code spring.liquibase.enabled=false} бина нет
+     */
+    @Component
+    public record Connections(
+            SessionSettingsRepository sessionSettings, DataSource pool, ObjectProvider<SpringLiquibase> liquibase) {
     }
 }

@@ -106,6 +106,26 @@ class ApiExceptionHandlerTest {
         assertThat(output).contains("WARN", "QueryTimeoutException", REQUEST_ID).doesNotContain(FOREIGN_TEXT);
     }
 
+    /** SQLSTATE драйвера отличает блокировку от отмены и от отказа соединения — без текста исключения. */
+    @Test
+    void databaseOutage_logsDeepestSqlState(CapturedOutput output) {
+        controller.failWith(new CannotAcquireLockException(FOREIGN_TEXT,
+                new RuntimeException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT, "55P03"))));
+
+        request();
+
+        assertThat(output).contains("sqlstate=55P03").doesNotContain(FOREIGN_TEXT);
+    }
+
+    @Test
+    void databaseOutage_withoutSqlException_logsNoSqlState(CapturedOutput output) {
+        controller.failWith(new TransactionTimedOutException(FOREIGN_TEXT));
+
+        request();
+
+        assertThat(output).contains("TransactionTimedOutException, sqlstate=нет, request_id=" + REQUEST_ID);
+    }
+
     /** Постоянные ошибки доступа к данным — это дефект или данные, а не временная недоступность: 500. */
     static Stream<RuntimeException> permanentFailures() {
         return Stream.of(

@@ -17,12 +17,15 @@ import ru.projectx.datareference.entity.Policy;
  * <p>Ранг записан не числом, а признаками по убыванию важности ({@code true} раньше
  * {@code false}): так в запросе нет литералов ранга, которые пришлось бы связывать параметрами.
  * В ранге имя обрезается по краям, как обрезалось при ранжировании на Java; в отборе — нет, как и раньше.
+ * Последний ключ порядка — наш {@code id}: предел режет выдачу в базе, и при равных ранге и ФИО
+ * повторный запрос должен вернуть те же строки.
  */
 class PolicySearchRepositoryImpl implements PolicySearchRepository {
 
     private static final String NUMBER = "number";
     private static final String LAST_NAME = "lastName";
     private static final String FIRST_NAME = "firstName";
+    private static final String ID = "id";
 
     private final EntityManager entityManager;
 
@@ -44,7 +47,8 @@ class PolicySearchRepositoryImpl implements PolicySearchRepository {
                         cb.desc(cb.equal(lowerNumber, number)),
                         cb.desc(PolicySpecifications.like(cb, lowerNumber, numberPrefix)),
                         cb.asc(policy.get(LAST_NAME)),
-                        cb.asc(policy.get(FIRST_NAME)));
+                        cb.asc(policy.get(FIRST_NAME)),
+                        cb.asc(policy.get(ID)));
         return limited(query, scope);
     }
 
@@ -61,7 +65,8 @@ class PolicySearchRepositoryImpl implements PolicySearchRepository {
                         cb.desc(cb.and(lastName, firstName)),
                         cb.desc(lastName),
                         cb.asc(policy.get(LAST_NAME)),
-                        cb.asc(policy.get(FIRST_NAME)));
+                        cb.asc(policy.get(FIRST_NAME)),
+                        cb.asc(policy.get(ID)));
         return limited(query, scope);
     }
 

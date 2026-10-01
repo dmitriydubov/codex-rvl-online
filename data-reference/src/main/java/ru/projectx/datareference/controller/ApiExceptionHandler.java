@@ -1,11 +1,13 @@
 package ru.projectx.datareference.controller;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.dao.TransientDataAccessException;
@@ -116,8 +118,9 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * В журнал — тип отказа и идентификатор запроса. Текст исключения туда не идёт: в нём SQL
-     * и сообщение драйвера, а с ними могут прийти значения строки.
+     * В журнал — тип отказа, SQLSTATE драйвера (если отказ пришёл из базы: 55P03 — блокировка,
+     * 57014 — отмена по таймауту, 08xxx — соединение) и идентификатор запроса. Текст исключения
+     * туда не идёт: в нём SQL и сообщение драйвера, а с ними могут прийти значения строки.
      */
     @ExceptionHandler({
             CannotCreateTransactionException.class,
@@ -127,12 +130,18 @@ public class ApiExceptionHandler {
             TransientDataAccessException.class})
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     public ErrorResponse databaseUnavailable(RuntimeException outage) {
-        log.warn("база недоступна или не ответила вовремя: {}, request_id={}",
-                outage.getClass().getSimpleName(), requestId());
+        log.warn("база недоступна или не ответила вовремя: {}, sqlstate={}, request_id={}",
+                outage.getClass().getSimpleName(), sqlState(outage), requestId());
         return ErrorResponse.of(SERVICE_UNAVAILABLE, "сервис временно недоступен, повторите запрос позже", requestId());
     }
 
-    /** Истёкший лимит транзакции Hibernate — временный отказ; любая другая системная ошибка JPA — 500. */
+    /**
+     * Истёкший лимит транзакции Hibernate — временный отказ; любая другая системная ошибка JPA — 500.
+     * Ограничение: Spring переводит в {@link JpaSystemException} любой {@code org.hibernate.TransactionException}
+     * без {@code SQLException} в причине, и отличить истёкший срок от прочих отказов транзакции можно
+     * только по тексту сообщения — на это обработчик не опирается. Для чтений REST другие такие отказы —
+     * дефект, а не данные; они тоже уйдут 503.
+     */
     @ExceptionHandler(JpaSystemException.class)
     public ResponseEntity<ErrorResponse> jpaSystemFailure(JpaSystemException failure) {
         if (failure.getCause() instanceof org.hibernate.TransactionException) {
@@ -146,6 +155,14 @@ public class ApiExceptionHandler {
     public ErrorResponse unexpected(Exception failure) {
         log.error("необработанная ошибка REST, request_id={}", requestId(), failure);
         return ErrorResponse.of(INTERNAL_ERROR, "внутренняя ошибка сервиса", requestId());
+    }
+
+    /** SQLSTATE самого глубокого {@link SQLException} в цепочке причин, если он есть. */
+    private static String sqlState(Throwable outage) {
+        return Optional.of(NestedExceptionUtils.getMostSpecificCause(outage))
+                .filter(SQLException.class::isInstance)
+                .map(cause -> ((SQLException) cause).getSQLState())
+                .orElse("нет");
     }
 
     @Nullable

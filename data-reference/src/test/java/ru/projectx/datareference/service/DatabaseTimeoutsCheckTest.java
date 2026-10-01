@@ -13,10 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
+import ru.projectx.datareference.support.TestApiProperties;
 
 /**
  * Проверка таймаутов при старте (Ш41): у соединения пула — значения из настройки, у соединения
@@ -49,17 +52,19 @@ class DatabaseTimeoutsCheckTest {
     @Mock
     private SpringLiquibase liquibase;
 
+    @Mock
+    private ObjectProvider<SpringLiquibase> liquibaseProvider;
+
     private DatabaseTimeoutsCheck check;
 
     @BeforeEach
     void setUp() {
-        when(liquibase.getDataSource()).thenReturn(migrations);
-        check = new DatabaseTimeoutsCheck(
-                new DatabaseSessionTimeouts("5s", "30s", "1min"), sessionSettings, pool, liquibase);
+        check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"));
     }
 
     @Test
     void matchingTimeouts_writeNoWarning(CapturedOutput output) {
+        withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
 
@@ -71,6 +76,7 @@ class DatabaseTimeoutsCheckTest {
     /** Пулер выбросил {@code options}: у сеанса пула умолчания сервера, то есть нули. */
     @Test
     void poolWithoutTimeouts_warnsPerParameter_withBothValues(CapturedOutput output) {
+        withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(DISABLED);
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
 
@@ -86,6 +92,7 @@ class DatabaseTimeoutsCheckTest {
     /** Таймаут на роли или базе достался и миграциям — долгая миграция оборвётся. */
     @Test
     void migrationsWithTimeout_warn(CapturedOutput output) {
+        withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(Map.of(
                 "lock_timeout", Duration.ZERO,
@@ -100,6 +107,7 @@ class DatabaseTimeoutsCheckTest {
 
     @Test
     void parameterMissingOnServer_warnsAsUnknown(CapturedOutput output) {
+        withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(Map.of(
                 "lock_timeout", Duration.ofSeconds(5), "statement_timeout", Duration.ofSeconds(30)));
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
@@ -111,8 +119,8 @@ class DatabaseTimeoutsCheckTest {
 
     @Test
     void unparsedSetting_warnsThatPoolIsNotChecked(CapturedOutput output) {
-        check = new DatabaseTimeoutsCheck(
-                new DatabaseSessionTimeouts("1.5s", "30s", "1min"), sessionSettings, pool, liquibase);
+        withMigrations();
+        check = check(new DatabaseSessionTimeouts("1.5s", "30s", "1min"));
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
 
@@ -120,5 +128,54 @@ class DatabaseTimeoutsCheckTest {
 
         assertThat(output).contains("настройка lock_timeout не разобрана, параметр не проверен");
         assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+    }
+
+    /** Проверка — наблюдение, а не условие старта: недоступная база или права на pg_settings — WARN, не отказ. */
+    @Test
+    void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnection(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS))
+                .thenThrow(new DataAccessResourceFailureException("Иванов 1980-05-17"));
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+
+        check.run(null);
+
+        assertThat(output).contains("соединение=пул приложения", "DataAccessResourceFailureException")
+                .doesNotContain("Иванов");
+    }
+
+    /** Миграции в контуре могут идти отдельно ({@code spring.liquibase.enabled=false}) — проверять нечего. */
+    @Test
+    void withoutLiquibase_warnsThatMigrationsAreNotChecked(CapturedOutput output) {
+        when(liquibaseProvider.getIfAvailable()).thenReturn(null);
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+
+        check.run(null);
+
+        assertThat(output).contains("соединение миграций не проверено: Liquibase в контексте нет");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+    }
+
+    /** Лимит REST-чтения не меньше lock_timeout — под чужой блокировкой REST уже не отказывает первым. */
+    @Test
+    void readTimeoutNotBelowLockTimeout_warns(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        check = check(new DatabaseSessionTimeouts("3s", "30s", "1min"));
+
+        check.run(null);
+
+        assertThat(output).contains("лимит REST-чтения PT3S не меньше lock_timeout PT3S");
+    }
+
+    private void withMigrations() {
+        when(liquibaseProvider.getIfAvailable()).thenReturn(liquibase);
+        when(liquibase.getDataSource()).thenReturn(migrations);
+    }
+
+    private DatabaseTimeoutsCheck check(DatabaseSessionTimeouts timeouts) {
+        return new DatabaseTimeoutsCheck(timeouts, TestApiProperties.defaults(),
+                new DatabaseTimeoutsCheck.Connections(sessionSettings, pool, liquibaseProvider));
     }
 }

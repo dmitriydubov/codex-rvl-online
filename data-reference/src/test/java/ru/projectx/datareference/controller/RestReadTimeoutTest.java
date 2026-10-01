@@ -48,12 +48,17 @@ class RestReadTimeoutTest {
     @CsvSource({
             "programs,            /internal/v1/programs/" + UNKNOWN_ID,
             "policies,            /internal/v1/policies/" + UNKNOWN_ID,
+            "policies,            /internal/v1/policies?external_id=" + UNKNOWN_ID,
+            "policies,            /internal/v1/policies/contract-view?external_id=" + UNKNOWN_ID,
+            "insurance_contracts, /internal/v1/policies?number=П-1&contract_id=" + UNKNOWN_ID,
+            "insurance_contracts, /internal/v1/insurance-contracts?external_id=" + UNKNOWN_ID,
             "policies,            /internal/v1/policies/" + UNKNOWN_ID + "/contract-view",
             "insurance_contracts, /internal/v1/insurance-contracts/" + UNKNOWN_ID,
             "insurance_contracts, /internal/v1/policies/search?contract_external_id=" + UNKNOWN_ID + "&query=ив",
             "insurance_contracts, /internal/v1/lpu?contract_external_id=" + UNKNOWN_ID,
             "lpu,                 /internal/v1/lpu/" + UNKNOWN_ID,
             "lpu,                 /internal/v1/lpu/" + UNKNOWN_ID + "/services",
+            "lpu,                 /internal/v1/lpu/" + UNKNOWN_ID + "/services?need_prices=true",
             "mkb10,               /internal/v1/mkb10?query=I25",
             "mkb10,               /internal/v1/mkb10?codes=I25"})
     void readWaitingForDatabase_isCutByReadLimit_beforeLockTimeout(String lockedTable, String path)
