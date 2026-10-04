@@ -2,6 +2,7 @@ package ru.projectx.datareference.config;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -52,14 +53,19 @@ public record OneCContractProperties(
 
     /** Текст настройки GUID вида деятельности «РВЛ»; пустая настройка означает, что значение не задано. */
     public Optional<String> rvlActivity() {
-        return Optional.ofNullable(rvlActivityId).filter(id -> !id.isBlank());
+        return filled(rvlActivityId);
     }
 
     public Optional<String> rvlContract() {
-        return Optional.ofNullable(rvlContractProperty).filter(name -> !name.isBlank());
+        return filled(rvlContractProperty);
     }
 
     public Optional<String> dmsProduct() {
-        return Optional.ofNullable(dmsProductType).filter(type -> !type.isBlank());
+        return filled(dmsProductType);
+    }
+
+    /** Пустая строка в переменной окружения значит то же, что отсутствие настройки. */
+    private static Optional<String> filled(@Nullable String setting) {
+        return Optional.ofNullable(setting).filter(Predicate.not(String::isBlank));
     }
 }
