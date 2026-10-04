@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -191,6 +192,23 @@ class OneCConsumerPauseTest {
         pause.resumeIfStorageAvailable();
         assertThat(pause.paused()).isEmpty();
         verifyNoInteractions(policies, mkb10, disabled);
+    }
+
+    /**
+     * Реестр назвал очередь, но контейнера по ней не отдал: это несогласованность реестра, а не отказ базы.
+     * Пауза отказывает, называя очередь, и не остаётся наполовину поставленной.
+     */
+    @Test
+    void queueWithoutContainer_failsNamingTheQueueAndRecordsNoPause() {
+        when(registry.getListenerContainer(MKB10)).thenReturn(null);
+        OneCConsumerPause pause = pause();
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> pause.pause(CONNECTION_LOST))
+                .withMessageContaining(MKB10);
+
+        assertThat(pause.paused()).isEmpty();
+        verify(policies, never()).stop(any(Runnable.class));
     }
 
     private static void stopCompletesAtOnce(MessageListenerContainer container) {

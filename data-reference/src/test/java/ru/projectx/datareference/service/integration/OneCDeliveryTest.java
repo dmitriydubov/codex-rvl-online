@@ -53,6 +53,16 @@ class OneCDeliveryTest {
         assertThat(delivery(raw).body()).isEqualTo(raw);
     }
 
+    /** Тело ровно из трёх байт метки — метка без содержимого: конверту достаётся пустое тело, карантину — метка. */
+    @Test
+    void bodyOfExactlyBom_isEmptiedButKeptInRawBody() {
+        OneCDelivery delivery = delivery(BOM.clone());
+
+        assertThat(delivery.body()).isEmpty();
+        assertThat(delivery.payload()).isEmpty();
+        assertThat(delivery.rawBody()).isEqualTo(BOM);
+    }
+
     /** Два байта метки из трёх — не метка; тело короче метки тоже остаётся как есть. */
     @Test
     void incompleteBom_isKept() {
