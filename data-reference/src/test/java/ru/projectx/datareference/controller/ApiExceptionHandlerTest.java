@@ -2,6 +2,7 @@ package ru.projectx.datareference.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -26,6 +27,7 @@ import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -38,11 +40,17 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.service.DatabaseOutages;
 
 /**
- * Единый формат отказов на настоящем стеке MVC: заглушка-контроллер бросает исключение,
- * обработчик решает статус и код. Фильтр X-Request-Id подключён, чтобы {@code request_id}
- * в теле сверялся с заголовком.
+ * Любой отказ REST уходит потребителю в едином формате с верным статусом, а в журнал — без текста
+ * чужого исключения. Это защищает две вещи сразу: сервисы Заявок и Договоров повторяют запрос
+ * только при 503, поэтому временный отказ базы нельзя выдать за внутреннюю ошибку; а текст
+ * исключения базы может нести значения строки с персональными данными, поэтому он не должен
+ * попасть ни в ответ, ни в журнал.
+ *
+ * <p>Стек MVC настоящий: заглушка-контроллер бросает исключение, обработчик решает статус и код.
+ * Фильтр X-Request-Id подключён, чтобы {@code request_id} в теле сверялся с заголовком.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
@@ -58,7 +66,7 @@ class ApiExceptionHandlerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler())
+                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages(new HibernateExceptionTranslator())))
                 .addFilters(new RequestIdFilter())
                 .build());
     }
@@ -66,6 +74,8 @@ class ApiExceptionHandlerTest {
     /**
      * Временный отказ базы: отказ соединения при входе в транзакцию, обрыв посреди запроса,
      * таймауты оператора и транзакции, ожидание блокировки. Вызывающий может повторить запрос.
+     * Последние два — сырые исключения Hibernate, какими они приходят с ленивой догрузки в сервисе,
+     * мимо перевода репозитория.
      */
     static Stream<RuntimeException> databaseOutages() {
         return Stream.of(
@@ -77,7 +87,9 @@ class ApiExceptionHandlerTest {
                 new CannotAcquireLockException(FOREIGN_TEXT),
                 new PessimisticLockingFailureException(FOREIGN_TEXT),
                 new TransactionTimedOutException(FOREIGN_TEXT),
-                new JpaSystemException(new TransactionException("Transaction timeout expired")));
+                new JpaSystemException(new TransactionException("Transaction timeout expired")),
+                new org.hibernate.QueryTimeoutException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT, "57014"), FOREIGN_TEXT),
+                new TransactionException("Transaction timeout expired"));
     }
 
     @ParameterizedTest
@@ -117,6 +129,17 @@ class ApiExceptionHandlerTest {
         assertThat(output).contains("sqlstate=55P03").doesNotContain(FOREIGN_TEXT);
     }
 
+    /** При обрыве соединения драйвер кладёт SQLSTATE класса 08 поверх IOException — в журнале нужен именно он. */
+    @Test
+    void connectionLoss_logsSqlStateOfDeepestSqlException_notOfRootIoException(CapturedOutput output) {
+        controller.failWith(new DataAccessResourceFailureException(FOREIGN_TEXT,
+                new SQLException(FOREIGN_TEXT, "08006", new IOException(FOREIGN_TEXT))));
+
+        request();
+
+        assertThat(output).contains("sqlstate=08006").doesNotContain(FOREIGN_TEXT);
+    }
+
     @Test
     void databaseOutage_withoutSqlException_logsNoSqlState(CapturedOutput output) {
         controller.failWith(new TransactionTimedOutException(FOREIGN_TEXT));
@@ -132,6 +155,7 @@ class ApiExceptionHandlerTest {
                 new InvalidDataAccessResourceUsageException(FOREIGN_TEXT),
                 new DataIntegrityViolationException(FOREIGN_TEXT),
                 new JpaSystemException(new IllegalStateException(FOREIGN_TEXT)),
+                new org.hibernate.exception.ConstraintViolationException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT, "23505"), "uq"),
                 new IllegalStateException(FOREIGN_TEXT));
     }
 
