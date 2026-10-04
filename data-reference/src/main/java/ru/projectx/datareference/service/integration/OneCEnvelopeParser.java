@@ -3,6 +3,7 @@ package ru.projectx.datareference.service.integration;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
+import ru.projectx.datareference.service.onec.OneCGuid;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -34,7 +35,8 @@ public class OneCEnvelopeParser {
 
     /**
      * @throws OneCEnvelopeException если тело нечитаемо или {@code message-id} нет либо
-     *         он не GUID — такое сообщение невозможно ни дедуплицировать, ни сохранить
+     *         он не GUID в канонической форме — такое сообщение невозможно ни дедуплицировать,
+     *         ни сохранить
      */
     public UUID messageIdOf(byte[] body) {
         JsonNode envelope = readTree(body);
@@ -68,15 +70,13 @@ public class OneCEnvelopeParser {
     }
 
     /**
-     * Значение в текст исключения не идёт: этим же путём проходят полисы, а текст
-     * исключения доезжает до лога.
+     * Только каноническая форма ({@link OneCGuid}): нестрогий разбор прочёл бы искажённый
+     * {@code message-id} как чужой GUID, и сообщение легло бы под чужим ключом дедупликации.
+     * Значение в текст исключения не идёт: этим же путём проходят полисы, а текст исключения
+     * доезжает до лога.
      */
     private static UUID parse(String raw) {
-        try {
-            return UUID.fromString(raw);
-        }
-        catch (IllegalArgumentException notAGuid) {
-            throw new OneCEnvelopeException("metadata.message-id не является GUID", notAGuid);
-        }
+        return OneCGuid.parse(raw)
+                .orElseThrow(() -> new OneCEnvelopeException("metadata.message-id не является GUID"));
     }
 }

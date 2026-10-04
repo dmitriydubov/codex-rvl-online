@@ -126,6 +126,20 @@ class OneCQueueListenerTest {
     }
 
     /**
+     * Ш13a, решение 1 (а) владельца: message-id не в канонической форме — сообщение неопознаваемо.
+     * Оно подтверждается и теряется, как нечитаемый конверт, а не ложится в сырьё под GUID, который
+     * из {@code 1-2-3-4-5} вычитал бы нестрогий разбор ({@code 00000001-0002-0003-0004-000000000005}).
+     */
+    @Test
+    void nonCanonicalMessageId_isAcknowledgedAndDropped() throws IOException {
+        listener().receive(OneCStream.MKB10, delivery(envelope("1-2-3-4-5")), channel);
+
+        verify(channel).basicAck(DELIVERY_TAG, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        verifyNoInteractions(ingestService);
+    }
+
+    /**
      * У прайсов две очереди на один поток: пакеты строк и финальные сообщения
      * со счётчиками. Различает их только имя очереди, и оно обязано доехать до сырья —
      * иначе сборка передачи (ТЗ-9) не отличит одно от другого.
@@ -260,6 +274,10 @@ class OneCQueueListenerTest {
     }
 
     private static String envelope(UUID messageId) {
+        return envelope(messageId.toString());
+    }
+
+    private static String envelope(String messageId) {
         return """
                 {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001"},\
                 "metadata":{"message-id":"%s","producer":"1c-usk"}}"""

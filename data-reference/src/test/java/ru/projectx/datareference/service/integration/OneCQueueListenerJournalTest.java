@@ -141,6 +141,24 @@ class OneCQueueListenerJournalTest {
                 .doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
     }
 
+    /**
+     * Ш13a, решение 1 (а): сообщение, потерянное из-за message-id не в канонической форме, оставляет
+     * ERROR «потеряно» с причиной, но без самого значения и без тела.
+     */
+    @Test
+    void nonCanonicalMessageId_isLoggedAsLostWithoutItsValue() throws IOException {
+        String messageId = "9f1c0f2e-0000-4000-8000-+0000000000c";
+
+        listener().receive(OneCStream.POLICIES, delivery(envelope(messageId)), channel);
+
+        ILoggingEvent error = onlyEvent(Level.ERROR);
+        assertThat(error.getFormattedMessage())
+                .contains("потеряно", "metadata.message-id не является GUID")
+                .doesNotContain(messageId, PERSONAL_DATA);
+        assertThat(error.getThrowableProxy()).isNull();
+        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
+    }
+
     @Test
     void duplicate_isReportedAsDuplicate() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenReturn(false);
@@ -234,6 +252,10 @@ class OneCQueueListenerJournalTest {
     }
 
     private static String envelope(UUID messageId) {
+        return envelope(messageId.toString());
+    }
+
+    private static String envelope(String messageId) {
         return """
                 {"data":{"fio":"%s"},"metadata":{"message-id":"%s","producer":"1c-usk"}}"""
                 .formatted(PERSONAL_DATA, messageId);

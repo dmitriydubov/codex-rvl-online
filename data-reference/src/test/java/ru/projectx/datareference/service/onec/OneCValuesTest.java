@@ -160,13 +160,62 @@ class OneCValuesTest {
                 .hasMessage("нет обязательного GUID в поле id");
     }
 
-    /** Текст исключения доезжает до лога: в нём имя поля, но не значение. */
+    /**
+     * Текст исключения доезжает до лога: в нём имя поля, но не значение. Причины-исключения
+     * у отказа нет: разбор не зовёт нестрогий {@code UUID.fromString}, а его ошибка цитировала
+     * бы значение («Invalid UUID string: …»).
+     */
     @Test
     void unparsableGuid_namesFieldButNotValue() {
         assertThatThrownBy(() -> OneCValues.uuid(node("{\"guid\":\"не-гуид-42\"}"), "guid"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле guid не является GUID")
-                .hasCauseInstanceOf(IllegalArgumentException.class);
+                .hasNoCause();
+    }
+
+    /**
+     * Ш13a: GUID поля — только в канонической форме 8-4-4-4-12. Эти значения {@code UUID.fromString}
+     * JDK 21 читает молча как чужой GUID (00000001-0002-0003-0004-000000000005), и сообщение 1С
+     * затёрло бы чужую запись. Отказ называет поле, но не значение.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1-2-3-4-5", "000000001-002-0003-0004-000000000005",
+            "00000001-0002-0003-0004-+00000000005", "00000001-0002-0003-0004-00000000000５"})
+    void nonCanonicalGuid_isContractViolationNamingFieldButNotValue(String nonCanonical) {
+        ObjectNode data = node("{\"contractId\":\"%s\"}".formatted(nonCanonical));
+
+        assertThatThrownBy(() -> OneCValues.requiredUuid(data, "contractId"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле contractId не является GUID")
+                .hasNoCause();
+    }
+
+    /**
+     * {@code 0-0-0-0-0} — не нулевой GUID «ссылки нет», а искажённое значение: нестрогий разбор
+     * читал его как нулевой GUID, и договор молча сохранялся без ссылки.
+     */
+    @Test
+    void nonCanonicalZeroGuid_isContractViolationRatherThanNoReference() {
+        assertThatThrownBy(() -> OneCValues.uuid(node("{\"guid\":\"0-0-0-0-0\"}"), "guid"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле guid не является GUID");
+    }
+
+    /** Регистр 1С:УСК не задаёт: прописные цифры — тот же GUID, хранится он строчными (Ш13a, решение 2). */
+    @Test
+    void uppercaseGuid_isTheSameGuid() {
+        ObjectNode data = node("{\"id\":\"F3876C53-C7D8-4620-B364-9538164BA5D4\"}");
+
+        assertThat(OneCValues.requiredUuid(data, "id"))
+                .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
+    }
+
+    /** Пробелы по краям, как у любой строки 1С, отбрасываются до разбора (Ш13a, решение 6). */
+    @Test
+    void guidWithSurroundingSpaces_isRead() {
+        ObjectNode data = node("{\"id\":\"  f3876c53-c7d8-4620-b364-9538164ba5d4 \"}");
+
+        assertThat(OneCValues.uuid(data, "id")).contains(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
     }
 
     @Test

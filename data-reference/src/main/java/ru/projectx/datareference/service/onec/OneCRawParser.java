@@ -16,13 +16,14 @@ import ru.projectx.datareference.exception.OneCFieldException;
  */
 final class OneCRawParser {
 
+    /**
+     * GUID — только в канонической форме ({@link OneCGuid}): иначе искажённое значение молча
+     * стало бы чужим GUID. У отказа нет причины-исключения, поэтому значение не попадает и в цепочку
+     * причин.
+     */
     static UUID uuid(String raw, String field) {
-        try {
-            return UUID.fromString(raw);
-        }
-        catch (IllegalArgumentException notAGuid) {
-            throw new OneCFieldException("поле " + field + " не является GUID", notAGuid);
-        }
+        return OneCGuid.parse(raw)
+                .orElseThrow(() -> new OneCFieldException("поле " + field + " не является GUID"));
     }
 
     /**

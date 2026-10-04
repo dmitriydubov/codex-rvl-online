@@ -3,6 +3,7 @@ package ru.projectx.datareference.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Дано;
+import io.cucumber.java.ru.Когда;
 import java.util.Map;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
@@ -59,5 +60,11 @@ public class OneCSteps {
         assertThat(inbox.statuses())
                 .as("статусы сырья после разбора, в порядке приёма")
                 .containsExactlyElementsOf(inbox.expectedStatuses());
+    }
+
+    /** Тот же штатный проход разбора, но исход проверяют шаги «Тогда», а не этот шаг. */
+    @Когда("Дата-референс разбирает присланные сообщения")
+    public void receivedMessagesBeingImported() {
+        scheduler.importPendingMessages();
     }
 }

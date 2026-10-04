@@ -25,9 +25,14 @@ public class OneCInbox {
                     now() + make_interval(secs => :order))
             """;
     private static final String STATUSES = "select status from inbound_message order by received_at";
+    private static final String ROW = """
+            select status, last_error, cast(payload as text) as payload
+            from inbound_message where message_id = :messageId
+            """;
 
     private final JdbcClient jdbc;
     private final List<String> expectedStatuses = new ArrayList<>();
+    private final List<OneCMessage> received = new ArrayList<>();
 
     public OneCInbox(JdbcClient jdbc) {
         this.jdbc = jdbc;
@@ -35,6 +40,7 @@ public class OneCInbox {
 
     public void receive(OneCMessage message) {
         expectedStatuses.add(message.expected().name());
+        received.add(message);
         jdbc.sql(RECEIVE)
                 .param("messageId", message.messageId())
                 .param("stream", message.stream().name())
@@ -42,6 +48,20 @@ public class OneCInbox {
                 .param("payload", message.envelope())
                 .param("order", expectedStatuses.size())
                 .update();
+    }
+
+    /** Строка сырья сообщения, присланного последним шагом «1С:УСК прислала …». */
+    public InboundRow last() {
+        return jdbc.sql(ROW)
+                .param("messageId", received.getLast().messageId())
+                .query((row, number) -> new InboundRow(
+                        row.getString("status"), row.getString("last_error"), row.getString("payload")))
+                .single();
+    }
+
+    /** Конверт, присланный последним шагом «1С:УСК прислала …», — каким его сохранил бы приём. */
+    public String lastEnvelope() {
+        return received.getLast().envelope();
     }
 
     /** Статусы, которыми разбор обязан закончить присланные сообщения, в порядке приёма. */

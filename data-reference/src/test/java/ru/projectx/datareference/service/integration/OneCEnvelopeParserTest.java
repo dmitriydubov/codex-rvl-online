@@ -103,6 +103,34 @@ class OneCEnvelopeParserTest {
     }
 
     /**
+     * Ш13a, решение 1 (а) владельца: message-id — только в канонической форме 8-4-4-4-12.
+     * Эти значения {@code UUID.fromString} JDK 21 читает молча как другой GUID, и сообщение легло
+     * бы в сырьё под чужим ключом дедупликации. Отказ — тот же, что у нечитаемого message-id, без
+     * значения и без причины-исключения, чей текст его бы цитировал.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1-2-3-4-5", "0-0-0-0-0", "09f1c0f2e-0000-4000-8000-00000000000",
+            "9f1c0f2e-0000-4000-8000-+0000000000a", "9f1c0f2e-0000-4000-8000-00000000000５"})
+    void nonCanonicalMessageId_isRejected(String messageId) {
+        String body = """
+                {"data":{},"metadata":{"message-id":"%s"}}""".formatted(messageId);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("metadata.message-id не является GUID")
+                .hasNoCause();
+    }
+
+    /** Регистр 1С:УСК не задаёт: прописные цифры — тот же message-id (Ш13a, решение 2). */
+    @Test
+    void uppercaseMessageId_isTheSameGuid() {
+        String body = """
+                {"data":{},"metadata":{"message-id":"9F1C0F2E-0000-4000-8000-00000000000A"}}""";
+
+        assertThat(parser.messageIdOf(bytes(body))).isEqualTo(MESSAGE_ID);
+    }
+
+    /**
      * Текст исключения доезжает до лога, а этим же путём идут полисы. Поэтому в ошибке
      * называется поле, но не его значение и тем более не тело сообщения.
      */
