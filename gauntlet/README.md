@@ -70,7 +70,7 @@ gauntlet/
 | `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное, **ни одного skipped**, при наличии фич исполнен хотя бы один сценарий; судятся только результаты этого прогона | — |
 | `crapGate` | свой (`CrapGate.java`) по JaCoCo XML, формула crap4java | **8** | `crap.threshold`, `config/crap-allowlist.txt` |
 | `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются; `dry.exclude` — пути вне поиска, у data-reference `entity/`) | `dry.*` |
-| `mutationGate` | PIT 1.22 + gradle-pitest-plugin 1.19.0 | **все покрытые мутанты убиты** (test strength 100 %), покрытие мутируемых классов ≥ 80 % | `pit.*` |
+| `mutationGate` | PIT 1.22 + gradle-pitest-plugin 1.19.0, свой `PitSummary.java` | **все покрытые мутанты убиты** (test strength 100 %), покрытие мутируемых классов ≥ 80 %; RUN_ERROR (JVM тестов упала на `redefineClasses`, PIT считает его обнаруженным) **не засчитывается убитым** — только строкой в allowlist, которую человек добавил, прочитав тесты | `pit.*`, `config/pit-runerror-allowlist.txt` |
 | `gherkinMutation` | свой (`GherkinMutator.java`) | 0 выживших мутантов значений Examples | — |
 
 Значения Мартина и их источники — в комментариях `config/gauntlet.properties`
@@ -127,7 +127,7 @@ found» — это ожидаемо), обычный `./gradlew build` кэш с
 | Утвердить спецификацию | ответить «да» в сессии |
 | Принять результат | merge PR в GitHub |
 | Изменить пороги, allowlist'ы, архитектуру, роли, CLAUDE.md, замороженную спеку | (а) отредактировать файл на GitHub в ветке; (б) **админ-окружение**: на claude.ai/code создайте второе cloud environment «gauntlet-admin» с переменной `GAUNTLET_GUARD=off` (и при желании `GAUNTLET_STOP_HOOK=off`); сессия, запущенная в нём, работает без guard-хука — просите Claude менять что угодно, изменения всё равно пройдут через PR и CI |
-| Исключения: эквивалентный мутант, большой `switch`, легитимный `@Generated` | агент остановится и опишет; вы добавляете строку в `config/*-allowlist.txt` одним из способов выше |
+| Исключения: эквивалентный мутант, большой `switch`, легитимный `@Generated`, RUN_ERROR-мутант, который тесты убили бы | агент остановится и опишет (для RUN_ERROR — назовёт тест и ассерт, который упал бы на мутанте); вы проверяете и добавляете строку в `config/*-allowlist.txt` одним из способов выше |
 
 **Сеть окружения.** Network access — Custom с галкой «Also include default list of common package managers»
 (Maven Central, портал плагинов Gradle, Docker Hub, GitHub) и доменами документации из раздела «Источники

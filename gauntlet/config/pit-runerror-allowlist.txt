@@ -1,0 +1,34 @@
+# Human-verified RUN_ERROR mutants. One line per method and mutator:  fully.qualified.Class#method  Mutator   # which test kills it
+# PIT 1.22.1 counts RUN_ERROR as detected, but the test JVM crashed on redefineClasses (records) before any
+# test ran, so nothing proved the mutant dead. A line here says a human read the tests and named the
+# assertion that fails for the mutant. The key is the method and the mutator, not the line number or the
+# description: RUN_ERROR is not deterministic (another run crashes on another mutant), and line numbers
+# go stale on every edit. So a line covers every RUN_ERROR of that mutator in that method - keep the
+# mutator explicit (one line per verified mutator, as for the two Boolean*ReturnVals of a lambda) and
+# reread the tests when the method grows a new conditional, return or lambda. The mutator is the simple
+# PIT name; omit it (or use *) only when every mutator of the method was verified; * also works inside
+# the method name (lambda$of$* - the compiler numbers lambdas). Agents cannot edit this file.
+#
+# Before adding a line: run the tests, read the mutated line, find the assertion that fails for exactly
+# this mutation. A mutant with no such assertion is a weak test, not an allowlist entry.
+
+# InboundRetryPropertiesTest: everyStepOfLadder_hasItsOwnDelay (attempt 1 -> 30s), attemptBeyondLadder_hasNoDelay
+# (attempt 4 -> empty; index 3 would throw), attemptBelowFirst_hasNoDelay (attempt 0 -> empty; index -1 would throw).
+ru.projectx.datareference.config.InboundRetryProperties#delayBeforeAttempt  ConditionalsBoundaryMutator        # <= 0 breaks attempt 1, > size breaks attempt 4
+ru.projectx.datareference.config.InboundRetryProperties#delayBeforeAttempt  RemoveConditionalMutator_ORDER_ELSE # get(-1) breaks attempt 0, get(3) breaks attempt 4
+
+# PolicyQueryServiceTest: byId_carriesContractAndOnlyActiveRvlPrograms_lookedUpByAllReferencedGuids
+# (response.contract() on null response; services() hasSize(1)), policyWithoutPrograms_..._andMissingContractIsEmpty
+# (contract == null -> ContractRef.of(null) throws).
+ru.projectx.datareference.dto.PolicyResponse#of                              NullReturnValsMutator              # byId_carries...: response.contract() on null
+ru.projectx.datareference.dto.PolicyResponse#of                              RemoveConditionalMutator_EQUAL_ELSE # policyWithoutPrograms...: ContractRef.of(null)
+ru.projectx.datareference.dto.PolicyResponse$ProgramLine#lambda$of$*         BooleanFalseReturnValsMutator      # byId_carries...: services() hasSize(1) gets 0
+ru.projectx.datareference.dto.PolicyResponse$ProgramLine#lambda$of$*         BooleanTrueReturnValsMutator       # byId_carries...: services() hasSize(1) gets 2
+
+# LpuServicesQueryServiceTest: withPrices_givesEveryServiceItsCurrentPrices_emptyWhenNone
+# (services().get(0).prices() on a null Service).
+ru.projectx.datareference.dto.LpuServicesResponse$Service#withPrices         NullReturnValsMutator              # withPrices_gives...: get(0).prices() on null
+
+# InsuranceContractQueryServiceTest: byExternalId_insurerMissingInReference_isEmptyInsurer,
+# contractWithoutInsurerGuid_doesNotLookForInsurer (insurer == null -> Organization.of(null) throws).
+ru.projectx.datareference.dto.InsuranceContractResponse#of                   RemoveConditionalMutator_EQUAL_ELSE # insurerMissing...: Organization.of(null)

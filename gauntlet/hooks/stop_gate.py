@@ -41,7 +41,8 @@ WATCHED = list(BUILD_FILES) + ["gauntlet"]
 REPORT_DIRS = ["build/test-results", "build/reports"]   # newer files here = the agent ran Gradle itself
 INTERESTING = re.compile(
     r"^(CRAP FAIL|DUPLICATE|DRY gate: FAILED|INTEGRITY|"
-    r"MUTANT (SURVIVED|ERROR)|SURVIVED|NO_COVERAGE|ACCEPTANCE SKIPPED|WARNING .*mutation sites|"
+    r"MUTANT (SURVIVED|ERROR)|SURVIVED|NO_COVERAGE|RUN_ERROR|MEMORY_ERROR|NON_VIABLE|mutationGate: |"
+    r"\s+\S+#\S+ \w+Mutator\w*$|ACCEPTANCE SKIPPED|WARNING .*mutation sites|"
     r"\[ERROR\]|\[ant:checkstyle\]|> Task .*FAILED|.*\bFAILED$|Execution failed for task|"
     r".*[A-Za-z](Exception|Error)(:|\s|$)|.*expected:?\s|Caused by|Architecture Violation|Rule '|"
     r"\s+at [a-z][\w.$]*\(\w+Test\.java:\d+\)|.*tests? completed, \d+ failed|gauntlet: )")

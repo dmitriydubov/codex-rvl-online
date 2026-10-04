@@ -132,7 +132,7 @@ www.jacoco.org
 
 | Переменная | Default | gauntlet-admin | Зачем |
 |---|---|---|---|
-| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` | да | да | Образы Testcontainers пойдут с `mirror.gcr.io` вместо Docker Hub (там 429). Слеш в конце обязателен. Testcontainers 2.0.5 читает свойство `hub.image.name.prefix` из этой переменной и применяет префикс только к образам Docker Hub (сверено: `docs/features/image_name_substitution.md` по тегу 2.0.5, `javap` `PrefixingImageNameSubstitutor`). На зеркале есть `postgres:16.10-alpine`, `rabbitmq:4.1-alpine` и `testcontainers/ryuk:0.14.0` и по короткому пути, и по пути с `library/`; digest совпадает с Docker Hub. Зонд на префиксе прошёл. Код не меняется, и правило набора «реестр в коде не хардкодится» не нарушается |
+| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` | да | да | Образы Testcontainers пойдут с `mirror.gcr.io` вместо Docker Hub (там 429). Слеш в конце обязателен. Testcontainers 2.0.5 читает свойство `hub.image.name.prefix` из этой переменной и применяет префикс только к образам Docker Hub (сверено: `docs/features/image_name_substitution.md` по тегу 2.0.5, `javap` `PrefixingImageNameSubstitutor`). На зеркале есть `postgres:16.10-alpine`, `rabbitmq:4.1-alpine` (с Ш6 — `rabbitmq:4.1.2-alpine`, тоже есть) и `testcontainers/ryuk:0.14.0` и по короткому пути, и по пути с `library/`; digest совпадает с Docker Hub. Зонд на префиксе прошёл. Код не меняется, и правило набора «реестр в коде не хардкодится» не нарушается |
 | `GAUNTLET_GUARD=off` | **нет** | да (уже задана) | Выключает guard целиком (раздел 2) |
 | `GAUNTLET_STOP_HOOK` | нет | нет | Stop-хук нужен и в админ-окружении |
 
@@ -182,12 +182,12 @@ apt_pid=$!
     started=1
     for _ in $(seq 1 30); do docker info > /dev/null 2>&1 && break; sleep 1; done
   fi
-  for image in postgres:16.10-alpine rabbitmq:4.1-alpine testcontainers/ryuk:0.14.0; do
+  for image in postgres:16.10-alpine rabbitmq:4.1.2-alpine testcontainers/ryuk:0.14.0; do
     docker pull -q "mirror.gcr.io/${image}" || true
   done
   # 3. Образы docker compose (стенд Ш2a и профиль app) — под исходными именами: на compose и Dockerfile
-  #    префикс Testcontainers не действует. JAR_SOURCE=host, поэтому eclipse-temurin:21-jdk в облаке не нужен.
-  for image in postgres:16.10-alpine eclipse-temurin:21-jre; do
+  #    префикс Testcontainers не действует. JAR_SOURCE=host, поэтому eclipse-temurin:21.0.12.1_1-jdk в облаке не нужен.
+  for image in postgres:16.10-alpine eclipse-temurin:21.0.12.1_1-jre; do
     docker pull -q "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}" || true
   done
   if [ "$started" = 1 ] && [ -f /var/run/docker.pid ]; then
@@ -205,7 +205,7 @@ exit 0
 документацией не описан. Вторая новая сессия после сохранения скрипта должна показать:
 - `which pdftoppm` → путь;
 - в `docker images` образы `mirror.gcr.io/postgres`, `mirror.gcr.io/rabbitmq` и `mirror.gcr.io/testcontainers/ryuk`, а также
-  `postgres:16.10-alpine` и `eclipse-temurin:21-jre` под исходными именами (для docker compose);
+  `postgres:16.10-alpine` и `eclipse-temurin:21.0.12.1_1-jre` под исходными именами (для docker compose);
 - строку статуса `docker: up`.
 
 **Не включено, пока не проверено.**
@@ -390,7 +390,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   `SPRING_LIQUIBASE_ANALYTICS_ENABLED=false`.
 - **Контейнеры Docker в облачной VM не выходят в сеть** (bridge). Поэтому `docker build` с `JAR_SOURCE=build` в облаке
   падает. Образ собирать `./gradlew clean bootJar && docker build --build-arg JAR_SOURCE=host`, базовые образы брать через
-  `--build-arg JDK_IMAGE=mirror.gcr.io/library/eclipse-temurin:21-jdk` и `JRE_IMAGE=…:21-jre`.
+  `--build-arg JDK_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jdk` и `JRE_IMAGE=…:21.0.12.1_1-jre` (теги
+  закреплены Ш6, PR #26).
 - **Stop-хук платформы** (`~/.claude/stop-hook-git-check.sh`, не gauntlet):
   - один раз блокирует остановку при незакоммиченных изменениях. На остановке для утверждения спецификации черновик фич не
     коммитить, остановиться повторно;
@@ -436,7 +437,13 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     мутант и может оставить в `data-reference/` файлы `hs_err_pid*.log`. С Ш2a они в `.gitignore` (корень, `hs_err_pid*.log`),
     и `gauntletScope` их не видит: в Ш3 подложенный файл не попал в `git ls-files --others --exclude-standard`.
     После Ш3 (PR #5) в прогоне `scope=all` с тегом `hs_err_pid*.log` не появился, но RUN_ERROR остались:
-    3 мутанта `InboundRetryProperties:36` (record) засчитаны убитыми.
+    3 мутанта `InboundRetryProperties:36` (record) засчитаны убитыми. **Закрыто Р4 (2026-10-04):** `PitSummary.java`
+    печатает каждый RUN_ERROR строкой `RUN_ERROR … - UNVERIFIED: tests did not run`, а RUN_ERROR вне
+    `gauntlet/config/pit-runerror-allowlist.txt` валит `pitSummary` и с ним `mutationGate` (`dependsOn 'pitSummary'`);
+    формат строки — `Class#method Mutator # тест, который убивает`. На `main` после PR #26 в `scope=all` 8 RUN_ERROR в
+    4 классах (`InboundRetryProperties`, `PolicyResponse`, `LpuServicesResponse$Service`, `InsuranceContractResponse`),
+    все проверены чтением тестов и внесены; набор RUN_ERROR от прогона к прогону меняется (SIGSEGV), поэтому у лямбд
+    в allowlist glob `lambda$of$*` и оба boolean-мутатора.
   - Цена: покрытие для mutationGate дают только unit-тесты — они есть у 7 из 67 классов, поэтому каждый касаемый класс
     требует unit-тестов (≥ 80 % строк, все покрытые мутанты убиты). Новый тест с `@IntegrationTest` молча выпадает из PIT.
   - Перед контрольным прогоном удалять `build/pitHistory.txt`: включён инкрементальный анализ.
@@ -464,11 +471,16 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   (у ТЗ-2 на брокере дефис, в ТЗ — подчёркивание; `contract-service/CLAUDE.md` исправлен по Р34). С Ш15 (PR #23) старт
   роняют и два одинаковых имени: id точки приёма равен имени очереди, и реестр Spring AMQP второй такой точки не
   принимает, даже при `RABBITMQ_LISTENER_AUTO_STARTUP=false`.
-- **Слушатели 1С по умолчанию выключены** (`RABBITMQ_LISTENER_AUTO_STARTUP=false`). Сервис здоров по пробам, но 1С не читает,
-  и в журнале об этом ни строки.
-- **Проверка TLS-сертификата и имени хоста брокера по умолчанию выключена** (в Boot 4.0.7 включена).
+- **Слушатели 1С по умолчанию включены** (с Ш5, PR #26: умолчание `RABBITMQ_LISTENER_AUTO_STARTUP` — `true`). Где переменная
+  не задана, сервис читает очереди 1С, и неверное или повторённое имя из 11 `ONEC_QUEUE_*` роняет старт. Локальный compose
+  и `.env.example` ставят `false`; при `false` сервис здоров по пробам, но 1С не читает, и в журнале об этом ни строки.
+- **Проверка TLS-сертификата и имени хоста брокера по умолчанию включена** (с Ш5, как в Boot 4.0.7). Тестовый контур
+  выключает её явно (`RABBITMQ_SSL_VALIDATE_CERTIFICATE=false`: сертификат самоподписанный, без имени хоста — решение по
+  PR #26); без этого TLS не поднимется, но старт не упадёт — readiness UP, 1С не читается, в журнале ошибки соединения AMQP.
   - `RABBITMQ_SSL_ENABLED=true` без `RABBITMQ_PORT=5671` даёт TLS на порт 5672.
   - При `validate-certificate=false` флаг `verify-hostname` в spring-rabbit 4.0.4 ничего не делает.
+- **Пароли без умолчаний** (с Ш5): незаданный `DB_PASSWORD` или `RABBITMQ_PASSWORD` уходит буквальной строкой плейсхолдера,
+  и ошибка — `password authentication failed` на миграциях Liquibase, а не «переменная не задана».
 - **Таймауты PostgreSQL — с Ш4 (PR #15), только на пуле приложения.** `lock_timeout` 5s, `statement_timeout` 30s,
   `idle_in_transaction_session_timeout` 1min (стартовый параметр `options` pgjdbc), `socketTimeout` 60 с
   (`application.yml:30-62` на `1aeefa1`); переменные `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`,
@@ -529,7 +541,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     Через 5 с к WARN добавляется ERROR «Shutdown Signal» с кодом 406 (unknown delivery tag): nack ушёл в новый канал,
     который прокси открыл сам. Это тот же сбой ack, а не второй отказ.
   - На quorum-очереди RabbitMQ ≥ 4.0 (delivery-limit по умолчанию 20) сообщение будет потеряно.
-  - При prefetch 20 возврат переставляет сообщения: порядок записи [2, 3, 4, 5, 1].
+  - С Ш1b (PR #26) prefetch 1: порядок записи при возврате [1, 2, 3, 4, 5] (на prefetch 20 было [2, 3, 4, 5, 1]).
+    На quorum-очереди без delivery-limit возвращённое сообщение уходит в конец очереди, и порядок не держит и prefetch 1
+    (раздел 8). Цена — пропускная способность ТЗ-1 примерно вдвое ниже (замер PR #26: 147–166 против 259–387 сообщ./с).
   - С Ш4 (PR #15) сбоем записи стала и чужая блокировка: таблица приёма (`inbound_message`, `inbox`), занятая дольше 5 с,
     даёт отказ 55P03 вместо ожидания, и слушатель уходит в цикл «до 5 с ожидания, 5 с паузы, nack»; до Ш4 он на ней ждал.
     На quorum-очереди с delivery-limit 20 одиночное сообщение теряется примерно через 3,5 мин такой блокировки. Считать ли
@@ -555,8 +569,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - Требует BuildKit (`RUN --mount`).
   - В режиме `JAR_SOURCE=host` маска `data-reference-*.jar` при нескольких совпадениях молча берёт последний по алфавиту
     (воспроизведено на 0.1.0/0.9.0/0.10.0). Перед сборкой — `clean bootJar`.
-- **Плавающие теги** `eclipse-temurin:21-jre` (сейчас JDK 21.0.12.1 на Ubuntu 26.04.1) и `rabbitmq:4.1-alpine` (4.1.8,
-  пересобран 2026-09-29). Прокси Docker в Nexus может отдать под тем же тегом другое.
+- **Теги закреплены** (Ш6, PR #26): `eclipse-temurin:21.0.12.1_1-jdk/-jre`, `rabbitmq:4.1.2-alpine`,
+  `rabbitmq:4.1.2-management-alpine` (Erlang 27.3.4.2 — как у брокера контура, Р16). Обновлять вручную: Temurin — отдельным
+  шагом на каждое квартальное обновление JDK, RabbitMQ — вслед за брокером 1С. Плавающий `rabbitmq:4.1-alpine` — уже 4.1.8,
+  другая патч-версия.
 - **`spring-boot-starter-web` 4.0.7 помечен устаревшим** в пользу `starter-webmvc`, но в Nexus контура есть только он. Не менять.
 
 ---
@@ -606,7 +622,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
    - (а) тег сразу на составных аннотациях — каждый касаемый класс потребует unit-тестов;
    - (б) оставить контекстные тесты в PIT — медленно, ложные выжившие;
    - (в) тег на классы тестов по кластерам, по мере появления unit-тестов.
-4. **RUN_ERROR** показывать отдельной строкой «не проверено» и не засчитывать как убитый.
+4. **RUN_ERROR** показывать отдельной строкой «не проверено» и не засчитывать как убитый — **сделано** (Р4, 2026-10-04,
+   PR набора): строка `UNVERIFIED` в `pitSummary`, красный `mutationGate` вне `config/pit-runerror-allowlist.txt`.
 5. **Приёмка.** `acceptanceCheck` должен падать при 0 исполненных сценариев и не читать устаревшие результаты.
 
 **Порядок работ задаёт владелец** (решения 2026-09-30, план):
@@ -732,12 +749,17 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 1. 312 модулей из `docs/gauntlet-setup-rvl-online-nexus.txt`: 180 с jar, 132 только POM (родительские POM, маркер плагина Spring
    Boot 4.0.7, 43 BOM из импорта `spring-boot-dependencies`). Версии из BOM совпадают с таблицей «Источников документации»;
    исключение — JUnit 6.1.3 в приёмке, но приёмка в контур не идёт.
-2. Дистрибутив `gradle-8.14.3-bin.zip`: зеркало для `distributionUrl` и аргумента `GRADLE_DISTRIBUTION_URL`.
+2. Дистрибутив `gradle-8.14.3-bin.zip`. В Nexus контура есть raw-proxy на services.gradle.org:
+   `https://nexus.sogaz.ru/repository/raw-proxy-services.gradle.com/gradle-8.14.3-bin.zip` (проверено сборкой образа
+   2026-10-01). Именно `-bin`, не `-all` (в `raw-hosted` лежит `gradle-8.14.3-all.zip` — другая сумма) и не образ `gradle:…`:
+   обёртка сверяет zip с `distributionSha256Sum` (`bd711022…3531`, Р17) и останавливает сборку при расхождении. В `.env` —
+   полный `https://…` адрес одной строкой `GRADLE_DISTRIBUTION_URL=<адрес>`: заготовка `<…>` из `.env.example` или повтор
+   имени переменной в значении дают `URISyntaxException`/`FileNotFoundException` на шаге `./gradlew dependencies`.
 3. Образы:
-   - `eclipse-temurin:21-jdk` и `21-jre` (Dockerfile);
-   - `postgres:16.10-alpine`, `rabbitmq:4.1-alpine`, `testcontainers/ryuk:0.14.0` (тесты через
+   - `eclipse-temurin:21.0.12.1_1-jdk` и `21.0.12.1_1-jre` (Dockerfile; теги закреплены Ш6);
+   - `postgres:16.10-alpine`, `rabbitmq:4.1.2-alpine`, `testcontainers/ryuk:0.14.0` (тесты через
      `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX`);
-   - `rabbitmq:4.1-management-alpine` (только локальный compose).
+   - `rabbitmq:4.1.2-management-alpine` (только локальный compose).
 4. Будущие зависимости плана — отдельно, до начала шага:
    - `io.micrometer:micrometer-registry-prometheus` (версия из BOM Boot 4.0.7, Micrometer 1.16.6);
    - провайдер кэша;
@@ -756,23 +778,40 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 | Переменная | Умолчание в коде | В контуре |
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/data_reference` | обязательна; параметры драйвера, нужные и пулу, и миграциям (`sslmode`, `sslrootcert`, `targetServerType`), — только здесь: у Liquibase своё соединение (Ш4, раздел 6); `?options=` и `?socketTimeout=` не задавать — URL перекрывает таймауты пула и отдаёт их миграциям |
-| `DB_USERNAME`, `DB_PASSWORD` | плейсхолдеры локального контура | обязательны, пароль — секрет развёртывания |
+| `DB_USERNAME`, `DB_PASSWORD` | логин локального контура; у пароля умолчания нет (Ш5) | обязательны, пароль — секрет развёртывания; без него — `password authentication failed` на миграциях |
 | `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `5s`, `30s`, `1min` (Ш4) | можно не задавать; если задавать — только с единицей PostgreSQL (`ms`, `s`, `min`): число без неё — миллисекунды; `0` — без ограничения |
 | `DB_SOCKET_TIMEOUT_SECONDS` | `60` (Ш4) | можно не задавать; целые секунды, больше `DB_STATEMENT_TIMEOUT` |
 | `API_READ_TIMEOUT_SECONDS` | `3` (Ш41, PR #25) | можно не задавать; целые секунды, не меньше 1, меньше `DB_LOCK_TIMEOUT` (иначе WARN при старте) и меньше таймаута клиента Договоров (О8); на агенте сборки не задавать — `RestReadTimeoutTest` ждёт 503 быстрее 5 с |
 | `RABBITMQ_HOST` | `localhost` | обязательна |
 | `RABBITMQ_PORT` | `5672` | `5671` при TLS: иначе TLS уйдёт на 5672 |
 | `RABBITMQ_VHOST` | `/` | по брокеру 1С |
-| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | плейсхолдеры | обязательны, пароль — секрет |
+| `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | логин локального контура; у пароля умолчания нет (Ш5) | обязательны, пароль — секрет |
 | `RABBITMQ_SSL_ENABLED` | `false` | `true` |
-| `RABBITMQ_SSL_VALIDATE_CERTIFICATE`, `RABBITMQ_SSL_VERIFY_HOSTNAME` | `false` | `true`; доверие сертификату брокера — через `certs/` |
-| `RABBITMQ_LISTENER_AUTO_STARTUP` | `false` | **обязательно `true`**, иначе сервис 1С не читает |
+| `RABBITMQ_SSL_VALIDATE_CERTIFICATE`, `RABBITMQ_SSL_VERIFY_HOSTNAME` | `true` (Ш5) | тестовый контур: `RABBITMQ_SSL_VALIDATE_CERTIFICATE=false` явно (сертификат самоподписанный, без имени хоста — решение по PR #26; `VERIFY_HOSTNAME` тогда не действует); прод: не задавать, CA в `certs/` при сборке образа, имя `RABBITMQ_HOST` в сертификате |
+| `RABBITMQ_LISTENER_AUTO_STARTUP` | `true` (Ш5) | задать `true` явно (Р62); где не задана — сервис читает 1С; `false` — сервис здоров, но 1С не читает |
 | `ONEC_QUEUE_*` (11 шт.) | имена тестового брокера `1c-usk_to_rvl-online_…` | сверить со списком брокера контура; неверное или повторённое имя роняет старт (с Ш15) |
 | `SPRING_LIQUIBASE_ANALYTICS_ENABLED` | не задано | `false` до переноса Ш1 |
 | `JDK_JAVA_OPTIONS` | `-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError` (образ) | по необходимости |
 
 Аргументы сборки образа: `JDK_IMAGE`, `JRE_IMAGE`, `GRADLE_DISTRIBUTION_URL`, `PUBLIC_REPOSITORIES` (по умолчанию `false` =
 Nexus), `JAR_SOURCE`.
+
+**Ловушки ручного переноса** (первый перенос в контур, 2026-10-01).
+- `data-reference/certs/import-ca.sh` и `certs/.gitkeep` обязательны: `Dockerfile` запускает скрипт на обоих этапах даже при
+  пустом `certs/`; без файла сборка падает с кодом 2 на `RUN … sh /certs/import-ca.sh`.
+- Тот же код 2 даёт CRLF в `import-ca.sh` (`set: Illegal option -`): копия, взятая на Windows до `.gitattributes` (PR #18),
+  или редактор, сохранивший CRLF. Проверка — `git ls-files --eol` (в колонке `w/` должно быть `lf`); лечение без
+  незакоммиченных правок — `git rm -r --cached -q . && git reset --hard`. Касается и `gradlew`, `gradle.properties`,
+  `src/test/resources/stand/seed.sh`.
+- IDE при переносе файлов перетаскиванием «обновляет ссылки» и переписывает пути `COPY` в `Dockerfile` на
+  `../../../Downloads/…` — сборка падает `not found`. Переносить проводником или `Copy-Item`; после переноса —
+  `Select-String -Path .\* -Pattern Downloads`.
+- `GRADLE_DISTRIBUTION_URL` — п. 2 «Проверить в Nexus»; `JDK_IMAGE`/`JRE_IMAGE` — полное имя образа в реестре контура
+  (`nexus.…/library/eclipse-temurin:21.0.12.1_1-jre`), образ `gradle:…` не нужен.
+- Compose: `docker compose up` без `-f` сам склеивает `docker-compose.yml` с `docker-compose.override.yml`; с `-f` перечислять
+  оба, базовый первым. Порты compose опубликованы на `127.0.0.1` (Ш5): для доступа с других машин — локальный
+  `docker-compose.override.yml` с `ports: !override`, не правка `docker-compose.yml`; после — правила брандмауэра на
+  8080/5432 и `Test-NetConnection` с другой машины.
 
 В документе 1С переменные брокера названы `RABBITMQ_1C_*`, а сервис читает `RABBITMQ_*`: в манифестах — имена из
 `application.yml`.

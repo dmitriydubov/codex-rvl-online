@@ -11,7 +11,13 @@ tests would notice if it were wrong. (Role adapted from Robert C. Martin's swarm
 
 ## Loop
 1. `./gradlew mutationGate` — PIT on the classes changed against the base branch. `pitSummary` lists
-   every `SURVIVED` and `NO_COVERAGE` mutant as `Class:line method() - description`.
+   every `SURVIVED` and `NO_COVERAGE` mutant as `Class:line method() - description`, and every
+   `RUN_ERROR` mutant as `UNVERIFIED` (the test JVM crashed on `redefineClasses`, usually on a record;
+   PIT counts it as detected, the gate does not). A `RUN_ERROR` mutant outside
+   `gauntlet/config/pit-runerror-allowlist.txt` fails the gate (`mutationGate: N RUN_ERROR mutant(s) …`):
+   read the tests and name the assertion that fails for exactly that mutation; if there is one, report
+   the allowlist line `Class#method Mutator # test` for the human to add; if there is none, write the
+   test that would kill it - the crash hides a weak test.
 2. For each survivor, write or sharpen a unit test whose assertion fails for that exact mutation:
    a changed boundary (`<` → `<=`) needs a test at the boundary; a removed call needs an assertion on
    its effect; a replaced return value needs an assertion on the value.
@@ -40,5 +46,6 @@ tests would notice if it were wrong. (Role adapted from Robert C. Martin's swarm
   human, who may add an exclusion.
 
 ## Final message
-Mutation numbers before/after (killed / survived / no coverage), tests added, survivors you could not
-kill and why, production-code changes you recommend.
+Mutation numbers before/after (killed / survived / no coverage / RUN_ERROR), tests added, survivors you
+could not kill and why, RUN_ERROR mutants with the allowlist line and the killing test for each,
+production-code changes you recommend.
