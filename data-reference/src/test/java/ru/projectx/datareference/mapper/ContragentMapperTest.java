@@ -144,6 +144,22 @@ class ContragentMapperTest {
         verify(lpuRepository, never()).save(any());
     }
 
+    @Test
+    void knownInsurer_getsTheNewDetails() {
+        var oldDetails = new Insurer.Details("Старое название", null, null, null, false);
+        Insurer known = Insurer.create(CONTRAGENT, oldDetails, NOW.minusSeconds(3600));
+        when(insurerRepository.findByExternalId(CONTRAGENT)).thenReturn(Optional.of(known));
+
+        ImportResult result = mapper(RVL).apply(insurer());
+
+        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
+        ArgumentCaptor<Insurer> saved = ArgumentCaptor.forClass(Insurer.class);
+        verify(insurerRepository).save(saved.capture());
+        assertThat(saved.getValue()).isSameAs(known);
+        assertThat(known.name()).isEqualTo("АО «Страховщик»");
+        assertThat(known.inn()).isEqualTo("7700000000");
+    }
+
     private ContragentMapper mapper(String rvlActivity) {
         var contract = new OneCContractProperties(rvlActivity, null, null, "Адрес", List.of());
         return new ContragentMapper(lpuRepository, insurerRepository, contract, clock);
