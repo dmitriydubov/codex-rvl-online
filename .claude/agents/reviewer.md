@@ -63,6 +63,12 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    say what the thing is in the domain, mixed levels of abstraction in one method, comments that
    explain bad code, a new integration path without idempotency, timeouts or limits, a cheaper or
    safer design the author did not consider.
+10. **Comments and Javadoc in plain language** (`contract-service/CLAUDE.md`, «Комментарии и Javadoc»;
+   owner's rule of 2026-10-04): in every file the change touches, a reader in the company network -
+   without the plan, the ТЗ or gauntlet - must understand what the thing is and why from the comment
+   alone. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
+   dash chains, «см. раздел … в CLAUDE.md», restated code, edit history («после PR #25»). Old Javadoc in
+   an untouched file is not a finding; old Javadoc in a touched file is.
 
 ## Output (exactly this shape)
 ```
