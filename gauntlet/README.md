@@ -39,8 +39,6 @@ gauntlet/
   CLAUDE.md               процесс и правила для агентов — импортируется корневым CLAUDE.md
   README.md               этот файл
   INSTALL.md              что делает Claude в первой сессии, чтобы вживить набор в сервис
-  METHOD.md               инструкция метода к бандлу стартера: протоколы start/scan/coordinate, правила владельца, что
-                          в бандле от эталонного проекта
   install.sh              механическая часть установки (запускает Claude, шаг 7 INSTALL.md)
   gauntlet.gradle         все гейты (скрипт-плагин; build.gradle(.kts) сборки подключает его последней строкой)
   config/                 пороги (gauntlet.properties), архитектура, checkstyle.xml, pmd-ruleset.xml, allowlist'ы;
