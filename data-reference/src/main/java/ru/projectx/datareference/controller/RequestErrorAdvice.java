@@ -87,8 +87,7 @@ public class RequestErrorAdvice {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .allow(allowedMethods(unsupported).toArray(HttpMethod[]::new))
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ErrorResponse.of(METHOD_NOT_ALLOWED,
-                        "метод " + unsupported.getMethod() + " у этого ресурса не поддерживается", CurrentRequest.id()));
+                .body(ErrorResponse.of(METHOD_NOT_ALLOWED, "метод у этого ресурса не поддерживается", CurrentRequest.id()));
     }
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)

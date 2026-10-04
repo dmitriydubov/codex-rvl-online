@@ -101,13 +101,13 @@ class ReferenceErrorAdviceTest {
     }
 
     @Test
-    void incompleteReference_isLoggedAsWarning_withCodeAndRequestId(CapturedOutput output) {
+    void incompleteReference_isLoggedAsWarning_withCodeLpuAndRequestId(CapturedOutput output) {
         controller.failWith(IncompleteReferenceException.noActivePriceContract(FIRST));
 
         request();
 
         assertThat(output).contains("WARN", "данных 1С не хватает для ответа: NO_ACTIVE_PRICE_CONTRACT",
-                "request_id=" + REQUEST_ID).doesNotContain("ERROR");
+                "lpu_id=" + FIRST, "request_id=" + REQUEST_ID).doesNotContain("ERROR");
     }
 
     private MvcTestResult request() {

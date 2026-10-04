@@ -23,8 +23,9 @@ import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 
 /**
- * Базовая логика B (ТЗ на API): допсоглашение со своими ценами важнее главного договора,
- * допсоглашение с ценами главного в отборе не участвует; два кандидата — неоднозначность.
+ * Выбор договора ЛПУ, по которому брать цены. Допсоглашение со своими ценами важнее главного договора.
+ * Допсоглашение, которое берёт цены главного, в отборе не участвует. Если подходят два договора, выбор
+ * неоднозначен, и сервис отвечает отказом.
  */
 @ExtendWith(MockitoExtension.class)
 class PriceContractResolverTest {
@@ -82,7 +83,7 @@ class PriceContractResolverTest {
                         ambiguous -> assertThat(ambiguous.lpuContractIds()).hasSize(2));
     }
 
-    /** Допсоглашение берёт цены с главного, а главного нет — договора, по которому брать цены, нет. */
+    /** Допсоглашение берёт цены с главного договора, а главного нет. Значит, договора с ценами нет. */
     @Test
     void onlySupplementWithMainPrices_isNone() {
         active(supplementWithMainPrices);

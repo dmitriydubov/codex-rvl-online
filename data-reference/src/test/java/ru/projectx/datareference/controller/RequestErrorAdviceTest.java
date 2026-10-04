@@ -79,6 +79,8 @@ class RequestErrorAdviceTest {
         assertThat(result.getResponse().getHeader(HttpHeaders.ALLOW)).isEqualTo("GET,HEAD,OPTIONS");
         assertThat(result).hasContentType(MediaType.APPLICATION_JSON);
         assertProtocolError(result, "METHOD_NOT_ALLOWED");
+        assertThat(result).bodyJson().extractingPath("$.error.message")
+                .isEqualTo("метод у этого ресурса не поддерживается");
         assertThat(output).doesNotContain("ERROR");
     }
 
@@ -108,8 +110,9 @@ class RequestErrorAdviceTest {
         assertThat(result.getResponse().getHeader(HttpHeaders.ALLOW)).isEqualTo("OPTIONS");
     }
 
+    /** Неразбираемый {@code Accept} ({@code foo/}) Spring тоже считает неприемлемым, и ответ тот же. */
     @ParameterizedTest
-    @ValueSource(strings = {"text/xml", "application/xml", "text/html"})
+    @ValueSource(strings = {"text/xml", "application/xml", "text/html", "foo/"})
     void unsupportedAccept_isNotAcceptable_withJsonBody_inUnifiedFormat(String accept, CapturedOutput output) {
         MvcTestResult result = mvc.get().uri(FailingController.READ_ONLY)
                 .header(RequestIdFilter.HEADER, REQUEST_ID).header(HttpHeaders.ACCEPT, accept).exchange();

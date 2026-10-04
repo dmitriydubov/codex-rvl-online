@@ -19,7 +19,8 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
  *
  * <p>409 и 422 означают ошибку данных в 1С, а не вызывающего, поэтому они пишутся в журнал на уровне
  * WARN. По таким записям собирают очередь на исправление. В журнал идут код ошибки, идентификаторы
- * записей и идентификатор запроса, персональных данных там нет.
+ * конфликтующих записей или ЛПУ без договора с ценами и идентификатор запроса. Персональных данных
+ * там нет.
  */
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.REFERENCE)
@@ -44,7 +45,8 @@ public class ReferenceErrorAdvice {
     @ExceptionHandler(IncompleteReferenceException.class)
     @ResponseStatus(HttpStatus.UNPROCESSABLE_CONTENT)
     public ErrorResponse incompleteReference(IncompleteReferenceException incomplete) {
-        log.warn("данных 1С не хватает для ответа: {}, request_id={}", incomplete.code(), CurrentRequest.id());
+        log.warn("данных 1С не хватает для ответа: {}, lpu_id={}, request_id={}",
+                incomplete.code(), incomplete.lpuId(), CurrentRequest.id());
         return ErrorResponse.of(incomplete.code(), incomplete.getMessage(), CurrentRequest.id());
     }
 }
