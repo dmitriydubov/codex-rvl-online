@@ -51,7 +51,17 @@ class DatabaseOutagesTest {
     void rawHibernateTransactionTimeout_isTemporary() {
         Optional<DatabaseOutages.Outage> outage = outages.recognize(new TransactionException("Transaction timeout expired"));
 
-        assertThat(outage).hasValue(new DatabaseOutages.Outage("JpaSystemException", "нет"));
+        assertThat(outage).hasValue(new DatabaseOutages.Outage("JpaSystemException/TransactionException", "нет"));
+    }
+
+    /** Та же обёртка, уже сделанная Spring на пути через репозиторий: в журнале видна причина, а не только обёртка. */
+    @Test
+    void wrappedHibernateTransactionTimeout_isTemporary_namedWithItsCause() {
+        var wrapped = new JpaSystemException(new TransactionException("Transaction timeout expired"));
+
+        Optional<DatabaseOutages.Outage> outage = outages.recognize(wrapped);
+
+        assertThat(outage).hasValue(new DatabaseOutages.Outage("JpaSystemException/TransactionException", "нет"));
     }
 
     /** При обрыве соединения драйвер кладёт SQLSTATE класса 08 поверх IOException: нужен не корень, а ближайший SQLException. */
@@ -70,8 +80,7 @@ class DatabaseOutagesTest {
                 new DataAccessResourceFailureException(TEXT),
                 new QueryTimeoutException(TEXT),
                 new CannotAcquireLockException(TEXT),
-                new TransactionTimedOutException(TEXT),
-                new JpaSystemException(new TransactionException("Transaction timeout expired")));
+                new TransactionTimedOutException(TEXT));
     }
 
     /** Уже переведённые Spring отказы остаются временными и после прохода через переводчик. */

@@ -73,7 +73,19 @@ public class DatabaseOutages {
         if (!isTemporary(classified)) {
             return Optional.empty();
         }
-        return Optional.of(new Outage(classified.getClass().getSimpleName(), sqlState(classified)));
+        return Optional.of(new Outage(typeOf(classified), sqlState(classified)));
+    }
+
+    /**
+     * Тип для журнала. Обёртка Spring вокруг истёкшего лимита Hibernate называется вместе с причиной,
+     * иначе в журнале не отличить истёкший лимит транзакции от другого сбоя транзакции.
+     */
+    private static String typeOf(Throwable classified) {
+        String type = classified.getClass().getSimpleName();
+        if (isExpiredHibernateTransaction(classified)) {
+            return type + "/" + classified.getCause().getClass().getSimpleName();
+        }
+        return type;
     }
 
     private Throwable translate(RuntimeException failure) {
@@ -108,7 +120,8 @@ public class DatabaseOutages {
     /**
      * Что писать в журнал о временном отказе: тип исключения и SQLSTATE драйвера.
      *
-     * @param type     простое имя класса исключения после перевода
+     * @param type     простое имя класса исключения после перевода; у обёртки истёкшего лимита Hibernate —
+     *                 вместе с именем причины, через косую черту
      * @param sqlState код SQLSTATE или «нет», если в цепочке причин не было ошибки JDBC
      */
     public record Outage(String type, String sqlState) {

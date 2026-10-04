@@ -42,7 +42,8 @@ class RestReadTimeoutTest {
     /** {@code lock_timeout} пула: без лимита чтения ответ пришёл бы не раньше. */
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     private static final String UNKNOWN_ID = "f662d1c4-5b26-4248-8ba1-47954abd301a";
-    private static final UUID POLICY_EXTERNAL_ID = UUID.fromString("f662d1c4-5b26-4248-8ba1-47954abd3002");
+    private static final String POLICY_EXTERNAL_ID_TEXT = "f662d1c4-5b26-4248-8ba1-47954abd3002";
+    private static final UUID POLICY_EXTERNAL_ID = UUID.fromString(POLICY_EXTERNAL_ID_TEXT);
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("f662d1c4-5b26-4248-8ba1-47954abd3003");
     private static final UUID PROGRAM_EXTERNAL_ID = UUID.fromString("f662d1c4-5b26-4248-8ba1-47954abd3004");
     private static final LocalDate BEGIN = LocalDate.of(2026, 1, 1);
@@ -96,8 +97,8 @@ class RestReadTimeoutTest {
     @CsvSource({
             "policy_programs, /internal/v1/policies/{id}",
             "policy_services, /internal/v1/policies/{id}",
-            "policy_programs, /internal/v1/policies?external_id=" + "f662d1c4-5b26-4248-8ba1-47954abd3002",
-            "policy_services, /internal/v1/policies?external_id=" + "f662d1c4-5b26-4248-8ba1-47954abd3002"})
+            "policy_programs, /internal/v1/policies?external_id=" + POLICY_EXTERNAL_ID_TEXT,
+            "policy_services, /internal/v1/policies?external_id=" + POLICY_EXTERNAL_ID_TEXT})
     void tablePartOfExistingPolicyWaitingForDatabase_isCutByReadLimit_beforeLockTimeout(
             String lockedTable, String path) throws SQLException {
 
