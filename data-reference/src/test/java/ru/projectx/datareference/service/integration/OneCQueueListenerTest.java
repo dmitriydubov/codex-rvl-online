@@ -36,12 +36,12 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
- * Что слушатель отвечает брокеру — единственное его решение, и проверяется оно здесь.
- * Настоящий брокер для этого не нужен и мешал бы: «подтвердил» и «вернул в очередь»
- * различаются вызовом канала, а не наблюдаемым состоянием.
+ * Защищает единственное решение слушателя очередей 1С:УСК: что ответить брокеру после приёма
+ * сообщения.
  *
- * <p>Разбор конверта — настоящий: он чистая функция, и подменять его значило бы
- * проверять слушатель на несуществующем поведении.
+ * <p>Настоящий брокер для этого не нужен и мешал бы: «подтвердил» и «вернул в очередь» различаются
+ * вызовом канала, а не наблюдаемым состоянием. Разбор конверта здесь настоящий, потому что это чистая
+ * функция, и подменять её значило бы проверять слушатель на несуществующем поведении.
  */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerTest {
@@ -57,8 +57,8 @@ class OneCQueueListenerTest {
     private Channel channel;
 
     /**
-     * Пауза перед возвратом — почти нулевая: проверяется факт возврата, а не длина
-     * ожидания, и настоящие пять секунд здесь были бы просто пятью секундами прогона.
+     * Пауза перед возвратом почти нулевая, потому что проверяется факт возврата, а не длина ожидания.
+     * Настоящие пять секунд здесь были бы просто пятью секундами прогона.
      */
     private OneCQueueListener listener() {
         return new OneCQueueListener(
@@ -77,7 +77,7 @@ class OneCQueueListenerTest {
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
     }
 
-    /** Дубль — не ошибка: сырьё уже лежит, брокеру достаточно подтверждения. */
+    /** Дубль не считается ошибкой: сырьё уже лежит, и брокеру достаточно подтверждения. */
     @Test
     void duplicateMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(false);
@@ -87,7 +87,7 @@ class OneCQueueListenerTest {
         verify(channel).basicAck(DELIVERY_TAG, false);
     }
 
-    /** Сырьё сохраняется целиком и как есть: разбирать его будет шедулер, а не слушатель. */
+    /** Сырьё сохраняется целиком и как есть, потому что разбирает его планировщик, а не слушатель. */
     @Test
     void storedMessage_keepsRawBody() throws IOException {
         String body = envelope(MESSAGE_ID);
@@ -98,8 +98,8 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Недоступная база — не повод терять сообщение: оно возвращается в очередь,
-     * и брокер отдаст его снова.
+     * Недоступная база не повод терять сообщение. Оно возвращается в очередь, и брокер отдаст его
+     * снова.
      */
     @Test
     void storageFailure_returnsMessageToQueue() throws IOException {
@@ -113,8 +113,8 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Без {@code message-id} сообщение принять нечем — оно подтверждается и теряется.
-     * Возврат в очередь дал бы бесконечную передоставку одного и того же.
+     * Без {@code message-id} сообщение принять нечем, поэтому оно подтверждается и теряется. Возврат
+     * в очередь дал бы бесконечную передоставку одного и того же.
      */
     @Test
     void unreadableEnvelope_isAcknowledgedAndDropped() throws IOException {
@@ -126,9 +126,38 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * У прайсов две очереди на один поток: пакеты строк и финальные сообщения
-     * со счётчиками. Различает их только имя очереди, и оно обязано доехать до сырья —
-     * иначе сборка передачи (ТЗ-9) не отличит одно от другого.
+     * Сообщение с {@code message-id} не в канонической записи неопознаваемо. Оно подтверждается и
+     * теряется, как нечитаемый конверт, а не ложится в сырьё под GUID
+     * {@code 00000001-0002-0003-0004-000000000005}, который нестрогий разбор вычитал бы из
+     * {@code 1-2-3-4-5}.
+     */
+    @Test
+    void nonCanonicalMessageId_isAcknowledgedAndDropped() throws IOException {
+        listener().receive(OneCStream.MKB10, delivery(envelope("1-2-3-4-5")), channel);
+
+        verify(channel).basicAck(DELIVERY_TAG, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        verifyNoInteractions(ingestService);
+    }
+
+    /**
+     * Нулевой {@code message-id} значит, что идентификатора нет, и такое сообщение тоже подтверждается
+     * и теряется. Если бы слушатель сохранил его под нулевым ключом, каждое следующее такое сообщение
+     * молча считалось бы дублем первого.
+     */
+    @Test
+    void zeroMessageId_isAcknowledgedAndDropped() throws IOException {
+        listener().receive(OneCStream.MKB10, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);
+
+        verify(channel).basicAck(DELIVERY_TAG, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        verifyNoInteractions(ingestService);
+    }
+
+    /**
+     * У прайсов две очереди на один поток: пакеты строк и финальные сообщения со счётчиками. Различает
+     * их только имя очереди, и оно обязано дойти до сырья. Иначе сборка передачи прайса не отличит одно
+     * от другого.
      */
     @Test
     void priceListFinal_isStoredWithItsOwnQueue() throws IOException {
@@ -140,8 +169,8 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Подтверждение — только после того, как приём зафиксирован: подтверждённое, но
-     * не сохранённое сообщение брокер больше не отдаст, и оно потеряно.
+     * Подтверждение уходит только после того, как приём зафиксирован. Подтверждённое, но не
+     * сохранённое сообщение брокер больше не отдаст, и оно будет потеряно.
      */
     @Test
     void storedMessage_isAcknowledgedOnlyAfterItIsStored() throws IOException {
@@ -180,9 +209,9 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * «Сразу» — значит, не досиживая паузу: прерывание означает остановку контейнера,
-     * и полная пауза на каждом сообщении задержала бы её. Пауза здесь — час; тест,
-     * который её досидит, оборвётся по таймауту.
+     * «Сразу» значит «не досиживая паузу». Прерывание означает остановку контейнера, и полная пауза на
+     * каждом сообщении задержала бы её. Пауза здесь длится час, поэтому тест, который её досидит,
+     * оборвётся по таймауту.
      */
     @Test
     void interruptedPause_returnsMessageWithoutWaitingOutTheBackoff() throws IOException {
@@ -202,8 +231,8 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Сырьё — тот же текст, что прислала 1С, и кириллица в нём тоже: тело читается
-     * как UTF-8. Не та кодировка превратила бы наименования в мусор без единой ошибки.
+     * Сырьё совпадает с текстом, который прислала 1С, вместе с кириллицей, потому что тело читается как
+     * UTF-8. Другая кодировка превратила бы наименования в мусор без единой ошибки.
      */
     @Test
     void cyrillicBody_isStoredAsSent() throws IOException {
@@ -218,9 +247,9 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Сорвавшийся коммит, который Spring не переводит в исключение доступа к данным, приходит
-     * как {@link TransactionSystemException} — не {@code DataAccessException}. Сообщение
-     * и тогда возвращается в очередь: ловить одни исключения доступа к данным было бы мало.
+     * Сорвавшийся коммит, который Spring не переводит в исключение доступа к данным, приходит как
+     * {@link TransactionSystemException}, а не как {@code DataAccessException}. Сообщение и тогда
+     * возвращается в очередь, потому что ловить одни исключения доступа к данным было бы мало.
      */
     @Test
     void commitFailure_returnsMessageToQueue() throws IOException {
@@ -233,13 +262,14 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * {@link IOException} канала на подтверждении — не сбой хранения: сырьё уже лежит в базе.
-     * Ошибка уходит контейнеру, а возврата в очередь нет — неподтверждённое сообщение брокер
-     * передоставит сам, и дедупликация примет его как дубль.
+     * {@link IOException} канала на подтверждении не является сбоем хранения, потому что сырьё уже
+     * лежит в базе. Ошибка уходит контейнеру, а возврата в очередь нет. Неподтверждённое сообщение
+     * брокер передоставит сам, и дедупликация примет его как дубль.
      *
-     * <p>Только {@code IOException}: закрытый канал за прокси {@code CachingConnectionFactory}
-     * бросает на подтверждении {@code IllegalStateException}, и её слушатель пока принимает
-     * за сбой хранения (пауза и попытка {@code nack}). Это решение владельца, вместе с Ш30, Ш31.
+     * <p>Это касается только {@code IOException}. Закрытый канал за прокси
+     * {@code CachingConnectionFactory} бросает на подтверждении {@code IllegalStateException}, и её
+     * слушатель пока принимает за сбой хранения: держит паузу и пытается вернуть сообщение. Так решил
+     * владелец, и это поведение пересмотрят вместе с доработкой приёма из очередей.
      */
     @Test
     void acknowledgementIoFailure_isNotTakenForStorageFailure() throws IOException {
@@ -260,6 +290,10 @@ class OneCQueueListenerTest {
     }
 
     private static String envelope(UUID messageId) {
+        return envelope(messageId.toString());
+    }
+
+    private static String envelope(String messageId) {
         return """
                 {"data":{"guid":"1a2b3c4d-0000-4000-8000-000000000001"},\
                 "metadata":{"message-id":"%s","producer":"1c-usk"}}"""

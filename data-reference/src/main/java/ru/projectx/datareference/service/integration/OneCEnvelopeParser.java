@@ -3,28 +3,32 @@ package ru.projectx.datareference.service.integration;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
+import ru.projectx.datareference.service.onec.OneCGuid;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Разбор конверта сообщения 1С — ровно настолько, насколько нужно приёму.
+ * Достаёт из конверта сообщения 1С:УСК его идентификатор {@code message-id}, который нужен приёму
+ * из очереди.
  *
  * <p>Конверт устроен так: {@code { "data": {…}, "metadata": { "message-id": …,
- * "topic": …, "producer": …, "creation-timestamp": … } } }. Приёму отсюда нужно
- * <b>одно</b> — {@code message-id}: он и ключ дедупликации, и ключ строки сырья.
- * Всё остальное разбирается позже, из сохранённого тела.
+ * "topic": …, "producer": …, "creation-timestamp": … } } }. Идентификатор {@code message-id}
+ * служит ключом дедупликации и ключом строки сырья, поэтому сообщение без него принять нельзя.
+ * В 1С:УСК нулевой GUID означает пустое значение, и нулевой {@code message-id} тоже считается
+ * отсутствующим. Всё остальное разбирается позже, из сохранённого тела.
  *
- * <p>Остальные поля {@code metadata} не читаются намеренно. {@code topic} у части потоков
- * пуст — маршрутизация идёт по очереди; {@code creation-timestamp} в разных примерах
- * контракта то ISO-строка, то большое число неизвестной единицы измерения, и числовой вид
- * интерпретировать нельзя, иначе в базу попадёт неверная дата.
+ * <p>Остальные поля {@code metadata} не читаются намеренно. Поле {@code topic} у части потоков
+ * пустое, потому что сообщение направляет очередь, а не это поле. Поле {@code creation-timestamp}
+ * в примерах контракта приходит то строкой даты, то большим числом неизвестной единицы
+ * измерения. Числовой вид истолковать нельзя, иначе в базу попадёт неверная дата.
  */
 @Component
 public class OneCEnvelopeParser {
 
     private static final String METADATA = "metadata";
     private static final String MESSAGE_ID = "message-id";
+    private static final String NO_MESSAGE_ID = "в metadata нет обязательного message-id";
 
     private final ObjectMapper json;
 
@@ -33,13 +37,16 @@ public class OneCEnvelopeParser {
     }
 
     /**
-     * @throws OneCEnvelopeException если тело нечитаемо или {@code message-id} нет либо
-     *         он не GUID — такое сообщение невозможно ни дедуплицировать, ни сохранить
+     * Достаёт {@code message-id} из тела сообщения.
+     *
+     * @throws OneCEnvelopeException если тело не читается как JSON, в нём нет {@code message-id},
+     *         он нулевой или записан не как GUID в канонической форме. Такое сообщение нельзя ни
+     *         дедуплицировать, ни сохранить.
      */
     public UUID messageIdOf(byte[] body) {
         JsonNode envelope = readTree(body);
         JsonNode metadata = metadataOf(envelope);
-        return parse(messageIdText(metadata));
+        return requireNotEmpty(parse(messageIdText(metadata)));
     }
 
     private JsonNode readTree(byte[] body) {
@@ -62,21 +69,31 @@ public class OneCEnvelopeParser {
     private static String messageIdText(JsonNode metadata) {
         String raw = metadata.path(MESSAGE_ID).asString(null);
         if (raw == null || raw.isBlank()) {
-            throw new OneCEnvelopeException("в metadata нет обязательного message-id");
+            throw new OneCEnvelopeException(NO_MESSAGE_ID);
         }
         return raw;
     }
 
     /**
-     * Значение в текст исключения не идёт: этим же путём проходят полисы, а текст
-     * исключения доезжает до лога.
+     * Принимает только каноническую запись GUID ({@link OneCGuid}). Нестрогий разбор прочитал бы
+     * искажённый {@code message-id} как чужой GUID, и сообщение легло бы под чужим ключом
+     * дедупликации. Значение в текст исключения не попадает: этим же путём приходят полисы, а текст
+     * исключения попадает в журнал.
      */
     private static UUID parse(String raw) {
-        try {
-            return UUID.fromString(raw);
+        return OneCGuid.parse(raw)
+                .orElseThrow(() -> new OneCEnvelopeException("metadata.message-id не является GUID"));
+    }
+
+    /**
+     * Нулевой {@code message-id} отклоняется так же, как отсутствующий. Иначе первое такое сообщение
+     * легло бы в сырьё под нулевым ключом, а все следующие считались бы его дублями и терялись,
+     * оставляя в журнале только DEBUG о дубле.
+     */
+    private static UUID requireNotEmpty(UUID messageId) {
+        if (OneCGuid.isEmpty(messageId)) {
+            throw new OneCEnvelopeException(NO_MESSAGE_ID);
         }
-        catch (IllegalArgumentException notAGuid) {
-            throw new OneCEnvelopeException("metadata.message-id не является GUID", notAGuid);
-        }
+        return messageId;
     }
 }
