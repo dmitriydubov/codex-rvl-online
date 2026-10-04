@@ -14,8 +14,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Конверт устроен так: {@code { "data": {…}, "metadata": { "message-id": …,
  * "topic": …, "producer": …, "creation-timestamp": … } } }. Идентификатор {@code message-id}
- * служит ключом дедупликации и ключом строки сырья. Всё остальное разбирается позже, из
- * сохранённого тела.
+ * служит ключом дедупликации и ключом строки сырья, поэтому нулевой GUID в нём означает, что
+ * идентификатора нет. Всё остальное разбирается позже, из сохранённого тела.
  *
  * <p>Остальные поля {@code metadata} не читаются намеренно. Поле {@code topic} у части потоков
  * пустое, потому что сообщение направляет очередь, а не это поле. Поле {@code creation-timestamp}
@@ -27,6 +27,10 @@ public class OneCEnvelopeParser {
 
     private static final String METADATA = "metadata";
     private static final String MESSAGE_ID = "message-id";
+    private static final String NO_MESSAGE_ID = "в metadata нет обязательного message-id";
+
+    /** Нулевой GUID в {@code message-id} значит, что идентификатора у сообщения нет. */
+    private static final UUID ZERO_GUID = new UUID(0L, 0L);
 
     private final ObjectMapper json;
 
@@ -37,14 +41,14 @@ public class OneCEnvelopeParser {
     /**
      * Достаёт {@code message-id} из тела сообщения.
      *
-     * @throws OneCEnvelopeException если тело не читается как JSON, в нём нет {@code message-id}
-     *         или он записан не как GUID в канонической форме. Такое сообщение нельзя ни
+     * @throws OneCEnvelopeException если тело не читается как JSON, в нём нет {@code message-id},
+     *         он нулевой или записан не как GUID в канонической форме. Такое сообщение нельзя ни
      *         дедуплицировать, ни сохранить.
      */
     public UUID messageIdOf(byte[] body) {
         JsonNode envelope = readTree(body);
         JsonNode metadata = metadataOf(envelope);
-        return parse(messageIdText(metadata));
+        return requireNotZero(parse(messageIdText(metadata)));
     }
 
     private JsonNode readTree(byte[] body) {
@@ -67,9 +71,21 @@ public class OneCEnvelopeParser {
     private static String messageIdText(JsonNode metadata) {
         String raw = metadata.path(MESSAGE_ID).asString(null);
         if (raw == null || raw.isBlank()) {
-            throw new OneCEnvelopeException("в metadata нет обязательного message-id");
+            throw new OneCEnvelopeException(NO_MESSAGE_ID);
         }
         return raw;
+    }
+
+    /**
+     * Нулевой {@code message-id} отклоняется так же, как отсутствующий. Иначе первое такое сообщение
+     * легло бы в сырьё под нулевым ключом, а все следующие молча считались бы его дублями и терялись
+     * без следа в журнале.
+     */
+    private static UUID requireNotZero(UUID messageId) {
+        if (ZERO_GUID.equals(messageId)) {
+            throw new OneCEnvelopeException(NO_MESSAGE_ID);
+        }
+        return messageId;
     }
 
     /**

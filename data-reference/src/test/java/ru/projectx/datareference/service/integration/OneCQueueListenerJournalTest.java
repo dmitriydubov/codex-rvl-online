@@ -161,6 +161,21 @@ class OneCQueueListenerJournalTest {
         assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
     }
 
+    /**
+     * Сообщение с нулевым message-id потеряно так же громко, как сообщение без message-id: в журнале
+     * остаётся ERROR «потеряно» с причиной, а не DEBUG о дубле.
+     */
+    @Test
+    void zeroMessageId_isLoggedAsLost() throws IOException {
+        listener().receive(OneCStream.POLICIES, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);
+
+        ILoggingEvent error = onlyEvent(Level.ERROR);
+        assertThat(error.getFormattedMessage())
+                .contains("потеряно", "в metadata нет обязательного message-id")
+                .doesNotContain(PERSONAL_DATA);
+        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
+    }
+
     @Test
     void duplicate_isReportedAsDuplicate() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenReturn(false);

@@ -141,6 +141,20 @@ class OneCQueueListenerTest {
     }
 
     /**
+     * Нулевой {@code message-id} значит, что идентификатора нет, и такое сообщение тоже подтверждается
+     * и теряется. Сохрани слушатель его под нулевым ключом, каждое следующее такое сообщение молча
+     * считалось бы дублем первого.
+     */
+    @Test
+    void zeroMessageId_isAcknowledgedAndDropped() throws IOException {
+        listener().receive(OneCStream.MKB10, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);
+
+        verify(channel).basicAck(DELIVERY_TAG, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        verifyNoInteractions(ingestService);
+    }
+
+    /**
      * У прайсов две очереди на один поток: пакеты строк и финальные сообщения со счётчиками. Различает
      * их только имя очереди, и оно обязано дойти до сырья. Иначе сборка передачи прайса не отличит одно
      * от другого.

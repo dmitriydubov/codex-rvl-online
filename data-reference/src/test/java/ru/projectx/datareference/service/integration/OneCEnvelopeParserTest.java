@@ -82,6 +82,20 @@ class OneCEnvelopeParserTest {
                 .hasMessage("в конверте нет объекта metadata");
     }
 
+    /**
+     * Нулевой GUID в message-id значит, что идентификатора нет. Принять такое сообщение нельзя: первое
+     * легло бы в сырьё под нулевым ключом, а все следующие молча считались бы его дублями и терялись.
+     */
+    @Test
+    void zeroMessageId_isRejectedAsMissing() {
+        String body = """
+                {"data":{},"metadata":{"message-id":"00000000-0000-0000-0000-000000000000"}}""";
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("в metadata нет обязательного message-id");
+    }
+
     /** Пустой и пробельный message-id считается отсутствующим, а не «не GUID». */
     @ParameterizedTest
     @ValueSource(strings = {"\"\"", "\"   \"", "null"})
