@@ -39,6 +39,15 @@ class RvlActivitySettingStartupTest {
         });
     }
 
+    /** Нулевой GUID в сообщениях 1С:УСК означает пустое значение, поэтому как настройка он не годится. */
+    @Test
+    void nilGuidSetting_stopsTheStart() {
+        context.withPropertyValues(SETTING + "=00000000-0000-0000-0000-000000000000").run(started -> {
+            assertThat(started).hasFailed();
+            assertThat(fullReport(started.getStartupFailure())).contains(SETTING);
+        });
+    }
+
     @Test
     void canonicalSetting_starts() {
         context.withPropertyValues(SETTING + "=F3876C53-C7D8-4620-B364-9538164BA5D4")

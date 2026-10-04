@@ -21,7 +21,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбирает поток контрагентов-юрлиц из 1С:УСК (ТЗ-3). В одном потоке приходят два разных
+ * Разбирает поток контрагентов-юрлиц из 1С:УСК. В одном потоке приходят два разных
  * справочника, и различает их сама 1С полем {@code thisIsLPU}.
  *
  * <p>Санаторий ({@code thisIsLPU = true}) принимается только с видом деятельности «РВЛ»: поток несёт
@@ -34,7 +34,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>GUID вида деятельности «РВЛ» берётся из настройки {@code projectx.onec.contract.rvl-activity-id}
  * и читается при создании маппера, то есть при старте сервиса. Запись не в канонической форме 8-4-4-4-12
  * останавливает старт: стандартное чтение UUID превратило бы её в другой GUID, и все санатории молча
- * уходили бы в пропуск. Само значение в текст ошибки не попадает.
+ * уходили бы в пропуск. Нулевой GUID тоже останавливает старт: в сообщениях 1С:УСК он означает пустое
+ * значение и ни с одним видом деятельности не совпадёт. Само значение в текст ошибки не попадает.
  */
 @Component
 public class ContragentMapper implements StreamMapper {
@@ -42,8 +43,8 @@ public class ContragentMapper implements StreamMapper {
     private static final String ACTIVITIES = "typesActivities";
     private static final String ACTIVITY_GUID = "guidTypeActivities";
     private static final String RVL_ACTIVITY_NOT_CANONICAL =
-            "настройка projectx.onec.contract.rvl-activity-id не в канонической записи GUID 8-4-4-4-12: "
-                    + "без неё санатории РВЛ не отличить от прочих контрагентов 1С:УСК";
+            "настройка projectx.onec.contract.rvl-activity-id не в канонической записи GUID 8-4-4-4-12 "
+                    + "или нулевая: без неё санатории РВЛ не отличить от прочих контрагентов 1С:УСК";
     private static final String RVL_ACTIVITY_NOT_SET =
             "не задан projectx.onec.contract.rvl-activity-id — отличить санаторий от прочих юрлиц 1С:УСК нечем";
     private static final String WITHOUT_RVL = "контрагент без вида деятельности РВЛ";
@@ -52,7 +53,7 @@ public class ContragentMapper implements StreamMapper {
 
     private final LpuRepository lpuRepository;
     private final InsurerRepository insurerRepository;
-    private final Optional<UUID> rvlActivity;
+    private final @Nullable UUID rvlActivity;
     private final Clock clock;
 
     public ContragentMapper(
@@ -80,14 +81,20 @@ public class ContragentMapper implements StreamMapper {
                 : applyInsurer(externalId, data);
     }
 
-    /** Пустая настройка означает, что GUID не задан; заданная читается только в канонической записи. */
-    private static Optional<UUID> rvlActivityOf(OneCContractProperties contract) {
-        return contract.rvlActivity().map(setting -> OneCGuid.parse(setting)
-                .orElseThrow(() -> new IllegalStateException(RVL_ACTIVITY_NOT_CANONICAL)));
+    /**
+     * Пустая настройка означает, что GUID не задан. Заданная читается только в канонической записи
+     * и не может быть нулевым GUID.
+     */
+    private static @Nullable UUID rvlActivityOf(OneCContractProperties contract) {
+        return contract.rvlActivity()
+                .map(setting -> OneCGuid.parse(setting)
+                        .filter(guid -> !OneCGuid.isEmpty(guid))
+                        .orElseThrow(() -> new IllegalStateException(RVL_ACTIVITY_NOT_CANONICAL)))
+                .orElse(null);
     }
 
     private ImportResult applySanatorium(UUID externalId, ObjectNode data) {
-        return rvlActivity
+        return Optional.ofNullable(rvlActivity)
                 .map(rvl -> applySanatorium(externalId, data, rvl))
                 .orElseGet(() -> ImportResult.skipped(RVL_ACTIVITY_NOT_SET));
     }
@@ -146,23 +153,18 @@ public class ContragentMapper implements StreamMapper {
                 .anyMatch(activityId::equals);
     }
 
-    /**
-     * Санаторий и страхователь — один и тот же контрагент 1С с одинаковыми реквизитами юрлица. У санатория
-     * к ним добавляются телефон и почта, поэтому общие реквизиты читаются один раз.
-     */
+    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
     private static Lpu.Details lpuDetailsOf(ObjectNode data) {
-        Insurer.Details legalEntity = insurerDetailsOf(data);
         return new Lpu.Details(
-                legalEntity.name(),
-                legalEntity.fullName(),
-                legalEntity.inn(),
-                legalEntity.kpp(),
+                OneCValues.requiredText(data, "Наименование"),
+                optionalText(data, "НаименованиеПолное"),
+                optionalText(data, "ИНН"),
+                optionalText(data, "КПП"),
                 optionalText(data, "Телефон"),
                 optionalText(data, "EMAIL"),
-                legalEntity.deleteMark());
+                OneCValues.flag(data, "deleteMark"));
     }
 
-    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
     private static Insurer.Details insurerDetailsOf(ObjectNode data) {
         return new Insurer.Details(
                 OneCValues.requiredText(data, "Наименование"),

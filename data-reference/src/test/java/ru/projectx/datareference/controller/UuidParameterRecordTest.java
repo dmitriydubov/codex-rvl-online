@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.net.URI;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,23 @@ class UuidParameterRecordTest {
             assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
             assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo(field);
         }
+        verifyNoInteractions(
+                insuranceContracts, programs, policies, policySearch, contractViews, catalogs, cards, services);
+    }
+
+    /** Пустой параметр — это «параметра нет», а не нечитаемый UUID; ответ тот же 400 с именем параметра. */
+    @ParameterizedTest
+    @CsvSource(delimiterString = " => ", value = {
+            "/insurance-contracts?external_id= => external_id",
+            "/policies?external_id=%20%20 => external_id",
+            "/policies?number=1&contract_id= => contract_id"})
+    void blankUuidParameter_isTheMissingParameter_withoutAskingServices(String path, String field) {
+        MvcTestResult result = mvc.get().uri(URI.create(API + path)).exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo(field);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo("обязательный параметр");
         verifyNoInteractions(
                 insuranceContracts, programs, policies, policySearch, contractViews, catalogs, cards, services);
     }

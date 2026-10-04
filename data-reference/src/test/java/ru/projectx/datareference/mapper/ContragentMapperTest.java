@@ -48,7 +48,12 @@ class ContragentMapperTest {
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @ParameterizedTest
-    @ValueSource(strings = {"1-2-3-4-5", "0-0-0-0-0", "f3876c53c7d8-4620-b364-9538164ba5d4-", " " + RVL})
+    @ValueSource(strings = {
+            "1-2-3-4-5",
+            "0-0-0-0-0",
+            "00000000-0000-0000-0000-000000000000",
+            "f3876c53c7d8-4620-b364-9538164ba5d4-",
+            " " + RVL})
     void nonCanonicalRvlActivitySetting_stopsTheStart_withoutRepeatingTheValue(String setting) {
         assertThatIllegalStateException()
                 .isThrownBy(() -> mapper(setting))

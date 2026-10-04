@@ -16,7 +16,8 @@ import ru.projectx.datareference.service.onec.OneCGuid;
  *
  * <p>Пустое значение по-прежнему означает, что параметра нет, как и при стандартном чтении.
  *
- * <p>Редактор хранит прочитанное значение, поэтому на каждый запрос создаётся новый экземпляр.
+ * <p>Редактор хранит прочитанное значение, поэтому для каждого аргумента запроса создаётся новый
+ * экземпляр (см. {@link UuidParameters}).
  */
 final class CanonicalUuidEditor extends PropertyEditorSupport {
 
