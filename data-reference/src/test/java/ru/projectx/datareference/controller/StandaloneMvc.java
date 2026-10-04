@@ -19,7 +19,7 @@ final class StandaloneMvc {
 
     static MockMvcTester of(Object controller) {
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler())
+                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages()))
                 .build());
     }
 }

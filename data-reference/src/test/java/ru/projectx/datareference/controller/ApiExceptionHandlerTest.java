@@ -58,7 +58,7 @@ class ApiExceptionHandlerTest {
     @BeforeEach
     void setUp() {
         mvc = MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler())
+                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages()))
                 .addFilters(new RequestIdFilter())
                 .build());
     }
