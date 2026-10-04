@@ -13,12 +13,12 @@ import ru.projectx.datareference.config.JacksonConfig;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
 
 /**
- * Разбор конверта — чистая функция от байтов, и проверяется без контекста Spring:
- * ни базы, ни брокера здесь не нужно.
+ * Защищает разбор конверта сообщения 1С:УСК: из тела достаётся только {@code message-id}, а
+ * сообщение без пригодного {@code message-id} отклоняется.
  *
- * <p>{@code ObjectMapper} берётся у приложения, а не собирается заново: разбор обязан
- * работать на той настройке, которая стоит в проде — в частности, на игнорировании
- * незнакомых полей.
+ * <p>Разбор — чистая функция от байтов, поэтому проверяется без контекста Spring, базы и брокера.
+ * {@code ObjectMapper} берётся у приложения, а не собирается заново: разбор обязан работать на той
+ * настройке, которая стоит в проде, в частности на игнорировании незнакомых полей.
  */
 class OneCEnvelopeParserTest {
 
@@ -73,7 +73,7 @@ class OneCEnvelopeParserTest {
                 .hasMessageContaining("message-id");
     }
 
-    /** metadata не объект — это конверт без metadata, а не metadata без message-id. */
+    /** Если metadata не объект, это конверт без metadata, а не metadata без message-id. */
     @Test
     void metadataThatIsNotObject_isRejectedAsMissingMetadata() {
         assertThatThrownBy(() -> parser.messageIdOf(bytes("""
@@ -82,7 +82,7 @@ class OneCEnvelopeParserTest {
                 .hasMessage("в конверте нет объекта metadata");
     }
 
-    /** Пустой и пробельный message-id — отсутствующий, а не «не GUID». */
+    /** Пустой и пробельный message-id считается отсутствующим, а не «не GUID». */
     @ParameterizedTest
     @ValueSource(strings = {"\"\"", "\"   \"", "null"})
     void blankMessageId_isRejectedAsMissing(String messageId) {
@@ -103,14 +103,14 @@ class OneCEnvelopeParserTest {
     }
 
     /**
-     * Ш13a, решение 1 (а) владельца: message-id — только в канонической форме 8-4-4-4-12.
-     * Эти значения {@code UUID.fromString} JDK 21 читает молча как другой GUID, и сообщение легло
-     * бы в сырьё под чужим ключом дедупликации. Отказ — тот же, что у нечитаемого message-id, без
-     * значения и без причины-исключения, чей текст его бы цитировал.
+     * message-id принимается только в канонической записи 8-4-4-4-12. Эти значения
+     * {@code UUID.fromString} в JDK 21 молча читает как другой GUID, и сообщение легло бы в сырьё под
+     * чужим ключом дедупликации. Отказ такой же, как у нечитаемого message-id: без значения и без
+     * исключения-причины, текст которого процитировал бы значение.
      */
     @ParameterizedTest
     @ValueSource(strings = {"1-2-3-4-5", "0-0-0-0-0", "09f1c0f2e-0000-4000-8000-00000000000",
-            "9f1c0f2e-0000-4000-8000-+0000000000a", "9f1c0f2e-0000-4000-8000-00000000000５"})
+            "9f1c0f2e-0000-4000-8000-+0000000000a", "9f1c0f2e-0000-4000-8000-00000000000\uFF15"})
     void nonCanonicalMessageId_isRejected(String messageId) {
         String body = """
                 {"data":{},"metadata":{"message-id":"%s"}}""".formatted(messageId);
@@ -122,8 +122,8 @@ class OneCEnvelopeParserTest {
     }
 
     /**
-     * message-id конверт не обрезает, в отличие от полей сообщения: с пробелом или переводом строки
-     * по краям он не в канонической форме и отклоняется, как отклонялся и до Ш13a (37 символов).
+     * Конверт не обрезает message-id, в отличие от полей сообщения. С пробелом или переводом строки
+     * по краям message-id записан не канонически и отклоняется.
      */
     @ParameterizedTest
     @ValueSource(strings = {" 9f1c0f2e-0000-4000-8000-00000000000a", "9f1c0f2e-0000-4000-8000-00000000000a\\n"})
@@ -136,7 +136,7 @@ class OneCEnvelopeParserTest {
                 .hasMessage("metadata.message-id не является GUID");
     }
 
-    /** Регистр 1С:УСК не задаёт: прописные цифры — тот же message-id (Ш13a, решение 2). */
+    /** 1С:УСК регистр не задаёт, поэтому message-id прописными цифрами — тот же GUID. */
     @Test
     void uppercaseMessageId_isTheSameGuid() {
         String body = """
@@ -176,9 +176,9 @@ class OneCEnvelopeParserTest {
     }
 
     /**
-     * Нечитаемое тело — возможно, полис. Jackson называет в своей ошибке токен, на котором
-     * споткнулся ({@code Unrecognized token '…'}), поэтому её текст в отказ не идёт:
-     * отказ — фиксированная фраза, без содержимого тела.
+     * Нечитаемое тело может оказаться полисом. Jackson называет в своей ошибке токен, на котором
+     * споткнулся ({@code Unrecognized token '…'}), поэтому её текст в отказ не идёт. Отказ — это
+     * фиксированная фраза без содержимого тела.
      */
     @Test
     void unreadableBody_isRejectedWithoutQuotingIt() {
@@ -202,7 +202,7 @@ class OneCEnvelopeParserTest {
     }
 
     /**
-     * message-id объектом или массивом — не текст: такой конверт отклоняется как
+     * message-id объектом или массивом текстом не является. Такой конверт отклоняется как
      * неопознаваемый, а не роняет разбор исключением Jackson о приведении типа.
      */
     @ParameterizedTest

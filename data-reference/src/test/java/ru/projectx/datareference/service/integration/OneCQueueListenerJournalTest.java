@@ -37,10 +37,12 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
- * Что слушатель оставляет в журнале. Две вещи: по строке журнала находится сообщение
- * (MDC {@code messageId}, {@code stream}, {@code queue} на время обработки), и в журнал
- * не попадает ни тело сообщения, ни текст чужого исключения — через слушатель идут
- * полисы с персональными данными, а ошибка вставки печатает параметры запроса.
+ * Защищает то, что слушатель очередей 1С:УСК оставляет в журнале.
+ *
+ * <p>Важны две вещи. По строке журнала находится её сообщение: на время обработки в MDC лежат
+ * {@code messageId}, {@code stream} и {@code queue}. И в журнал не попадает ни тело сообщения, ни
+ * текст чужого исключения, потому что через слушатель идут полисы с персональными данными, а ошибка
+ * вставки печатает параметры запроса.
  */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerJournalTest {
@@ -48,10 +50,10 @@ class OneCQueueListenerJournalTest {
     private static final String QUEUE = "1c-usk_to_rvl-online_policies";
     private static final UUID MESSAGE_ID = UUID.fromString("9f1c0f2e-0000-4000-8000-00000000000c");
 
-    /** Похоже на ПДн из полиса — ровно то, чего в журнале быть не должно. */
+    /** Похоже на персональные данные из полиса, то есть ровно на то, чего в журнале быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна";
 
-    /** Ключ MDC, который положил не слушатель — например, трассировка. */
+    /** Ключ MDC, который положил не слушатель, а, например, трассировка. */
     private static final String FOREIGN_MDC_KEY = "traceId";
     private static final String FOREIGN_MDC_VALUE = "0af7651916cd43dd8448eb211c80319c";
 
@@ -97,7 +99,7 @@ class OneCQueueListenerJournalTest {
                 .containsEntry(OneCQueueListener.MDC_QUEUE, QUEUE);
     }
 
-    /** Поток контейнера обрабатывает следующее сообщение: чужие ключи ему не достаются. */
+    /** Поток контейнера обработает следующее сообщение, и ключи этого сообщения ему не достаются. */
     @Test
     void mdc_isClearedAfterProcessing() throws IOException {
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
@@ -107,7 +109,7 @@ class OneCQueueListenerJournalTest {
         assertThat(MDC.get(OneCQueueListener.MDC_QUEUE)).isNull();
     }
 
-    /** PH-23: в журнал — тип исключения, но не его текст. */
+    /** В журнал попадает тип исключения, но не его текст: текст ошибки вставки печатает параметры запроса. */
     @Test
     void storageFailure_logsExceptionTypeButNotItsText() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
@@ -125,8 +127,8 @@ class OneCQueueListenerJournalTest {
     }
 
     /**
-     * Потерянное сообщение — единственный след в журнале, поэтому строка несёт поток
-     * и очередь. Тела в ней нет: у нечитаемого конверта внутри может оказаться полис.
+     * От потерянного сообщения остаётся только строка журнала, поэтому она несёт поток и очередь. Тела
+     * в ней нет: у нечитаемого конверта внутри может оказаться полис.
      */
     @Test
     void unreadableEnvelope_logsStreamAndQueueButNoBody() throws IOException {
@@ -142,8 +144,8 @@ class OneCQueueListenerJournalTest {
     }
 
     /**
-     * Ш13a, решение 1 (а): сообщение, потерянное из-за message-id не в канонической форме, оставляет
-     * ERROR «потеряно» с причиной, но без самого значения и без тела.
+     * Сообщение, потерянное из-за message-id не в канонической записи, оставляет ERROR «потеряно» с
+     * причиной, но без самого значения и без тела.
      */
     @Test
     void nonCanonicalMessageId_isLoggedAsLostWithoutItsValue() throws IOException {
@@ -178,9 +180,9 @@ class OneCQueueListenerJournalTest {
     }
 
     /**
-     * Канал может отказать и на подтверждении — оборвалось соединение с брокером. Ошибка
-     * уходит контейнеру, но ключи сообщения с потока всё равно снимаются: иначе следующее
-     * сообщение этого потока писало бы в журнал чужой {@code messageId}.
+     * Канал может отказать и на подтверждении, если оборвалось соединение с брокером. Ошибка уходит
+     * контейнеру, но ключи сообщения с потока всё равно снимаются. Иначе следующее сообщение этого
+     * потока писало бы в журнал чужой {@code messageId}.
      */
     @Test
     void mdc_isClearedWhenAcknowledgementFails() throws IOException {
@@ -215,8 +217,8 @@ class OneCQueueListenerJournalTest {
     }
 
     /**
-     * Слушатель снимает только свои ключи: то, что положили в MDC до него (контейнер,
-     * трассировка), остаётся на месте.
+     * Слушатель снимает только свои ключи. То, что положили в MDC до него контейнер или трассировка,
+     * остаётся на месте.
      */
     @Test
     void foreignMdcKeys_surviveProcessing() throws IOException {

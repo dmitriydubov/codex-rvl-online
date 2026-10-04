@@ -14,9 +14,12 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Правила преобразования значений 1С. Чистая функция от JSON — ни контекста,
- * ни базы здесь не нужно, и это те тесты, которые ловят самые дорогие ошибки:
- * неверно понятое значение не роняет обработку, а тихо оседает в базе.
+ * Защищает правила преобразования значений из сообщений 1С:УСК: GUID, даты, строки, флаги, числа
+ * и деньги.
+ *
+ * <p>Неверно понятое значение не роняет обработку, а тихо оседает в базе, поэтому эти тесты ловят
+ * самые дорогие ошибки. Правила — чистые функции от JSON, и ни контекста Spring, ни базы здесь не
+ * нужно.
  */
 class OneCValuesTest {
 
@@ -67,9 +70,9 @@ class OneCValuesTest {
     }
 
     /**
-     * Смещение отбрасывается, а не переводится в UTC: это календарная дата договора.
-     * Перевод сдвинул бы полночь в +03:00 на день назад — ровно та ошибка, которую
-     * легко не заметить.
+     * Смещение отбрасывается, а не переводится в UTC, потому что это календарная дата договора.
+     * Перевод сдвинул бы полночь со смещением +03:00 на предыдущий день, а такую ошибку легко не
+     * заметить.
      */
     @Test
     void midnightWithOffset_keepsItsCalendarDate() {
@@ -79,9 +82,9 @@ class OneCValuesTest {
     }
 
     /**
-     * Третий вид даты, ТЗ-2: момент <b>без</b> смещения. Такой не разбирается ни как
-     * OffsetDateTime, ни как LocalDate — до появления этого потока он попадал
-     * в «поле не является датой» и уводил всё сообщение в терминальный отказ.
+     * Третий вид даты — момент <b>без</b> смещения, как в договорах страхования. Он не разбирается
+     * ни как {@code OffsetDateTime}, ни как {@code LocalDate}. Без отдельной ветки разбора такая дата
+     * давала бы «поле не является датой», и всё сообщение уходило бы в отказ без повторов.
      */
     @Test
     void dateTimeWithoutOffset_isRead() {
@@ -108,7 +111,7 @@ class OneCValuesTest {
                 .isInstanceOf(OneCFieldException.class);
     }
 
-    /** Открытая дата в обязательном поле — это незаполненное обязательное поле. */
+    /** Открытая дата в обязательном поле означает, что поле не заполнено. */
     @Test
     void requiredDate_rejectsOpenDate() {
         assertThatThrownBy(() -> OneCValues.requiredDate(node("{\"beginDate\":\"3000-01-01\"}"), "beginDate"))
@@ -150,7 +153,7 @@ class OneCValuesTest {
                 .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
     }
 
-    /** Нулевой GUID в обязательном поле — «ссылки нет», то есть поле не заполнено. */
+    /** Нулевой GUID в обязательном поле значит «ссылки нет», то есть поле не заполнено. */
     @Test
     void requiredGuid_rejectsZeroGuid() {
         ObjectNode data = node("{\"id\":\"00000000-0000-0000-0000-000000000000\"}");
@@ -161,9 +164,9 @@ class OneCValuesTest {
     }
 
     /**
-     * Текст исключения доезжает до лога: в нём имя поля, но не значение. Причины-исключения
-     * у отказа нет: разбор не зовёт нестрогий {@code UUID.fromString}, а его ошибка цитировала
-     * бы значение («Invalid UUID string: …»).
+     * Текст исключения попадает в журнал, поэтому в нём есть имя поля, но нет значения. У отказа нет
+     * исключения-причины: разбор не вызывает нестрогий {@code UUID.fromString}, а его ошибка
+     * процитировала бы значение («Invalid UUID string: …»).
      */
     @Test
     void unparsableGuid_namesFieldButNotValue() {
@@ -174,13 +177,13 @@ class OneCValuesTest {
     }
 
     /**
-     * Ш13a: GUID поля — только в канонической форме 8-4-4-4-12. Эти значения {@code UUID.fromString}
-     * JDK 21 читает молча как чужой GUID (00000001-0002-0003-0004-000000000005), и сообщение 1С
-     * затёрло бы чужую запись. Отказ называет поле, но не значение.
+     * GUID поля принимается только в канонической записи 8-4-4-4-12. Эти значения
+     * {@code UUID.fromString} в JDK 21 молча читает как чужой GUID 00000001-0002-0003-0004-000000000005,
+     * и сообщение 1С затёрло бы чужую запись. Отказ называет поле, но не значение.
      */
     @ParameterizedTest
     @ValueSource(strings = {"1-2-3-4-5", "000000001-002-0003-0004-000000000005",
-            "00000001-0002-0003-0004-+00000000005", "00000001-0002-0003-0004-00000000000５"})
+            "00000001-0002-0003-0004-+00000000005", "00000001-0002-0003-0004-00000000000\uFF15"})
     void nonCanonicalGuid_isContractViolationNamingFieldButNotValue(String nonCanonical) {
         ObjectNode data = node("{\"contractId\":\"%s\"}".formatted(nonCanonical));
 
@@ -191,8 +194,8 @@ class OneCValuesTest {
     }
 
     /**
-     * {@code 0-0-0-0-0} — не нулевой GUID «ссылки нет», а искажённое значение: нестрогий разбор
-     * читал его как нулевой GUID, и договор молча сохранялся без ссылки.
+     * {@code 0-0-0-0-0} — искажённое значение, а не нулевой GUID «ссылки нет». Нестрогий разбор
+     * прочитал бы его как нулевой GUID, и договор молча сохранился бы без ссылки.
      */
     @Test
     void nonCanonicalZeroGuid_isContractViolationRatherThanNoReference() {
@@ -201,7 +204,7 @@ class OneCValuesTest {
                 .hasMessage("поле guid не является GUID");
     }
 
-    /** Регистр 1С:УСК не задаёт: прописные цифры — тот же GUID, хранится он строчными (Ш13a, решение 2). */
+    /** 1С:УСК регистр не задаёт, поэтому GUID прописными цифрами — тот же GUID, и хранится он строчными. */
     @Test
     void uppercaseGuid_isTheSameGuid() {
         ObjectNode data = node("{\"id\":\"F3876C53-C7D8-4620-B364-9538164BA5D4\"}");
@@ -210,7 +213,7 @@ class OneCValuesTest {
                 .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
     }
 
-    /** Пробелы по краям, как у любой строки 1С, отбрасываются до разбора (Ш13a, решение 6). */
+    /** Пробелы по краям GUID отбрасываются до разбора, как у любой строки 1С. */
     @Test
     void guidWithSurroundingSpaces_isRead() {
         ObjectNode data = node("{\"id\":\"  f3876c53-c7d8-4620-b364-9538164ba5d4 \"}");
@@ -231,7 +234,7 @@ class OneCValuesTest {
                 .hasMessage("нет обязательной даты в поле beginDate");
     }
 
-    /** Значение — возможно, дата рождения из полиса — в текст исключения не попадает. */
+    /** Значение в текст исключения не попадает, потому что им может оказаться дата рождения из полиса. */
     @Test
     void unparsableDate_namesFieldButNotValue() {
         assertThatThrownBy(() -> OneCValues.date(node("{\"birthDate\":\"17.05.1980\"}"), "birthDate"))
@@ -244,7 +247,7 @@ class OneCValuesTest {
         assertThat(OneCValues.text(node("{}"), "code")).isEmpty();
     }
 
-    /** JSON {@code null} — то же, что отсутствующее значение, а не строка «null». */
+    /** JSON {@code null} означает отсутствующее значение, а не строку «null». */
     @Test
     void nullText_isEmpty() {
         assertThat(OneCValues.text(node("{\"code\":null}"), "code")).isEmpty();
@@ -282,7 +285,7 @@ class OneCValuesTest {
         assertThat(OneCValues.integer(node("{\"rowNumber\":7}"), "rowNumber")).contains(7);
     }
 
-    /** Число строкой — не число: контракт передаёт числа числами. */
+    /** Число, записанное строкой, числом не считается: контракт передаёт числа числами. */
     @Test
     void integerAsText_isEmpty() {
         assertThat(OneCValues.integer(node("{\"rowNumber\":\"7\"}"), "rowNumber")).isEmpty();
@@ -293,7 +296,7 @@ class OneCValuesTest {
         assertThat(OneCValues.amount(node("{\"price\":\"4999.95\"}"), "price")).isEmpty();
     }
 
-    /** Пустая ссылка — «ссылки нет», как и нулевой GUID, а не нарушение контракта. */
+    /** Пустая ссылка значит «ссылки нет», как и нулевой GUID, и нарушением контракта не считается. */
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     void blankGuid_meansNoReference(String blank) {
@@ -301,9 +304,9 @@ class OneCValuesTest {
     }
 
     /**
-     * Заглушка и открытая дата узнаются по календарному дню, в каком бы из трёх видов дата
-     * ни пришла. Сравнение текста с «3000-01-01» пропустило бы открытую дату моментом
-     * (ТЗ-5, ТЗ-2), и договор действовал бы тысячу лет.
+     * Заглушка и открытая дата узнаются по календарному дню, в каком бы из трёх видов дата ни пришла.
+     * Сравнение текста с «3000-01-01» пропустило бы открытую дату, записанную моментом, как в договорах
+     * ЛПУ и договорах страхования, и договор действовал бы тысячу лет.
      */
     @ParameterizedTest
     @ValueSource(strings = {"3000-01-01T00:00:00+03:00", "3000-01-01T00:00:00",
@@ -312,7 +315,7 @@ class OneCValuesTest {
         assertThat(OneCValues.date(node("{\"endDate\":\"%s\"}".formatted(unset)), "endDate")).isEmpty();
     }
 
-    /** В обязательном поле заглушка и открытая дата — незаполненное поле, а не нечитаемая дата. */
+    /** В обязательном поле заглушка и открытая дата означают незаполненное поле, а не нечитаемую дату. */
     @ParameterizedTest
     @ValueSource(strings = {"0001-01-01", "3000-01-01T00:00:00+03:00"})
     void requiredDate_reportsPlaceholderAndOpenDateAsMissing(String unset) {
@@ -324,8 +327,8 @@ class OneCValuesTest {
     }
 
     /**
-     * Календарный день «как написан» — не «первые десять символов»: момент с невозможным
-     * временем — не дата, и оседать в базе днём 2024-10-10 он не должен.
+     * Календарный день берётся так, как написан, но это не «первые десять символов». Момент с
+     * невозможным временем датой не является, и днём 2024-10-10 в базу он попасть не должен.
      */
     @Test
     void momentWithImpossibleTime_isContractViolation() {
@@ -339,7 +342,7 @@ class OneCValuesTest {
         assertThat(OneCValues.text(node("{\"code\":[\"A00\"]}"), "code")).isEmpty();
     }
 
-    /** Флаг читается по значению, а не по присутствию поля: deleteMark=false — запись не в архиве. */
+    /** Флаг читается по значению, а не по присутствию поля, поэтому deleteMark=false значит «не в архиве». */
     @Test
     void explicitlyFalseFlag_isFalse() {
         assertThat(OneCValues.flag(node("{\"deleteMark\":false}"), "deleteMark")).isFalse();
