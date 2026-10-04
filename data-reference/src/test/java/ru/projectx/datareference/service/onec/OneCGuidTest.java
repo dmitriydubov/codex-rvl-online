@@ -48,6 +48,20 @@ class OneCGuidTest {
     }
 
     /**
+     * В выгрузках 1С:УСК нулевой GUID означает пустое значение. На этом правиле держатся и «ссылки нет»
+     * в полях сообщения, и «идентификатора нет» в {@code message-id} конверта.
+     */
+    @Test
+    void zeroGuid_isEmpty() {
+        assertThat(OneCGuid.isEmpty(new UUID(0L, 0L))).isTrue();
+    }
+
+    @Test
+    void realGuid_isNotEmpty() {
+        assertThat(OneCGuid.isEmpty(GUID)).isFalse();
+    }
+
+    /**
      * Каждое из этих значений {@code UUID.fromString} в JDK 21 принимает молча и читает как другой GUID.
      * Здесь группы короче 8-4-4-4-12, знак числа, строка из 35 символов, строка из 36 символов со
      * сдвинутыми дефисами и знак внутри группы. Последние три значения оканчиваются полноширинной

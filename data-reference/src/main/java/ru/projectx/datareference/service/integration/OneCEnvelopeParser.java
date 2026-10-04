@@ -14,8 +14,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Конверт устроен так: {@code { "data": {…}, "metadata": { "message-id": …,
  * "topic": …, "producer": …, "creation-timestamp": … } } }. Идентификатор {@code message-id}
- * служит ключом дедупликации и ключом строки сырья, поэтому нулевой GUID в нём означает, что
- * идентификатора нет. Всё остальное разбирается позже, из сохранённого тела.
+ * служит ключом дедупликации и ключом строки сырья, поэтому сообщение без него принять нельзя.
+ * В 1С:УСК нулевой GUID означает пустое значение, и нулевой {@code message-id} тоже считается
+ * отсутствующим. Всё остальное разбирается позже, из сохранённого тела.
  *
  * <p>Остальные поля {@code metadata} не читаются намеренно. Поле {@code topic} у части потоков
  * пустое, потому что сообщение направляет очередь, а не это поле. Поле {@code creation-timestamp}
@@ -28,9 +29,6 @@ public class OneCEnvelopeParser {
     private static final String METADATA = "metadata";
     private static final String MESSAGE_ID = "message-id";
     private static final String NO_MESSAGE_ID = "в metadata нет обязательного message-id";
-
-    /** Нулевой GUID в {@code message-id} значит, что идентификатора у сообщения нет. */
-    private static final UUID ZERO_GUID = new UUID(0L, 0L);
 
     private final ObjectMapper json;
 
@@ -48,7 +46,7 @@ public class OneCEnvelopeParser {
     public UUID messageIdOf(byte[] body) {
         JsonNode envelope = readTree(body);
         JsonNode metadata = metadataOf(envelope);
-        return requireNotZero(parse(messageIdText(metadata)));
+        return requireNotEmpty(parse(messageIdText(metadata)));
     }
 
     private JsonNode readTree(byte[] body) {
@@ -77,18 +75,6 @@ public class OneCEnvelopeParser {
     }
 
     /**
-     * Нулевой {@code message-id} отклоняется так же, как отсутствующий. Иначе первое такое сообщение
-     * легло бы в сырьё под нулевым ключом, а все следующие молча считались бы его дублями и терялись
-     * без следа в журнале.
-     */
-    private static UUID requireNotZero(UUID messageId) {
-        if (ZERO_GUID.equals(messageId)) {
-            throw new OneCEnvelopeException(NO_MESSAGE_ID);
-        }
-        return messageId;
-    }
-
-    /**
      * Принимает только каноническую запись GUID ({@link OneCGuid}). Нестрогий разбор прочитал бы
      * искажённый {@code message-id} как чужой GUID, и сообщение легло бы под чужим ключом
      * дедупликации. Значение в текст исключения не попадает: этим же путём приходят полисы, а текст
@@ -97,5 +83,17 @@ public class OneCEnvelopeParser {
     private static UUID parse(String raw) {
         return OneCGuid.parse(raw)
                 .orElseThrow(() -> new OneCEnvelopeException("metadata.message-id не является GUID"));
+    }
+
+    /**
+     * Нулевой {@code message-id} отклоняется так же, как отсутствующий. Иначе первое такое сообщение
+     * легло бы в сырьё под нулевым ключом, а все следующие считались бы его дублями и терялись,
+     * оставляя в журнале только DEBUG о дубле.
+     */
+    private static UUID requireNotEmpty(UUID messageId) {
+        if (OneCGuid.isEmpty(messageId)) {
+            throw new OneCEnvelopeException(NO_MESSAGE_ID);
+        }
+        return messageId;
     }
 }
