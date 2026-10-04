@@ -17,7 +17,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
  * <p>Пул — обычный планировщик Spring с фиксированным числом потоков, размер берётся из
  * {@code spring.task.scheduling.pool.size}. Свой бин нужен потому, что при включённых виртуальных потоках
  * Boot по умолчанию ставит планировщик, который все задачи с паузой между проходами выполняет на одном
- * потоке. У сервиса таких задач три, и зависшая одна останавливала бы остальные.
+ * потоке. У сервиса таких задач четыре: три прохода по расписанию и проверка базы, пока приём из 1С
+ * стоит на паузе; зависшая одна останавливала бы остальные.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnBooleanProperty(name = "projectx.scheduling.enabled", matchIfMissing = true)
