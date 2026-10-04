@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.entity.OneCStream;
 
 /**
  * Срок хранения тела сообщения с персональными данными (ПДн): по истечении срока тело полиса стирается из
@@ -59,7 +58,7 @@ public class PersonalDataRetention {
     }
 
     private int forgetOneBatch() {
-        return transactions.execute(status -> agedMessages.forgetPayloads(
-                OneCStream.POLICIES, properties.payloadTtl(), properties.retentionBatchSize()));
+        return transactions.execute(status -> agedMessages.forgetPolicyPayloads(
+                properties.payloadTtl(), properties.retentionBatchSize()));
     }
 }

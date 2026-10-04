@@ -11,12 +11,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
@@ -33,16 +30,11 @@ class AgedInboundMessagesTest {
     @Mock
     private InboundMessageRepository repository;
 
-    /**
-     * Поток — параметр запроса, а не поток его сегодняшнего вызывающего: проверяется каждый, иначе зашитые
-     * в запрос полисы прошли бы этот тест незамеченными.
-     */
-    @ParameterizedTest
-    @EnumSource(OneCStream.class)
-    void forgetPayloads_erasesRowsReceivedBeforeNowMinusAge(OneCStream stream) {
-        when(repository.forgetPayloads(stream, NOW.minus(Duration.ofDays(30)), 500)).thenReturn(17);
+    @Test
+    void forgetPolicyPayloads_erasesRowsReceivedBeforeNowMinusAge() {
+        when(repository.forgetPolicyPayloads(NOW.minus(Duration.ofDays(30)), 500)).thenReturn(17);
 
-        assertThat(agedMessages().forgetPayloads(stream, Duration.ofDays(30), 500)).isEqualTo(17);
+        assertThat(agedMessages().forgetPolicyPayloads(Duration.ofDays(30), 500)).isEqualTo(17);
     }
 
     @Test

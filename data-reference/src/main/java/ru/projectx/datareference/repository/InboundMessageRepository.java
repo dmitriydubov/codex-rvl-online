@@ -9,7 +9,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 
@@ -77,31 +76,26 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
             Limit limit);
 
     /**
-     * Стирает тела не больше {@code limit} строк потока, принятых раньше {@code receivedBefore}, начиная с самых
-     * старых, и возвращает, сколько стёрто. Нужен сроку хранения персональных данных: строки остаются, тела
-     * не читаются в память. Транзакция — вызывающего, одна на пачку.
+     * Стирает тела не больше {@code limit} строк потока полисов, принятых раньше {@code receivedBefore}, начиная
+     * с самых старых, и возвращает, сколько стёрто. Нужен сроку хранения персональных данных: строки остаются,
+     * тела не читаются в память. Метод не открывает транзакцию: её открывает вызывающий, отдельную на каждую
+     * пачку.
      *
      * <p>Запрос написан на SQL PostgreSQL, потому что в языке запросов JPA у подзапроса нет ограничения числа
-     * строк.
+     * строк. Поток записан в запросе значением, а не параметром: так PostgreSQL при любом плане видит, что
+     * подходит частичный индекс по строкам полисов с телом, и не перебирает всю таблицу сырья.
      */
-    default int forgetPayloads(OneCStream stream, Instant receivedBefore, int limit) {
-        return forgetPayloadsOfStream(stream.name(), receivedBefore, limit);
-    }
-
     @Modifying
     @Query(nativeQuery = true, value = """
             update inbound_message
                set payload = null
              where message_id in (select message_id
                                     from inbound_message
-                                   where stream = :stream
+                                   where stream = 'POLICIES'
                                      and payload is not null
                                      and received_at < :receivedBefore
                                    order by received_at
                                    limit :limit)
             """)
-    int forgetPayloadsOfStream(
-            @Param("stream") String stream,
-            @Param("receivedBefore") Instant receivedBefore,
-            @Param("limit") int limit);
+    int forgetPolicyPayloads(@Param("receivedBefore") Instant receivedBefore, @Param("limit") int limit);
 }

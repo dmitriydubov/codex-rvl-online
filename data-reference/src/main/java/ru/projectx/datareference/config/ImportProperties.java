@@ -24,7 +24,7 @@ import org.springframework.validation.annotation.Validated;
  *                десятки тысяч сообщений, и разбирать их одним проходом значило бы держать в памяти всю
  *                выгрузку сразу
  * @param stuckTransferThreshold сколько многочастная передача прайса может ждать своих частей, прежде чем
- *                это станет поводом для тревоги. Передача, часть которой потерялась у источника, не
+ *                это станет поводом для тревоги, больше нуля. Передача, часть которой потерялась у источника, не
  *                соберётся никогда: прайс по её услуге тихо останется вчерашним, и заметить это можно только
  *                по давности
  * @param stuckTransferPollInterval пауза между проверками зависших передач
@@ -33,7 +33,9 @@ import org.springframework.validation.annotation.Validated;
  *                и строка со всеми сразу была бы нечитаемой
  * @param payloadTtl сколько тело сообщения с персональными данными живёт в таблице сырья после приёма.
  *                Тридцать суток заметно больше любого разумного срока разбора инцидента и заметно меньше
- *                срока, на котором таблица сырья превращается во вторую копию реестра застрахованных
+ *                срока, на котором таблица сырья превращается во вторую копию реестра застрахованных. Меньше
+ *                суток не допускается: со сроком около нуля стирались бы и тела ещё не разобранных сообщений,
+ *                и разобрать их стало бы нечем
  * @param retentionPollInterval пауза между проходами стирания персональных данных
  * @param retentionBatchSize сколько тел стирается одной транзакцией. Весь остаток одним запросом надолго
  *                заблокировал бы строки, которые в это же время читает разбор; поэтому проход стирает
@@ -45,10 +47,10 @@ public record ImportProperties(
         @DefaultValue("10s") @DurationMin(millis = 1) Duration pollInterval,
         @DefaultValue("30s") @DurationMin(millis = 0) Duration initialDelay,
         @DefaultValue("100") @Positive int batchSize,
-        @DefaultValue("1h") Duration stuckTransferThreshold,
+        @DefaultValue("1h") @DurationMin(millis = 1) Duration stuckTransferThreshold,
         @DefaultValue("15m") @DurationMin(millis = 1) Duration stuckTransferPollInterval,
         @DefaultValue("20") @Positive int stuckTransferReportLimit,
-        @DefaultValue("30d") Duration payloadTtl,
+        @DefaultValue("30d") @DurationMin(days = 1) Duration payloadTtl,
         @DefaultValue("1h") @DurationMin(millis = 1) Duration retentionPollInterval,
         @DefaultValue("500") @Positive int retentionBatchSize) {
 }

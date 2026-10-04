@@ -73,7 +73,7 @@ public class ReferenceImportScheduler {
         }
     }
 
-    /** Снимаются только свои ключи: то, что положили в MDC до прохода, остаётся на месте. */
+    /** В конце снимаются только ключи сообщения; остальные ключи MDC планировщик не трогает. */
     private void importOne(InboundMessage message) {
         MDC.put(OneCLogContext.MESSAGE_ID, message.messageId().toString());
         MDC.put(OneCLogContext.STREAM, message.stream().name());

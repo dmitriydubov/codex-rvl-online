@@ -72,6 +72,33 @@ class ImportPropertiesTest {
     }
 
     @Test
+    void zeroStuckTransferThreshold_failsStartup() {
+        context.withPropertyValues("projectx.import.stuck-transfer-threshold=0s")
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining("stuckTransferThreshold"));
+    }
+
+    /**
+     * Срок хранения тела меньше суток не пускает сервис в работу: со сроком около нуля стирались бы тела ещё
+     * не разобранных полисов, и разобрать их стало бы нечем. Сутки ровно — уже допустимы.
+     */
+    @Test
+    void payloadTtlBelowOneDay_failsStartup() {
+        context.withPropertyValues("projectx.import.payload-ttl=23h")
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining("payloadTtl"));
+    }
+
+    @Test
+    void payloadTtlOfOneDay_isAccepted() {
+        context.withPropertyValues("projectx.import.payload-ttl=1d")
+                .run(started -> assertThat(started.getBean(ImportProperties.class).payloadTtl())
+                        .isEqualTo(Duration.ofDays(1)));
+    }
+
+    @Test
     void zeroReportLimit_failsStartup() {
         context.withPropertyValues("projectx.import.stuck-transfer-report-limit=0")
                 .run(started -> assertThat(started).getFailure()

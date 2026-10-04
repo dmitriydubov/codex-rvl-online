@@ -61,7 +61,7 @@ class AgedInboundMessagesQueryTest {
 
     /** Пачка не больше предела, и первыми стираются самые старые тела. */
     @Test
-    void forgetPayloads_erasesOldestRowsUpToLimit() {
+    void forgetPolicyPayloads_erasesOldestRowsUpToLimit() {
         UUID oldest = store(OneCStream.POLICIES, Duration.ofDays(40));
         UUID older = store(OneCStream.POLICIES, Duration.ofDays(35));
         UUID old = store(OneCStream.POLICIES, Duration.ofDays(31));
@@ -76,7 +76,7 @@ class AgedInboundMessagesQueryTest {
 
     /** Свежие тела, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
     @Test
-    void forgetPayloads_skipsFreshOtherStreamAndErasedRows() {
+    void forgetPolicyPayloads_skipsFreshOtherStreamAndErasedRows() {
         UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(29));
         UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
         store(OneCStream.POLICIES, Duration.ofDays(40));
@@ -121,7 +121,7 @@ class AgedInboundMessagesQueryTest {
     }
 
     private int forget(int limit) {
-        return transactions.execute(status -> agedMessages.forgetPayloads(OneCStream.POLICIES, Duration.ofDays(30), limit));
+        return transactions.execute(status -> agedMessages.forgetPolicyPayloads(Duration.ofDays(30), limit));
     }
 
     private void buffer(UUID transfer, Duration age) {

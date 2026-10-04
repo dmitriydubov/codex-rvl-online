@@ -24,7 +24,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
@@ -64,19 +63,19 @@ class PayloadExpiryTest {
     /** Полные пачки — повод для следующей; неполная означает, что остаток исчерпан, и проход заканчивается. */
     @Test
     void remainderLargerThanBatch_isErasedInSeveralBatches() {
-        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE))
+        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE))
                 .thenReturn(BATCH_SIZE, BATCH_SIZE, 3);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages, times(3)).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages, times(3)).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
         verifyNoMoreInteractions(agedMessages);
     }
 
     /** Каждая пачка — в своей транзакции, и ни один запрос не идёт вне транзакции. */
     @Test
     void everyBatch_runsInItsOwnTransaction() {
-        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
+        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
             transactions.erasedInsideCurrent();
             return transactions.opened() < 2 ? BATCH_SIZE : 0;
         });
@@ -89,17 +88,17 @@ class PayloadExpiryTest {
     /** Остаток ровно в пачку: ещё один короткий запрос, который ничего не находит, — и проход окончен. */
     @Test
     void remainderOfExactlyOneBatch_endsOnEmptyBatch() {
-        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
+        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages, times(2)).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages, times(2)).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
     }
 
     /** В журнал — сколько тел стёрто за весь проход и какой срок, без единого значения из стёртых тел. */
     @Test
     void erasure_isReportedOnceWithTotalAndTtl() {
-        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
+        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
 
         retention().forgetExpiredPayloads();
 
@@ -113,11 +112,11 @@ class PayloadExpiryTest {
     /** Стирать нечего — один запрос, одна транзакция и молчание в журнале. */
     @Test
     void nothingExpired_oneQueryAndNothingLogged() {
-        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
+        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
         assertThat(transactions.opened()).isEqualTo(1);
         assertThat(logged.list).isEmpty();
     }

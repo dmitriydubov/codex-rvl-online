@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
@@ -31,13 +30,13 @@ public class AgedInboundMessages {
     }
 
     /**
-     * Стирает тела не больше {@code limit} строк потока, принятых раньше, чем {@code age} назад, начиная с самых
-     * старых. Транзакция — вызывающего.
+     * Стирает тела не больше {@code limit} сообщений полисов, принятых раньше, чем {@code age} назад, начиная
+     * с самых старых. Метод не открывает транзакцию: её открывает вызывающий.
      *
      * @return сколько тел стёрто
      */
-    public int forgetPayloads(OneCStream stream, Duration age, int limit) {
-        return repository.forgetPayloads(stream, receivedBefore(age), limit);
+    public int forgetPolicyPayloads(Duration age, int limit) {
+        return repository.forgetPolicyPayloads(receivedBefore(age), limit);
     }
 
     /**
