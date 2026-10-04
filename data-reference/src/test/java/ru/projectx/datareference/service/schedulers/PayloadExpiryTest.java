@@ -131,14 +131,25 @@ class PayloadExpiryTest {
         return (Logger) LoggerFactory.getLogger(PersonalDataRetention.class);
     }
 
-    /** Транзакции, которые только запоминают, сколько стираний случилось внутри каждой. */
+    /**
+     * Транзакции, которые только запоминают, сколько стираний случилось внутри каждой.
+     *
+     * <p>Ни одному тесту здесь не нужно больше трёх пачек. Если проход перестанет останавливаться на неполной
+     * пачке, он будет открывать транзакции бесконечно, и тест не упал бы, а завис. Поэтому после
+     * {@link #MAX_TRANSACTIONS} транзакций подмена сама роняет тест с понятной причиной.
+     */
     private static final class RecordingTransactions implements TransactionOperations {
+
+        private static final int MAX_TRANSACTIONS = 10;
 
         private final List<Integer> erasures = new ArrayList<>();
         private boolean active;
 
         @Override
         public <T> T execute(TransactionCallback<T> action) {
+            assertThat(erasures.size())
+                    .as("проход не остановился: открыто уже %d транзакций", erasures.size())
+                    .isLessThan(MAX_TRANSACTIONS);
             erasures.add(0);
             active = true;
             try {
