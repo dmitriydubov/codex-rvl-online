@@ -3,22 +3,18 @@ package ru.projectx.datareference;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * {@code data-reference} — сервис справочных данных контура РВЛ ОНЛАЙН: справочники
- * и полисы из 1С:УСК, наружу — REST для сервисов Заявок и Договоров.
+ * Сервис справочных данных {@code data-reference}: принимает справочники и полисы из учётной системы
+ * 1С:УСК и отдаёт их по REST сервисам Заявок и Договоров.
  *
- * <p>Единственный источник данных — учётная система 1С:УСК. Она публикует изменения
- * в свой RabbitMQ, сервис их вычитывает, складывает сырьё у себя и раскладывает
- * по таблицам PostgreSQL: справочники санаториев, договоров, программ, услуг и цен,
- * а также полисы застрахованных. Разбор потоков и порядок разработки — в {@code CLAUDE.md}.
- *
- * <p>Приложение долгоживущее: его держит шедулер, разбирающий накопленное сырьё.
+ * <p>Единственный источник данных — 1С:УСК. Она публикует изменения в свой RabbitMQ, сервис их
+ * вычитывает, складывает сырые сообщения у себя и по расписанию раскладывает по таблицам PostgreSQL:
+ * санатории, договоры, программы, услуги, цены и полисы застрахованных. Расписания включает
+ * {@link ru.projectx.datareference.config.SchedulingConfig}.
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan
-@EnableScheduling
 public class DataReferenceApplication {
 
     public static void main(String[] args) {

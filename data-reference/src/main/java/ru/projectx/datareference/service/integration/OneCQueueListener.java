@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
+import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
@@ -31,19 +32,11 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  * </ul>
  *
  * <p>На время обработки в MDC лежат поток, очередь и, когда он прочитан, {@code message-id}:
- * по ним строка журнала находит своё сообщение.
+ * по ним строка журнала находит своё сообщение. Имена ключей — {@link OneCLogContext}, общие с разбором
+ * по расписанию.
  */
 @Component
 public class OneCQueueListener {
-
-    /** Ключ MDC: {@code message-id} обрабатываемого сообщения. */
-    public static final String MDC_MESSAGE_ID = "messageId";
-
-    /** Ключ MDC: поток 1С, имя константы {@link OneCStream}. */
-    public static final String MDC_STREAM = "stream";
-
-    /** Ключ MDC: очередь, из которой пришло сообщение. */
-    public static final String MDC_QUEUE = "queue";
 
     private static final Logger log = LoggerFactory.getLogger(OneCQueueListener.class);
 
@@ -62,14 +55,14 @@ public class OneCQueueListener {
     /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
     public void receive(OneCStream stream, Message message, Channel channel) throws IOException {
         OneCDelivery delivery = new OneCDelivery(stream, message, channel);
-        MDC.put(MDC_STREAM, stream.name());
-        MDC.put(MDC_QUEUE, delivery.queue());
+        MDC.put(OneCLogContext.STREAM, stream.name());
+        MDC.put(OneCLogContext.QUEUE, delivery.queue());
         try {
             accept(delivery);
         }
         finally {
-            MDC.remove(MDC_STREAM);
-            MDC.remove(MDC_QUEUE);
+            MDC.remove(OneCLogContext.STREAM);
+            MDC.remove(OneCLogContext.QUEUE);
         }
     }
 
@@ -82,12 +75,12 @@ public class OneCQueueListener {
             dropUnidentifiable(delivery, unidentifiable);
             return;
         }
-        MDC.put(MDC_MESSAGE_ID, messageId.toString());
+        MDC.put(OneCLogContext.MESSAGE_ID, messageId.toString());
         try {
             store(delivery, messageId);
         }
         finally {
-            MDC.remove(MDC_MESSAGE_ID);
+            MDC.remove(OneCLogContext.MESSAGE_ID);
         }
     }
 
@@ -95,7 +88,8 @@ public class OneCQueueListener {
      * Возврат в очередь здесь ничем не ограничен, и это не недосмотр: сохранение —
      * запись байтов, которые только что разобрались как JSON, и постоянная ошибка у неё
      * известна одна: тело, которое не принимает колонка {@code jsonb} (например, с нулевым
-     * символом U+0000), — CA-01, его закрывает Ш30. Недоступная база проходит сама. Повтор
+     * символом U+0000). Такое тело пока возвращается в очередь снова и снова; отдельная
+     * обработка для него запланирована. Недоступная база проходит сама. Повтор
      * не превращается в горячий цикл из-за паузы перед возвратом.
      */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {

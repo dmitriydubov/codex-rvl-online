@@ -17,11 +17,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * не зависят. Поэтому здесь своя обвязка, а не классы из src/test.
  *
  * <p>Контекст — как у {@code @IntegrationTest}: настоящий PostgreSQL той же версии, что
- * в тестах и в контуре, AMQP выключен. Шедулер разбора усыплён на час, чтобы его тики
- * не меняли статусы посреди сценария; сырьё сценария разбирает шаг, явно вызывая проход
- * шедулера (решение Р6). Первый тик всех трёх планировщиков сырья отодвинут на тот же час
- * ({@code projectx.import.initial-delay}): без задержки он случался бы сразу при старте
- * контекста, перед первым сценарием или посреди него.
+ * в тестах и в контуре, AMQP выключен. Расписания выключены ({@code projectx.scheduling.enabled=false}),
+ * чтобы проходы не меняли статусы посреди сценария; сырьё сценария разбирает шаг, явно вызывая проход
+ * разбора.
  * Сценариям, которым нужны брокер 1С:УСК или остановленные часы, эту обвязку расширяет
  * первая же такая задача, вместе со спецификацией.
  *
@@ -31,8 +29,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "projectx.import.poll-interval=1h",
-        "projectx.import.initial-delay=1h",
+        "projectx.scheduling.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import(CucumberSpringConfiguration.Containers.class)
 public class CucumberSpringConfiguration {

@@ -1,8 +1,9 @@
 package ru.projectx.datareference.service.schedulers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -10,9 +11,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.time.Duration;
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,29 +20,32 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
-import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.entity.InboundMessage;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.support.ImportSettings;
 
 /**
- * Проход срока хранения без базы: что он стирает и о чём сообщает. Что строки со стёртым
- * телом остаются в таблице и что справочные потоки не трогаются, проверяет на настоящей базе
+ * Проход срока хранения без базы: сколько пачек он стирает, каждую ли в своей транзакции и о чём сообщает.
+ * Что запрос стирает только тела полисов старше срока и оставляет сами строки, проверяет на настоящей базе
  * {@link PersonalDataRetentionTest}; здесь — решения самого прохода.
+ *
+ * <p>Транзакции подменены записью: каждая пачка обязана стираться внутри своей транзакции, а проход в целом —
+ * не держать ни одной. Иначе транзакция на весь остаток держала бы блокировки строк, которые в это же время
+ * читает разбор.
  */
 @ExtendWith(MockitoExtension.class)
 class PayloadExpiryTest {
 
     private static final Duration PAYLOAD_TTL = Duration.ofDays(30);
     private static final int BATCH_SIZE = 7;
-    private static final Instant RECEIVED_AT = Instant.parse("2026-01-10T09:15:00Z");
-    private static final String QUEUE = "1c-usk_to_rvl-online_policies";
 
     @Mock
     private AgedInboundMessages agedMessages;
 
-    @Mock
-    private InboundMessageRepository repository;
+    private final RecordingTransactions transactions = new RecordingTransactions();
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
@@ -58,55 +61,107 @@ class PayloadExpiryTest {
         logged.stop();
     }
 
-    /** Только поток полисов, не больше пачки, и тело каждой строки стирается и сохраняется. */
+    /** Полные пачки — повод для следующей; неполная означает, что остаток исчерпан, и проход заканчивается. */
     @Test
-    void expiredPolicyPayloads_areErasedAndSaved() {
-        InboundMessage first = policy();
-        InboundMessage second = policy();
-        when(agedMessages.withPayload(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(List.of(first, second));
+    void remainderLargerThanBatch_isErasedInSeveralBatches() {
+        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE))
+                .thenReturn(BATCH_SIZE, BATCH_SIZE, 3);
 
         retention().forgetExpiredPayloads();
 
-        assertThat(first.payload()).isNull();
-        assertThat(second.payload()).isNull();
-        verify(repository).save(first);
-        verify(repository).save(second);
+        verify(agedMessages, times(3)).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+        verifyNoMoreInteractions(agedMessages);
     }
 
-    /** В журнал — число и срок, без единого значения из стёртых тел. */
+    /** Каждая пачка — в своей транзакции, и ни один запрос не идёт вне транзакции. */
     @Test
-    void erasure_isReportedWithCountAndTtl() {
-        when(agedMessages.withPayload(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(List.of(policy()));
+    void everyBatch_runsInItsOwnTransaction() {
+        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
+            transactions.erasedInsideCurrent();
+            return transactions.opened() < 2 ? BATCH_SIZE : 0;
+        });
+
+        retention().forgetExpiredPayloads();
+
+        assertThat(transactions.erasuresPerTransaction()).containsExactly(1, 1);
+    }
+
+    /** Остаток ровно в пачку: ещё один короткий запрос, который ничего не находит, — и проход окончен. */
+    @Test
+    void remainderOfExactlyOneBatch_endsOnEmptyBatch() {
+        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
+
+        retention().forgetExpiredPayloads();
+
+        verify(agedMessages, times(2)).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+    }
+
+    /** В журнал — сколько тел стёрто за весь проход и какой срок, без единого значения из стёртых тел. */
+    @Test
+    void erasure_isReportedOnceWithTotalAndTtl() {
+        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
 
         retention().forgetExpiredPayloads();
 
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("стёрты тела 1 сообщений полисов старше PT720H: срок хранения персональных данных");
+                    .isEqualTo("стёрты тела 10 сообщений полисов старше PT720H: срок хранения персональных данных");
         });
     }
 
+    /** Стирать нечего — один запрос, одна транзакция и молчание в журнале. */
     @Test
-    void nothingExpired_nothingIsSavedOrLogged() {
-        when(agedMessages.withPayload(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(List.of());
+    void nothingExpired_oneQueryAndNothingLogged() {
+        when(agedMessages.forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
 
-        verifyNoInteractions(repository);
+        verify(agedMessages).forgetPayloads(OneCStream.POLICIES, PAYLOAD_TTL, BATCH_SIZE);
+        assertThat(transactions.opened()).isEqualTo(1);
         assertThat(logged.list).isEmpty();
     }
 
     private PersonalDataRetention retention() {
-        return new PersonalDataRetention(agedMessages, repository, new ImportProperties(Duration.ofSeconds(10),
-                Duration.ofSeconds(30), 100, Duration.ofHours(1), PAYLOAD_TTL, BATCH_SIZE));
-    }
-
-    private static InboundMessage policy() {
-        return InboundMessage.receive(UUID.randomUUID(), OneCStream.POLICIES, QUEUE, "{\"id\":\"полис\"}", RECEIVED_AT);
+        return new PersonalDataRetention(agedMessages, transactions,
+                ImportSettings.defaults().payloadTtl(PAYLOAD_TTL).retentionBatchSize(BATCH_SIZE).build());
     }
 
     private static Logger retentionLog() {
         return (Logger) LoggerFactory.getLogger(PersonalDataRetention.class);
+    }
+
+    /** Транзакции, которые только запоминают, сколько стираний случилось внутри каждой. */
+    private static final class RecordingTransactions implements TransactionOperations {
+
+        private final List<Integer> erasures = new ArrayList<>();
+        private boolean active;
+
+        @Override
+        public <T> T execute(TransactionCallback<T> action) {
+            erasures.add(0);
+            active = true;
+            try {
+                TransactionStatus status = new SimpleTransactionStatus();
+                return action.doInTransaction(status);
+            }
+            finally {
+                active = false;
+            }
+        }
+
+        void erasedInsideCurrent() {
+            assertThat(active).as("стирание вне транзакции").isTrue();
+            int current = erasures.size() - 1;
+            erasures.set(current, erasures.get(current) + 1);
+        }
+
+        int opened() {
+            return erasures.size();
+        }
+
+        List<Integer> erasuresPerTransaction() {
+            return erasures;
+        }
     }
 }

@@ -34,6 +34,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.JacksonConfig;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
@@ -94,9 +95,9 @@ class OneCQueueListenerJournalTest {
 
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
 
-        assertThat(seen).containsEntry(OneCQueueListener.MDC_MESSAGE_ID, MESSAGE_ID.toString())
-                .containsEntry(OneCQueueListener.MDC_STREAM, OneCStream.POLICIES.name())
-                .containsEntry(OneCQueueListener.MDC_QUEUE, QUEUE);
+        assertThat(seen).containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString())
+                .containsEntry(OneCLogContext.STREAM, OneCStream.POLICIES.name())
+                .containsEntry(OneCLogContext.QUEUE, QUEUE);
     }
 
     /** Поток контейнера обработает следующее сообщение, и ключи этого сообщения ему не достаются. */
@@ -104,9 +105,9 @@ class OneCQueueListenerJournalTest {
     void mdc_isClearedAfterProcessing() throws IOException {
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
 
-        assertThat(MDC.get(OneCQueueListener.MDC_MESSAGE_ID)).isNull();
-        assertThat(MDC.get(OneCQueueListener.MDC_STREAM)).isNull();
-        assertThat(MDC.get(OneCQueueListener.MDC_QUEUE)).isNull();
+        assertThat(MDC.get(OneCLogContext.MESSAGE_ID)).isNull();
+        assertThat(MDC.get(OneCLogContext.STREAM)).isNull();
+        assertThat(MDC.get(OneCLogContext.QUEUE)).isNull();
     }
 
     /** В журнал попадает тип исключения, но не его текст: текст ошибки вставки печатает параметры запроса. */
@@ -123,7 +124,7 @@ class OneCQueueListenerJournalTest {
                 .doesNotContain(PERSONAL_DATA);
         assertThat(warning.getThrowableProxy()).isNull();
         assertThat(warning.getMDCPropertyMap())
-                .containsEntry(OneCQueueListener.MDC_MESSAGE_ID, MESSAGE_ID.toString());
+                .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
     }
 
     /**
@@ -138,9 +139,9 @@ class OneCQueueListenerJournalTest {
         assertThat(error.getFormattedMessage()).doesNotContain(PERSONAL_DATA);
         assertThat(error.getThrowableProxy()).isNull();
         assertThat(error.getMDCPropertyMap())
-                .containsEntry(OneCQueueListener.MDC_STREAM, OneCStream.POLICIES.name())
-                .containsEntry(OneCQueueListener.MDC_QUEUE, QUEUE)
-                .doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
+                .containsEntry(OneCLogContext.STREAM, OneCStream.POLICIES.name())
+                .containsEntry(OneCLogContext.QUEUE, QUEUE)
+                .doesNotContainKey(OneCLogContext.MESSAGE_ID);
     }
 
     /**
@@ -158,7 +159,7 @@ class OneCQueueListenerJournalTest {
                 .contains("потеряно", "metadata.message-id не является GUID")
                 .doesNotContain(messageId, PERSONAL_DATA);
         assertThat(error.getThrowableProxy()).isNull();
-        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
+        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCLogContext.MESSAGE_ID);
     }
 
     /**
@@ -173,7 +174,7 @@ class OneCQueueListenerJournalTest {
         assertThat(error.getFormattedMessage())
                 .contains("потеряно", "в metadata нет обязательного message-id")
                 .doesNotContain(PERSONAL_DATA);
-        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCQueueListener.MDC_MESSAGE_ID);
+        assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCLogContext.MESSAGE_ID);
     }
 
     @Test
@@ -245,9 +246,9 @@ class OneCQueueListenerJournalTest {
     }
 
     private static void assertNoMessageKeysInMdc() {
-        assertThat(MDC.get(OneCQueueListener.MDC_MESSAGE_ID)).isNull();
-        assertThat(MDC.get(OneCQueueListener.MDC_STREAM)).isNull();
-        assertThat(MDC.get(OneCQueueListener.MDC_QUEUE)).isNull();
+        assertThat(MDC.get(OneCLogContext.MESSAGE_ID)).isNull();
+        assertThat(MDC.get(OneCLogContext.STREAM)).isNull();
+        assertThat(MDC.get(OneCLogContext.QUEUE)).isNull();
     }
 
     private ILoggingEvent onlyEvent(Level level) {
