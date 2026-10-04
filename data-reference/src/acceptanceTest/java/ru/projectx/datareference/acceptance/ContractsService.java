@@ -31,6 +31,7 @@ public class ContractsService {
 
     /** Переменная URI-шаблона: id, полученный на шаге «Дано». */
     private static final String OBTAINED_ID = "{id}";
+    private static final String PATH_ROOT = "/";
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
@@ -68,9 +69,21 @@ public class ContractsService {
     }
 
     private ServiceResponse exchange(String path, Consumer<HttpHeaders> headers) {
+        requireAbsolutePath(path);
         lastResponse = ServiceResponse.of(
                 client.get().uri(path, uriVariables(path)).headers(headers).exchange().returnResult());
         return lastResponse;
+    }
+
+    /**
+     * Путь из сценария уходит потребителем как есть. Клиент сам дописал бы «/» между адресом сервера
+     * и относительным путём, и сценарий с путём без ведущего «/» проверял бы не тот запрос, что в нём
+     * написан. Цель HTTP-запроса к серверу всегда начинается с «/».
+     */
+    private static void requireAbsolutePath(String path) {
+        if (!path.startsWith(PATH_ROOT)) {
+            throw new IllegalArgumentException("путь запроса в сценарии должен начинаться с «/»: " + path);
+        }
     }
 
     private Object[] uriVariables(String path) {

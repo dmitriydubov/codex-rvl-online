@@ -10,18 +10,20 @@ import ru.projectx.datareference.service.DatabaseOutages;
  * с подменёнными сервисами и настоящий {@link ApiExceptionHandler}.
  *
  * <p>Здесь проверяется маршрутизация (путь, параметры, выбор обработчика) и то, что
- * контроллер отдаёт найденное сервисом. Имена полей JSON в snake_case здесь не
- * проверяются: standalone-сборка не берёт настроек Jackson из Boot, их закрепляют
- * API-тесты на полном контексте.
+ * контроллер отдаёт найденное сервисом. UUID из пути и параметров читаются тем же строгим
+ * правилом, что и в приложении: его подключает {@link UuidParameters}. Имена полей JSON в
+ * snake_case здесь не проверяются: standalone-сборка не берёт настроек Jackson из Boot, их
+ * закрепляют API-тесты на полном контексте.
  */
 final class StandaloneMvc {
 
     private StandaloneMvc() {
     }
 
-    static MockMvcTester of(Object controller) {
-        return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages(new HibernateExceptionTranslator())))
+    static MockMvcTester of(Object... controllers) {
+        var exceptionHandler = new ApiExceptionHandler(new DatabaseOutages(new HibernateExceptionTranslator()));
+        return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controllers)
+                .setControllerAdvice(exceptionHandler, new UuidParameters())
                 .build());
     }
 }

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Insurer;
@@ -13,42 +14,46 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.service.onec.ImportResult;
+import ru.projectx.datareference.service.onec.OneCGuid;
 import ru.projectx.datareference.service.onec.OneCValues;
 import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * ТЗ-3: контрагенты-юрлица. Один поток несёт два разных справочника, и различает их
- * сама 1С — полем {@code thisIsLPU}:
+ * Разбирает поток контрагентов-юрлиц из 1С:УСК. В одном потоке приходят два разных
+ * справочника, и различает их сама 1С полем {@code thisIsLPU}.
  *
- * <ul>
- *   <li>{@code true} — санаторий, и он попадает к нам <b>только</b> с видом деятельности
- *       РВЛ. Этот поток несёт всех контрагентов 1С:УСК, а нужны нам единицы;</li>
- *   <li>{@code false} — страхователь. Сохраняется без фильтра, но исход разбора — пропуск
- *       с причиной, а не «применено»: см. {@link #applyInsurer}.</li>
- * </ul>
+ * <p>Санаторий ({@code thisIsLPU = true}) принимается только с видом деятельности «РВЛ»: поток несёт
+ * всех контрагентов 1С:УСК, а нужны из них единицы. Если санатория у нас нет и вида «РВЛ» у него нет,
+ * сообщение просто не наше, и оно уходит в пропуск. Если санаторий у нас уже есть, а вид «РВЛ» в новом
+ * сообщении пропал, запись не удаляется, а становится архивной, и её реквизиты всё равно обновляются.
  *
- * <p>Фильтр РВЛ — не «отбросить лишнее», а различение двух разных состояний, и ведут
- * они себя по-разному:
- * <ul>
- *   <li>контрагента у нас нет и РВЛ у него нет — сообщение просто не наше, пропуск;</li>
- *   <li>контрагент у нас <b>есть</b>, а РВЛ в новом сообщении пропал — запись
- *       не удаляется, а помечается архивной, реквизиты при этом обновляются
- *       (ТЗ-3, п. 3.3).</li>
- * </ul>
+ * <p>Страхователь ({@code thisIsLPU = false}) сохраняется без фильтра в справочник страхователей.
+ *
+ * <p>GUID вида деятельности «РВЛ» берётся из настройки {@code projectx.onec.contract.rvl-activity-id}
+ * и читается при создании маппера, то есть при старте сервиса. Запись не в канонической форме 8-4-4-4-12
+ * останавливает старт: стандартное чтение UUID превратило бы её в другой GUID, и все санатории молча
+ * уходили бы в пропуск. Нулевой GUID тоже останавливает старт: в сообщениях 1С:УСК он означает пустое
+ * значение и ни с одним видом деятельности не совпадёт. Само значение в текст ошибки не попадает.
  */
 @Component
 public class ContragentMapper implements StreamMapper {
 
     private static final String ACTIVITIES = "typesActivities";
     private static final String ACTIVITY_GUID = "guidTypeActivities";
+    private static final String RVL_ACTIVITY_NOT_CANONICAL =
+            "настройка projectx.onec.contract.rvl-activity-id не в канонической записи GUID 8-4-4-4-12 "
+                    + "или нулевая: без неё санатории РВЛ не отличить от прочих контрагентов 1С:УСК";
+    private static final String RVL_ACTIVITY_NOT_SET =
+            "не задан projectx.onec.contract.rvl-activity-id — отличить санаторий от прочих юрлиц 1С:УСК нечем";
+    private static final String WITHOUT_RVL = "контрагент без вида деятельности РВЛ";
     private static final String NOT_A_SANATORIUM =
             "контрагент не ЛПУ (thisIsLPU = false) — сохранён в справочник страхователей";
 
     private final LpuRepository lpuRepository;
     private final InsurerRepository insurerRepository;
-    private final OneCContractProperties contract;
+    private final @Nullable UUID rvlActivity;
     private final Clock clock;
 
     public ContragentMapper(
@@ -59,7 +64,7 @@ public class ContragentMapper implements StreamMapper {
 
         this.lpuRepository = lpuRepository;
         this.insurerRepository = insurerRepository;
-        this.contract = contract;
+        this.rvlActivity = rvlActivityOf(contract);
         this.clock = clock;
     }
 
@@ -76,50 +81,58 @@ public class ContragentMapper implements StreamMapper {
                 : applyInsurer(externalId, data);
     }
 
-    /** Ветка А: санаторий. Применяется только при виде деятельности РВЛ. */
+    /**
+     * Пустая настройка означает, что GUID не задан. Заданная читается только в канонической записи
+     * и не может быть нулевым GUID.
+     */
+    private static @Nullable UUID rvlActivityOf(OneCContractProperties contract) {
+        return contract.rvlActivity()
+                .map(setting -> OneCGuid.parse(setting)
+                        .filter(guid -> !OneCGuid.isEmpty(guid))
+                        .orElseThrow(() -> new IllegalStateException(RVL_ACTIVITY_NOT_CANONICAL)))
+                .orElse(null);
+    }
+
     private ImportResult applySanatorium(UUID externalId, ObjectNode data) {
-        Optional<UUID> rvlActivity = contract.rvlActivity();
-        if (rvlActivity.isEmpty()) {
-            return ImportResult.skipped(
-                    "не задан projectx.onec.contract.rvl-activity-id — "
-                            + "отличить санаторий от прочих юрлиц 1С:УСК нечем");
-        }
+        return Optional.ofNullable(rvlActivity)
+                .map(rvl -> applySanatorium(externalId, data, rvl))
+                .orElseGet(() -> ImportResult.skipped(RVL_ACTIVITY_NOT_SET));
+    }
 
-        boolean hasRvl = hasActivity(data, rvlActivity.get());
+    private ImportResult applySanatorium(UUID externalId, ObjectNode data, UUID rvl) {
         Lpu.Details details = lpuDetailsOf(data);
-        Optional<Lpu> existing = lpuRepository.findByExternalId(externalId);
-
-        if (existing.isEmpty()) {
-            if (!hasRvl) {
-                return ImportResult.skipped("контрагент без вида деятельности РВЛ");
-            }
-            lpuRepository.save(Lpu.create(externalId, details, clock.instant()));
-            return ImportResult.applied();
+        Optional<Lpu> known = lpuRepository.findByExternalId(externalId);
+        if (!hasActivity(data, rvl)) {
+            return known
+                    .map(lpu -> archiveAfterLosingRvl(lpu, details))
+                    .orElseGet(() -> ImportResult.skipped(WITHOUT_RVL));
         }
-
-        Lpu lpu = existing.get();
-
-        Instant now = clock.instant();
-        if (hasRvl) {
-            lpu.applySnapshot(details, now);
-        }
-        else {
-            lpu.archiveAfterLosingRvl(details, now);
-        }
+        Lpu lpu = known
+                .map(existing -> refreshed(existing, details))
+                .orElseGet(() -> Lpu.create(externalId, details, clock.instant()));
         lpuRepository.save(lpu);
         return ImportResult.applied();
     }
 
+    private ImportResult archiveAfterLosingRvl(Lpu lpu, Lpu.Details details) {
+        lpu.archiveAfterLosingRvl(details, clock.instant());
+        lpuRepository.save(lpu);
+        return ImportResult.applied();
+    }
+
+    private Lpu refreshed(Lpu lpu, Lpu.Details details) {
+        lpu.applySnapshot(details, clock.instant());
+        return lpu;
+    }
+
     /**
-     * Ветка Б: страхователь. Фильтра нет — сохраняются все, но исход всё равно пропуск.
+     * Страхователь сохраняется всегда, но исход разбора называется пропуском, хотя строка в справочнике
+     * страхователей создана или обновлена.
      *
-     * <p>Это <b>не</b> значит «ничего не записано»: строка в {@code insurers} создаётся
-     * или обновляется. Пропуском исход назван потому, что вопрос к строке сырья на разборе
-     * один — <i>появился ли справочник, за которым в этот поток шли</i>. Санатории и
-     * страхователи едут одной очередью, и при статусе {@code PROCESSED} у обоих
-     * «в {@code lpu} пусто, потому что таких контрагентов не присылали» и «пусто, потому
-     * что все они оказались страхователями» выглядят в базе одинаково. Причина пропуска
-     * называет и то, куда запись всё-таки легла.
+     * <p>Санатории и страхователи приходят одной очередью. По исходу разбора видно, появился ли санаторий,
+     * за которым в этот поток и шли. Если бы страхователь считался применённым, то «санаториев не
+     * присылали» и «все присланные оказались страхователями» выглядели бы в базе одинаково. Причина
+     * пропуска называет, куда запись всё-таки легла.
      */
     private ImportResult applyInsurer(UUID externalId, ObjectNode data) {
         Insurer.Details details = insurerDetailsOf(data);
@@ -140,27 +153,28 @@ public class ContragentMapper implements StreamMapper {
                 .anyMatch(activityId::equals);
     }
 
-    /**
-     * Имена полей 1С здесь кириллические и приходят как есть — это ключи JSON источника,
-     * а не наш словарь.
-     */
+    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
     private static Lpu.Details lpuDetailsOf(ObjectNode data) {
         return new Lpu.Details(
                 OneCValues.requiredText(data, "Наименование"),
-                OneCValues.text(data, "НаименованиеПолное").orElse(null),
-                OneCValues.text(data, "ИНН").orElse(null),
-                OneCValues.text(data, "КПП").orElse(null),
-                OneCValues.text(data, "Телефон").orElse(null),
-                OneCValues.text(data, "EMAIL").orElse(null),
+                optionalText(data, "НаименованиеПолное"),
+                optionalText(data, "ИНН"),
+                optionalText(data, "КПП"),
+                optionalText(data, "Телефон"),
+                optionalText(data, "EMAIL"),
                 OneCValues.flag(data, "deleteMark"));
     }
 
     private static Insurer.Details insurerDetailsOf(ObjectNode data) {
         return new Insurer.Details(
                 OneCValues.requiredText(data, "Наименование"),
-                OneCValues.text(data, "НаименованиеПолное").orElse(null),
-                OneCValues.text(data, "ИНН").orElse(null),
-                OneCValues.text(data, "КПП").orElse(null),
+                optionalText(data, "НаименованиеПолное"),
+                optionalText(data, "ИНН"),
+                optionalText(data, "КПП"),
                 OneCValues.flag(data, "deleteMark"));
+    }
+
+    private static @Nullable String optionalText(ObjectNode data, String field) {
+        return OneCValues.text(data, field).orElse(null);
     }
 }
