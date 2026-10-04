@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Insurer;
@@ -145,24 +146,33 @@ public class ContragentMapper implements StreamMapper {
                 .anyMatch(activityId::equals);
     }
 
-    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
+    /**
+     * Санаторий и страхователь — один и тот же контрагент 1С с одинаковыми реквизитами юрлица. У санатория
+     * к ним добавляются телефон и почта, поэтому общие реквизиты читаются один раз.
+     */
     private static Lpu.Details lpuDetailsOf(ObjectNode data) {
+        Insurer.Details legalEntity = insurerDetailsOf(data);
         return new Lpu.Details(
-                OneCValues.requiredText(data, "Наименование"),
-                OneCValues.text(data, "НаименованиеПолное").orElse(null),
-                OneCValues.text(data, "ИНН").orElse(null),
-                OneCValues.text(data, "КПП").orElse(null),
-                OneCValues.text(data, "Телефон").orElse(null),
-                OneCValues.text(data, "EMAIL").orElse(null),
-                OneCValues.flag(data, "deleteMark"));
+                legalEntity.name(),
+                legalEntity.fullName(),
+                legalEntity.inn(),
+                legalEntity.kpp(),
+                optionalText(data, "Телефон"),
+                optionalText(data, "EMAIL"),
+                legalEntity.deleteMark());
     }
 
+    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
     private static Insurer.Details insurerDetailsOf(ObjectNode data) {
         return new Insurer.Details(
                 OneCValues.requiredText(data, "Наименование"),
-                OneCValues.text(data, "НаименованиеПолное").orElse(null),
-                OneCValues.text(data, "ИНН").orElse(null),
-                OneCValues.text(data, "КПП").orElse(null),
+                optionalText(data, "НаименованиеПолное"),
+                optionalText(data, "ИНН"),
+                optionalText(data, "КПП"),
                 OneCValues.flag(data, "deleteMark"));
+    }
+
+    private static @Nullable String optionalText(ObjectNode data, String field) {
+        return OneCValues.text(data, field).orElse(null);
     }
 }
