@@ -121,6 +121,21 @@ class OneCEnvelopeParserTest {
                 .hasNoCause();
     }
 
+    /**
+     * message-id конверт не обрезает, в отличие от полей сообщения: с пробелом или переводом строки
+     * по краям он не в канонической форме и отклоняется, как отклонялся и до Ш13a (37 символов).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {" 9f1c0f2e-0000-4000-8000-00000000000a", "9f1c0f2e-0000-4000-8000-00000000000a\\n"})
+    void messageIdWithSurroundingWhitespace_isRejected(String messageId) {
+        String body = """
+                {"data":{},"metadata":{"message-id":"%s"}}""".formatted(messageId);
+
+        assertThatThrownBy(() -> parser.messageIdOf(bytes(body)))
+                .isInstanceOf(OneCEnvelopeException.class)
+                .hasMessage("metadata.message-id не является GUID");
+    }
+
     /** Регистр 1С:УСК не задаёт: прописные цифры — тот же message-id (Ш13a, решение 2). */
     @Test
     void uppercaseMessageId_isTheSameGuid() {
