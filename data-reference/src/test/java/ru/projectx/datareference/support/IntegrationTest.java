@@ -11,20 +11,18 @@ import org.springframework.context.annotation.Import;
 /**
  * Тест поднимает приложение целиком на настоящем PostgreSQL, с остановленными часами.
  *
- * <p>Одной аннотацией, а не четырьмя на каждом классе, ради последней строки:
- * <b>шедулер разбора здесь усыплён</b>. Иначе он просыпается посреди чужого теста,
- * разбирает положенное этим тестом сырьё и меняет статусы, которые тест как раз
- * собирался проверить. Тесту самого шедулера это не мешает: он вызывает проход
- * напрямую, что вдобавок делает его детерминированным — без ожиданий и таймаутов.
- * Усыплён и первый тик всех трёх планировщиков сырья: без задержки он случался бы прямо
- * на старте контекста, то есть перед первым тестом класса или посреди него.
+ * <p>Одной аннотацией, а не четырьмя на каждом классе, ради главного: <b>расписания здесь выключены</b>
+ * ({@code projectx.scheduling.enabled=false}). Иначе проход разбора просыпается посреди чужого теста,
+ * разбирает положенное этим тестом сырьё и меняет статусы, которые тест как раз собирался проверить.
+ * Тесты планировщиков вызывают проходы напрямую, что вдобавок делает их детерминированными — без
+ * ожиданий и таймаутов. Выключены все три задачи по расписанию, вместе с пулом их потоков.
  *
  * <p><b>Брокера в этом контексте нет вовсе</b> — автоконфигурация AMQP исключена.
- * Раньше здесь стояло {@code spring.rabbitmq.listener.simple.auto-startup=false}, и этого
- * оказалось недостаточно: {@code RabbitListenerEndpointRegistry.startIfNecessary} стартует
+ * Выключить автостарт слушателей ({@code spring.rabbitmq.listener.simple.auto-startup=false})
+ * недостаточно: {@code RabbitListenerEndpointRegistry.startIfNecessary} стартует
  * контейнер при {@code contextRefreshed || isAutoStartup()}, а флаг {@code contextRefreshed}
  * взводится сразу после первого refresh. Spring останавливает и <b>перезапускает</b>
- * кэшированные контексты между тестовыми классами — и на перезапуске слушатели поднимались
+ * кэшированные контексты между тестовыми классами — и на перезапуске слушатели поднимались бы
  * вопреки свойству, шли на localhost:5672 и падали на первой же очереди, которой там нет.
  *
  * <p>Отсюда правило: тесту без брокера не нужно выключать слушателей — ему не нужна
@@ -54,8 +52,7 @@ import org.springframework.context.annotation.Import;
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("no-mutate")
 @SpringBootTest(properties = {
-        "projectx.import.poll-interval=1h",
-        "projectx.import.initial-delay=1h",
+        "projectx.scheduling.enabled=false",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
 public @interface IntegrationTest {

@@ -4,31 +4,36 @@ import java.time.Clock;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.OneCLogContext;
+import ru.projectx.datareference.service.onec.ImportResult;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
 /**
- * Когда разбирать накопленное сырьё. Что при этом делать — знает
- * {@link ReferenceImportService}; здесь только расписание и разбор отказов.
+ * Проход по накопленным сырым сообщениям: берёт пачку дозревших и отдаёт каждое в разбор. Что делать с
+ * сообщением, знает {@link ReferenceImportService}; здесь — выборка, журнал и разбор отказов. Когда
+ * запускать проход, задаёт {@link ScheduledPasses}.
  *
- * <p>Классификация отказа живёт тут, а не внутри разбора, по причине транзакций:
- * неудачная попытка откатывает транзакцию разбора вместе с изменениями справочника,
- * и записать отказ можно только снаружи неё. Отсюда же и правило — <b>ловим ровно два
- * случая</b>:
+ * <p>Классификация отказа живёт тут, а не внутри разбора, из-за транзакций: неудачная попытка откатывает
+ * транзакцию разбора вместе с изменениями справочника, и записать отказ можно только снаружи неё.
+ * Поэтому здесь ловятся ровно два случая:
  * <ul>
- *   <li>{@link OneCFieldException} — сообщение не соответствует контракту. Ошибка
- *       постоянная: следующая попытка даст то же самое, поэтому строка сразу уходит
- *       в терминальный отказ;</li>
- *   <li>любой другой отказ — недоступная база, блокировка, таймаут — временный:
- *       строка идёт на лестницу повторов.</li>
+ *   <li>{@link OneCFieldException} — сообщение не соответствует контракту. Ошибка постоянная: следующая
+ *       попытка даст то же самое, поэтому строка сразу уходит в окончательный отказ;</li>
+ *   <li>любой другой отказ — недоступная база, блокировка, таймаут — временный: строка идёт на лестницу
+ *       повторов.</li>
  * </ul>
+ *
+ * <p>Исход каждого сообщения виден в журнале: применено, пропущено с причиной или отказ. На время разбора в
+ * MDC лежат {@code message-id} и поток сообщения, под теми же именами, что при приёме из брокера. Тела
+ * сообщения и текста чужого исключения в журнале нет: через этот путь идут полисы с персональными данными.
  */
 @Component
 public class ReferenceImportScheduler {
@@ -58,12 +63,9 @@ public class ReferenceImportScheduler {
     /**
      * Один проход: взять пачку дозревших сообщений и разобрать каждое.
      *
-     * <p>Обычный цикл, а не стрим: каждый шаг пишет в базу и ловит свои исключения —
-     * это побочные эффекты по определению, и стрим здесь только притворялся бы
-     * декларативностью.
+     * <p>Обычный цикл, а не стрим: каждый шаг пишет в базу и ловит свои исключения, то есть состоит из
+     * побочных эффектов.
      */
-    @Scheduled(fixedDelayString = "${projectx.import.poll-interval:10s}",
-            initialDelayString = ImportProperties.INITIAL_DELAY_PLACEHOLDER)
     public void importPendingMessages() {
         List<InboundMessage> due = repository.findDueForImport(clock.instant(), Limit.of(properties.batchSize()));
         for (InboundMessage message : due) {
@@ -71,23 +73,49 @@ public class ReferenceImportScheduler {
         }
     }
 
+    /** В конце снимаются только ключи сообщения; остальные ключи MDC планировщик не трогает. */
     private void importOne(InboundMessage message) {
+        MDC.put(OneCLogContext.MESSAGE_ID, message.messageId().toString());
+        MDC.put(OneCLogContext.STREAM, message.stream().name());
         try {
-            importService.importMessage(message);
+            importAndClassify(message);
+        }
+        finally {
+            MDC.remove(OneCLogContext.MESSAGE_ID);
+            MDC.remove(OneCLogContext.STREAM);
+        }
+    }
+
+    private void importAndClassify(InboundMessage message) {
+        try {
+            reportOutcome(message, importService.importMessage(message));
         }
         catch (OneCFieldException permanent) {
+            // Текст своего исключения разбора называет поле, но не его значение, поэтому он идёт в журнал.
             log.warn("сообщение {} потока {} не соответствует контракту, повтор бессмыслен: {}",
                     message.messageId(), message.stream(), permanent.getMessage());
             inboundMessageService.recordPermanentFailure(message.messageId(), permanent.getMessage());
         }
         catch (RuntimeException temporary) {
-            // В лог — только тип отказа. Текст чужого исключения способен нести значения
-            // полей: ошибка вставки, например, печатает параметры запроса, а через этот
-            // же путь проходят полисы с персональными данными. Полный текст сохраняется
-            // в строке сырья — там он под теми же правилами доступа, что и сами данные.
+            // В журнал — только тип отказа. Текст чужого исключения способен нести значения полей: ошибка
+            // вставки, например, печатает параметры запроса. Полный текст сохраняется в строке сырья, где он
+            // под теми же правилами доступа, что и сами данные.
             log.warn("временная ошибка разбора сообщения {} потока {}: {}",
                     message.messageId(), message.stream(), temporary.getClass().getName());
             inboundMessageService.recordTemporaryFailure(message.messageId(), temporary.toString());
+        }
+    }
+
+    /**
+     * Причина пропуска пишется в журнал целиком: её составляют правила потоков, и в ней бывают только
+     * идентификаторы и признаки справочников, а не данные застрахованных.
+     */
+    private static void reportOutcome(InboundMessage message, ImportResult result) {
+        switch (result) {
+            case ImportResult.Applied ignored ->
+                    log.info("сообщение {} потока {} применено", message.messageId(), message.stream());
+            case ImportResult.Skipped skipped -> log.info("сообщение {} потока {} пропущено: {}",
+                    message.messageId(), message.stream(), skipped.reason());
         }
     }
 }

@@ -6,20 +6,17 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
 /**
- * Сырьё старше порога — общая выборка двух присмотров за таблицей {@code inbound_message}:
- * срока хранения персональных данных ({@link PersonalDataRetention}) и зависших передач
- * ТЗ-9 ({@link StuckTransferAlert}).
+ * Запросы к сырым сообщениям старше порога для двух задач по расписанию: срока хранения персональных данных
+ * ({@link PersonalDataRetention}) и проверки зависших передач прайсов ({@link StuckTransferAlert}).
  *
- * <p>Оба спрашивают одно и то же — какие строки приняты раньше, чем «сейчас минус порог», —
- * и различаются только тем, какие строки и какой порог. Это решает сам присмотр, там же
- * и объяснено почему; здесь — как порог становится моментом по часам сервиса. Часы
- * инъецируются, поэтому тесты управляют временем без ожидания.
+ * <p>Обе задачи задают давность — «старше тридцати суток», «дольше часа», — а запросу нужен момент. Здесь
+ * давность превращается в момент по часам сервиса: принято раньше, чем «сейчас минус порог». Часы
+ * инъецируются, поэтому тесты управляют временем без ожидания. Какие строки и какой порог, решает сама
+ * задача, там же объяснено почему.
  */
 @Component
 public class AgedInboundMessages {
@@ -33,18 +30,21 @@ public class AgedInboundMessages {
     }
 
     /**
-     * Строки потока, у которых ещё лежит тело, принятые раньше, чем {@code age} назад.
+     * Стирает тела не больше {@code limit} сообщений полисов, принятых раньше, чем {@code age} назад, начиная
+     * с самых старых. Метод не открывает транзакцию: её открывает вызывающий.
      *
-     * @param limit сколько строк вернуть за раз, не больше
+     * @return сколько тел стёрто
      */
-    public List<InboundMessage> withPayload(OneCStream stream, Duration age, int limit) {
-        return repository.findByStreamAndPayloadIsNotNullAndReceivedAtLessThan(
-                stream, receivedBefore(age), Limit.of(limit));
+    public int forgetPolicyPayloads(Duration age, int limit) {
+        return repository.forgetPolicyPayloads(receivedBefore(age), limit);
     }
 
-    /** Строки в статусе {@code status}, принятые раньше, чем {@code age} назад. */
-    public List<InboundMessage> inStatus(InboundStatus status, Duration age) {
-        return repository.findByStatusAndReceivedAtLessThan(status, receivedBefore(age));
+    /**
+     * Передачи прайсов, которые ждут своих частей дольше {@code age}: самые давние первыми, не больше
+     * {@code limit}. Тела сообщений не читаются.
+     */
+    public List<BufferedTransfer> transfersBufferedLongerThan(Duration age, int limit) {
+        return repository.findTransfersBufferedBefore(receivedBefore(age), Limit.of(limit));
     }
 
     private Instant receivedBefore(Duration age) {
