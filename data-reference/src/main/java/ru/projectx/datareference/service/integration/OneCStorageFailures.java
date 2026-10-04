@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.service.QuarantineService;
-import ru.projectx.datareference.service.SqlStates;
 
 /**
  * Что делать с сообщением 1С:УСК, сырьё которого база записать не смогла. Решение зависит от кода SQLSTATE
@@ -44,7 +43,7 @@ class OneCStorageFailures {
         switch (OneCStorageFailure.of(failure)) {
             case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
             case OneCStorageFailure.DuplicateRace ignored -> returnAfterPause(delivery, messageId, failure);
-            case OneCStorageFailure.Outage outage -> pauseConsumers(messageId, outage);
+            case OneCStorageFailure.Outage outage -> pauseConsumers(messageId, outage.outage());
         }
     }
 
@@ -59,9 +58,7 @@ class OneCStorageFailures {
             quarantined = quarantine.quarantine(delivery.rejected(messageId), sqlState);
         }
         catch (RuntimeException storageFailure) {
-            pauseConsumers(messageId, new OneCStorageFailure.Outage(
-                    SqlStates.deepest(storageFailure).orElse(OneCStorageFailure.NO_SQL_STATE),
-                    storageFailure.getClass().getName()));
+            pauseConsumers(messageId, OneCStorageFailure.Outage.of(storageFailure).outage());
             return;
         }
         if (quarantined) {
@@ -79,9 +76,9 @@ class OneCStorageFailures {
     }
 
     /** Сообщение остаётся неподтверждённым намеренно: в очередь его вернёт остановка контейнера. */
-    private void pauseConsumers(UUID messageId, OneCStorageFailure.Outage outage) {
+    private void pauseConsumers(UUID messageId, StorageOutage outage) {
         log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, outage.failureType(), outage.sqlState());
-        consumers.pause(outage.toStorageOutage());
+        consumers.pause(outage);
     }
 
     /**

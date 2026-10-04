@@ -103,16 +103,34 @@ public class OneCConsumerPause {
 
     /**
      * Пауза снимается до запуска: первый же запущенный потребитель может снова отказать и поставить новую
-     * паузу, и она не должна пропасть вместе со старой.
+     * паузу, и она не должна пропасть вместе со старой. Пауза, прочитанная до проверки базы, к этому моменту
+     * могла смениться другой — тогда возобновлять нечего, новой паузой займётся следующая проверка.
      */
     private void resume(PauseState current) {
+        if (!current.equals(state)) {
+            return;
+        }
         if (!current.consumersStopped().isDone()) {
             log.info("база отвечает, но потребители 1С:УСК ещё останавливаются: запуск отложен до следующей проверки");
             return;
         }
         state = null;
-        current.paused().queues().forEach(queue -> container(queue).start());
+        current.paused().queues().forEach(this::startConsumer);
         log.info("база снова отвечает: потребители {} запущены, приём из 1С:УСК возобновлён", current.paused().queues());
+    }
+
+    /**
+     * Контейнер может не запуститься по причине на стороне брокера, например пропала очередь: это уже не
+     * отказ хранилища, пауза его не описывает, и остальные очереди он задерживать не должен. Такой отказ —
+     * ERROR с именем очереди; контейнер остаётся остановленным, и это видно брокеру по отсутствию потребителя.
+     */
+    private void startConsumer(String queue) {
+        try {
+            container(queue).start();
+        }
+        catch (RuntimeException notStarted) {
+            log.error("потребитель очереди {} не запущен после паузы: {}", queue, notStarted.getClass().getName());
+        }
     }
 
     /**

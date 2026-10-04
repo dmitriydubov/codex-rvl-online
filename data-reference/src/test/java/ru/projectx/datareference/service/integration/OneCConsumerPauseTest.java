@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -11,10 +12,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
@@ -62,6 +73,20 @@ class OneCConsumerPauseTest {
     /** Контейнер, выключенный не паузой: автостарт отключён настройкой, человеком или не стартовал вовсе. */
     @Mock
     private MessageListenerContainer disabled;
+
+    private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
+
+    @BeforeEach
+    void captureLog() {
+        logged.start();
+        pauseLog().addAppender(logged);
+    }
+
+    @AfterEach
+    void releaseLog() {
+        pauseLog().detachAppender(logged);
+        logged.stop();
+    }
 
     @BeforeEach
     void registry() {
@@ -182,24 +207,80 @@ class OneCConsumerPauseTest {
     }
 
     /**
-     * Первый же запущенный потребитель снова отказывает — база «мигнула». Новая пауза не должна пропасть вместе
-     * со старой: после возобновления приём снова на паузе с новой причиной, потребители остановлены ещё раз.
+     * База «мигнула»: пока возобновление запускает потребителей, слушатель первого запущенного снова отказывает
+     * из своего потока. Его пауза ждёт конца запуска (монитор) и не пропадает: после возобновления приём снова
+     * на паузе с новой причиной, потребители остановлены второй раз.
      */
     @Test
-    void outageDuringResume_startsAFreshPause() {
+    void outageFromAnotherThreadDuringResume_waitsAndStartsAFreshPause() throws Exception {
         OneCConsumerPause pause = pause();
         pause.pause(CONNECTION_LOST);
         when(probe.storageAvailable()).thenReturn(true);
-        doAnswer(invocation -> {
+        List<String> order = new CopyOnWriteArrayList<>();
+        Thread listener = new Thread(() -> {
             pause.pause(LOCK_TIMEOUT);
+            order.add("pause");
+        });
+        doAnswer(invocation -> {
+            listener.start();
+            await().atMost(Duration.ofSeconds(10)).until(() -> listener.getState() == Thread.State.BLOCKED);
             return null;
         }).when(policies).start();
 
         pause.resumeIfStorageAvailable();
+        order.add("resume");
+        listener.join(Duration.ofSeconds(10).toMillis());
 
+        assertThat(order).containsExactly("resume", "pause");
         assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
         verify(policies, times(2)).stop(any(Runnable.class));
         verify(mkb10, times(2)).stop(any(Runnable.class));
+        verify(policies).start();
+        verify(mkb10).start();
+    }
+
+    /**
+     * Пауза, прочитанная до проверки базы, успела смениться другой (её сняли и поставили новую, пока шла
+     * проверка): возобновлять нечего, новую паузу не трогаем — ею займётся следующая проверка.
+     */
+    @Test
+    void pauseReplacedDuringStorageCheck_isLeftForTheNextCheck() {
+        OneCConsumerPause pause = pause();
+        pause.pause(CONNECTION_LOST);
+        AtomicInteger checks = new AtomicInteger();
+        when(probe.storageAvailable()).thenAnswer(invocation -> {
+            if (checks.incrementAndGet() == 1) {
+                pause.resumeIfStorageAvailable();
+                pause.pause(LOCK_TIMEOUT);
+            }
+            return true;
+        });
+
+        pause.resumeIfStorageAvailable();
+
+        assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
+        verify(policies).start();
+        verify(mkb10).start();
+    }
+
+    /**
+     * Контейнер не запустился по причине на стороне брокера: остальные всё равно запускаются, пауза снята, а
+     * отказ виден в журнале с именем очереди.
+     */
+    @Test
+    void startFailureOfOneContainer_startsTheOthersAndReportsIt() {
+        doThrow(new AmqpException("очередь пропала")).when(policies).start();
+        OneCConsumerPause pause = pause();
+        pause.pause(CONNECTION_LOST);
+        when(probe.storageAvailable()).thenReturn(true);
+
+        pause.resumeIfStorageAvailable();
+
+        verify(mkb10).start();
+        assertThat(pause.paused()).isEmpty();
+        assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.ERROR)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains(POLICIES, "не запущен"));
     }
 
     /** Отказ остановки одного контейнера не заклинивает паузу: его остановка считается завершённой, остальные стоят. */
@@ -260,5 +341,9 @@ class OneCConsumerPauseTest {
 
     private OneCConsumerPause pause() {
         return new OneCConsumerPause(registryProvider, probe, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static Logger pauseLog() {
+        return (Logger) LoggerFactory.getLogger(OneCConsumerPause.class);
     }
 }

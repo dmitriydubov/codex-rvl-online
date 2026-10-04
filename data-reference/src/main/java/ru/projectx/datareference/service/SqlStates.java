@@ -17,7 +17,15 @@ import org.jspecify.annotations.Nullable;
  */
 public final class SqlStates {
 
+    /** Что писать вместо кода в журнале и health, когда отказ пришёл не из базы либо без кода. */
+    private static final String NONE = "нет";
+
     private SqlStates() {
+    }
+
+    /** Код SQLSTATE для журнала и health: сам код либо слово «нет», если его в цепочке причин не оказалось. */
+    public static String deepestOrNone(Throwable failure) {
+        return deepest(failure).orElse(NONE);
     }
 
     /**

@@ -45,8 +45,6 @@ import org.springframework.transaction.TransactionTimedOutException;
 @Component
 public class DatabaseOutages {
 
-    private static final String NO_SQL_STATE = "нет";
-
     private static final List<Class<? extends RuntimeException>> TEMPORARY = List.of(
             CannotCreateTransactionException.class,
             TransactionTimedOutException.class,
@@ -104,7 +102,7 @@ public class DatabaseOutages {
 
     /** Код SQLSTATE отказа для журнала; правило, какой код в цепочке причин считается кодом отказа, — {@link SqlStates}. */
     private static String sqlState(Throwable failure) {
-        return SqlStates.deepest(failure).orElse(NO_SQL_STATE);
+        return SqlStates.deepestOrNone(failure);
     }
 
     /**

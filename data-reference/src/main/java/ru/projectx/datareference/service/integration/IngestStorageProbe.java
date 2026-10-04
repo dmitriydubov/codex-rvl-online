@@ -29,7 +29,6 @@ public class IngestStorageProbe {
     private static final Logger log = LoggerFactory.getLogger(IngestStorageProbe.class);
 
     private static final UUID NEVER_STORED = new UUID(0, 0);
-    private static final String NO_SQL_STATE = "нет";
 
     private final InboxRepository inbox;
     private final InboundMessageRepository rawMessages;
@@ -54,7 +53,7 @@ public class IngestStorageProbe {
         catch (RuntimeException unavailable) {
             // Тип и код, но не текст: текст ошибки базы может нести значения строк.
             log.info("таблицы приёма из 1С:УСК недоступны: {} SQLSTATE {}",
-                    unavailable.getClass().getName(), SqlStates.deepest(unavailable).orElse(NO_SQL_STATE));
+                    unavailable.getClass().getName(), SqlStates.deepestOrNone(unavailable));
             return false;
         }
     }

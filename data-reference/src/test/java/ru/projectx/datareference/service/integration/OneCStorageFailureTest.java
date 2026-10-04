@@ -38,16 +38,16 @@ class OneCStorageFailureTest {
     void connectionLockTimeoutAndUnknownCodes_areOutageWithCodeAndType(String sqlState) {
         OneCStorageFailure failure = OneCStorageFailure.of(withSqlState(sqlState));
 
-        assertThat(failure).isEqualTo(
-                new OneCStorageFailure.Outage(sqlState, DataIntegrityViolationException.class.getName()));
+        assertThat(failure).isEqualTo(new OneCStorageFailure.Outage(
+                new StorageOutage(sqlState, DataIntegrityViolationException.class.getName())));
     }
 
     @Test
     void failureWithoutSqlState_isOutageNamedWithoutCode() {
         OneCStorageFailure failure = OneCStorageFailure.of(new TransactionSystemException(TEXT));
 
-        assertThat(failure).isEqualTo(
-                new OneCStorageFailure.Outage("нет", TransactionSystemException.class.getName()));
+        assertThat(failure).isEqualTo(new OneCStorageFailure.Outage(
+                new StorageOutage("нет", TransactionSystemException.class.getName())));
     }
 
     /** Код берётся у самого глубокого исключения JDBC: внешнее 23505 поверх внутреннего 22P05 — отравленное тело. */
@@ -59,11 +59,12 @@ class OneCStorageFailureTest {
         assertThat(OneCStorageFailure.of(nested)).isEqualTo(new OneCStorageFailure.Poison("22P05"));
     }
 
+    /** Отказ записи карантина читается как отказ хранилища, каким бы ни был его код: тело bytea принимает любое. */
     @Test
-    void outage_convertsToStorageOutageForThePause() {
-        var outage = new OneCStorageFailure.Outage("08006", "X");
-
-        assertThat(outage.toStorageOutage()).isEqualTo(new StorageOutage("08006", "X"));
+    void anyFailure_readsAsOutageWithItsCodeAndType() {
+        assertThat(OneCStorageFailure.Outage.of(withSqlState("22P05")))
+                .isEqualTo(new OneCStorageFailure.Outage(
+                        new StorageOutage("22P05", DataIntegrityViolationException.class.getName())));
     }
 
     private static RuntimeException withSqlState(String sqlState) {

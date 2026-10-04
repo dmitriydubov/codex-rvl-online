@@ -16,8 +16,6 @@ sealed interface OneCStorageFailure {
     /** Код класса ошибок данных PostgreSQL: значение, которое база не принимает. */
     String DATA_EXCEPTION_CLASS = "22";
     String UNIQUE_VIOLATION = "23505";
-    /** Что писать вместо кода, когда отказ пришёл не из базы либо без кода. */
-    String NO_SQL_STATE = "нет";
 
     /** Исход по отказу записи; код берётся у самого глубокого {@code SQLException} в цепочке причин. */
     static OneCStorageFailure of(RuntimeException failure) {
@@ -28,7 +26,7 @@ sealed interface OneCStorageFailure {
         if (sqlState.filter(UNIQUE_VIOLATION::equals).isPresent()) {
             return new DuplicateRace();
         }
-        return new Outage(sqlState.orElse(NO_SQL_STATE), failure.getClass().getName());
+        return Outage.of(failure);
     }
 
     /**
@@ -53,13 +51,13 @@ sealed interface OneCStorageFailure {
      * сообщение бессмысленно, пока база не вернётся, поэтому потребители встают на паузу. Неизвестный отказ
      * лучше задержать, чем потерять.
      *
-     * @param sqlState    код отказа или «нет»
-     * @param failureType полное имя класса исключения — для журнала и health
+     * @param outage что об отказе можно сказать без персональных данных: код и тип исключения
      */
-    record Outage(String sqlState, String failureType) implements OneCStorageFailure {
+    record Outage(StorageOutage outage) implements OneCStorageFailure {
 
-        StorageOutage toStorageOutage() {
-            return new StorageOutage(sqlState, failureType);
+        /** Любой отказ как отказ хранилища: так читается и отказ самой записи в карантин. */
+        static Outage of(RuntimeException failure) {
+            return new Outage(new StorageOutage(SqlStates.deepestOrNone(failure), failure.getClass().getName()));
         }
     }
 }
