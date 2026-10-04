@@ -19,6 +19,7 @@ public final class ImportSettings {
     private Duration payloadTtl = Duration.ofDays(30);
     private Duration retentionPollInterval = Duration.ofHours(1);
     private int retentionBatchSize = 500;
+    private Duration quarantineTtl = Duration.ofDays(30);
 
     private ImportSettings() {
     }
@@ -72,9 +73,14 @@ public final class ImportSettings {
         return this;
     }
 
+    public ImportSettings quarantineTtl(Duration value) {
+        quarantineTtl = value;
+        return this;
+    }
+
     public ImportProperties build() {
         return new ImportProperties(pollInterval, initialDelay, batchSize, stuckTransferThreshold,
                 stuckTransferPollInterval, stuckTransferReportLimit, payloadTtl, retentionPollInterval,
-                retentionBatchSize);
+                retentionBatchSize, quarantineTtl);
     }
 }

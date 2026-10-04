@@ -40,6 +40,10 @@ import org.springframework.validation.annotation.Validated;
  * @param retentionBatchSize сколько тел стирается одной транзакцией. Весь остаток одним запросом надолго
  *                заблокировал бы строки, которые в это же время читает разбор; поэтому проход стирает
  *                пачками, и каждая пачка коммитится сразу
+ * @param quarantineTtl сколько тело карантинного сообщения — того, которое база не приняла в сырьё, — живёт после
+ *                приёма. Тело не разобрано, и по имени очереди нельзя поручиться, что в нём нет персональных
+ *                данных, поэтому срок один для всех очередей и по умолчанию равен сроку тела полиса. Меньше суток
+ *                не допускается: карантин разбирает человек, и ему нужно успеть увидеть тело
  */
 @Validated
 @ConfigurationProperties("projectx.import")
@@ -52,5 +56,6 @@ public record ImportProperties(
         @DefaultValue("20") @Positive int stuckTransferReportLimit,
         @DefaultValue("30d") @DurationMin(days = 1) Duration payloadTtl,
         @DefaultValue("1h") @DurationMin(millis = 1) Duration retentionPollInterval,
-        @DefaultValue("500") @Positive int retentionBatchSize) {
+        @DefaultValue("500") @Positive int retentionBatchSize,
+        @DefaultValue("30d") @DurationMin(days = 1) Duration quarantineTtl) {
 }

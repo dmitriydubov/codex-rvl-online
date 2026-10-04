@@ -77,6 +77,19 @@ class OneCQueueIngestTest {
         RunningListeners.assertAllRunning(listeners);
     }
 
+    /**
+     * Контейнеров ровно столько, сколько очередей в конфигурации, и их идентификаторы — имена очередей. Лишний
+     * контейнер — это второй потребитель какой-то очереди (например, случайный {@code @RabbitListener}), и он
+     * перемешал бы порядок потока; недостающий — очередь, которую никто не читает.
+     */
+    @Test
+    void listenerContainers_areExactlyTheElevenQueues() {
+        assertThat(listeners.getListenerContainerIds()).containsExactlyInAnyOrder(
+                queues.policies(), queues.insuranceContracts(), queues.contragents(), queues.mkb10(),
+                queues.lpuContracts(), queues.programs(), queues.appealTypes(), queues.lpuContacts(),
+                queues.priceLists(), queues.priceListsFinal(), queues.contragentServices());
+    }
+
     @Test
     void messageFromQueue_isStoredAsRawWithItsStream() {
         UUID messageId = UUID.randomUUID();

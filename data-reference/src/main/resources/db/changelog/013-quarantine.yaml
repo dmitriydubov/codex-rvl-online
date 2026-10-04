@@ -1,0 +1,48 @@
+# Карантин сообщений 1С:УСК, тела которых база не принимает в сырьё.
+databaseChangeLog:
+
+  - changeSet:
+      id: 013-quarantine
+      author: rvl-online
+      comment: >
+        Сообщение 1С:УСК, тело которого не принимает колонка jsonb сырья (например, JSON-escape
+        нулевого символа), нельзя ни записать, ни вернуть брокеру: возвращённое оно выдаётся
+        снова первым и держит очередь целиком. Такое тело кладётся сюда байт в байт (bytea —
+        текст с нулевым символом не примет и колонка text), с именем очереди-источника и
+        причиной — кодом SQLSTATE отказа, без текста ошибки базы. Ключ — message_id сообщения,
+        как у сырья: повторная доставка второй записи не создаёт. Тело может нести персональные
+        данные полиса и автоматически не переобрабатывается, поэтому у него срок хранения:
+        по истечении тело стирается, запись с причиной остаётся. Частичный индекс — под
+        выборку стирания, сырым sql: createIndex молча игнорирует условие where.
+      changes:
+        - createTable:
+            tableName: quarantine
+            columns:
+              - column:
+                  name: message_id
+                  type: uuid
+                  constraints: { primaryKey: true, primaryKeyName: pk_quarantine, nullable: false }
+              - column:
+                  name: stream
+                  type: text
+                  constraints: { nullable: false }
+              - column:
+                  name: source_queue
+                  type: text
+                  constraints: { nullable: false }
+              - column: { name: body, type: bytea }
+              - column:
+                  name: reason
+                  type: text
+                  constraints: { nullable: false }
+              - column:
+                  name: received_at
+                  type: timestamptz
+                  constraints: { nullable: false }
+        - sql:
+            dbms: postgresql
+            sql: create index idx_quarantine_retention on quarantine (received_at) where body is not null
+      rollback:
+        - sql: drop index if exists idx_quarantine_retention
+        - dropTable:
+            tableName: quarantine

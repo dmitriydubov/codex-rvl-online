@@ -15,6 +15,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.rabbitmq.client.Channel;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,12 +30,13 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.JacksonConfig;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.OneCLogContext;
+import ru.projectx.datareference.service.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 /**
@@ -43,7 +45,8 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  * <p>Важны две вещи. По строке журнала находится её сообщение: на время обработки в MDC лежат
  * {@code messageId}, {@code stream} и {@code queue}. И в журнал не попадает ни тело сообщения, ни
  * текст чужого исключения, потому что через слушатель идут полисы с персональными данными, а ошибка
- * вставки печатает параметры запроса.
+ * вставки печатает параметры запроса. Журнал снимается со всего пакета приёма: об исходе отказа записи
+ * пишет не сам слушатель, а его помощник.
  */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerJournalTest {
@@ -60,6 +63,12 @@ class OneCQueueListenerJournalTest {
 
     @Mock
     private OneCIngestService ingestService;
+
+    @Mock
+    private QuarantineService quarantineService;
+
+    @Mock
+    private OneCConsumerPause consumers;
 
     @Mock
     private Channel channel;
@@ -114,7 +123,8 @@ class OneCQueueListenerJournalTest {
     @Test
     void storageFailure_logsExceptionTypeButNotItsText() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
-                new DataIntegrityViolationException("ошибка вставки, параметры: " + PERSONAL_DATA));
+                new DataIntegrityViolationException("ошибка вставки, параметры: " + PERSONAL_DATA,
+                        new SQLException("параметры: " + PERSONAL_DATA, "23505")));
 
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
 
@@ -125,6 +135,58 @@ class OneCQueueListenerJournalTest {
         assertThat(warning.getThrowableProxy()).isNull();
         assertThat(warning.getMDCPropertyMap())
                 .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
+    }
+
+    /** Отказ хранилища, ставящий приём на паузу: WARN с типом и кодом SQLSTATE, без текста ошибки. */
+    @Test
+    void storageOutage_logsTypeAndSqlStateButNotText() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any())).thenThrow(
+                new DataAccessResourceFailureException("обрыв на строке " + PERSONAL_DATA,
+                        new SQLException("обрыв на строке " + PERSONAL_DATA, "08006")));
+
+        listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
+
+        ILoggingEvent warning = onlyEvent(Level.WARN);
+        assertThat(warning.getFormattedMessage())
+                .contains(DataAccessResourceFailureException.class.getName(), "08006")
+                .doesNotContain(PERSONAL_DATA);
+        assertThat(warning.getThrowableProxy()).isNull();
+        assertThat(warning.getMDCPropertyMap())
+                .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
+    }
+
+    /**
+     * Карантин оставляет ERROR с кодом отказа и размером тела, но без самого тела и без текста ошибки базы:
+     * оба несут значения строки.
+     */
+    @Test
+    void quarantine_logsReasonAndSizeButNoBody() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any())).thenThrow(
+                new DataIntegrityViolationException("unsupported escape in " + PERSONAL_DATA,
+                        new SQLException("unsupported escape in " + PERSONAL_DATA, "22P05")));
+        when(quarantineService.quarantine(any(), any())).thenReturn(true);
+
+        listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
+
+        ILoggingEvent error = onlyEvent(Level.ERROR);
+        assertThat(error.getFormattedMessage())
+                .contains("карантин", "22P05", MESSAGE_ID.toString(), QUEUE)
+                .doesNotContain(PERSONAL_DATA);
+        assertThat(error.getThrowableProxy()).isNull();
+        assertThat(error.getMDCPropertyMap())
+                .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
+    }
+
+    /** Повтор уже карантинного сообщения — не событие: ни ERROR, ни WARN. */
+    @Test
+    void redeliveredQuarantinedMessage_leavesNoJournalEntry() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any())).thenThrow(
+                new DataIntegrityViolationException("escape", new SQLException("escape", "22P05")));
+        when(quarantineService.quarantine(any(), any())).thenReturn(false);
+
+        listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
+
+        assertThat(logged.list).isEmpty();
     }
 
     /**
@@ -212,8 +274,8 @@ class OneCQueueListenerJournalTest {
 
     @Test
     void mdc_isClearedWhenReturnToQueueFails() throws IOException {
-        when(ingestService.receive(any(), any(), any(), any()))
-                .thenThrow(new CannotAcquireLockException("база недоступна"));
+        when(ingestService.receive(any(), any(), any(), any())).thenThrow(
+                new DataIntegrityViolationException("duplicate key", new SQLException("duplicate key", "23505")));
         doThrow(new IOException("канал закрыт")).when(channel).basicNack(anyLong(), anyBoolean(), anyBoolean());
 
         assertThatIOException().isThrownBy(
@@ -262,11 +324,13 @@ class OneCQueueListenerJournalTest {
         return new OneCQueueListener(
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
-                new IngestProperties(Duration.ofMillis(1)));
+                new OneCStorageFailures(quarantineService, consumers,
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10))));
     }
 
+    /** Журнал всего пакета приёма: слушатель и его помощник по отказам записи пишут в свои категории. */
     private static Logger listenerLog() {
-        return (Logger) LoggerFactory.getLogger(OneCQueueListener.class);
+        return (Logger) LoggerFactory.getLogger(OneCQueueListener.class.getPackageName());
     }
 
     private static String envelope(UUID messageId) {

@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/011-mkb10-search.yaml
   - include:
       file: db/changelog/012-catalog-indexes.yaml
+  - include:
+      file: db/changelog/013-quarantine.yaml

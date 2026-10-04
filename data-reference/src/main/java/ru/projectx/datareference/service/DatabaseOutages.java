@@ -1,9 +1,7 @@
 package ru.projectx.datareference.service;
 
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.RecoverableDataAccessException;
@@ -104,20 +102,9 @@ public class DatabaseOutages {
         return failure instanceof JpaSystemException && failure.getCause() instanceof org.hibernate.TransactionException;
     }
 
-    /**
-     * Код SQLSTATE самого глубокого {@link SQLException} в цепочке причин. Он говорит, что именно
-     * случилось в базе: 55P03 — не дождались блокировки, 57014 — оператор отменён по таймауту,
-     * класс 08 — проблема с соединением. Именно самого глубокого, а не корневой причины: при обрыве
-     * соединения драйвер PostgreSQL кладёт код класса 08 поверх {@code IOException}, и у корня кода нет.
-     */
+    /** Код SQLSTATE отказа для журнала; правило, какой код в цепочке причин считается кодом отказа, — {@link SqlStates}. */
     private static String sqlState(Throwable failure) {
-        @Nullable String found = null;
-        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof SQLException sql) {
-                found = sql.getSQLState();
-            }
-        }
-        return Optional.ofNullable(found).orElse(NO_SQL_STATE);
+        return SqlStates.deepest(failure).orElse(NO_SQL_STATE);
     }
 
     /**

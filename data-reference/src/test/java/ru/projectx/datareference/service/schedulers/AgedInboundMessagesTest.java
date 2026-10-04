@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
 import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.QuarantineRepository;
 
 /**
  * Порог давности превращается в момент по часам сервиса: «старше тридцати суток» значит принято раньше, чем
@@ -30,11 +31,21 @@ class AgedInboundMessagesTest {
     @Mock
     private InboundMessageRepository repository;
 
+    @Mock
+    private QuarantineRepository quarantine;
+
     @Test
     void forgetPolicyPayloads_erasesRowsReceivedBeforeNowMinusAge() {
         when(repository.forgetPolicyPayloads(NOW.minus(Duration.ofDays(30)), 500)).thenReturn(17);
 
         assertThat(agedMessages().forgetPolicyPayloads(Duration.ofDays(30), 500)).isEqualTo(17);
+    }
+
+    @Test
+    void forgetQuarantineBodies_erasesRowsReceivedBeforeNowMinusAge() {
+        when(quarantine.forgetBodies(NOW.minus(Duration.ofDays(7)), 50)).thenReturn(3);
+
+        assertThat(agedMessages().forgetQuarantineBodies(Duration.ofDays(7), 50)).isEqualTo(3);
     }
 
     @Test
@@ -46,6 +57,6 @@ class AgedInboundMessagesTest {
     }
 
     private AgedInboundMessages agedMessages() {
-        return new AgedInboundMessages(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new AgedInboundMessages(repository, quarantine, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 }

@@ -1,0 +1,105 @@
+package ru.projectx.datareference.service.integration;
+
+import java.io.IOException;
+import java.util.Optional;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import ru.projectx.datareference.config.IngestProperties;
+import ru.projectx.datareference.service.QuarantineService;
+import ru.projectx.datareference.service.SqlStates;
+
+/**
+ * Что делать с сообщением 1С:УСК, сырьё которого база записать не смогла. Решение зависит от кода SQLSTATE
+ * отказа ({@link OneCStorageFailure}):
+ * <ul>
+ *   <li>тело не принимает сама база — сообщение уходит в карантин байт в байт и подтверждается брокеру,
+ *       очередь идёт дальше; в журнале ERROR с причиной, но без тела;</li>
+ *   <li>две доставки одного сообщения столкнулись на записи — пауза и возврат в очередь: повтор примет
+ *       сообщение как дубль;</li>
+ *   <li>всё остальное — временный отказ хранилища: потребители очередей встают на паузу, а сообщение остаётся
+ *       неподтверждённым и вернётся в очередь при остановке контейнера.</li>
+ * </ul>
+ *
+ * <p>В журнал идут тип исключения и код, но не текст ошибки: ошибка вставки печатает параметры запроса, а
+ * этим путём проходят полисы с персональными данными.
+ */
+@Component
+class OneCStorageFailures {
+
+    private static final Logger log = LoggerFactory.getLogger(OneCStorageFailures.class);
+    private static final String NO_SQL_STATE = "нет";
+
+    private final QuarantineService quarantine;
+    private final OneCConsumerPause consumers;
+    private final IngestProperties properties;
+
+    OneCStorageFailures(QuarantineService quarantine, OneCConsumerPause consumers, IngestProperties properties) {
+        this.quarantine = quarantine;
+        this.consumers = consumers;
+        this.properties = properties;
+    }
+
+    /** Отвечает брокеру за сообщение, сырьё которого не записалось из-за {@code failure}. */
+    void handle(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
+        Optional<String> sqlState = SqlStates.deepest(failure);
+        OneCStorageFailure outcome = OneCStorageFailure.ofSqlState(sqlState);
+        if (outcome == OneCStorageFailure.POISON) {
+            quarantine(delivery, messageId, sqlState.orElseThrow());
+            return;
+        }
+        if (outcome == OneCStorageFailure.DUPLICATE_RACE) {
+            returnAfterPause(delivery, messageId, failure);
+            return;
+        }
+        pauseConsumers(messageId, failure, sqlState.orElse(NO_SQL_STATE));
+    }
+
+    /**
+     * Карантин — тоже запись в базу, и она тоже может не удаться: тогда это уже отказ хранилища, а не отравленное
+     * тело, и потребители встают на паузу. Повторная доставка уже карантинного сообщения второй записи не создаёт
+     * и просто подтверждается.
+     */
+    private void quarantine(OneCDelivery delivery, UUID messageId, String sqlState) throws IOException {
+        boolean quarantined;
+        try {
+            quarantined = quarantine.quarantine(delivery.rejected(messageId), sqlState);
+        }
+        catch (RuntimeException storageFailure) {
+            pauseConsumers(messageId, storageFailure, SqlStates.deepest(storageFailure).orElse(NO_SQL_STATE));
+            return;
+        }
+        if (quarantined) {
+            log.error("сообщение {} из очереди {} в карантине: база не принимает его тело, SQLSTATE {} ({} байт)",
+                    messageId, delivery.queue(), sqlState, delivery.rawBody().length);
+        }
+        delivery.acknowledge();
+    }
+
+    private void returnAfterPause(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
+        log.warn("сырьё сообщения {} не сохранено, вернём источнику через {}: {}",
+                messageId, properties.storageUnavailableBackoff(), failure.getClass().getName());
+        pauseBeforeRedelivery();
+        delivery.returnToQueue();
+    }
+
+    /** Сообщение остаётся неподтверждённым намеренно: в очередь его вернёт остановка контейнера. */
+    private void pauseConsumers(UUID messageId, RuntimeException failure, String sqlState) {
+        log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, failure.getClass().getName(), sqlState);
+        consumers.pause(new StorageOutage(sqlState, failure.getClass().getName()));
+    }
+
+    /**
+     * Держит паузу перед возвратом сообщения. Прерывание — это остановка контейнера:
+     * флаг восстанавливаем и возвращаем сообщение сразу, канал ещё открыт.
+     */
+    private void pauseBeforeRedelivery() {
+        try {
+            Thread.sleep(properties.storageUnavailableBackoff());
+        }
+        catch (InterruptedException shuttingDown) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}

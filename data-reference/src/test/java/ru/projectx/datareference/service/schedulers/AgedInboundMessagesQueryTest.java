@@ -12,18 +12,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.QuarantineService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
 /**
- * Запросы к сырым сообщениям старше порога на настоящем PostgreSQL: стирание тел пачкой и выборка зависших
- * передач. Их условия — порядок, предел, группировка — проверяются только базой, unit-тесты видят лишь
- * параметры вызова.
+ * Запросы к сырым и карантинным сообщениям старше порога на настоящем PostgreSQL: стирание тел пачкой и
+ * выборка зависших передач. Их условия — порядок, предел, группировка — проверяются только базой, unit-тесты
+ * видят лишь параметры вызова.
  *
  * <p>Часы остановлены, поэтому «старое» сообщение кладётся через сервис, а время приёма отодвигается
  * запросом.
@@ -47,6 +50,12 @@ class AgedInboundMessagesQueryTest {
 
     @Autowired
     private InboundMessageRepository inboundMessageRepository;
+
+    @Autowired
+    private QuarantineService quarantineService;
+
+    @Autowired
+    private QuarantineRepository quarantineRepository;
 
     @Autowired
     private DatabaseCleaner databaseCleaner;
@@ -118,6 +127,43 @@ class AgedInboundMessagesQueryTest {
                 OLD_TRANSFER, processed);
 
         assertThat(agedMessages.transfersBufferedLongerThan(Duration.ofHours(1), 10)).isEmpty();
+    }
+
+    /** Карантин: пачка не больше предела, первыми стираются самые старые тела, записи с причиной остаются. */
+    @Test
+    void forgetQuarantineBodies_erasesOldestBodiesUpToLimitAndKeepsRows() {
+        UUID oldest = quarantine(Duration.ofDays(40));
+        UUID older = quarantine(Duration.ofDays(35));
+        UUID fresh = quarantine(Duration.ofDays(29));
+
+        int erased = transactions.execute(status -> agedMessages.forgetQuarantineBodies(Duration.ofDays(30), 1));
+
+        assertThat(erased).isEqualTo(1);
+        assertThat(quarantineRepository.findById(oldest)).hasValueSatisfying(row -> {
+            assertThat(row.body()).isEmpty();
+            assertThat(row.reason()).isEqualTo("22P05");
+        });
+        assertThat(quarantineRepository.findById(older).orElseThrow().body()).isPresent();
+        assertThat(quarantineRepository.findById(fresh).orElseThrow().body()).isPresent();
+    }
+
+    /** Тело с нулевым байтом, которое не приняли бы ни jsonb, ни text, в карантине лежит байт в байт. */
+    @Test
+    void quarantineBody_withZeroByte_isStoredByteForByte() {
+        byte[] poisoned = {'{', '"', 'a', '"', ':', '"', 0, '"', '}'};
+        UUID messageId = UUID.randomUUID();
+
+        quarantineService.quarantine(new RejectedMessage(messageId, OneCStream.POLICIES, QUEUE, poisoned), "22021");
+
+        assertThat(quarantineRepository.findById(messageId).orElseThrow().body()).contains(poisoned);
+    }
+
+    private UUID quarantine(Duration age) {
+        UUID messageId = UUID.randomUUID();
+        quarantineService.quarantine(new RejectedMessage(messageId, OneCStream.POLICIES, QUEUE, new byte[] {1}), "22P05");
+        testJdbc.update("update quarantine set received_at = ? where message_id = ?",
+                Timestamp.from(FixedClockConfig.NOW.minus(age)), messageId);
+        return messageId;
     }
 
     private int forget(int limit) {
