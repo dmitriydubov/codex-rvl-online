@@ -437,7 +437,13 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     мутант и может оставить в `data-reference/` файлы `hs_err_pid*.log`. С Ш2a они в `.gitignore` (корень, `hs_err_pid*.log`),
     и `gauntletScope` их не видит: в Ш3 подложенный файл не попал в `git ls-files --others --exclude-standard`.
     После Ш3 (PR #5) в прогоне `scope=all` с тегом `hs_err_pid*.log` не появился, но RUN_ERROR остались:
-    3 мутанта `InboundRetryProperties:36` (record) засчитаны убитыми.
+    3 мутанта `InboundRetryProperties:36` (record) засчитаны убитыми. **Закрыто Р4 (2026-10-04):** `PitSummary.java`
+    печатает каждый RUN_ERROR строкой `RUN_ERROR … - UNVERIFIED: tests did not run`, а RUN_ERROR вне
+    `gauntlet/config/pit-runerror-allowlist.txt` валит `pitSummary` и с ним `mutationGate` (`dependsOn 'pitSummary'`);
+    формат строки — `Class#method Mutator # тест, который убивает`. На `main` после PR #26 в `scope=all` 8 RUN_ERROR в
+    4 классах (`InboundRetryProperties`, `PolicyResponse`, `LpuServicesResponse$Service`, `InsuranceContractResponse`),
+    все проверены чтением тестов и внесены; набор RUN_ERROR от прогона к прогону меняется (SIGSEGV), поэтому у лямбд
+    в allowlist glob `lambda$of$*` и оба boolean-мутатора.
   - Цена: покрытие для mutationGate дают только unit-тесты — они есть у 7 из 67 классов, поэтому каждый касаемый класс
     требует unit-тестов (≥ 80 % строк, все покрытые мутанты убиты). Новый тест с `@IntegrationTest` молча выпадает из PIT.
   - Перед контрольным прогоном удалять `build/pitHistory.txt`: включён инкрементальный анализ.
@@ -616,7 +622,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
    - (а) тег сразу на составных аннотациях — каждый касаемый класс потребует unit-тестов;
    - (б) оставить контекстные тесты в PIT — медленно, ложные выжившие;
    - (в) тег на классы тестов по кластерам, по мере появления unit-тестов.
-4. **RUN_ERROR** показывать отдельной строкой «не проверено» и не засчитывать как убитый.
+4. **RUN_ERROR** показывать отдельной строкой «не проверено» и не засчитывать как убитый — **сделано** (Р4, 2026-10-04,
+   PR набора): строка `UNVERIFIED` в `pitSummary`, красный `mutationGate` вне `config/pit-runerror-allowlist.txt`.
 5. **Приёмка.** `acceptanceCheck` должен падать при 0 исполненных сценариев и не читать устаревшие результаты.
 
 **Порядок работ задаёт владелец** (решения 2026-09-30, план):

@@ -2222,7 +2222,16 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   показывать RUN_ERROR отдельной строкой «не проверено» и не засчитывать их как убитые; record без логики исключать
   поштучно через `exclude.classes`. Ш9 record не трогает, Р4 ему не нужен. После Ш3 (PR #5) RUN_ERROR есть и без
   контекстных тестов: в PIT scope=all с тегом 3 из 6 «убитых» мутантов record InboundRetryProperties (`:36`) — RUN_ERROR;
-  hs_err при этом не появился. Р4 остаётся в силе.
+  hs_err при этом не появился. Р4 остаётся в силе. **Сделано 2026-10-04 (координатор, PR набора):** `PitSummary.java`
+  печатает RUN_ERROR/MEMORY_ERROR/NON_VIABLE строкой `UNVERIFIED: tests did not run`; RUN_ERROR вне
+  `gauntlet/config/pit-runerror-allowlist.txt` (`Class#method Mutator # тест`) — exit 1 и красный `mutationGate`
+  (`dependsOn 'pitSummary'`); Stop-хук возвращает эти строки агенту; роль hardener и «Когда застрял» дополнены.
+  Вместо `exclude.classes` для record — allowlist: исключение класса спрятало бы и выживших мутантов его логики.
+  Внесены 8 RUN_ERROR `main` после PR #26 (scope=all), каждый сверен с тестом: `InboundRetryProperties#delayBeforeAttempt`
+  (ConditionalsBoundary, RemoveConditional_ORDER_ELSE), `PolicyResponse#of` (NullReturnVals, RemoveConditional_EQUAL_ELSE),
+  `PolicyResponse$ProgramLine#lambda$of$*` (оба Boolean*ReturnVals), `LpuServicesResponse$Service#withPrices`
+  (NullReturnVals), `InsuranceContractResponse#of` (RemoveConditional_EQUAL_ELSE). MEMORY_ERROR и NON_VIABLE гейт
+  не валит: первый — вердикт PIT о мутанте-«пожирателе», второй — байткод, который JVM отвергла, не изменение кода.
 - Р37 (желательно, до О2). **Guard для модульных CLAUDE.md и всего `.github/`.** Рекомендация: да, с кейсами в selftest.
   Иначе `data-reference/CLAUDE.md` после О2 открыт для правки агентом.
 - Р33 (для О2). **Какие правила главнее: `contract-service/CLAUDE.md` или gauntlet** (DIP против «абстракций с одной

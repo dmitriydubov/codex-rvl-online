@@ -160,7 +160,8 @@ tasks.register('gauntletInfo') {
             "checkstyle   : ${gauntletDir.toPath().relativize(configFile('checkstyle.xml').toPath())}",
             "pmd          : ${gauntletDir.toPath().relativize(configFile('pmd-ruleset.xml').toPath())}",
             "allowlists   : ${gauntletDir.toPath().relativize(configFile('integrity-allowlist.txt').toPath())}, " +
-                    "${gauntletDir.toPath().relativize(configFile('crap-allowlist.txt').toPath())}",
+                    "${gauntletDir.toPath().relativize(configFile('crap-allowlist.txt').toPath())}, " +
+                    "${gauntletDir.toPath().relativize(configFile('pit-runerror-allowlist.txt').toPath())}",
             "basePackage  : ${basePackage ?: '(not set)'}    glue: ${glue ?: '(not set)'}",
             "cucumber     : ${setting('cucumber.version', '7.23.0')}    scope: ${scope}    baseRef: ${baseRef}",
             "features     : ${featuresPath}"].collect { it.toString() }
@@ -467,19 +468,22 @@ plugins.withId('info.solidsoft.pitest') {
 
 tasks.register('pitSummary', Exec) {
     group = 'gauntlet'
-    description = 'Lists surviving/uncovered mutants and oversized files from the PIT report.'
+    description = 'Lists surviving, uncovered and unverified (RUN_ERROR) mutants and oversized files from the PIT ' +
+            'report; fails on a RUN_ERROR mutant outside config/pit-runerror-allowlist.txt.'
     def nothingToMutate = changedClassGlobs()?.isEmpty()
     onlyIf { !nothingToMutate }
     executable javaBin
     args "${tools}/PitSummary.java", '--report', buildDirFile('reports/pitest/mutations.xml').absolutePath,
-            '--max-per-file', setting('pit.maxMutationsPerFile', '100')
+            '--max-per-file', setting('pit.maxMutationsPerFile', '100'),
+            '--allowlist', configFile('pit-runerror-allowlist.txt').absolutePath
 }
 
 tasks.register('mutationGate') {
     group = 'gauntlet'
-    description = 'Mutation testing with PIT: every covered mutant in scope must be killed.'
+    description = 'Mutation testing with PIT: every covered mutant in scope must be killed, and a RUN_ERROR mutant ' +
+            '(PIT counts it as detected, the tests never ran) only passes through config/pit-runerror-allowlist.txt.'
     if (pit.applied) {
-        dependsOn 'pitest'
+        dependsOn 'pitest', 'pitSummary'
     }
     def applied = pit.applied
     doLast {
