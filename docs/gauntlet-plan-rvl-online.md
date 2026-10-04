@@ -203,6 +203,10 @@
   человека — твои рекомендации»** переданы сессии: allowlist не нужен; умолчания (пул 3, `stuck-transfer-report-limit` 20,
   `payload-ttl` ≥ 1 сутки) приняты; переписанный комментарий в `OneCQueueListener` оставить; «сообщение применено» остаётся
   INFO (Р7); уточнённый смысл «зависшей передачи» принят; исключение в правиле 4 записать. CI `gauntlet` на PR #38 зелёный.
+  **PR #38 смержен владельцем 19:34 UTC** (владелец: «можешь проверить ш14b»): проверка после мержа — карточка Ш14b и раздел 5;
+  правки `contract-service/CLAUDE.md` (константы MDC → `service.OneCLogContext`, расписания выключены в тестах, исключение в
+  правиле 4 для `projectx.scheduling.enabled`) — этим PR координатора. Контрольный `gauntletFast` на `main` 1de7002 зелёный
+  (615 unit-тестов, 132 сценария, 0 skipped). Сессия заархивирована. Дорожка приёма из 1С свободна: следующий Ш30+Ш31.
   Дорожки на тот момент (запись о Ш13c выше): REST свободна (Ш2, затем
   Ш8+Ш25), приём из 1С свободен (Ш14b).
 - 2026-10-04, **PR #31 (Ш41a) смержен владельцем 16:02 UTC**; ответ владельца сессии на остановке спецификации «1) да 2) а
@@ -882,8 +886,8 @@
   2026-10-04); дальше этап 3: Ш8+Ш25 свободен (обработчик ошибок после Ш41a — 11 методов, классификация отказов в
   `service/DatabaseOutages`);
 - конфигурация и сборка: этап 2 смержен целиком (PR #18, #26, #36);
-- приём из 1С: Ш13a и Ш13c смержены → Ш14b (Ш4, Ш5, Ш14a смержены, Р7 — «да») → Ш30+Ш31 → дальше этап 4 по порядку выше.
-  Ш2 и Ш14b по файлам не пересекаются и могут идти параллельно.
+- приём из 1С: Ш13a, Ш13c и Ш14b смержены (PR #30, #34, #38) → Ш30+Ш31 → Ш15a → Ш16 → Ш17 → дальше этап 4 по порядку
+  выше.
 
 ### 3.3. Этап 0 — окружение и решения первой очереди (без кода, вне итога)
 
@@ -1704,6 +1708,27 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 
 **Ш14b. Планировщики: пул, интервалы из записи, выключатель, стирание пачками, проекция в алерте, исход разбора в
 журнале** — тип: инфраструктура.
+- **Сделан 2026-10-04, PR #38 (смержен 19:34 UTC)** (session_01PmmMTDoCfuCKUyP3URCbH1, `claude/sh14b-schedulers`, Opus 5.5
+  xhigh по решению владельца). Проверка координатора по `main` 1de7002: `config/SchedulingConfig` (`@EnableScheduling` под
+  `projectx.scheduling.enabled`, `matchIfMissing`; бин `taskScheduler` из `ThreadPoolTaskSchedulerBuilder`, пул 3 — при
+  виртуальных потоках Boot иначе ставил бы `SimpleAsyncTaskScheduler` с одним потоком для fixed-delay), `service/schedulers/
+  ScheduledPasses` (три `FixedDelayTask` из `ImportProperties`, `@Scheduled` и `INITIAL_DELAY_PLACEHOLDER` в `src/main` не
+  осталось), стирание пачками одним `UPDATE … IN (SELECT … ORDER BY received_at LIMIT)` в своей транзакции каждая, проекция
+  `repository/BufferedTransfer` без тел с пределом, ключи MDC в `service/OneCLogContext`, исход разбора в журнале; тестовые
+  контексты ставят `projectx.scheduling.enabled=false`. Набор не тронут. Отчёт: 615 unit-тестов, 132 сценария, 33/33
+  мутанта, RUN_ERROR 0, CRAP 3,0; reviewer раунд 1 — 2 major (источники) + 5 minor, раунд 2 APPROVED; hardener убил
+  TIMED_OUT-мутанта предохранителем в тесте; Grok APPROVED (три остаточных риска, сессия ответила). Факт ~1,5 ч против 6 ч.
+  Ответы владельца: allowlist не нужен; пул 3, `stuck-transfer-report-limit` 20, `payload-ttl` ≥ 1 сутки — да; комментарий в
+  `OneCQueueListener` оставить; «применено» — INFO; смысл «зависшей передачи» (первая часть старше порога, число частей)
+  принят. Правки `contract-service/CLAUDE.md` (константы MDC → `OneCLogContext`, расписания выключены в тестах, исключение
+  в правиле 4) — PR координатора. Перенос в контур: новых зависимостей нет; новые свойства `spring.task.scheduling.pool.size`,
+  `projectx.scheduling.enabled`, `projectx.import.retention-poll-interval`, `stuck-transfer-poll-interval`,
+  `stuck-transfer-report-limit`, ограничения `payload-ttl` ≥ 1 сутки и `stuck-transfer-threshold` > 0; удалён
+  `SchedulersFirstTickTest`, удалены члены `OneCQueueListener.MDC_*`, `ImportProperties.INITIAL_DELAY_PLACEHOLDER`,
+  `AgedInboundMessages.withPayload/inStatus`, два производных метода репозитория. Остаточные риски — в описании PR
+  (`await-termination` не задан; два теста ждут реальное время до 10 с; литерал `'POLICIES'` в SQL ради частичного индекса).
+  Ловушка процесса та же, что у Ш2: репозиторий подключился после старта, хуки набора в сессии, вероятно, не действовали;
+  PR открыл координатор. Исходный разбор, по которому шла задача:
 - 2026-10-01 (PR #23): MDC `messageId` и `stream` на время importOne — те же ключи и формат значений, что у слушателя после
   Ш15 (`stream` = `OneCStream.name()`); в finally снимать только свои ключи. Константы `MDC_*` предпочтительно вынести из
   `OneCQueueListener` (AMQP-класс) в класс ключей MDC пакета `service` без AMQP — тогда Ш14b трогает и слушатель (зелёный
@@ -2654,7 +2679,7 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 | 1 | Ш41a 503 на ленивой догрузке и точность лимита REST-чтений | `claude/sh41a-lazy-load-503`, session_012JKNCGPsDmt4SzEcXJH7AQ | #31 | смержен 2026-10-04 16:02 UTC | ~1 ч 05 мин сессии (Fable 5.1 xhigh, $43,8) | оценка 7 ч (6 + 1 остаток Ш11); 2 новых сценария (97 всего), 45/45 мутантов, 0 RUN_ERROR, 55/55 Gherkin-мутантов, max CRAP 3,0; reviewer APPROVED (3 minor исправлены); решения владельца «1) да 2) а 3) а1 4) а», «1) как оптимальнее 2) да 3) да 4) да»; остатки — фраза в `contract-service/CLAUDE.md` (закрыта PR координатора), риски ревьюера в карточке |
 | 3 | Ш13c Канонический UUID в REST и настройках (Р69) | `claude/sh13c-canonical-uuid-rest`, session_01BAcyfzZ1aVvpKVbaYwVDB5 | #34 | смержен 2026-10-04 18:17 UTC | ~2,5 ч сессии (Opus 5.5 xhigh, $19,6) | оценка 5 ч; 132 сценария (+27), 40/40 мутантов (2 RUN_ERROR по allowlist PR #33), 99/99 Gherkin-мутантов, max CRAP 2,0; reviewer: 1-й раунд 2 major + 5 minor исправлены, 2-й APPROVED; Grok APPROVED; попутно `ContragentMapper` приведён к лимитам и впервые покрыт unit-тестами |
 | 2 | Ш2 Синтетические значения в тестовых фикстурах | `claude/sh2-synthetic-fixtures`, session_018ubMHim4YKQS4SaKAGcXCM | #36 | смержен 2026-10-04 19:07 UTC | ~1 ч сессии (Opus 5.5 xhigh, $5,9) | оценка 3 ч; без спецификации; только `src/test` (3 файла); 603 unit-теста, 132 сценария; reviewer 2 раунда (3 minor исправлены), Grok APPROVED; ответы владельца «1) вне шага — вымышленные, шаг не нужен 2) да» |
-| 4 | Ш14b Планировщики: пул, интервалы из настроек, выключатель, стирание пачками, проекция в алерте, исход разбора в журнале | `claude/sh14b-schedulers`, session_01PmmMTDoCfuCKUyP3URCbH1 | — | открыта 2026-10-04 18:43 UTC (Opus 5.5 xhigh — владелец спросил, можно ли вместо Fable; координатор подтвердил) | | оценка 6 ч; без спецификации; задача для Jira утверждена до старта; параллельно с Ш2 (файлы не пересекаются) |
+| 4 | Ш14b Планировщики: пул, интервалы из настроек, выключатель, стирание пачками, проекция в алерте, исход разбора в журнале | `claude/sh14b-schedulers`, session_01PmmMTDoCfuCKUyP3URCbH1 | #38 | смержен 2026-10-04 19:34 UTC | ~1,5 ч сессии (Opus 5.5 xhigh, $15,4) | оценка 6 ч; без спецификации; 615 unit-тестов, 132 сценария, 33/33 мутанта, RUN_ERROR 0; reviewer 2 раунда (2 major источниками, 5 minor), Grok APPROVED; PR открыл координатор (сессия не смогла); ответы владельца по 7 пунктам в описании PR |
 | — | gauntlet: allowlist RUN_ERROR `OneCContractProperties` для Ш13c; план — способ чтения UUID (Р69) | `claude/hopeful-brown-c5i29y` (координатор, gauntlet-admin) | #33 | смержен 2026-10-04 18:03 UTC | ~0,3 | Grok APPROVED; обе строки сверены координатором с тестом `filledValues_areReturnedAsGiven` |
 | — | docs + gauntlet: итоги Ш13a и Ш41a, Р69 и Ш13c, адресация вопросов, бандл ревизии 3 | `claude/hopeful-brown-c5i29y` (координатор, gauntlet-admin) | #32 | смержен 2026-10-04 17:03 UTC | ~1,5 | Grok 1 minor исправлен; ответы владельца «1) всё ок 2) да» |
 | — | docs + Р4: итоги PR #26, уроки переноса, правила владельца (Jira, Grok), RUN_ERROR в mutationGate | `claude/hopeful-brown-c5i29y` (координатор, gauntlet-admin) | #28 | смержен 2026-10-04 | ~1 | Grok APPROVED, 2 minor (1 исправлен, 1 — так задумано); ответ владельца «1) да 2) да достаточно» |
