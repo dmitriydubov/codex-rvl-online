@@ -2,8 +2,9 @@
 # Снято протоколом scan 2026-09-30 с HEAD 795e5ec: чистый GRADLE_USER_HOME, адрес Nexus контура подменён на Maven Central,
 # `./gradlew build -PpublicRepositories=false` зелёный (155 тестов). Владелец проверяет наличие каждой строки в Nexus контура
 # до переноса. Формат: group:artifact:version<TAB>что нужно (jar — jar и pom; pom — только pom: родительский POM или BOM).
-# Кроме модулей: дистрибутив Gradle gradle-8.14.3-bin.zip; образы eclipse-temurin:21-jdk, eclipse-temurin:21-jre (Dockerfile),
-# postgres:16.10-alpine, rabbitmq:4.1-alpine, testcontainers/ryuk:0.14.0 (тесты), rabbitmq:4.1-management-alpine (только compose).
+# Кроме модулей: дистрибутив Gradle gradle-8.14.3-bin.zip; образы eclipse-temurin:21.0.12.1_1-jdk, eclipse-temurin:21.0.12.1_1-jre (Dockerfile),
+# postgres:16.10-alpine, rabbitmq:4.1.2-alpine, testcontainers/ryuk:0.14.0 (тесты), rabbitmq:4.1.2-management-alpine (только compose);
+# теги закреплены Ш6 (PR #26). Дистрибутив в контуре: repository/raw-proxy-services.gradle.com/gradle-8.14.3-bin.zip (сумма Р17).
 
 biz.aQute.bnd:biz.aQute.bnd.annotation:7.1.0	jar
 ch.qos.logback:logback-classic:1.5.34	jar
