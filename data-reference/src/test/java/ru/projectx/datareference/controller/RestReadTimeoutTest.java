@@ -1,11 +1,16 @@
 package ru.projectx.datareference.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static ru.projectx.datareference.support.FixedClockConfig.NOW;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,22 +18,35 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.PolicyProgram;
+import ru.projectx.datareference.entity.PolicyServiceLine;
+import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
  * Лимит времени REST-чтений ({@code projectx.api.read-timeout-seconds}, 3 с по умолчанию): чтение,
  * которое ждёт базу, обрывается по нему и отвечает 503, не дожидаясь {@code lock_timeout} пула (5 с).
+ * Иначе потребитель, который ждёт ответа меньше, оборвал бы запрос сам, а соединение пула осталось бы
+ * занятым до конца ожидания блокировки.
  *
  * <p>База «не отвечает» потому, что другой сеанс держит таблицу под ACCESS EXCLUSIVE — её ждёт даже
- * SELECT. Записей не нужно: запрос по несуществующему ключу ждёт блокировку так же.
+ * SELECT. Для первого запроса записей не нужно: запрос по несуществующему ключу ждёт блокировку так же.
+ * Для табличных частей полиса запись нужна: они догружаются лениво, уже после того, как полис найден,
+ * и отказ на них приходит из Hibernate, а не из репозитория.
  */
 @IntegrationTest
 class RestReadTimeoutTest {
 
-    /** {@code lock_timeout} пула (Ш4): без лимита чтения ответ пришёл бы не раньше. */
+    /** {@code lock_timeout} пула: без лимита чтения ответ пришёл бы не раньше. */
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     private static final String UNKNOWN_ID = "f662d1c4-5b26-4248-8ba1-47954abd301a";
+    private static final String POLICY_EXTERNAL_ID_TEXT = "f662d1c4-5b26-4248-8ba1-47954abd3002";
+    private static final UUID POLICY_EXTERNAL_ID = UUID.fromString(POLICY_EXTERNAL_ID_TEXT);
+    private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("f662d1c4-5b26-4248-8ba1-47954abd3003");
+    private static final UUID PROGRAM_EXTERNAL_ID = UUID.fromString("f662d1c4-5b26-4248-8ba1-47954abd3004");
+    private static final LocalDate BEGIN = LocalDate.of(2026, 1, 1);
 
     @Autowired
     private MockMvcTester mvc;
@@ -38,6 +56,9 @@ class RestReadTimeoutTest {
 
     @Autowired
     private DatabaseCleaner databaseCleaner;
+
+    @Autowired
+    private PolicyRepository policies;
 
     @BeforeEach
     void emptyDatabase() {
@@ -64,6 +85,29 @@ class RestReadTimeoutTest {
     void readWaitingForDatabase_isCutByReadLimit_beforeLockTimeout(String lockedTable, String path)
             throws SQLException {
 
+        assertCutByReadLimit(lockedTable, path);
+    }
+
+    /**
+     * Полис найден, а его табличная часть под блокировкой: ленивая догрузка в сервисе обрывается
+     * по лимиту и отвечает 503 раньше {@code lock_timeout}, а не внутренней ошибкой.
+     * {@code {id}} в пути — id сохранённого полиса.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "policy_programs, /internal/v1/policies/{id}",
+            "policy_services, /internal/v1/policies/{id}",
+            "policy_programs, /internal/v1/policies?external_id=" + POLICY_EXTERNAL_ID_TEXT,
+            "policy_services, /internal/v1/policies?external_id=" + POLICY_EXTERNAL_ID_TEXT})
+    void tablePartOfExistingPolicyWaitingForDatabase_isCutByReadLimit_beforeLockTimeout(
+            String lockedTable, String path) throws SQLException {
+
+        Policy saved = policies.save(policyWithOneProgram());
+
+        assertCutByReadLimit(lockedTable, path.replace("{id}", saved.id().toString()));
+    }
+
+    private void assertCutByReadLimit(String lockedTable, String path) throws SQLException {
         try (Connection anotherSession = dataSource.getConnection()) {
             anotherSession.setAutoCommit(false);
             try {
@@ -81,6 +125,15 @@ class RestReadTimeoutTest {
                 anotherSession.rollback();
             }
         }
+    }
+
+    /** Застрахованный — вымышленный: персональных данных в тестовых данных нет. */
+    private static Policy policyWithOneProgram() {
+        var details = new Policy.Details(CONTRACT_EXTERNAL_ID, "П-0001", "Тестов", "Тест", null,
+                LocalDate.of(1990, 1, 1), null, null, BEGIN, null, true, false);
+        var program = new PolicyProgram.Row(PROGRAM_EXTERNAL_ID, BEGIN, null, null, null, null, null, BigDecimal.TEN, true);
+        var line = new PolicyServiceLine.Row(PROGRAM_EXTERNAL_ID, 1, BigDecimal.ONE, BEGIN, null, true);
+        return Policy.create(POLICY_EXTERNAL_ID, new Policy.Snapshot(details, List.of(program), List.of(line)), NOW);
     }
 
     private static void lock(Connection session, String table) throws SQLException {

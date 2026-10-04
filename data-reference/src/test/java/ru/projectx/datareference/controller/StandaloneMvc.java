@@ -1,7 +1,9 @@
 package ru.projectx.datareference.controller;
 
+import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import ru.projectx.datareference.service.DatabaseOutages;
 
 /**
  * Стек MVC для unit-теста контроллера — без контекста Spring и без базы: контроллер
@@ -19,7 +21,7 @@ final class StandaloneMvc {
 
     static MockMvcTester of(Object controller) {
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler())
+                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages(new HibernateExceptionTranslator())))
                 .build());
     }
 }
