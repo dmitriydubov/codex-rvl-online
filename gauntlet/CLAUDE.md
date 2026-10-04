@@ -122,7 +122,15 @@
   Его комментарий — не истина и не шум: автор PR (сессия шага — на своём PR, координатор — на своём) проверяет каждое
   замечание по коду и источникам; прав — исправить и запушить; не прав — ответить в том же треде, почему, со ссылкой на
   код или документацию. Молчать нельзя. Замечание, противоречащее утверждённой спецификации или решению владельца, —
-  вопрос владельцу, а не правка.
+  вопрос владельцу, а не правка. Каждый ответ в GitHub начинается строкой «Ответ Claude Code на комментарий Grok AI»
+  (с номером или датой комментария), чтобы в треде было видно, кто кому отвечает.
+- **Модель и уровень рассуждений сессий** (решение владельца 2026-10-04). Координатор — Fable 5.1, уровень max,
+  ультракод выключен: воркфлоу из многих агентов (adversarial-проверка PR, параллельная сверка плана) — только по
+  явному запросу владельца. Сессии шагов по умолчанию — Opus 5.5, уровень xhigh, без ультракода: процесс gauntlet
+  уже многоагентный (specifier, hardener, reviewer, хуки), ультракод поверх него — главный расход лимита. Шаги с
+  тонкой семантикой фреймворка (транзакции, Hibernate, AMQP, таймауты) — Fable 5.1 xhigh. При старте каждой сессии
+  шага координатор пишет в чат рекомендацию модели и уровня под эту задачу с обоснованием; решает владелец. При
+  создании сессии координатор задаёт только модель; уровень и ультракод владелец выставляет в настройках сессии.
 - **Решения человека — нумерованным списком** в любой остановке и в отчёте; ответ «1) да 2) нет …»
   записывается в описание PR.
 - **Лимит токенов.** Если в сессию пришло предупреждение о 99 % пятичасового или недельного лимита либо
@@ -229,7 +237,9 @@
     метод делает ровно то, что говорит имя, и держит один уровень абстракции; guard clause вместо
     вложенности; комментарий, объясняющий плохой код, — повод переписать код; Javadoc на русском для
     публичных классов и неочевидных методов; `var` — только когда тип виден из правой части. Класс должен
-    читаться сверху вниз как рассказ.
+    читаться сверху вниз как рассказ. Комментарии и Javadoc — простым человеческим языком, без кодов плана
+    и ТЗ, по разделу «Комментарии и Javadoc» в `contract-service/CLAUDE.md`; всё не переписывается — старые
+    комментарии правятся в файлах, которые задача меняет.
 
 ## Источники документации
 Единственные допустимые источники для правила 12. Версии — те, что разрешает сборка `data-reference`
@@ -279,7 +289,7 @@ PDF читаются инструментом Read (страницами). До�
 | Mockito 5.20 | Javadoc (он же руководство): javadoc.io/doc/org.mockito/mockito-core/5.20.0 (site.mockito.org закрыт) | javadoc-jar |
 | Testcontainers 2.0.5 | java.testcontainers.org (модули: /modules/databases/postgres/, /modules/rabbitmq/) | raw.githubusercontent.com/testcontainers/testcontainers-java/2.0.5/docs/ |
 | Awaitility 4.3 | руководство — вики: raw.githubusercontent.com/wiki/awaitility/awaitility/Usage.md | javadoc-jar |
-| Cucumber-JVM 8.0.1 (приёмка) | cucumber.io/docs/ (Java: installation/java/); Gherkin на русском — cucumber.io/docs/gherkin/languages/ | javadoc-jar, raw.githubusercontent.com/cucumber/cucumber-jvm/v8.0.1/ |
+| Cucumber-JVM 8.0.1 (приёмка); Cucumber Expressions 20.1.0; Gherkin 42.0.1 | cucumber.io/docs/ (Java: installation/java/; выражения шагов — docs/cucumber/cucumber-expressions/); Gherkin на русском — cucumber.io/docs/gherkin/languages/. Сайт без версии — сверять с исходниками по тегу | javadoc-jar, raw.githubusercontent.com/cucumber/cucumber-jvm/v8.0.1/; грамматика выражений шагов (альтернативы `a/b`, параметры) — raw.githubusercontent.com/cucumber/cucumber-expressions/v20.1.0/ARCHITECTURE.md (README тега документации не содержит); грамматика Gherkin — raw.githubusercontent.com/cucumber/gherkin/v42.0.1/gherkin.berp |
 | Gradle 8.14.3 | docs.gradle.org/8.14.3/userguide/; DSL: docs.gradle.org/8.14.3/dsl/ | нет |
 | Docker Compose v5.1.1 (CLI; в облачной VM версия меняется от сессии к сессии — встречалась и v5.3.1: сверять `docker compose version` и брать справку по своему тегу) и спецификация compose-файла (`docker-compose.yml`) | docs.docker.com — **закрыт** | CLI — по тегу версии: raw.githubusercontent.com/docker/compose/v5.1.1/docs/reference/<команда>.md (compose.md, compose_up.md, compose_down.md …); файл — raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/<раздел>.md (services.md, build.md, fragments.md) и raw.githubusercontent.com/compose-spec/compose-spec/main/<NN>-<раздел>.md; руководства — raw…/docker/docs/main/content/manuals/compose/…; у docker/docs и compose-spec тегов под версию нет — ветка main, поведение проверять `docker compose … config` |
 | Dockerfile и BuildKit (`Dockerfile` модуля: `RUN --mount`, `FROM ${ARG}`) | docs.docker.com — **закрыт** | raw.githubusercontent.com/moby/buildkit/master/frontend/dockerfile/docs/reference.md; руководства — raw…/docker/docs/main/content/manuals/build/…; поведение проверять `docker build` локально |
