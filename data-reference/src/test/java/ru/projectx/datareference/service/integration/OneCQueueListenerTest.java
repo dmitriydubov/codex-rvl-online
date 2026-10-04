@@ -223,6 +223,22 @@ class OneCQueueListenerTest {
     }
 
     /**
+     * Две доставки одного отравленного сообщения пишут карантин одновременно: вторая упала на ключе карантина.
+     * Запись уже есть, поэтому она подтверждается — без паузы и без возврата в очередь.
+     */
+    @Test
+    void concurrentQuarantineOfTheSameMessage_isAcknowledged() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any())).thenThrow(poison());
+        when(quarantineService.quarantine(any(), any())).thenThrow(duplicateRace());
+
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        verify(channel).basicAck(DELIVERY_TAG, false);
+        verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        verifyNoInteractions(consumers);
+    }
+
+    /**
      * Две доставки одного сообщения столкнулись на ключе: вторая возвращается в очередь после паузы и на
      * повторе будет принята как дубль. Потребители не останавливаются — база здорова.
      */

@@ -39,4 +39,18 @@ class SqlStatesTest {
     void sqlExceptionWithoutState_isEmpty() {
         assertThat(SqlStates.deepest(new SQLException(TEXT))).isEmpty();
     }
+
+    /** Исключение JDBC без кода глубже в цепочке не затирает код, который стоит выше него. */
+    @Test
+    void deeperSqlExceptionWithoutState_doesNotHideTheOuterState() {
+        var outer = new SQLException(TEXT, "22P05", new SQLException(TEXT));
+
+        assertThat(SqlStates.deepest(outer)).hasValue("22P05");
+    }
+
+    @Test
+    void deepestOrNone_namesMissingStateWithTheWordNo() {
+        assertThat(SqlStates.deepestOrNone(new IllegalStateException(TEXT))).isEqualTo("нет");
+        assertThat(SqlStates.deepestOrNone(new SQLException(TEXT, "08006"))).isEqualTo("08006");
+    }
 }

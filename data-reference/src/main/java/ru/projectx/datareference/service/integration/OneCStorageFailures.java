@@ -53,19 +53,41 @@ class OneCStorageFailures {
      * сообщения второй записи не создаёт и просто подтверждается.
      */
     private void quarantine(OneCDelivery delivery, UUID messageId, String sqlState) throws IOException {
-        boolean quarantined;
+        if (storeInQuarantine(delivery, messageId, sqlState)) {
+            delivery.acknowledge();
+        }
+    }
+
+    /** {@code true} — сообщение в карантине (записано сейчас или раньше), можно подтверждать; {@code false} — пауза. */
+    private boolean storeInQuarantine(OneCDelivery delivery, UUID messageId, String sqlState) {
         try {
-            quarantined = quarantine.quarantine(delivery.rejected(messageId), sqlState);
+            reportQuarantined(quarantine.quarantine(delivery.rejected(messageId), sqlState), delivery, messageId, sqlState);
+            return true;
         }
         catch (RuntimeException storageFailure) {
-            pauseConsumers(messageId, OneCStorageFailure.Outage.of(storageFailure).outage());
-            return;
+            return quarantinedByConcurrentDelivery(messageId, storageFailure);
         }
+    }
+
+    /**
+     * Две доставки одного отравленного сообщения могут писать карантин одновременно: обе не нашли записи, вторая
+     * упала на ключе (23505). Запись уже есть — первая доставка её закоммитила, иначе ключ не столкнулся бы, — и
+     * второй достаточно подтверждения. Любой другой отказ записи карантина — отказ хранилища.
+     */
+    private boolean quarantinedByConcurrentDelivery(UUID messageId, RuntimeException storageFailure) {
+        if (OneCStorageFailure.of(storageFailure) instanceof OneCStorageFailure.DuplicateRace) {
+            log.debug("сообщение {} уже положила в карантин параллельная доставка", messageId);
+            return true;
+        }
+        pauseConsumers(messageId, OneCStorageFailure.Outage.of(storageFailure).outage());
+        return false;
+    }
+
+    private static void reportQuarantined(boolean quarantined, OneCDelivery delivery, UUID messageId, String sqlState) {
         if (quarantined) {
             log.error("сообщение {} из очереди {} в карантине: база не принимает его тело, SQLSTATE {} ({} байт)",
                     messageId, delivery.queue(), sqlState, delivery.rawBody().length);
         }
-        delivery.acknowledge();
     }
 
     private void returnAfterPause(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
