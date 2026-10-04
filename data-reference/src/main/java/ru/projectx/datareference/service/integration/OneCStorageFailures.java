@@ -1,7 +1,6 @@
 package ru.projectx.datareference.service.integration;
 
 import java.io.IOException;
-import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +28,6 @@ import ru.projectx.datareference.service.SqlStates;
 class OneCStorageFailures {
 
     private static final Logger log = LoggerFactory.getLogger(OneCStorageFailures.class);
-    private static final String NO_SQL_STATE = "нет";
 
     private final QuarantineService quarantine;
     private final OneCConsumerPause consumers;
@@ -43,23 +41,17 @@ class OneCStorageFailures {
 
     /** Отвечает брокеру за сообщение, сырьё которого не записалось из-за {@code failure}. */
     void handle(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
-        Optional<String> sqlState = SqlStates.deepest(failure);
-        OneCStorageFailure outcome = OneCStorageFailure.ofSqlState(sqlState);
-        if (outcome == OneCStorageFailure.POISON) {
-            quarantine(delivery, messageId, sqlState.orElseThrow());
-            return;
+        switch (OneCStorageFailure.of(failure)) {
+            case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
+            case OneCStorageFailure.DuplicateRace ignored -> returnAfterPause(delivery, messageId, failure);
+            case OneCStorageFailure.Outage outage -> pauseConsumers(messageId, outage);
         }
-        if (outcome == OneCStorageFailure.DUPLICATE_RACE) {
-            returnAfterPause(delivery, messageId, failure);
-            return;
-        }
-        pauseConsumers(messageId, failure, sqlState.orElse(NO_SQL_STATE));
     }
 
     /**
      * Карантин — тоже запись в базу, и она тоже может не удаться: тогда это уже отказ хранилища, а не отравленное
-     * тело, и потребители встают на паузу. Повторная доставка уже карантинного сообщения второй записи не создаёт
-     * и просто подтверждается.
+     * тело (колонка bytea принимает любое тело), и потребители встают на паузу. Повторная доставка уже карантинного
+     * сообщения второй записи не создаёт и просто подтверждается.
      */
     private void quarantine(OneCDelivery delivery, UUID messageId, String sqlState) throws IOException {
         boolean quarantined;
@@ -67,7 +59,9 @@ class OneCStorageFailures {
             quarantined = quarantine.quarantine(delivery.rejected(messageId), sqlState);
         }
         catch (RuntimeException storageFailure) {
-            pauseConsumers(messageId, storageFailure, SqlStates.deepest(storageFailure).orElse(NO_SQL_STATE));
+            pauseConsumers(messageId, new OneCStorageFailure.Outage(
+                    SqlStates.deepest(storageFailure).orElse(OneCStorageFailure.NO_SQL_STATE),
+                    storageFailure.getClass().getName()));
             return;
         }
         if (quarantined) {
@@ -79,15 +73,15 @@ class OneCStorageFailures {
 
     private void returnAfterPause(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
         log.warn("сырьё сообщения {} не сохранено, вернём источнику через {}: {}",
-                messageId, properties.storageUnavailableBackoff(), failure.getClass().getName());
+                messageId, properties.duplicateDeliveryBackoff(), failure.getClass().getName());
         pauseBeforeRedelivery();
         delivery.returnToQueue();
     }
 
     /** Сообщение остаётся неподтверждённым намеренно: в очередь его вернёт остановка контейнера. */
-    private void pauseConsumers(UUID messageId, RuntimeException failure, String sqlState) {
-        log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, failure.getClass().getName(), sqlState);
-        consumers.pause(new StorageOutage(sqlState, failure.getClass().getName()));
+    private void pauseConsumers(UUID messageId, OneCStorageFailure.Outage outage) {
+        log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, outage.failureType(), outage.sqlState());
+        consumers.pause(outage.toStorageOutage());
     }
 
     /**
@@ -96,7 +90,7 @@ class OneCStorageFailures {
      */
     private void pauseBeforeRedelivery() {
         try {
-            Thread.sleep(properties.storageUnavailableBackoff());
+            Thread.sleep(properties.duplicateDeliveryBackoff());
         }
         catch (InterruptedException shuttingDown) {
             Thread.currentThread().interrupt();

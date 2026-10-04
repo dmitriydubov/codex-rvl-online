@@ -388,7 +388,7 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Закрытый канал за прокsi фабрики соединений бросает на подтверждении {@code IllegalStateException}
+     * Закрытый канал за прокси фабрики соединений бросает на подтверждении {@code IllegalStateException}
      * («Channel closed; cannot ack/nack»). Это тоже не сбой хранения: запись уже закоммичена, и слушатель не
      * ставит потребителей на паузу, не возвращает сообщение и не считает его несохранённым. Исключение уходит
      * контейнеру.
@@ -413,12 +413,12 @@ class OneCQueueListenerTest {
      * Пауза перед возвратом почти нулевая, потому что проверяется факт возврата, а не длина ожидания.
      * Настоящие пять секунд здесь были бы просто пятью секундами прогона.
      */
-    private OneCQueueListener listener(Duration storageUnavailableBackoff) {
+    private OneCQueueListener listener(Duration duplicateDeliveryBackoff) {
         return new OneCQueueListener(
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(storageUnavailableBackoff, STORAGE_CHECK_INTERVAL)));
+                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL)));
     }
 
     /** Отказ базы на теле с JSON-escape нулевого символа: класс 22, как его бросает запись сырья. */

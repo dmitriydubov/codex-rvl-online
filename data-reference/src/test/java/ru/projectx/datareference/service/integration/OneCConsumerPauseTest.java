@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -177,6 +179,44 @@ class OneCConsumerPauseTest {
 
         assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
         verify(policies, times(2)).stop(any(Runnable.class));
+    }
+
+    /**
+     * Первый же запущенный потребитель снова отказывает — база «мигнула». Новая пауза не должна пропасть вместе
+     * со старой: после возобновления приём снова на паузе с новой причиной, потребители остановлены ещё раз.
+     */
+    @Test
+    void outageDuringResume_startsAFreshPause() {
+        OneCConsumerPause pause = pause();
+        pause.pause(CONNECTION_LOST);
+        when(probe.storageAvailable()).thenReturn(true);
+        doAnswer(invocation -> {
+            pause.pause(LOCK_TIMEOUT);
+            return null;
+        }).when(policies).start();
+
+        pause.resumeIfStorageAvailable();
+
+        assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
+        verify(policies, times(2)).stop(any(Runnable.class));
+        verify(mkb10, times(2)).stop(any(Runnable.class));
+    }
+
+    /** Отказ остановки одного контейнера не заклинивает паузу: его остановка считается завершённой, остальные стоят. */
+    @Test
+    void stopFailureOfOneContainer_doesNotWedgeThePause() {
+        doThrow(new AmqpException("канал закрыт")).when(mkb10).stop(any(Runnable.class));
+        OneCConsumerPause pause = pause();
+
+        pause.pause(CONNECTION_LOST);
+
+        verify(policies).stop(any(Runnable.class));
+        assertThat(pause.consumersStopped()).isTrue();
+        when(probe.storageAvailable()).thenReturn(true);
+        pause.resumeIfStorageAvailable();
+        verify(policies).start();
+        verify(mkb10).start();
+        assertThat(pause.paused()).isEmpty();
     }
 
     /** Без брокера реестра контейнеров нет: пауза запоминает отказ, останавливать ей нечего, и возобновление проходит. */

@@ -9,10 +9,12 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Приём сообщений из брокера 1С:УСК.
  *
- * @param storageUnavailableBackoff пауза перед возвратом сообщения источнику, когда две доставки одного
+ * @param duplicateDeliveryBackoff пауза перед возвратом сообщения источнику, когда две доставки одного
  *                сообщения столкнулись на записи и вторую нужно повторить. Без неё брокер отдаёт сообщение
  *                обратно немедленно, и повтор превращается в горячий цикл: десятки повторов в секунду на
- *                очередь, лог, в котором ничего не найти, и нагрузка на чужой брокер
+ *                очередь, лог, в котором ничего не найти, и нагрузка на чужой брокер. Раньше та же пауза
+ *                стояла перед любым возвратом при недоступной базе; теперь недоступная база останавливает
+ *                потребителей, и возврат остался только для этого случая
  * @param storageCheckInterval как часто, пока потребители очередей стоят на паузе из-за недоступной базы,
  *                сервис проверяет, отвечает ли база снова, чтобы вернуть потребителей. Это и наибольшая
  *                задержка возобновления приёма после восстановления базы
@@ -20,6 +22,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties("projectx.onec.ingest")
 public record IngestProperties(
-        @DefaultValue("5s") Duration storageUnavailableBackoff,
+        @DefaultValue("5s") Duration duplicateDeliveryBackoff,
         @DefaultValue("10s") @DurationMin(millis = 1) Duration storageCheckInterval) {
 }
