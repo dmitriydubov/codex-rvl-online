@@ -5,8 +5,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.service.onec.OneCGuid;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -38,6 +41,11 @@ final class OneCMessages {
     private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
     private static final String PLACEHOLDER_FIRST_NAME = "Шаг";
     private static final String PLACEHOLDER_DATE_OF_BIRTH = "1985-06-15";
+
+    /** Строка таблицы шага с явным {@code message-id} сообщения. */
+    static final String MESSAGE_ID = "message-id";
+    /** Строка таблицы шага о байтах перед конвертом («UTF-8 BOM» или «ничего»); читает её шаг публикации. */
+    static final String BEFORE_ENVELOPE = "перед конвертом";
 
     private static final String CONTRAGENTS_QUEUE = "1c-usk_to_rvl-online_contragents-ul-changes";
     private static final String CONTRACTS_QUEUE = "1c-usk_to_rvl-online_contracts-changes";
@@ -76,9 +84,13 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /** ТЗ-2: договор страхования продукта ДМС; страхователь — если сценарий его назвал. */
+    /**
+     * ТЗ-2: договор страхования продукта ДМС; страхователь — если сценарий его назвал. Строки
+     * «message-id» и «перед конвертом» — свойства доставки, а не договора: первая задаёт идентификатор
+     * сообщения явно, вторую читает шаг публикации в брокер.
+     */
     static OneCMessage insuranceContract(Map<String, String> table) {
-        onlyKnown(table, "external_id", "номер", "страхователь", "начало", "окончание");
+        onlyKnown(table, "external_id", "номер", "страхователь", "начало", "окончание", MESSAGE_ID, BEFORE_ENVELOPE);
         ObjectNode data = JSON.createObjectNode()
                 .put("contractId", required(table, "external_id"))
                 .put("number", required(table, "номер"))
@@ -87,7 +99,19 @@ final class OneCMessages {
                 .put("dateEndISO", required(table, "окончание"))
                 .put("notActive", false);
         Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addInsurer(data, insurer));
-        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, InboundStatus.PROCESSED);
+        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, InboundStatus.PROCESSED,
+                fixedMessageId(table));
+    }
+
+    /**
+     * {@code message-id} из таблицы шага — только канонический GUID: иное значение — ошибка сценария, а не
+     * сообщение с испорченным конвертом (тот путь закрепляют тесты приёма).
+     */
+    private static @Nullable UUID fixedMessageId(Map<String, String> table) {
+        return Optional.ofNullable(table.get(MESSAGE_ID))
+                .map(raw -> OneCGuid.parse(raw).orElseThrow(() -> new IllegalArgumentException(
+                        "message-id в таблице шага — не канонический GUID: " + raw)))
+                .orElse(null);
     }
 
     /** ТЗ-6: программа РВЛ с одной строкой перечня {@code service[]}. */

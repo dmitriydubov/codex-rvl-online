@@ -29,7 +29,9 @@ public class DatabaseLockSteps {
             "полисы", "policies",
             "программы полиса", "policy_programs",
             "условия обслуживания полиса", "policy_services",
-            "договоры страхования", "insurance_contracts");
+            "договоры страхования", "insurance_contracts",
+            "журнал входящих сообщений 1С:УСК", "inbox",
+            "сырьё сообщений 1С:УСК", "inbound_message");
 
     private final DataSource dataSource;
     private @Nullable Connection lockingSession;

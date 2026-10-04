@@ -11,6 +11,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.QueueInformation;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,36 +23,34 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.RunningListeners;
 
 /**
- * Порядок записи сырья, когда запись одного сообщения не удалась, — на настоящем брокере
- * и настоящей базе.
+ * Временный отказ записи сырья на настоящем брокере и настоящей базе: потребители всех очередей встают на
+ * паузу, сообщения ждут в очереди, после восстановления принимаются в прежнем порядке.
  *
- * <p>Сервис не сравнивает версии сообщений: применяется последнее записанное. Значит, порядок
- * записи обязан совпадать с порядком очереди и тогда, когда сообщение вернулось в неё после
- * отказа базы. Возвращённое брокер ставит на прежнее место в очереди, но сообщения, уже выданные
- * потребителю сверх него (prefetch), до потребителя доехали раньше, и при prefetch больше 1 они
- * записываются первыми: зонд на prefetch 20 дал порядок [2, 3, 4, 5, 1]. Поэтому prefetch — 1,
- * и этот тест его держит.
+ * <p>Сервис не сравнивает версии сообщений: применяется последнее записанное. Значит, порядок записи обязан
+ * совпадать с порядком очереди и тогда, когда первое сообщение записалось не с первой попытки. Пауза держит
+ * порядок сама: неподтверждённое сообщение возвращается в очередь закрытием канала и встаёт на прежнее
+ * место, а следующие за ним не выдаются, пока потребитель остановлен. Prefetch 1 здесь по-прежнему нужен:
+ * при большем контейнер перед остановкой дорабатывал бы уже выданные сообщения, и они записались бы раньше
+ * возвращённого.
  *
- * <p>Отказ — настоящий отказ базы, а не подмена бина: триггер на {@code inbound_message} роняет
- * первую попытку записи первого сообщения и протоколирует каждую удавшуюся запись. Счётчик
- * попыток — последовательность: {@code nextval} не откатывается вместе с транзакцией, а строка
- * протокола откатывается — в нём остаются только записи, дошедшие до коммита, в порядке записи.
- * Всё это лежит в отдельной схеме, чтобы не попасть под очистку базы и не пережить тест.
+ * <p>Отказ — настоящий отказ базы, а не подмена бина: триггер на {@code inbound_message} роняет первую попытку
+ * записи первого сообщения кодом {@code lock_not_available} (55P03, так выглядит блокировка дольше
+ * {@code lock_timeout}) и протоколирует каждую удавшуюся запись. Счётчик попыток — последовательность:
+ * {@code nextval} не откатывается вместе с транзакцией, а строка протокола откатывается — в нём остаются
+ * только записи, дошедшие до коммита, в порядке записи. Всё это лежит в отдельной схеме, чтобы не попасть под
+ * очистку базы и не пережить тест. Проверка доступности вызывается явно: расписания в тестах выключены.
  *
- * <p>Очереди здесь classic ({@code RabbitTestcontainer}): у них, как и у quorum-очереди
- * с {@code delivery-limit}, возвращённое сообщение встаёт на прежнее место. Quorum-очередь
- * без лимита ставит его в конец — там порядок не держит никакой prefetch, и этот тест
- * такой случай не покрывает.
+ * <p>Очереди здесь classic ({@code RabbitTestcontainer}): у них, как и у quorum-очереди с
+ * {@code delivery-limit}, возвращённое сообщение встаёт на прежнее место. Quorum-очередь без лимита ставит
+ * его в конец — там порядок не держит ничто, и этот тест такой случай не покрывает.
  */
 @AmqpIntegrationTest
 class OneCQueueOrderTest {
 
     private static final int MESSAGES = 5;
 
-    /**
-     * Запас на пять доставок, паузу перед возвратом сообщения (умолчание
-     * {@code storage-unavailable-backoff} — 5 с) и повторную доставку.
-     */
+    /** Запас на пять доставок и остановку контейнеров. */
+    private static final Duration PAUSE_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration ALL_WRITTEN_TIMEOUT = Duration.ofSeconds(30);
 
     private static final String PROBE_SCHEMA = "create schema order_probe";
@@ -73,7 +73,7 @@ class OneCQueueOrderTest {
             begin
                 if new.message_id = tg_argv[0]::uuid then
                     if nextval('order_probe.attempts') = 1 then
-                        raise exception 'проверка порядка: отказ записи сырья';
+                        raise exception 'проверка порядка: отказ записи сырья' using errcode = 'lock_not_available';
                     end if;
                 end if;
                 insert into order_probe.written (message_id) values (new.message_id);
@@ -96,8 +96,13 @@ class OneCQueueOrderTest {
     /** Попытки записи первого сообщения: отказ и удачная повторная. */
     private static final long FAILED_THEN_WRITTEN = 2;
 
+    private static final String LOCK_NOT_AVAILABLE = "55P03";
+
     @Autowired
     private RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    private RabbitAdmin rabbitAdmin;
 
     @Autowired
     private OneCQueueProperties queues;
@@ -111,6 +116,9 @@ class OneCQueueOrderTest {
     @Autowired
     private RabbitListenerEndpointRegistry listeners;
 
+    @Autowired
+    private OneCConsumerPause pause;
+
     @BeforeEach
     void clearTables() {
         databaseCleaner.clear();
@@ -122,23 +130,46 @@ class OneCQueueOrderTest {
         RunningListeners.assertAllRunning(listeners);
     }
 
+    /** Потребители возвращаются и после провала теста: контекст общий с другими тестами приёма. */
     @AfterEach
-    void removeProbe() {
+    void removeProbeAndResume() {
         jdbc.sql(DROP_TRIGGER).update();
         jdbc.sql(DROP_PROBE_SCHEMA).update();
+        await().atMost(PAUSE_TIMEOUT).until(pause::consumersStopped);
+        pause.resumeIfStorageAvailable();
     }
 
     @Test
-    void firstMessageWriteFails_queueOrderIsKept() {
+    void firstMessageWriteFails_consumersPauseAndQueueOrderIsKeptAfterResume() {
         List<UUID> queueOrder = Stream.generate(UUID::randomUUID).limit(MESSAGES).toList();
         failFirstWriteOf(queueOrder.getFirst());
 
         queueOrder.forEach(messageId -> rabbitTemplate.convertAndSend(queues.mkb10(), messageWithId(messageId)));
 
+        await().atMost(PAUSE_TIMEOUT).untilAsserted(() -> {
+            assertThat(pause.paused()).map(paused -> paused.outage().sqlState()).hasValue(LOCK_NOT_AVAILABLE);
+            assertThat(mkb10Queue().getConsumerCount()).as("потребителей у очереди").isZero();
+            assertThat(mkb10Queue().getMessageCount()).as("сообщений ждёт в очереди").isEqualTo(MESSAGES);
+        });
+        assertThat(listeners.getListenerContainer(queues.policies()).isRunning())
+                .as("остановлены потребители всех очередей, не только отказавшей").isFalse();
+        assertThat(writtenInOrder()).as("до возобновления ничего не записано").isEmpty();
+
+        await().atMost(PAUSE_TIMEOUT).until(pause::consumersStopped);
+        pause.resumeIfStorageAvailable();
+
         await().atMost(ALL_WRITTEN_TIMEOUT)
                 .untilAsserted(() -> assertThat(writtenInOrder()).hasSizeGreaterThanOrEqualTo(MESSAGES));
         assertThat(writtenInOrder()).containsExactlyElementsOf(queueOrder);
         assertThat(firstMessageAttempts()).as("отказ первой записи был внедрён").isEqualTo(FAILED_THEN_WRITTEN);
+        assertThat(pause.paused()).isEmpty();
+        RunningListeners.assertAllRunning(listeners);
+    }
+
+    private QueueInformation mkb10Queue() {
+        QueueInformation info = rabbitAdmin.getQueueInfo(queues.mkb10());
+        assertThat(info).as("очередь %s объявлена", queues.mkb10()).isNotNull();
+        return info;
     }
 
     private void failFirstWriteOf(UUID messageId) {

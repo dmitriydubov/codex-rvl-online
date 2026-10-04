@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
 import ru.projectx.datareference.service.OneCLogContext;
@@ -22,14 +21,17 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  * в базе. При автоматическом подтверждении сообщение считалось бы обработанным
  * в момент доставки, и падение до коммита теряло бы его молча.
  *
- * <p>Три исхода, и у каждого своё подтверждение:
+ * <p>Четыре исхода, и у каждого свой ответ брокеру:
  * <ul>
  *   <li>принято или дубль — {@code ack}: делать больше нечего;</li>
- *   <li>наша база недоступна — {@code nack} с возвратом в очередь после паузы: сообщение
- *       не наше дело терять, брокер отдаст его снова, когда база вернётся;</li>
- *   <li>конверт нечитаем — {@code ack}, и сообщение <b>теряется</b>. См.
- *       {@link #dropUnidentifiable}.</li>
+ *   <li>тело не принимает сама база — сообщение уходит в карантин и подтверждается, очередь идёт дальше;</li>
+ *   <li>база временно не принимает записи — сообщение остаётся неподтверждённым, потребители очередей
+ *       встают на паузу до её восстановления, и брокер отдаст сообщение снова на прежнем месте
+ *       (столкновение двух доставок одного сообщения — исключение: пауза и возврат в очередь);</li>
+ *   <li>конверт нечитаем — {@code ack}, и сообщение <b>теряется</b>. См. {@link #dropUnidentifiable}.</li>
  * </ul>
+ * Что делать после отказа записи, решает {@link OneCStorageFailures}. Сбой самого подтверждения отказом записи
+ * не считается: запись уже зафиксирована, и неподтверждённое сообщение брокер пришлёт снова как дубль.
  *
  * <p>На время обработки в MDC лежат поток, очередь и, когда он прочитан, {@code message-id}:
  * по ним строка журнала находит своё сообщение. Имена ключей — {@link OneCLogContext}, общие с разбором
@@ -42,14 +44,14 @@ public class OneCQueueListener {
 
     private final OneCEnvelopeParser envelopeParser;
     private final OneCIngestService ingestService;
-    private final IngestProperties properties;
+    private final OneCStorageFailures storageFailures;
 
     public OneCQueueListener(
-            OneCEnvelopeParser envelopeParser, OneCIngestService ingestService, IngestProperties properties) {
+            OneCEnvelopeParser envelopeParser, OneCIngestService ingestService, OneCStorageFailures storageFailures) {
 
         this.envelopeParser = envelopeParser;
         this.ingestService = ingestService;
-        this.properties = properties;
+        this.storageFailures = storageFailures;
     }
 
     /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
@@ -85,29 +87,24 @@ public class OneCQueueListener {
     }
 
     /**
-     * Возврат в очередь здесь ничем не ограничен, и это не недосмотр: сохранение —
-     * запись байтов, которые только что разобрались как JSON, и постоянная ошибка у неё
-     * известна одна: тело, которое не принимает колонка {@code jsonb} (например, с нулевым
-     * символом U+0000). Такое тело пока возвращается в очередь снова и снова; отдельная
-     * обработка для него запланирована. Недоступная база проходит сама. Повтор
-     * не превращается в горячий цикл из-за паузы перед возвратом.
+     * Подтверждение стоит вне {@code try} намеренно: отказ канала на подтверждении — не отказ записи.
+     * Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
      */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {
         try {
-            boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
-            if (!stored) {
-                log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
-            }
-            delivery.acknowledge();
+            ingest(delivery, messageId);
         }
-        catch (RuntimeException storageUnavailable) {
-            // Тип, но не текст: сообщение об ошибке вставки печатает параметры запроса,
-            // а этим путём проходят полисы с персональными данными.
-            log.warn("сырьё сообщения {} не сохранено, вернём источнику через {}: {}",
-                    messageId, properties.storageUnavailableBackoff(),
-                    storageUnavailable.getClass().getName());
-            pauseBeforeRedelivery();
-            delivery.returnToQueue();
+        catch (RuntimeException storageFailure) {
+            storageFailures.handle(delivery, messageId, storageFailure);
+            return;
+        }
+        delivery.acknowledge();
+    }
+
+    private void ingest(OneCDelivery delivery, UUID messageId) {
+        boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
+        if (!stored) {
+            log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
         }
     }
 
@@ -128,20 +125,7 @@ public class OneCQueueListener {
     private static void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
         log.error("сообщение потока {} из очереди {} потеряно: {} ({} байт). "
                         + "Принять его нельзя — в конверте нет пригодного message-id",
-                delivery.stream(), delivery.queue(), cause.getMessage(), delivery.body().length);
+                delivery.stream(), delivery.queue(), cause.getMessage(), delivery.rawBody().length);
         delivery.acknowledge();
-    }
-
-    /**
-     * Держит паузу перед возвратом сообщения. Прерывание — это остановка контейнера:
-     * флаг восстанавливаем и возвращаем сообщение сразу, канал ещё открыт.
-     */
-    private void pauseBeforeRedelivery() {
-        try {
-            Thread.sleep(properties.storageUnavailableBackoff());
-        }
-        catch (InterruptedException shuttingDown) {
-            Thread.currentThread().interrupt();
-        }
     }
 }
