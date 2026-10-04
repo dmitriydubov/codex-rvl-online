@@ -27,13 +27,14 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Три ручки чтения справочников и единый формат ошибки — через настоящий стек MVC
- * (фильтры, конвертеры, обработчик ошибок) поверх настоящей базы. Клиент к стеку —
+ * Чтение программ и договоров страхования через REST и единый формат ошибки. Запросы проходят через
+ * настоящий стек MVC (фильтры, конвертеры, обработчик ошибок) поверх настоящей базы. Клиент к стеку —
  * {@link MockMvcTester} из {@code TestSupportConfig}.
  *
- * <p>Проверяется контракт наружу: имена полей в snake_case, оба идентификатора
- * в каждом ответе, формат ошибки и сквозной {@code X-Request-Id}. Полисы — в
- * {@code PolicyApiTest}, МКБ-10 — в {@code Mkb10ApiTest}.
+ * <p>Проверяется то, на что опираются соседние сервисы: имена полей в snake_case, оба идентификатора
+ * в каждом ответе, формат ошибки и сквозной {@code X-Request-Id}. Полисы проверяет
+ * {@code PolicyApiTest}, справочник диагнозов МКБ-10 — {@code Mkb10ApiTest}. Названия, номера договоров
+ * и реквизиты страхователя здесь вымышленные.
  */
 @IntegrationTest
 class ReferenceApiTest {
@@ -74,7 +75,7 @@ class ReferenceApiTest {
     @Test
     void program_returnsBothIdsNameAndServices() {
         Lpu lpu = lpuRepository.save(Lpu.create(LPU_EXT,
-                new Lpu.Details("Санаторий «Заря»", null, null, null, null, null, false), NOW));
+                new Lpu.Details("Санаторий «Тестовый»", null, null, null, null, null, false), NOW));
         Program program = Program.create(PROGRAM_EXT,
                 new Program.Details(null, null, "Санаторно-курортное лечение", "СКЛ", false), NOW);
         program.replaceAvailableLpu(List.of(new ProgramLpu.Row(lpu, null, LocalDate.of(2026, 1, 1), null,
@@ -90,7 +91,7 @@ class ReferenceApiTest {
         assertThat(result).bodyJson().extractingPath("$.is_archive").isEqualTo(false);
         assertThat(result).bodyJson().extractingPath("$.services").asArray().hasSize(1);
         assertThat(result).bodyJson().extractingPath("$.services[0].lpu_external_id").isEqualTo(LPU_EXT.toString());
-        assertThat(result).bodyJson().extractingPath("$.services[0].lpu_name").isEqualTo("Санаторий «Заря»");
+        assertThat(result).bodyJson().extractingPath("$.services[0].lpu_name").isEqualTo("Санаторий «Тестовый»");
         assertThat(result).bodyJson().extractingPath("$.services[0].coverage_type").isEqualTo("R");
         assertThat(result).bodyJson().extractingPath("$.services[0].percent_copayment").isEqualTo(10.00);
     }
@@ -98,29 +99,29 @@ class ReferenceApiTest {
     @Test
     void insuranceContract_returnsInsurerByLogicalLink() {
         insurerRepository.save(Insurer.create(INSURER_EXT,
-                new Insurer.Details("АО «Работодатель»", "Акционерное общество «Работодатель»", "7701", "770101001", false),
+                new Insurer.Details("АО «Работодатель»", "Акционерное общество «Работодатель»", "7701", "000000000", false),
                 NOW));
         InsuranceContract contract = insuranceContractRepository.save(InsuranceContract.create(CONTRACT_EXT,
-                new InsuranceContract.Details("0646480513", LocalDate.of(2026, 5, 7), LocalDate.of(2027, 5, 6),
+                new InsuranceContract.Details("0000000001", LocalDate.of(2026, 5, 7), LocalDate.of(2027, 5, 6),
                         INSURER_EXT, false), NOW));
 
         MvcTestResult result = mvc.get().uri(BASE + "/insurance-contracts/{id}", contract.id()).exchange();
 
         assertThat(result).hasStatusOk();
-        assertThat(result).bodyJson().extractingPath("$.number").isEqualTo("0646480513");
+        assertThat(result).bodyJson().extractingPath("$.number").isEqualTo("0000000001");
         assertThat(result).bodyJson().extractingPath("$.end_date").isEqualTo("2027-05-06");
         assertThat(result).bodyJson().extractingPath("$.insurer.external_id").isEqualTo(INSURER_EXT.toString());
         assertThat(result).bodyJson().extractingPath("$.insurer.name").isEqualTo("АО «Работодатель»");
         assertThat(result).bodyJson().extractingPath("$.insurer.full_name").isEqualTo("Акционерное общество «Работодатель»");
         assertThat(result).bodyJson().extractingPath("$.insurer.inn").isEqualTo("7701");
-        assertThat(result).bodyJson().extractingPath("$.insurer.kpp").isEqualTo("770101001");
+        assertThat(result).bodyJson().extractingPath("$.insurer.kpp").isEqualTo("000000000");
         assertThat(result).bodyJson().extractingPath("$.insurer.id").isNotNull();
     }
 
     @Test
     void insuranceContract_isFoundByExternalId_andRequiresAKey() {
         InsuranceContract contract = insuranceContractRepository.save(InsuranceContract.create(CONTRACT_EXT,
-                new InsuranceContract.Details("0646480513", LocalDate.of(2026, 5, 7), null, null, false), NOW));
+                new InsuranceContract.Details("0000000001", LocalDate.of(2026, 5, 7), null, null, false), NOW));
 
         MvcTestResult found = mvc.get().uri(BASE + "/insurance-contracts?external_id={ext}", CONTRACT_EXT).exchange();
         assertThat(found).hasStatusOk();
@@ -131,11 +132,14 @@ class ReferenceApiTest {
         assertThat(noKey).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
     }
 
-    /** Страхователь-физлицо в справочнике не значится (ТЗ-2) — договор всё равно отдаётся. */
+    /**
+     * Страхователь-физическое лицо в справочнике страхователей не значится. Договор всё равно отдаётся,
+     * только без страхователя.
+     */
     @Test
     void insuranceContract_withoutInsurerInReference_hasNullInsurer() {
         InsuranceContract contract = insuranceContractRepository.save(InsuranceContract.create(CONTRACT_EXT,
-                new InsuranceContract.Details("0646480513", LocalDate.of(2026, 5, 7), null, INSURER_EXT, false),
+                new InsuranceContract.Details("0000000001", LocalDate.of(2026, 5, 7), null, INSURER_EXT, false),
                 NOW));
 
         MvcTestResult result = mvc.get().uri(BASE + "/insurance-contracts/{id}", contract.id()).exchange();
@@ -178,7 +182,10 @@ class ReferenceApiTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NOT_FOUND");
     }
 
-    /** Без заголовка идентификатор выдаётся сервисом: ошибка без него в журнале не найдётся. */
+    /**
+     * Если вызывающий не прислал идентификатор запроса, его выдаёт сервис. Без идентификатора ошибку
+     * не найти в журнале.
+     */
     @Test
     void requestId_isIssuedWhenCallerSendsNone() {
         MvcTestResult result = mvc.get().uri(BASE + "/policies/{id}", UUID.randomUUID()).exchange();

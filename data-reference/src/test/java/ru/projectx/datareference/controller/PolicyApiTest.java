@@ -25,10 +25,13 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * R-05 (полис целиком по трём ключам), R-04 (поиск по ФИО и номеру) и полис для сервиса Договоров
- * без ПДн ({@code contract-view}) поверх настоящей базы. Часы остановлены
- * на {@link ru.projectx.datareference.support.FixedClockConfig#NOW}: по Москве это 14.03.2026,
- * и «действующий на сегодня» считается от этого дня.
+ * Чтение полисов через REST поверх настоящей базы: полис целиком по идентификатору, внешнему ключу
+ * или номеру в договоре, поиск полисов договора по части ФИО или номера и полис для сервиса Договоров
+ * без персональных данных (ПДн). Часы остановлены на
+ * {@link ru.projectx.datareference.support.FixedClockConfig#NOW}: по Москве это 14.03.2026, и полис
+ * «действующий на сегодня» считается от этого дня.
+ *
+ * <p>Все ФИО, даты рождения, почта и номера полисов здесь вымышленные.
  */
 @IntegrationTest
 class PolicyApiTest {
@@ -39,6 +42,8 @@ class PolicyApiTest {
     private static final UUID RVL_PROGRAM_EXT = UUID.fromString("5a1d0000-0000-4000-8000-0000000000b1");
     private static final UUID ARCHIVED_PROGRAM_EXT = UUID.fromString("5a1d0000-0000-4000-8000-0000000000b2");
     private static final UUID UNKNOWN_PROGRAM_EXT = UUID.fromString("5a1d0000-0000-4000-8000-0000000000b3");
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1900, 1, 1);
+    private static final String EMAIL = "insured@example.test";
 
     @Autowired
     private MockMvcTester mvc;
@@ -71,16 +76,16 @@ class PolicyApiTest {
 
     @Test
     void policyById_returnsPersonalDataContractAndRvlProgramsOnly() {
-        Policy policy = savePolicy("П-000001", "Петров", "Иван", "Сергеевич", TODAY.minusMonths(1), null,
+        Policy policy = savePolicy("П-000001", "Тестов", "Макет", "Заглушкович", TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT, ARCHIVED_PROGRAM_EXT, UNKNOWN_PROGRAM_EXT));
 
         MvcTestResult result = mvc.get().uri(BASE + "/policies/{id}", policy.id()).exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.external_id").isEqualTo(policy.externalId().toString());
-        assertThat(result).bodyJson().extractingPath("$.last_name").isEqualTo("Петров");
-        assertThat(result).bodyJson().extractingPath("$.date_of_birth").isEqualTo("1984-03-11");
-        assertThat(result).bodyJson().extractingPath("$.email").isEqualTo("petrov@example.test");
+        assertThat(result).bodyJson().extractingPath("$.last_name").isEqualTo("Тестов");
+        assertThat(result).bodyJson().extractingPath("$.date_of_birth").isEqualTo("1900-01-01");
+        assertThat(result).bodyJson().extractingPath("$.email").isEqualTo("insured@example.test");
         assertThat(result).bodyJson().extractingPath("$.contract.id").isEqualTo(contract.id().toString());
         assertThat(result).bodyJson().extractingPath("$.contract.number").isEqualTo("26 LM 0001");
         assertThat(result).bodyJson().extractingPath("$.programs").asArray().hasSize(1);
@@ -93,7 +98,7 @@ class PolicyApiTest {
 
     @Test
     void policyByExternalId_isFound() {
-        Policy policy = savePolicy("П-000002", "Сидорова", "Анна", null, TODAY.minusMonths(1), null,
+        Policy policy = savePolicy("П-000002", "Ключева", "Внешняя", null, TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult result = mvc.get().uri(BASE + "/policies?external_id={ext}", policy.externalId()).exchange();
@@ -103,11 +108,11 @@ class PolicyApiTest {
     }
 
     /**
-     * Полис для сервиса Договоров (Р20 (а)) выбирается из базы проекцией: архивный отдаётся с признаком,
-     * а не как «не найден», открытая дата — пустая, а ФИО, дата рождения, пол и почта, которые у полиса
-     * есть, не попадают в ответ ни по {@code id}, ни по {@code external_id}. Сравнение строгое: лишнее поле
-     * роняет тест так же, как неверное значение. Неархивный полис с датой окончания закреплён примерами
-     * стенда 09 и 10 ({@link ConsumerStandTest}).
+     * Полис для сервиса Договоров читается из базы без персональных данных. Архивный полис отдаётся
+     * с признаком архива, а не как «не найден», и открытая дата окончания приходит пустой. ФИО, дата
+     * рождения, пол и почта у полиса есть, но в ответ не попадают ни по {@code id}, ни по
+     * {@code external_id}. Сравнение строгое: лишнее поле роняет тест так же, как неверное значение.
+     * Неархивный полис с датой окончания проверяют примеры 09 и 10 в {@link ConsumerStandTest}.
      */
     @Test
     void contractView_archivedPolicyWithOpenEnd_isOnlyKeysPeriodAndArchiveFlag() {
@@ -132,7 +137,7 @@ class PolicyApiTest {
 
     @Test
     void policyByNumberAndContract_isFound_andDuplicatesGive409() {
-        Policy first = savePolicy("П-000003", "Кузнецов", "Олег", null, TODAY.minusMonths(1), null,
+        Policy first = savePolicy("П-000003", "Дублев", "Номер", null, TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult found = mvc.get().uri(BASE + "/policies?number={n}&contract_id={c}", "П-000003", contract.id())
@@ -140,7 +145,7 @@ class PolicyApiTest {
         assertThat(found).hasStatusOk();
         assertThat(found).bodyJson().extractingPath("$.id").isEqualTo(first.id().toString());
 
-        Policy duplicate = savePolicy("П-000003", "Кузнецов", "Олег", null, TODAY.minusMonths(1), null,
+        Policy duplicate = savePolicy("П-000003", "Дублев", "Номер", null, TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT));
         MvcTestResult conflict = mvc.get().uri(BASE + "/policies?number={n}&contract_id={c}", "П-000003", contract.id())
                 .exchange();
@@ -165,50 +170,53 @@ class PolicyApiTest {
 
     @Test
     void search_byNameTokens_findsBothOrdersAndRanksLastAndFirstName() {
-        savePolicy("П-000010", "Петров", "Иван", "Сергеевич", TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000011", "Петрова", "Анна", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000012", "Иванов", "Пётр", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000010", "Тестов", "Макет", "Заглушкович", TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000011", "Тестова", "Проба", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000012", "Макетов", "Тёст", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult bothOrders = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}",
-                CONTRACT_EXT, "иван петр").exchange();
+                CONTRACT_EXT, "макет тест").exchange();
         assertThat(bothOrders).hasStatusOk();
         assertThat(bothOrders).bodyJson().extractingPath("$.items[*].last_name").asArray()
-                .containsExactly("Иванов", "Петров");
+                .containsExactly("Макетов", "Тестов");
 
         MvcTestResult byPrefix = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}",
-                CONTRACT_EXT, "  Петр ").exchange();
+                CONTRACT_EXT, "  Тест ").exchange();
         assertThat(byPrefix).bodyJson().extractingPath("$.items[*].last_name").asArray()
                 .as("фамилия важнее имени, внутри группы — по фамилии")
-                .containsExactly("Петров", "Петрова", "Иванов");
-        assertThat(byPrefix).bodyText().doesNotContain("@example.test").doesNotContain("1984-03-11");
+                .containsExactly("Тестов", "Тестова", "Макетов");
+        assertThat(byPrefix).bodyText().doesNotContain("@example.test").doesNotContain("1900-01-01");
     }
 
     @Test
     void search_byDigits_findsNumberAndRanksExactFirst() {
-        savePolicy("26 KM R/016039/1", "Орлов", "Пётр", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("26 KM R/016039/12", "Быков", "Илья", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("99 TS T/000001/1", "Точнов", "Номер", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("99 TS T/000001/12", "Длиннов", "Номер", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult result = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}",
-                CONTRACT_EXT, "26 km r/016039/1").exchange();
+                CONTRACT_EXT, "99 ts t/000001/1").exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.items[*].number").asArray()
-                .containsExactly("26 KM R/016039/1", "26 KM R/016039/12");
+                .containsExactly("99 TS T/000001/1", "99 TS T/000001/12");
     }
 
-    /** Базовая логика A: архив, истёкшие, будущие и полисы без программы РВЛ в подсказку не попадают. */
+    /**
+     * В подсказку попадают только полисы, по которым сотрудника можно направить на лечение: архивные,
+     * истёкшие, ещё не начавшиеся и полисы без программы РВЛ поиск пропускает.
+     */
     @Test
     void search_skipsArchivedExpiredFutureAndNonRvlPolicies() {
-        savePolicy("П-000020", "Волков", "Иван", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000021", "Волков", "Архив", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT), true);
-        savePolicy("П-000022", "Волков", "Истёк", null, TODAY.minusYears(2), TODAY.minusDays(1), List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000023", "Волков", "Будущий", null, TODAY.plusDays(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000024", "Волков", "Безрвл", null, TODAY.minusMonths(1), null, List.of(UNKNOWN_PROGRAM_EXT));
+        savePolicy("П-000020", "Фильтров", "Действует", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000021", "Фильтров", "Архив", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT), true);
+        savePolicy("П-000022", "Фильтров", "Истёк", null, TODAY.minusYears(2), TODAY.minusDays(1), List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000023", "Фильтров", "Будущий", null, TODAY.plusDays(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000024", "Фильтров", "Безрвл", null, TODAY.minusMonths(1), null, List.of(UNKNOWN_PROGRAM_EXT));
 
         MvcTestResult result = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}",
-                CONTRACT_EXT, "волк").exchange();
+                CONTRACT_EXT, "фильтр").exchange();
 
-        assertThat(result).bodyJson().extractingPath("$.items[*].first_name").asArray().containsExactly("Иван");
+        assertThat(result).bodyJson().extractingPath("$.items[*].first_name").asArray().containsExactly("Действует");
     }
 
     @Test
@@ -235,34 +243,36 @@ class PolicyApiTest {
 
     @Test
     void search_limitCutsRankedList() {
-        savePolicy("П-000030", "Соколов", "Иван", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000031", "Соколова", "Ирина", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000030", "Пределов", "Первый", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000031", "Пределова", "Вторая", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult result = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}&limit=1",
-                CONTRACT_EXT, "соко").exchange();
+                CONTRACT_EXT, "пред").exchange();
 
         assertThat(result).bodyJson().extractingPath("$.items").asArray().hasSize(1);
-        assertThat(result).bodyJson().extractingPath("$.items[0].last_name").isEqualTo("Соколов");
+        assertThat(result).bodyJson().extractingPath("$.items[0].last_name").isEqualTo("Пределов");
     }
 
     /**
-     * Предел режет уже ранжированный список (Ш12: ранг и предел — в одном запросе): «Андреев Сокол»
-     * по алфавиту первый, но совпало только имя, а у «Соколова» — фамилия.
+     * Предел выдачи режет уже ранжированный список, а не алфавитный, потому что ранг и предел считает
+     * один запрос в базе. «Алфавитов Ранг» по алфавиту первый, но у него совпало только имя, а у «Рангова»
+     * совпала фамилия. С номером так же: полис с точно совпавшим номером идёт раньше полиса, номер
+     * которого только содержит строку поиска, хотя фамилия у второго по алфавиту раньше.
      */
     @Test
     void search_limitAppliesAfterRanking_notAlphabet() {
-        savePolicy("П-000040", "Андреев", "Сокол", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000041", "Соколов", "Иван", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("П-000016039", "Борисов", "Олег", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
-        savePolicy("16039", "Яковлев", "Олег", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000040", "Алфавитов", "Ранг", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000041", "Рангов", "Второй", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("П-000099001", "Буквин", "Подстрока", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
+        savePolicy("99001", "Точнов", "Номер", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
 
         MvcTestResult byName = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}&limit=1",
-                CONTRACT_EXT, "сокол").exchange();
+                CONTRACT_EXT, "ранг").exchange();
         MvcTestResult byNumber = mvc.get().uri(BASE + "/policies/search?contract_external_id={c}&query={q}&limit=1",
-                CONTRACT_EXT, "16039").exchange();
+                CONTRACT_EXT, "99001").exchange();
 
-        assertThat(byName).bodyJson().extractingPath("$.items[*].last_name").asArray().containsExactly("Соколов");
-        assertThat(byNumber).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly("16039");
+        assertThat(byName).bodyJson().extractingPath("$.items[*].last_name").asArray().containsExactly("Рангов");
+        assertThat(byNumber).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly("99001");
     }
 
     private Policy savePolicy(String number, String lastName, String firstName, @Nullable String middleName,
@@ -273,7 +283,7 @@ class PolicyApiTest {
     private Policy savePolicy(String number, String lastName, String firstName, @Nullable String middleName,
             LocalDate beginDate, @Nullable LocalDate endDate, List<UUID> programExternalIds, boolean archived) {
         var details = new Policy.Details(CONTRACT_EXT, number, lastName, firstName, middleName,
-                LocalDate.of(1984, 3, 11), "Мужской", "petrov@example.test", beginDate, endDate, true, archived);
+                BIRTH_DATE, "Мужской", EMAIL, beginDate, endDate, true, archived);
         List<PolicyProgram.Row> programs = programExternalIds.stream()
                 .map(program -> new PolicyProgram.Row(program, beginDate, endDate, null, null, null, null,
                         new BigDecimal("150000.00"), true))
