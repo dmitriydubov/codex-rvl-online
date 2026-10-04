@@ -1,8 +1,13 @@
-# Human-verified RUN_ERROR mutants. One mutant per line:  fully.qualified.Class#method  Mutator   # which test kills it
+# Human-verified RUN_ERROR mutants. One line per method and mutator:  fully.qualified.Class#method  Mutator   # which test kills it
 # PIT 1.22.1 counts RUN_ERROR as detected, but the test JVM crashed on redefineClasses (records) before any
 # test ran, so nothing proved the mutant dead. A line here says a human read the tests and named the
-# assertion that fails for the mutant. The mutator is the simple PIT name; omit it (or use *) for every
-# mutator of the method; * also works inside the method name (lambda$of$*). Agents cannot edit this file.
+# assertion that fails for the mutant. The key is the method and the mutator, not the line number or the
+# description: RUN_ERROR is not deterministic (another run crashes on another mutant), and line numbers
+# go stale on every edit. So a line covers every RUN_ERROR of that mutator in that method - keep the
+# mutator explicit (one line per verified mutator, as for the two Boolean*ReturnVals of a lambda) and
+# reread the tests when the method grows a new conditional, return or lambda. The mutator is the simple
+# PIT name; omit it (or use *) only when every mutator of the method was verified; * also works inside
+# the method name (lambda$of$* - the compiler numbers lambdas). Agents cannot edit this file.
 #
 # Before adding a line: run the tests, read the mutated line, find the assertion that fails for exactly
 # this mutation. A mutant with no such assertion is a weak test, not an allowlist entry.
