@@ -114,8 +114,10 @@
 - **Остаточные риски**.
 
 ### Правила владельца
-- **Задача для Jira** (тема, описание с критериями приёмки, трудозатраты) пишется в чат до начала работы.
-  Если её уже написал координатор и она пришла в промпте, заново не пишется.
+- **Задача для Jira** — это задача владельца в рабочем контуре, а не задание сессии. Координатор пишет её в свой чат
+  простым человеческим языком, без «нейрослопа» (тема, что и зачем, критерии приёмки, трудозатраты) до начала работы;
+  после апрува владельца координатор открывает сессию шага с отдельным описанием уже для сессии. Если задача пришла
+  сессии в промпте, заново она не пишется (уточнение владельца 2026-10-04).
 - **Решения человека — нумерованным списком** в любой остановке и в отчёте; ответ «1) да 2) нет …»
   записывается в описание PR.
 - **Лимит токенов.** Если в сессию пришло предупреждение о 99 % пятичасового или недельного лимита либо
@@ -259,7 +261,7 @@ PDF читаются инструментом Read (страницами). До�
 | Jakarta Persistence 3.2 | jakarta.ee/specifications/persistence/3.2/ | javadoc-jar |
 | Liquibase 5.0.3 | docs.liquibase.com | javadoc-jar и sources-jar `org.liquibase:liquibase-core` |
 | PostgreSQL 16 (образ `postgres:16.10-alpine`), JDBC 42.7.11 | www.postgresql.org/docs/16/; jdbc.postgresql.org/documentation/ | исходник документации: raw.githubusercontent.com/postgres/postgres/REL_16_STABLE/doc/src/sgml/ |
-| RabbitMQ 4.1 (образ `rabbitmq:4.1-alpine`): подтверждения, повторная доставка, DLX, аргументы очередей | www.rabbitmq.com/docs — **закрыт** (сайт отвечает 403 на страницы) | исходники той же документации: raw.githubusercontent.com/rabbitmq/rabbitmq-website/main/versioned_docs/version-4.1/<страница>.md (например, confirms.md) |
+| RabbitMQ 4.1 (образ `rabbitmq:4.1.2-alpine` — патч-версия брокера 1С контура, Р16): подтверждения, повторная доставка, DLX, аргументы очередей | www.rabbitmq.com/docs — **закрыт** (сайт отвечает 403 на страницы) | исходники той же документации: raw.githubusercontent.com/rabbitmq/rabbitmq-website/main/versioned_docs/version-4.1/<страница>.md (например, confirms.md) |
 | RabbitMQ Java-клиент 5.27.1 | www.rabbitmq.com/client-libraries/java-api-guide; Javadoc rabbitmq.github.io/rabbitmq-java-client/ — **закрыт** | javadoc-jar `com.rabbitmq:amqp-client:5.27.1`; raw.githubusercontent.com/rabbitmq/rabbitmq-java-client/v5.27.1/ |
 | Jackson 3.1 (`tools.jackson`) | javadoc.io/doc/tools.jackson.core/jackson-databind/<версия>; миграция: raw.githubusercontent.com/FasterXML/jackson/main/jackson3/MIGRATING_TO_JACKSON_3.md | javadoc-jar, `javap` |
 | JSpecify 1.0 | jspecify.dev/docs/user-guide/ | javadoc-jar |
@@ -274,7 +276,7 @@ PDF читаются инструментом Read (страницами). До�
 | Awaitility 4.3 | руководство — вики: raw.githubusercontent.com/wiki/awaitility/awaitility/Usage.md | javadoc-jar |
 | Cucumber-JVM 8.0.1 (приёмка) | cucumber.io/docs/ (Java: installation/java/); Gherkin на русском — cucumber.io/docs/gherkin/languages/ | javadoc-jar, raw.githubusercontent.com/cucumber/cucumber-jvm/v8.0.1/ |
 | Gradle 8.14.3 | docs.gradle.org/8.14.3/userguide/; DSL: docs.gradle.org/8.14.3/dsl/ | нет |
-| Docker Compose v5.1.1 (CLI) и спецификация compose-файла (`docker-compose.yml`) | docs.docker.com — **закрыт** | CLI — по тегу версии: raw.githubusercontent.com/docker/compose/v5.1.1/docs/reference/<команда>.md (compose.md, compose_up.md, compose_down.md …); файл — raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/<раздел>.md (services.md, build.md, fragments.md) и raw.githubusercontent.com/compose-spec/compose-spec/main/<NN>-<раздел>.md; руководства — raw…/docker/docs/main/content/manuals/compose/…; у docker/docs и compose-spec тегов под версию нет — ветка main, поведение проверять `docker compose … config` |
+| Docker Compose v5.1.1 (CLI; в облачной VM версия меняется от сессии к сессии — встречалась и v5.3.1: сверять `docker compose version` и брать справку по своему тегу) и спецификация compose-файла (`docker-compose.yml`) | docs.docker.com — **закрыт** | CLI — по тегу версии: raw.githubusercontent.com/docker/compose/v5.1.1/docs/reference/<команда>.md (compose.md, compose_up.md, compose_down.md …); файл — raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/<раздел>.md (services.md, build.md, fragments.md) и raw.githubusercontent.com/compose-spec/compose-spec/main/<NN>-<раздел>.md; руководства — raw…/docker/docs/main/content/manuals/compose/…; у docker/docs и compose-spec тегов под версию нет — ветка main, поведение проверять `docker compose … config` |
 | Dockerfile и BuildKit (`Dockerfile` модуля: `RUN --mount`, `FROM ${ARG}`) | docs.docker.com — **закрыт** | raw.githubusercontent.com/moby/buildkit/master/frontend/dockerfile/docs/reference.md; руководства — raw…/docker/docs/main/content/manuals/build/…; поведение проверять `docker build` локально |
 | Гейты: PIT 1.22.1, gradle-pitest-plugin 1.19.0, ArchUnit 1.5.1, Checkstyle 12.3.1, PMD 7.27.0, JaCoCo 0.8.15 | pitest.org; gradle-pitest-plugin.solidsoft.info; www.archunit.org/userguide/; checkstyle.org; docs.pmd-code.org/pmd-doc-7.27.0/; www.jacoco.org/jacoco/trunk/doc/ | по тегу версии на raw.githubusercontent.com: hcoles/pitest/1.22.1/README.md; szpak/gradle-pitest-plugin/release/1.19.0/README.md; TNG/ArchUnit/v1.5.1/docs/userguide/; checkstyle/checkstyle/checkstyle-12.3.1/src/site/xdoc/checks/; pmd/pmd/pmd_releases/7.27.0/pmd-java/src/main/resources/category/java/; jacoco/jacoco/v0.8.15/org.jacoco.doc/docroot/doc/ |
 | Git (`.gitattributes`, `.gitignore`; версия — `git --version` в сессии, сейчас 2.43.0) | git-scm.com/docs — **закрыт** (и без версии) | по тегу версии: raw.githubusercontent.com/git/git/v<версия>/Documentation/<страница>.txt (например, gitattributes.txt); поведение проверять `git ls-files --eol`, `git check-attr` |
