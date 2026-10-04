@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.service;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -15,9 +15,11 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 
 /**
- * Отличает временный отказ базы данных от всех прочих ошибок REST-чтения. Временный отказ — тот,
- * после которого тот же запрос стоит повторить чуть позже: сервисы Заявок и Договоров так и
- * делают, когда получают 503. Любая другая ошибка повтором не лечится и уходит как 500.
+ * Отличает временный отказ базы данных от всех прочих ошибок. Временный отказ — тот, после которого
+ * ту же операцию стоит повторить чуть позже: сервисы Заявок и Договоров так и делают, когда получают
+ * 503. Любая другая ошибка повтором не лечится и уходит как 500. Перечень временных отказов один на
+ * весь сервис: кто бы ни решал, повторять ли операцию, он спрашивает здесь. Проверяемое исключение
+ * отказом базы не бывает: отказы базы приходят только непроверяемыми исключениями Spring и Hibernate.
  *
  * <p>Сначала ошибка переводится в иерархию исключений Spring тем же переводчиком, которым
  * пользуются прокси репозиториев. Это нужно для исключений, которые пришли сырыми из Hibernate:
@@ -64,18 +66,18 @@ public class DatabaseOutages {
      * @return описание отказа для журнала или пусто, когда ошибка постоянная
      */
     public Optional<Outage> recognize(Exception failure) {
-        Throwable classified = translate(failure);
+        if (!(failure instanceof RuntimeException runtime)) {
+            return Optional.empty();
+        }
+        Throwable classified = translate(runtime);
         if (!isTemporary(classified)) {
             return Optional.empty();
         }
         return Optional.of(new Outage(classified.getClass().getSimpleName(), sqlState(classified)));
     }
 
-    private Throwable translate(Exception failure) {
-        if (!(failure instanceof RuntimeException runtime)) {
-            return failure;
-        }
-        DataAccessException translated = translator.translateExceptionIfPossible(runtime);
+    private Throwable translate(RuntimeException failure) {
+        DataAccessException translated = translator.translateExceptionIfPossible(failure);
         return translated == null ? failure : translated;
     }
 

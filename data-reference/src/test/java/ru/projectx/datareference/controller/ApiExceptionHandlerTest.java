@@ -40,6 +40,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.service.DatabaseOutages;
 
 /**
  * Любой отказ REST уходит потребителю в едином формате с верным статусом, а в журнал — без текста

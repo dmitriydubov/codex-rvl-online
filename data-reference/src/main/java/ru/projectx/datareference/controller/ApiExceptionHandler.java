@@ -19,6 +19,7 @@ import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.service.DatabaseOutages;
 
 /**
  * Все отказы REST-чтения справочников отдаются в одном формате {@link ErrorResponse}. Запрос
