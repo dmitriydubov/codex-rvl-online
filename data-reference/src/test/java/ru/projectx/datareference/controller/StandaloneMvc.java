@@ -1,5 +1,6 @@
 package ru.projectx.datareference.controller;
 
+import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -19,7 +20,7 @@ final class StandaloneMvc {
 
     static MockMvcTester of(Object controller) {
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages()))
+                .setControllerAdvice(new ApiExceptionHandler(new DatabaseOutages(new HibernateExceptionTranslator())))
                 .build());
     }
 }
