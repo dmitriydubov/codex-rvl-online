@@ -124,7 +124,7 @@ class PolicyQueryServiceTest {
         assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_ID))
                 .isInstanceOfSatisfying(AmbiguousReferenceException.class, ambiguous -> {
                     assertThat(ambiguous.code()).isEqualTo("AMBIGUOUS_POLICY");
-                    assertThat(ambiguous.details()).hasSize(2);
+                    assertThat(ambiguous.candidateIds()).hasSize(2);
                 });
     }
 

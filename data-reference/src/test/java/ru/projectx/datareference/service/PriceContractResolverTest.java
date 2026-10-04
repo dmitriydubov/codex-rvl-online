@@ -70,7 +70,7 @@ class PriceContractResolverTest {
 
         assertThatThrownBy(() -> resolver.resolve(lpu.id(), TODAY))
                 .isInstanceOfSatisfying(AmbiguousReferenceException.class,
-                        ambiguous -> assertThat(ambiguous.details()).hasSize(2));
+                        ambiguous -> assertThat(ambiguous.candidateIds()).hasSize(2));
     }
 
     @Test

@@ -3,51 +3,66 @@ package ru.projectx.datareference.exception;
 import java.io.Serial;
 import java.util.List;
 import java.util.UUID;
-import ru.projectx.datareference.dto.ErrorResponse;
 
 /**
- * Данные 1С допускают больше одного ответа там, где ответ должен быть один:
- * два полиса с одним номером в договоре, два кандидата на прайсовый договор.
- * Выбирать наугад нельзя — лучше заметный отказ, чем тихо неверная запись, — поэтому
- * {@code 409} с перечнем конфликтующих записей в {@code details}: по ним разбор
- * идёт на стороне 1С.
+ * Данные 1С допускают больше одного ответа там, где ответ должен быть один. Например, в договоре два
+ * полиса с одним номером, или у ЛПУ (лечебно-профилактического учреждения) два договора, по которым можно
+ * брать цены. Выбирать наугад нельзя: заметный отказ лучше тихо неверной записи. Поэтому сервис отвечает
+ * 409 и перечисляет конфликтующие записи, а по ним данные разбирают на стороне 1С.
+ *
+ * <p>Исключение хранит вид записей и их идентификаторы, а не готовые элементы ответа: как назвать
+ * запись в ответе REST, решает обработчик ошибок.
  */
-public class AmbiguousReferenceException extends RuntimeException {
+public final class AmbiguousReferenceException extends RuntimeException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
     private static final String AMBIGUOUS_POLICY = "AMBIGUOUS_POLICY";
-    /** Открыт для каталога R-01: там та же неоднозначность — причина пропуска, а не отказ. */
+    /** Код открыт для каталога ЛПУ: там та же неоднозначность становится причиной пропуска, а не отказом. */
     public static final String AMBIGUOUS_PRICE_CONTRACT = "AMBIGUOUS_PRICE_CONTRACT";
 
-    private final String code;
-    private final transient List<ErrorResponse.Detail> details;
+    /** Какие записи конфликтуют. */
+    public enum CandidateKind {
+        /** Полисы с одним номером в одном договоре страхования. */
+        POLICY,
+        /** Договоры ЛПУ, каждый из которых может быть договором с ценами. */
+        LPU_CONTRACT
+    }
 
-    private AmbiguousReferenceException(String code, String message, List<ErrorResponse.Detail> details) {
+    private final String code;
+    private final CandidateKind candidateKind;
+    private final transient List<UUID> candidateIds;
+
+    private AmbiguousReferenceException(String code, String message, CandidateKind kind, List<UUID> candidateIds) {
         super(message);
         this.code = code;
-        this.details = List.copyOf(details);
+        this.candidateKind = kind;
+        this.candidateIds = List.copyOf(candidateIds);
     }
 
     public static AmbiguousReferenceException policy(List<UUID> policyIds) {
         return new AmbiguousReferenceException(AMBIGUOUS_POLICY,
-                "по номеру полиса в договоре найдено больше одной записи",
-                policyIds.stream().<ErrorResponse.Detail>map(ErrorResponse.PolicyCandidate::new).toList());
+                "по номеру полиса в договоре найдено больше одной записи", CandidateKind.POLICY, policyIds);
     }
 
-    /** Базовая логика B: у ЛПУ больше одного действующего кандидата на прайсовый договор. */
+    /** У ЛПУ больше одного действующего договора, по которому можно брать цены. */
     public static AmbiguousReferenceException priceContract(UUID lpuId, List<UUID> lpuContractIds) {
         return new AmbiguousReferenceException(AMBIGUOUS_PRICE_CONTRACT,
                 "у ЛПУ " + lpuId + " больше одного действующего кандидата на прайсовый договор",
-                lpuContractIds.stream().<ErrorResponse.Detail>map(ErrorResponse.LpuContractCandidate::new).toList());
+                CandidateKind.LPU_CONTRACT, lpuContractIds);
     }
 
     public String code() {
         return code;
     }
 
-    public List<ErrorResponse.Detail> details() {
-        return details;
+    public CandidateKind candidateKind() {
+        return candidateKind;
+    }
+
+    /** Идентификаторы конфликтующих записей в том порядке, в каком их нашёл сервис. */
+    public List<UUID> candidateIds() {
+        return candidateIds;
     }
 }

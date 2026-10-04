@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -8,7 +9,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -20,6 +22,9 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * <p>Клиент — {@code RestTestClient.bindToServer(ClientHttpRequestFactory)} из spring-test: автонастройка Boot
  * для него ({@code spring-boot-resttestclient}) — отдельный модуль, которого нет
  * на classpath и в Nexus контура.
+ *
+ * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Прежний клиент на
+ * {@code HttpURLConnection} не умеет метод PATCH, а сценарии отказа по методу его отправляют.
  *
  * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
  * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон
@@ -40,18 +45,29 @@ public class ContractsService {
     private @Nullable String obtainedId;
 
     public ContractsService(@LocalServerPort int port) {
-        SimpleClientHttpRequestFactory requests = new SimpleClientHttpRequestFactory();
-        requests.setConnectTimeout(CONNECT_TIMEOUT);
+        HttpClient http = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(CONNECT_TIMEOUT)
+                .build();
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
         requests.setReadTimeout(READ_TIMEOUT);
         this.client = RestTestClient.bindToServer(requests).baseUrl("http://localhost:" + port).build();
     }
 
     public ServiceResponse request(String path) {
-        return exchange(path, headers -> { });
+        return exchange(HttpMethod.GET, path, headers -> { });
     }
 
     public ServiceResponse request(String path, String requestId) {
-        return exchange(path, headers -> headers.set(ServiceResponse.REQUEST_ID, requestId));
+        return exchange(HttpMethod.GET, path, headers -> headers.set(ServiceResponse.REQUEST_ID, requestId));
+    }
+
+    public ServiceResponse send(HttpMethod method, String path) {
+        return exchange(method, path, headers -> { });
+    }
+
+    public ServiceResponse requestAccepting(String path, String accept) {
+        return exchange(HttpMethod.GET, path, headers -> headers.set(HttpHeaders.ACCEPT, accept));
     }
 
     public ServiceResponse lastResponse() {
@@ -68,10 +84,10 @@ public class ContractsService {
                 .orElseThrow(() -> new IllegalStateException("сценарий не получил id на шаге «Дано»"));
     }
 
-    private ServiceResponse exchange(String path, Consumer<HttpHeaders> headers) {
+    private ServiceResponse exchange(HttpMethod method, String path, Consumer<HttpHeaders> headers) {
         requireAbsolutePath(path);
         lastResponse = ServiceResponse.of(
-                client.get().uri(path, uriVariables(path)).headers(headers).exchange().returnResult());
+                client.method(method).uri(path, uriVariables(path)).headers(headers).exchange().returnResult());
         return lastResponse;
     }
 

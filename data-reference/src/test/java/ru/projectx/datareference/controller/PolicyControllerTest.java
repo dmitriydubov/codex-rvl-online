@@ -41,7 +41,7 @@ class PolicyControllerTest {
     private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_id";
     /** У полиса для Договоров ключ по GUID 1С один — отказ называет только его. */
     private static final String NO_EXTERNAL_ID_REASON = "нужен external_id";
-    /** Причина отказа Spring по пустому обязательному параметру ({@link ApiExceptionHandler}). */
+    /** Причина отказа Spring по пустому обязательному параметру ({@link RequestErrorAdvice}). */
     private static final String MISSING_VALUE_REASON = "обязательный параметр";
 
     @Mock
