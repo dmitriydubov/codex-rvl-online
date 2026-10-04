@@ -24,20 +24,23 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * ТЗ-2: договоры страхования. Поток несёт договоры всех продуктов страховщика,
- * поэтому проверяется прежде всего фильтр — какие сообщения вообще доходят до таблицы.
+ * Приём договоров страхования из обмена с 1С:УСК в таблицу договоров. Обмен присылает договоры всех
+ * продуктов страховщика, поэтому прежде всего проверяется отбор: какие сообщения доходят до таблицы,
+ * а какие пропускаются.
  *
- * <p>Даты здесь третьего вида: момент <b>без</b> смещения ({@code 2026-05-07T00:00:00}).
- * До этого потока такой формы не встречалось, и разбирать её никто не умел.
+ * <p>Даты в этом обмене приходят моментом без смещения часового пояса ({@code 2026-05-07T00:00:00}).
+ * В других обменах такой формы нет, поэтому отдельно проверено, что календарный день сохраняется как
+ * написан. Номер договора и идентификаторы сторон здесь вымышленные.
  */
 @IntegrationTest
 class InsuranceContractImportTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_contracts-changes";
     private static final String DMS = "Личное страхование";
-    private static final UUID CONTRACT_ID = UUID.fromString("75af8e16-78d0-3b1f-8405-349aae9b01e8");
-    private static final UUID INSURER_ID = UUID.fromString("5e595002-41bd-4904-8b4e-f7690896baa0");
-    private static final UUID INSURED_ID = UUID.fromString("5e595002-41bd-4904-8b4e-f7690896bbbb");
+    private static final String CONTRACT_NUMBER = "0000000001";
+    private static final UUID CONTRACT_ID = UUID.fromString("7e570000-0000-4000-8000-0000000000c1");
+    private static final UUID INSURER_ID = UUID.fromString("7e570000-0000-4000-8000-0000000000d1");
+    private static final UUID INSURED_ID = UUID.fromString("7e570000-0000-4000-8000-0000000000d2");
 
     @Autowired
     private DatabaseCleaner databaseCleaner;
@@ -70,14 +73,14 @@ class InsuranceContractImportTest {
         importOne(contract(DMS, insurerParty()));
 
         InsuranceContract stored = repository.findByExternalId(CONTRACT_ID).orElseThrow();
-        assertThat(stored.number()).isEqualTo("0646480513");
+        assertThat(stored.number()).isEqualTo(CONTRACT_NUMBER);
         assertThat(stored.externalInsurerId()).isEqualTo(INSURER_ID);
         assertThat(stored.isArchive()).isFalse();
     }
 
     /**
-     * Даты приходят моментом без смещения, и календарный день берётся как написан —
-     * конец дня 23:59:59 остаётся тем же днём, а не переезжает на следующий.
+     * Даты приходят моментом без смещения, и календарный день берётся как написан. Конец дня
+     * 23:59:59 остаётся тем же днём и не переезжает на следующий.
      */
     @Test
     void datesWithoutOffset_keepTheirCalendarDay() {
@@ -88,7 +91,7 @@ class InsuranceContractImportTest {
         assertThat(stored.endDate()).isEqualTo(LocalDate.of(2027, 5, 6));
     }
 
-    /** Поток несёт все продукты страховщика; чужие до таблицы доходить не должны. */
+    /** Обмен присылает договоры всех продуктов страховщика, и договоры не по ДМС до таблицы не доходят. */
     @Test
     void contractOfAnotherProduct_isSkipped() {
         ImportResult result = importOne(contract("Обязательное страхование", insurerParty()));
@@ -100,8 +103,8 @@ class InsuranceContractImportTest {
     }
 
     /**
-     * Сторон в договоре несколько, и брать первую попавшуюся нельзя: застрахованный
-     * и страхователь — разные лица.
+     * Сторон в договоре несколько, и брать первую попавшуюся нельзя: застрахованный и страхователь
+     * бывают разными лицами. Страхователь выбирается по его роли в договоре.
      */
     @Test
     void insurer_isPickedByRoleAmongSeveralParties() {
@@ -111,7 +114,10 @@ class InsuranceContractImportTest {
                 .isEqualTo(INSURER_ID);
     }
 
-    /** Страхователем может быть физлицо, которого в справочнике нет: договор всё равно наш. */
+    /**
+     * Если ни у одной стороны договора нет роли «Страхователь», договор всё равно сохраняется,
+     * только без страхователя.
+     */
     @Test
     void contractWithoutInsurerRole_isStoredWithoutInsurer() {
         importOne(contract(DMS, party(INSURED_ID, "Застрахованный")));
@@ -119,7 +125,10 @@ class InsuranceContractImportTest {
         assertThat(repository.findByExternalId(CONTRACT_ID).orElseThrow().externalInsurerId()).isNull();
     }
 
-    /** {@code notActive} у этого потока — то же, чем {@code deleteMark} у остальных. */
+    /**
+     * В этом обмене признак {@code notActive} значит то же, что {@code deleteMark} в остальных:
+     * договор уходит в архив.
+     */
     @Test
     void notActiveContract_isArchived() {
         importOne(contract(DMS, insurerParty()).replace("\"notActive\":false", "\"notActive\":true"));
@@ -128,12 +137,13 @@ class InsuranceContractImportTest {
     }
 
     /**
-     * Тип продукта не задан — применять нечего: отличить ДМС от чужого продукта нечем,
-     * а сохранить всё подряд значит завести у себя договоры еОСАГО.
+     * Если в настройках не задан тип продукта ДМС, договор пропускается. Без этой настройки ДМС нечем
+     * отличить от других продуктов, а сохранять всё подряд значит завести у себя чужие договоры,
+     * например еОСАГО.
      *
-     * <p>Маппер собирается здесь руками, а не берётся из контекста: проверяется поведение
-     * при <i>другой</i> конфигурации, а менять её у общего контекста ради одного теста
-     * значило бы поднимать второй контекст на весь прогон.
+     * <p>Маппер собирается здесь вручную, а не берётся из контекста. Тест проверяет поведение при
+     * другой конфигурации, а менять её у общего контекста ради одного теста значило бы поднимать
+     * второй контекст на весь прогон.
      */
     @Test
     void productTypeNotConfigured_isSkipped() {
@@ -160,14 +170,18 @@ class InsuranceContractImportTest {
         return (ObjectNode) json.readTree(data);
     }
 
-    /** Пример из ТЗ-2, сокращённый до полей маппинга. */
+    /**
+     * Пример сообщения о договоре страхования из обмена с 1С:УСК, сокращённый до полей, которые читает
+     * маппер. Код продукта маппер не читает: он оставлен, чтобы сообщение было похоже на настоящее.
+     * Значения вымышленные.
+     */
     private static String contract(String productType, String parties) {
         return """
-                {"contractId":"%s","number":"0646480513","productType":"%s",\
-                "productCode":"300000057","dateBeginISO":"2026-05-07T00:00:00",\
+                {"contractId":"%s","number":"%s","productType":"%s",\
+                "productCode":"000000001","dateBeginISO":"2026-05-07T00:00:00",\
                 "dateEndISO":"2027-05-06T23:59:59","notActive":false,\
                 "contragentList":[%s]}"""
-                .formatted(CONTRACT_ID, productType, parties);
+                .formatted(CONTRACT_ID, CONTRACT_NUMBER, productType, parties);
     }
 
     private static String insurerParty() {
