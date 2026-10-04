@@ -157,18 +157,19 @@ class ServerFailureAdviceTest {
     }
 
     /**
-     * Непредвиденная ошибка попадает в журнал с уровнем ERROR, типом исключения и идентификатором запроса,
-     * но без текста и без стека: текст чужого исключения может нести значения строки с персональными
-     * данными, а стек печатает тот же текст у каждой причины.
+     * Непредвиденная ошибка попадает в журнал с уровнем ERROR, цепочкой причин с местом каждой и
+     * идентификатором запроса, но без текстов и без стека. Текст чужого исключения может нести значения
+     * строки с персональными данными, а стек печатает тот же текст у каждой причины.
      */
     @Test
-    void permanentFailure_isLoggedWithTypeAndRequestId_withoutForeignText(CapturedOutput output) {
+    void permanentFailure_isLoggedWithCauseChainAndRequestId_withoutForeignText(CapturedOutput output) {
         controller.failWith(new DataIntegrityViolationException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT)));
 
         request();
 
-        assertThat(output).contains("ERROR", "DataIntegrityViolationException", "request_id=" + REQUEST_ID)
-                .doesNotContain(FOREIGN_TEXT, "SQLException");
+        assertThat(output).contains("ERROR", "DataIntegrityViolationException at ", " <- java.sql.SQLException at ",
+                "ServerFailureAdviceTest#permanentFailure_isLoggedWithCauseChainAndRequestId_withoutForeignText:",
+                "request_id=" + REQUEST_ID).doesNotContain(FOREIGN_TEXT, "\tat ");
     }
 
     private MvcTestResult request() {

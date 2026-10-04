@@ -21,9 +21,9 @@ import ru.projectx.datareference.service.DatabaseOutages;
  * одна на все ручки и не зависит от того, в каком слое ошибка возникла.
  *
  * <p>Здесь перехватывается любое исключение. Это верхняя граница сервиса, и перехват не подавляет ошибку,
- * а классифицирует её. Наружу уходят код и общий текст. В журнал идут тип исключения и идентификатор
- * запроса, но не текст и не стек: в тексте чужого исключения могут быть SQL и значения строки с
- * персональными данными, а стек печатает текст каждой причины.
+ * а классифицирует её. Наружу уходят код и общий текст. В журнал идут цепочка причин с местом каждой
+ * ({@link FailureTrace}) и идентификатор запроса, но не тексты и не стек: в тексте чужого исключения
+ * могут быть SQL и значения строки с персональными данными, а стек печатает текст каждой причины.
  */
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.SERVER_FAILURE)
@@ -56,7 +56,7 @@ public class ServerFailureAdvice {
     }
 
     private ErrorResponse internalError(Exception failure) {
-        log.error("необработанная ошибка REST: {}, request_id={}", failure.getClass().getName(), CurrentRequest.id());
+        log.error("необработанная ошибка REST: {}, request_id={}", FailureTrace.of(failure), CurrentRequest.id());
         return ErrorResponse.of(INTERNAL_ERROR, "внутренняя ошибка сервиса", CurrentRequest.id());
     }
 }
