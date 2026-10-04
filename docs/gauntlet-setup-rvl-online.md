@@ -143,7 +143,8 @@ www.jacoco.org
   очереди с именами контура (`TestBroker.java`), то есть на настоящем брокере забрали бы настоящие сообщения. Таймауты
   `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`, `DB_SOCKET_TIMEOUT_SECONDS` к тому же дошли
   бы до тестов: значение, отличное от умолчания, уронит `DatabaseTimeoutsTest` (Ш4) — `PostgresTestcontainer` подменяет
-  только адрес и учётные данные, а тест сверяет умолчания `application.yml`.
+  только адрес и учётные данные, а тест сверяет умолчания `application.yml`. То же для `API_READ_TIMEOUT_SECONDS` (Ш41,
+  PR #25): `RestReadTimeoutTest` ждёт 503 раньше `lock_timeout` 5 с, и значение 5 и больше его уронит.
 - `RABBITMQ_SSL_ENABLED`: `bootRun` и приёмка пошли бы по TLS.
 
 `BASH_MAX_TIMEOUT_MS` можно задать, если нужны команды дольше 10 минут. Полный `mutationGate -Pgauntlet.scope=all` до Ш3
@@ -430,7 +431,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     (`src/test/java/…/support/`). Контекстные классы идут только в `test`, PIT исполняет только unit-классы, контейнеры не
     стартуют. На Ш3 — 20 контекстных классов (с `ConsumerStandTest` из Ш2a), 5 unit-классов в PIT, pitest со `scope=all`
     — 15 с; на `main` после PR #20 контекстных классов 22 (плюс `DatabaseTimeoutsTest` из Ш4 и `SqlErrorLogTest` из
-    Ш1+Ш1a).
+    Ш1+Ш1a); после PR #26 — 25 контекстных классов (`@IntegrationTest`/`@AmqpIntegrationTest`) и 40 unit-классов в PIT.
   - Мутант, которого убивали только контекстные тесты, теперь NO_COVERAGE или SURVIVED: проба Ш3 на `OneCValues` — строки 51,
     70, 86, 87, 97 → nocov, 92 → surv. 9 ложных выживших «`stream()` → null» ушли в NO_COVERAGE.
   - RUN_ERROR на record-классах (падение JVM и `UnsupportedOperationException` при `redefineClasses`) засчитывается как убитый
@@ -444,8 +445,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     4 классах (`InboundRetryProperties`, `PolicyResponse`, `LpuServicesResponse$Service`, `InsuranceContractResponse`),
     все проверены чтением тестов и внесены; набор RUN_ERROR от прогона к прогону меняется (SIGSEGV), поэтому у лямбд
     в allowlist glob `lambda$of$*` и оба boolean-мутатора.
-  - Цена: покрытие для mutationGate дают только unit-тесты — они есть у 7 из 67 классов, поэтому каждый касаемый класс
-    требует unit-тестов (≥ 80 % строк, все покрытые мутанты убиты). Новый тест с `@IntegrationTest` молча выпадает из PIT.
+  - Цена: покрытие для mutationGate дают только unit-тесты — на 2026-09-30 они были у 7 из 67 классов (после PR #25
+    unit-тесты есть у сервисов чтения, DTO ответов и обработчика ошибок), поэтому каждый касаемый класс требует
+    unit-тестов (≥ 80 % строк, все покрытые мутанты убиты). Новый тест с `@IntegrationTest` молча выпадает из PIT.
   - Перед контрольным прогоном удалять `build/pitHistory.txt`: включён инкрементальный анализ.
 - **Приёмка при нуле фич SKIPPED.** Если фичи есть, но исполнено 0 сценариев, `acceptanceCheck` зелёный. После удаления фич
   он читает устаревшие результаты.
@@ -459,7 +461,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Лимит PMD TooManyMethods (12).** `OneCQueueListener` (15 методов) разделён в Ш15 (PR #23): 11 точек приёма
   регистрирует `OneCQueueEndpoints`, у слушателя один публичный `receive`. `ReferenceController` (15) разделён на
   контроллеры по ресурсам в Ш7 (PR #7).
-  У `PriceListTransferAssembler` 12 — на пределе, у `ApiExceptionHandler` 9.
+  У `PriceListTransferAssembler` 12 — на пределе; у `ApiExceptionHandler` после PR #25 тоже 12: новый обработчик требует
+  сначала вынести классификацию отказов базы в отдельный класс (Ш41a, первым коммитом), иначе `pmdGate` красный.
 - **Два бина `ObjectMapper`.** snake_case наружу даёт только `@Primary` `jsonMapper` Boot. Бин из `JacksonConfig` никуда не
   внедряется. Настраивать REST-JSON через свойства или customizer Boot.
 - **`TestRestTemplate` в тестовых jar Boot 4.0.7 нет** — есть `RestTestClient` из spring-test.
@@ -524,9 +527,15 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     одинаков: это расхождение документации с кодом, а не версий, и прав код. Поэтому заданы все три свойства, `user` и
     `password` не убирать. Отсюда и правило для `DB_URL`: параметры драйвера, нужные и пулу, и миграциям, — только в нём
     (раздел 9).
-  - **REST-чтения.** Транзакционного таймаута нет: до Ш41+Ш26 (короткий лимит REST-чтений, решение владельца 2026-10-01,
-    план 1.2) чтение ограничено лишь сессионными таймаутами пула: `statement_timeout` 30 с на каждый оператор (чтение из
-    нескольких операторов может идти дольше), `lock_timeout` 5 с на ожидание блокировки, `socketTimeout` 60 с.
+  - **REST-чтения.** С PR #25 (Ш41+Ш26) у чтений свой лимит — `@RestReadTransaction`, 3 с (`API_READ_TIMEOUT_SECONDS`),
+    превышение — 503 `SERVICE_UNAVAILABLE`. Ловушки: лимит действует только на транзакцию, которую метод начинает сам;
+    Hibernate передаёт остаток в `Statement.setQueryTimeout` целыми секундами — остаток меньше 0,5 с даёт 0, то есть без
+    JDBC-таймаута (держат только `lock_timeout` и `statement_timeout`; Ш41a); ожидание соединения пула — Hikari
+    connectionTimeout 30 с, поэтому при исчерпанном пуле 503 придёт не раньше 30 с; лимит должен быть меньше
+    `lock_timeout` (иначе WARN при старте: под чужой блокировкой REST не отказывает первым); ленивая догрузка табличных
+    частей полиса в `@Service` (R-05) при таймауте даёт 500, а не 503 — Spring переводит исключения Hibernate только у
+    прокси `@Repository` (дефект, Ш41a). Без лимита (вложенный вызов) чтение ограничено лишь сессионными таймаутами пула:
+    `statement_timeout` 30 с на оператор, `lock_timeout` 5 с, `socketTimeout` 60 с.
   - **Разбор.** Проход (до 100 сообщений, `projectx.import.batch-size`) упирается в занятую чужой блокировкой таблицу
     справочника по разу на каждое сообщение, которое её пишет (при ACCESS EXCLUSIVE — и читает), и стоит до ~8 мин
     (100 × 5 с `lock_timeout`) — всё это время на общем потоке стоят и стирание ПДн, и алерт (выше; до Ш14b). Блокировка
@@ -596,11 +605,11 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 |---|---|
 | `config` | `Jackson3JsonFormatMapper` |
 | `controller` | — (`ReferenceController` разделён в Ш7, PR #7) |
-| `dto` | `LpuServicesResponse`, `Mkb10Response`, `PolicyResponse`, `PolicySearchResponse` |
+| `dto` | `LpuServicesResponse`, `PolicyResponse` (приведены к лимитам в Ш11, PR #25), `Mkb10Response`, `PolicySearchResponse` (Ш10, PR #25) |
 | `entity` | 15 сущностей, кроме `InboundStatus`, `InboxEntry`, `OneCStream` |
 | `exception` | 3 исключения REST |
 | `mapper` | все 10 мапперов |
-| `service` | `InboundMessageService`, `LpuCatalogService`, `Mkb10QueryService`, `PolicySearchService`, `PriceContractResolver`, `ReferenceQueryService`, `RvlAppealTypes` |
+| `service` | `InboundMessageService`; `LpuCatalogService` (разделён в Ш11, PR #25), `Mkb10QueryService`, `PolicySearchService`, `PriceContractResolver` (Ш10, PR #25), `ReferenceQueryService` (удалён в PR #25: вместо него `PolicyQueryService`, `InsuranceContractQueryService`, `ProgramQueryService`), `RvlAppealTypes` (не тронут; unit-тест — Ш41a) |
 | `service.integration` | `OneCEnvelopeParser` (Ш13, PR #20), `OneCQueueListener` (приведён к лимитам в Ш15, PR #23) |
 | `service.onec` | `OneCIngestService` (закалён в Ш15, PR #23), `OneCValues` (Ш13, PR #20), `PriceListTransferAssembler`, `ReferenceImportService` |
 | `service.schedulers` | `PersonalDataRetention`, `StuckTransferAlert` (Ш14a, PR #13) |
@@ -650,11 +659,12 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 Поведенческие шаги идут после рефакторинга тех файлов, которые трогают. Первый из них — исполняемая спецификация действующего
 контракта трёх GET для Договоров вместе с каркасом приёмки (план, Ш25a): код сервиса он не меняет. Полный граф — в плане.
 
-**Архитектура.** Против направления четыре ребра, все объявлены в `architecture.properties`, `archTest` зелёный.
+**Архитектура.** Против направления было четыре ребра, все объявлены в `architecture.properties`, `archTest` зелёный.
 - `mapper → service`: 29 импортов в 10 файлах — `StreamMapper`, `ImportResult`, `OneCValues`;
 - `service → mapper`: `PriceListTransferAssembler → PriceListMapper`; вместе с первым ребром это цикл;
-- `dto → repository`: `Mkb10Response` строится из `Mkb10Row`;
-- `exception → dto`: исключения несут `ErrorResponse.Detail`.
+- `dto → repository`: `Mkb10Response` строился из `Mkb10Row` — **снято в Ш10 (PR #25), политика сужена по Р8:
+  `allowed.dto=entity` (PR #27)**;
+- `exception → dto`: исключения несут `ErrorResponse.Detail` (снимает Ш8).
 
 Снятие цикла — перенос трёх классов из `service.onec` в `mapper`, затем `fail.on.cycles=true` (решение 1 PR #1).
 
@@ -665,7 +675,11 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   приёма — в `service.integration`.
 
 **Кандидаты в `exclude.classes`.** Новых нет: `*Repository*` и `PolicySpecifications` уже исключены, остальные тонкие адаптеры
-покрыты тестами. Record-классы без логики — только поштучно и по решению владельца (п. 4). После Ш3 (PR #5) PIT контекстные
+покрыты тестами. С PR #25 маска `*Repository*` скрывает от PIT, CRAP и JaCoCo ещё два класса с кодом —
+`PolicySearchRepositoryImpl` (Criteria API: ранг, порядок и предел R-04, Ш12) и `SessionSettingsRepository` (`JdbcClient`,
+чтение `pg_settings`): тонкие IO-адаптеры, которые проверяют только интеграционные тесты (`PolicyApiTest`,
+`DatabaseTimeoutsTest`); перечень скрытого ведётся в комментарии `gauntlet/config/data-reference/gauntlet.properties`
+(PR #27), сужать маску — решение владельца. Record-классы без логики — только поштучно и по решению владельца (п. 4). После Ш3 (PR #5) PIT контекстные
 тесты не исполняет: тонкий адаптер, до которого дотягиваются только они, для PIT без покрытия — при касании unit-тест либо
 `exclude.classes` по решению владельца (правило 8 набора).
 
@@ -707,6 +721,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Мониторинг до метрик.** Метрик в сервисе нет, открыт только `/actuator/health`. До шага метрик (план, Ш24) нужны:
   - алерты по журналу: ERROR «потеряно» (нечитаемый конверт), WARN «не соответствует контракту», WARN «передачи прайсов не
     собрались», повторяющийся WARN «сырьё … не сохранено»;
+  - с PR #25 (Ш41+Ш26): WARN «база недоступна или не ответила вовремя: <тип>, sqlstate=<код>, request_id=<id>» — каждый
+    503 REST, алерт по частоте; при старте — WARN «проверка таймаутов PostgreSQL: …», «таймаут сеанса PostgreSQL расходится
+    с настройкой: соединение=…, параметр=…, ожидается=…, фактически=…», «лимит REST-чтения … не меньше lock_timeout …» —
+    неверная настройка контура, старт не прерывают;
   - периодический SQL-отчёт по `inbound_message`: FAILED, SKIPPED, BUFFERED старше часа, RETRY, давность последнего PROCESSED
     как признак зависшего планировщика.
 
@@ -770,8 +788,11 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 `TEST_POSTGRES_URL` и `TEST_RABBITMQ_URL`: `DatabaseCleaner` очищает все таблицы. `DatabaseTimeoutsTest` (Ш4) ждёт у
 соединения миграций `lock_timeout`, `statement_timeout` и `idle_in_transaction_session_timeout`, равные 0: таймауты
 уровня сервера, базы или роли на выделенной тестовой базе (`postgresql.conf`, `ALTER DATABASE/ROLE … SET`) уронят эту
-проверку, а переменные таймаутов `DB_*` не по умолчанию на агенте — проверку пула (раздел 1.2). Решение 7 PR #1: CI
-контура пока не уведомляем.
+проверку, а переменные таймаутов `DB_*` не по умолчанию на агенте — проверку пула (раздел 1.2). `RestReadTimeoutTest` (Ш41, PR #25) ждёт 503 раньше `lock_timeout` 5 с —
+`API_READ_TIMEOUT_SECONDS` от 5 на агенте его уронит. `OneCQueueOrderTest` (Ш1b, PR #26) создаёт в тестовой базе схему
+`order_probe`, функцию и триггер на `inbound_message`: на выделенной базе роли нужны CREATE на базу и TRIGGER на таблицу, а
+после оборванного прогона схема остаётся и следующий падает на `create schema` — убрать `drop schema if exists order_probe
+cascade` (исправление самого теста — план, 3.11). Решение 7 PR #1: CI контура пока не уведомляем.
 
 **Переменные окружения сервиса.**
 
