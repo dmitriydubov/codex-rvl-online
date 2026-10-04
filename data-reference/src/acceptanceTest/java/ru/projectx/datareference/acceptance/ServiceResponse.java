@@ -7,22 +7,24 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Ответ Дата-референса, каким его видит сервис Договоров: статус, заголовки и тело JSON.
+ * Ответ Дата-референса, каким его видит сервис Договоров: статус, заголовки, тело JSON и размер тела
+ * в байтах. Пустое тело (ответ на HEAD и OPTIONS) читается как {@code MissingNode}.
  *
  * <p>Поле тела задаётся путём, как в сценариях: имена через точку, индекс массива
  * в квадратных скобках ({@code programs[0].program.id}). Путь переводится в JSON Pointer
  * ({@code /programs/0/program/id}), и отсутствующее поле даёт {@code MissingNode},
  * а не {@code null}: «поля нет» и «поле пусто» остаются разными исходами.
  */
-record ServiceResponse(int status, HttpHeaders headers, JsonNode body) {
+record ServiceResponse(int status, HttpHeaders headers, JsonNode body, int bodyBytes) {
 
     static final String REQUEST_ID = "X-Request-Id";
 
     private static final JsonMapper JSON = JsonMapper.shared();
 
     static ServiceResponse of(ExchangeResult result) {
+        byte[] content = result.getResponseBodyContent();
         return new ServiceResponse(result.getStatus().value(), result.getResponseHeaders(),
-                JSON.readTree(result.getResponseBodyContent()));
+                JSON.readTree(content), content.length);
     }
 
     JsonNode field(String path) {
