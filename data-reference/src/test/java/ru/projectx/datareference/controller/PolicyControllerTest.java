@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -110,6 +113,25 @@ class PolicyControllerTest {
 
         assertThat(result).hasStatus(400);
         assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
+        verifyNoInteractions(policies, policySearch, contractViews);
+    }
+
+    /**
+     * Пустой номер — тоже недостающая часть ключа, как и пустой UUID: отказ по полю {@code number} без обращения
+     * к сервису чтения, а не «полиса нет» после поиска в базе.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"", "%20%20"})
+    void blankNumberWithContract_isMissingNumber_withoutAskingService(String number) {
+        MvcTestResult result = mvc.get()
+                .uri(URI.create(POLICIES + "?number=" + number + "&contract_external_id=" + CONTRACT_EXTERNAL_ID))
+                .exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().hasSize(1);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("number");
         assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
         verifyNoInteractions(policies, policySearch, contractViews);
     }

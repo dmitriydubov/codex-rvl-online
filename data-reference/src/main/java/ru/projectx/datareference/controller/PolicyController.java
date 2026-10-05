@@ -67,11 +67,18 @@ public class PolicyController {
         return policies.byExternalId(externalId);
     }
 
-    /** Без договора сюда же попадает номер: обязательный {@code contract_external_id} отказывает по своему имени. */
+    /**
+     * Без договора сюда же попадает номер: обязательный {@code contract_external_id} отказывает по своему имени.
+     * Пустой номер — тоже недостающая часть ключа: отказ по полю {@code number} приходит раньше поиска в базе, как и
+     * у пустого GUID, а не «полиса нет» после поиска.
+     */
     @GetMapping(path = "/policies", params = {NUMBER, "!" + EXTERNAL_ID, "!" + LEGACY_CONTRACT_ID})
     public PolicyResponse policyByNumber(
             @RequestParam String number, @RequestParam(CONTRACT_EXTERNAL_ID) UUID contractExternalId) {
 
+        if (number.isBlank()) {
+            throw new InvalidRequestException(NUMBER, RequestErrorAdvice.REQUIRED_PARAMETER);
+        }
         return policies.byNumber(number, contractExternalId);
     }
 
