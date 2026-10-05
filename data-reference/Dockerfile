@@ -106,7 +106,8 @@ COPY --from=layers --chown=app:app /workspace/extracted/snapshot-dependencies/ .
 COPY --from=layers --chown=app:app /workspace/extracted/application/ ./
 
 USER 10001:10001
-EXPOSE 8080
+# 8080 — REST и короткие пробы /livez и /readyz, 8081 — актуатор (health, prometheus; MANAGEMENT_PORT).
+EXPOSE 8080 8081
 
 # Память JVM — от лимита контейнера, а не от памяти узла; при нехватке памяти процесс
 # завершается, и Kubernetes перезапускает под, вместо того чтобы он висел полуживым.
