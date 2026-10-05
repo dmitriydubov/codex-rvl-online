@@ -231,7 +231,9 @@
   в строку источников; карточка Ш24 — метрики, остаток Ш31a закрыт, миграция 014 блокирует запись при построении,
   цепочка `InboundMessageService` получила `InboundTransitionMetrics`, `transferParts`/`saveTransferPart`. Grok APPROVED,
   сессия ответила на три остаточных риска. Проверка после мержа — карточка Ш24, раздел 5; контрольный `gauntletFast` на
-  `main` 9a003b3 — ниже в этой записи. Сессия заархивирована. Дорожка приёма из 1С: Ш19 в работе; после него Ш45, Ш46, Ш47.
+  `main` 9a003b3 зелёный (1019 unit- и интеграционных тестов, 264 сценария приёмки, 0 skipped, exit 0; первый прогон упал
+  по окружению — Maven Central ответил 429 на новый артефакт `micrometer-registry-prometheus`, повтор через 45 с прошёл).
+  Сессия заархивирована. Дорожка приёма из 1С: Ш19 в работе; после него Ш45, Ш46, Ш47.
 - 2026-10-05, **бандл стартера и инструкция метода — ревизия 4** (поручение владельца ~16:35 UTC): набор снят с ветки
   координатора 3469106 (PR #61, в нём все правки набора на эту дату: роль hardener при пустой области PIT, правило 15 «без
   следов внешнего контура», ревизия источников, allowlist без мёртвых строк), очищен `clean_kit.py` ревизии 4 (пары
@@ -265,7 +267,9 @@
   проверка из сессии — открылись docs.liquibase.com, prometheus.io, docs.docker.com, git-scm.com, docs.github.com,
   kubernetes.io, central.sonatype.com, search.maven.org, api.osv.dev (POST `/v1/query` отвечает), adoptium.net,
   services.gradle.org; **остался закрыт downloads.gradle.org** — на него перенаправляет services.gradle.org при скачивании
-  дистрибутива (нужен только при смене версии Gradle). Статусы в таблице источников обновлены (PR #63).
+  дистрибутива (нужен только при смене версии Gradle). Статусы в таблице источников обновлены (PR #63). **Ответ
+  владельца «1) да»** (~16:57 UTC) — `downloads.gradle.org` открывается; на момент ответа домен из сессии ещё закрыт,
+  проверка — при следующей ревизии или первой смене версии Gradle.
 - 2026-10-05, **Ш18: PR #60 открыт сессией 15:51 UTC, смержен владельцем 16:01 UTC** (CI зелёный 15:59, слит с `main`
   87e7f1e). Остановок не было: вариант общего шага владелец утвердил «1) да» в сессии, GA-9 закрыт тестом по ТЗ-07 без Ш18a.
   Отчёт PR: пункты 2–4 координатору — закрыты комментарием в PR (Ш18a снят, `ContragentMapper` приведён раньше в Ш13c,
@@ -2609,6 +2613,10 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 
 **Ш29. last_error без текста чужого исключения, стирание вместе с телом** — тип: со спецификацией; меняется содержимое
 сохранённой строки.
+- Кандидат из Ш19 (PR #65, п. 1 — решает владелец): текст ошибки разбора контактов «в сообщении ТЗ-8 не найден GUID
+  контрагента» попадает в `last_error` с кодом документа вместо понятной причины («в сообщении контактной информации не
+  найден GUID контрагента»). Рекомендация координатора — править здесь, вместе с остальными текстами `last_error`, а не
+  отдельной задачей.
 - Файлы → гейты: ReferenceImportScheduler (`:89`, после Ш14b), InboundMessageService (`:80-81`),
   `InboundMessage.java:178-180` (после Ш17), `application.yml` (`logServerErrorDetail=false` в
   `spring.datasource.hikari.data-source-properties`, рядом с `options` и `socketTimeout` из Ш4, `:39-62` на `1aeefa1`;
@@ -2676,6 +2684,9 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 **Ш34. ТЗ-9: порядок финализации и закрытие зависших передач** — тип: со спецификацией.
 - Файлы → гейты:
   - сборщик (после Ш16, Ш33), PriceListMapper (после Ш19), StuckTransferAlert (после Ш14a, Ш14b);
+  - остаток из Ш19 (PR #65, п. 2, решение координатора 2026-10-05): `PriceListMapper` снимает старые цены услуги до разбора
+    строк, и при битой строке их спасает только откат транзакции разбора — здесь разбирать строки до удаления; тесты
+    прайса из Ш19, которые фиксируют нынешний порядок, меняются в этом же шаге;
   - хранение ключа порядка финала по услуге. **Рекомендуется новая таблица** (changeSet; под CPD нужен Р1). Колонка в
     ContragentService или PriceListItem потянула бы в этап 4 Ш21 или Ш23.
 - Закрывает: DOM1C-13, PH-14 (закрытие зависших).
@@ -2694,6 +2705,11 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   (ProgramMapper, OneCValues).
 - Остатки из Ш18 (PR #60, решение координатора 2026-10-05): Javadoc `StreamMapper` — убрать «контроль версии» при переносе;
   `OptionalFields` (mapper, Ш18) и `OneCValues` после переноса в одном пакете — слить или оставить два класса, решить здесь.
+- После Ш19 (PR #65) мапперы стоят на общих пакетных классах `mapper/CatalogStreamMapper` (поток, `SnapshotUpsert`, часы;
+  наследуют `UnfilteredStreamMapper`, `InsuranceContractMapper`, `OwnedCatalogStreamMapper`), `OwnedCatalogStreamMapper`
+  (запись с владельцем: `LpuContractMapper`, `ContragentServiceMapper`) и `CatalogReference` (фильтр «ссылка есть в
+  справочнике»: `ContragentServiceMapper`, `PriceListMapper`, `LpuContactMapper`) — импорты `StreamMapper` и `OneCValues`
+  при переносе меняются в них, а не в каждом маппере.
 - Оценка: 5 ч.
 - Риски: PIT на ~15 классах в одном прогоне (после Ш3 PIT scope=all по всему модулю — 15 с, PR #5). Переименованные
   файлы — в «Перенос в контур», иначе в контуре останутся дубли классов.
@@ -2781,7 +2797,9 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   ConstructorCallsOverridableMethod@49, CPD 2, nocov 7, cov 0/16), `Insurer.java` (@43, CPD 1, nocov 7, cov 0/16),
   `Program.java` (ImmutableField@49, @57, CPD 1, nocov 11, cov 0/26), `ContragentService.java` (@47, nocov 7, cov 0/16),
   `OneCEntity.java` (AbstractClassWithoutAbstractMethod@29 — снять abstract, nocov 7, cov 0/19). Вызовы конструкторов:
-  InsuranceContractMapper, ProgramMapper, ContragentServiceMapper (к этому моменту зелёные).
+  InsuranceContractMapper, ProgramMapper, ContragentServiceMapper (к этому моменту зелёные). После Ш19 (PR #65) вызовы
+  `create`/`applySnapshot` этих сущностей идут через общие классы `CatalogStreamMapper` и `OwnedCatalogStreamMapper`
+  (функции-параметры `SnapshotUpsert`): смена сигнатур сущностей правит лямбды в мапперах, общие классы не трогает.
 - Приём по GA-3: private-конструктор вызывает только super, `applySnapshot` вызывает статическая фабрика `create()`,
   защищённый конструктор без аргументов остаётся для Hibernate, final не ставится. Комментарий `Program.java:43-47`
   переписать со ссылкой на JPA §2.1. **Публичные аксессоры не меняются**; иначе в область попадут DTO и сервисы чтения
@@ -2814,7 +2832,9 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   nocov 13, cov 0/24), `PriceListItem.java` (CPD 6, nocov 10, cov 0/24), `ProgramLpu.java` (CPD 6, nocov 11, cov 0/25);
   вызовы — AppealTypeMapper, Mkb10Mapper, ContragentMapper, LpuContractMapper, PriceListMapper,
   ProgramMapper. **Публичные аксессоры не меняются**; иначе в область попадают LpuCatalogService, LpuCardService и
-  LpuCardResponse (зелёные после PR #25).
+  LpuCardResponse (зелёные после PR #25). После Ш19 (PR #65) `LpuContractMapper` и `PriceListMapper` стоят на
+  `OwnedCatalogStreamMapper`/`CatalogReference`: смена конструкторов сущностей правит лямбды в мапперах, общие классы
+  `mapper/CatalogStreamMapper`, `OwnedCatalogStreamMapper`, `CatalogReference` не трогает.
 - Зависит: Ш18, Ш19, Ш20, Ш37 (LpuContractMapper, PriceListMapper), Р1, Р3.
 - Оценка: 11 ч.
 - Риски: оценку пересмотреть координатору: после Ш3 у шести сущностей 69 мутантов без покрытия (cov 0 %) — прежде
@@ -3294,7 +3314,7 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 | 3 | Ш44 R-06: расчёт стоимости услуги за период | `claude/sh44-service-price-period`, session_01EAU4mUT3MHscahdZ2Y1DNo | #59 | смержен 2026-10-05 15:58 UTC | ~1,75 ч сессии (Opus 5.5 xhigh, $25,7) | оценка 18 ч, факт сессии ~20 ч по её отчёту; со спецификацией (19 + 1 сценарий, правка после заморозки cff204e координатором по решению владельца); 905 unit-тестов, 264 сценария, PIT 116/116, Gherkin 271/271; reviewer 2 раунда (3 major), Grok APPROVED; решения владельца «2) да 5) да, разработчик ок», 1, 3, 4 — координатор |
 | 4 | Ш17 InboundMessage и InboundMessageService под лимиты | `claude/sh17-inbound-message-limits`, session_0125WYxccVTgGaDpsXmAHWVY | #57 | смержен 2026-10-05 14:44 UTC | ~0,5 ч сессии (Opus 5.5 xhigh, $8,8) | оценка 8 ч; рефакторинг без спецификации; записи-снимки вместо 13 аксессоров, PIT 62/62, 244 сценария без правок; reviewer 2 раунда (1 major + 3 minor), Grok APPROVED; ответы владельца «1) да 2) переслать координатору» (forgetPayload — Ш36) |
 | 4 | Ш24 Метрики приёма и разбора | `claude/sh24-ingest-metrics`, session_012DxAubgrWf3bjCAsuboL72 | #62 | смержен 2026-10-05 16:47 UTC | ~1,5 ч сессии (Opus 5.5 xhigh, $19,8) | оценка 8 ч, факт сессии 8–9 ч по её отчёту; инфраструктура без спецификации (Р52); 10 метрик `onec_*`, снимок очереди раз в 30 с, миграция 014; PIT 134/134, 264 сценария без правок; reviewer 2 раунда, Grok APPROVED; решения владельца «1–2 рекомендация → Ш46, 3 да, 4 координатору, 5 да → Ш47» |
-| 4 | Ш19 Мапперы ЛПУ и договоров | `claude/sh19-lpu-contract-mappers`, session_01Eh7AxAcpoXFd4vJi2QYsnt | — | открыта 2026-10-05 16:19 UTC (Opus 5.5, xhigh по рекомендации) | | оценка 12 ч; рефакторинг без спецификации; задача для Jira утверждена «1) да»; переиспользует SnapshotUpsert из Ш18; первая сессия под правилом «без следов внешнего контура» |
+| 4 | Ш19 Мапперы ЛПУ и договоров | `claude/sh19-lpu-contract-mappers`, session_01Eh7AxAcpoXFd4vJi2QYsnt | #65 | открыт 2026-10-05 17:00 UTC, CI идёт | | оценка 12 ч, факт сессии ~3 ч по её отчёту; рефакторинг без спецификации; общие классы `CatalogStreamMapper`, `OwnedCatalogStreamMapper`, `CatalogReference`; 1030 тестов, 264 сценария, PIT 82/82; reviewer APPROVED (3 minor, 2 nit); отчёт: п. 1 владельцу (текст «ТЗ-8» в `last_error` → рекомендация Ш29), п. 2 → Ш34, п. 3 → карточки Ш20/Ш21/Ш23 |
 | 4 | Ш18 Мапперы, кластер «upsert» | `claude/sh18-mapper-upsert`, session_01EWUWbkYh4oeAh8iwRsVnCp | #60 | смержен 2026-10-05 16:01 UTC | ~0,75 ч сессии (Opus 5.5 xhigh, $8,9) | оценка 20–24 ч, факт — одна сессия; рефакторинг без спецификации, одной сессией («2) одной»); GA-9 закрыт тестом по ТЗ-07, Ш18a снят; 917 тестов, 244 сценария, PIT 75/75; reviewer APPROVED (7 minor), Grok APPROVED; решения «1) да», 2–4 — координатор |
 | 4 | Ш16 Разбор сообщений 1С: обработчик на поток вместо ветки «если прайсы», сборщик прайсов под unit-тестами | `claude/sh16-stream-handlers`, session_01NPR5B4WUibZo5n9BYgwVBd | #48 | смержен 2026-10-05 10:41 UTC | ~2 ч сессии (Opus 5.5 xhigh, $8,1) | оценка 9 ч; рефакторинг без спецификации; 809 unit-тестов, PIT 60/60; reviewer 2 раунда (1 major + 4 minor), Grok APPROVED; CI падал на случайном RUN_ERROR record'а → allowlist PR #49 координатора |
 | 3 | Ш27a Проверка входа REST-чтений до транзакции | `claude/sh27a-validate-before-transaction`, session_01LYWwgbbQFmbiu2NgquRWrJ | #50 | смержен 2026-10-05 10:41 UTC | ~1,5 ч сессии (создана на Fable 5.1, владелец переключил на Opus 5.5; $8,1) | оценка 5 ч; со спецификацией, одна остановка (7 решений «да»); 210 сценариев (+21), PIT 33/33, Gherkin 172/172; reviewer 2 раунда (4 minor), Grok APPROVED; п. 1 → Ш31a, п. 2 «да» (фасад вместо Bean Validation) |
