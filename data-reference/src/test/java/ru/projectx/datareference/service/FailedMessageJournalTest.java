@@ -138,6 +138,24 @@ class FailedMessageJournalTest {
         }
     }
 
+    /** Откат транзакции значит, что отказ не записан: сообщение разберут снова, и записи ERROR быть не должно. */
+    @Test
+    void permanentFailureInRolledBackTransaction_isNotReported() {
+        existing();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service().recordPermanentFailure(MESSAGE_ID,
+                    new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(sync -> sync.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+            assertThat(logged.list).isEmpty();
+        }
+        finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
     private InboundMessage existing() {
         InboundMessage message = InboundMessage.receive(
                 new InboundReceipt(MESSAGE_ID, OneCStream.CONTRAGENTS, QUEUE, NOW), "{\"data\":{}}");
@@ -147,7 +165,8 @@ class FailedMessageJournalTest {
 
     private InboundMessageService service() {
         return new InboundMessageService(repository, new InboundRetryProperties(BACKOFF),
-                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()), new FinalRejectionJournal());
+                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()),
+                new FinalRejectionJournal());
     }
 
     private static Logger serviceLog() {
