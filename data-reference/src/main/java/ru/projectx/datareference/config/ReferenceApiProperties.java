@@ -55,13 +55,7 @@ public record ReferenceApiProperties(
             @Min(1) @DefaultValue("10") int defaultLimit,
             @Min(1) @DefaultValue("50") int maxLimit,
             @Min(1) @DefaultValue("2") int minQueryLength,
-            @Min(1) @DefaultValue("100") int maxQueryLength) {
-
-        /** Верхний предел длины строки не ниже нижнего: иначе не прошла бы ни одна строка поиска. */
-        @AssertTrue(message = "max-query-length не меньше min-query-length")
-        public boolean isQueryLengthRangeConsistent() {
-            return maxQueryLength >= minQueryLength;
-        }
+            @Min(1) @DefaultValue("100") int maxQueryLength) implements QueryLengthRange {
     }
 
     /**
@@ -73,12 +67,23 @@ public record ReferenceApiProperties(
             @Min(1) @DefaultValue("100") int maxLimit,
             @Min(1) @DefaultValue("2") int minQueryLength,
             @Min(1) @DefaultValue("100") int maxQueryLength,
-            @Min(1) @DefaultValue("100") int maxCodes) {
+            @Min(1) @DefaultValue("100") int maxCodes) implements QueryLengthRange {
+    }
 
-        /** Верхний предел длины строки не ниже нижнего: иначе не прошла бы ни одна строка поиска. */
+    /**
+     * Нижний и верхний пределы длины строки поиска. Верхний не может быть ниже нижнего: иначе не прошла бы ни
+     * одна строка, и такая настройка не пускает сервис в работу. Проверка общая для обоих поисков и описана здесь
+     * один раз: валидатор берёт ограничения и с интерфейса, который реализует запись настроек.
+     */
+    public interface QueryLengthRange {
+
+        int minQueryLength();
+
+        int maxQueryLength();
+
         @AssertTrue(message = "max-query-length не меньше min-query-length")
-        public boolean isQueryLengthRangeConsistent() {
-            return maxQueryLength >= minQueryLength;
+        default boolean isQueryLengthRangeConsistent() {
+            return maxQueryLength() >= minQueryLength();
         }
     }
 }
