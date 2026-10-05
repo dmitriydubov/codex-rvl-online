@@ -1,7 +1,9 @@
 package ru.projectx.datareference.controller;
 
+import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.core.annotation.Order;
@@ -45,6 +47,12 @@ public class RequestErrorAdvice {
     private static final String NOT_ACCEPTABLE = "NOT_ACCEPTABLE";
     private static final String MALFORMED_REQUEST = "нарушен формат запроса";
 
+    /**
+     * Как назвать в причине отказа ожидаемое значение параметра. Дату вызывающий должен узнать по записи, а не по
+     * имени класса Java; остальные типы называются именем класса, как UUID.
+     */
+    private static final Map<Class<?>, String> EXPECTED_VALUES = Map.of(LocalDate.class, "дата yyyy-mm-dd");
+
     /** Причина отказа по пропущенному обязательному параметру; ею же отказывают ручки, которые сами видят пропуск. */
     static final String REQUIRED_PARAMETER = "обязательный параметр";
 
@@ -64,7 +72,7 @@ public class RequestErrorAdvice {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse malformedArgument(MethodArgumentTypeMismatchException mismatch) {
         String expected = Optional.ofNullable(mismatch.getRequiredType())
-                .map(Class::getSimpleName)
+                .map(type -> EXPECTED_VALUES.getOrDefault(type, type.getSimpleName()))
                 .orElse("другой тип");
         return validationError(List.of(new ErrorResponse.Violation(mismatch.getName(), "ожидается " + expected)));
     }

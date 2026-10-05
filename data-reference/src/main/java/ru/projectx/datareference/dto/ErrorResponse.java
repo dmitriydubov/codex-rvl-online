@@ -1,5 +1,6 @@
 package ru.projectx.datareference.dto;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -32,7 +33,7 @@ public record ErrorResponse(Body error) {
     }
 
     /** Элемент {@code details}: у каждого кода ошибки свой состав. */
-    public sealed interface Detail permits Violation, PolicyCandidate, LpuContractCandidate {
+    public sealed interface Detail permits Violation, PolicyCandidate, LpuContractCandidate, PriceRowCandidate, UncoveredInterval {
     }
 
     /** {@code VALIDATION_ERROR}: какое поле запроса и чем не устроило. */
@@ -45,5 +46,16 @@ public record ErrorResponse(Body error) {
 
     /** {@code AMBIGUOUS_PRICE_CONTRACT}: договоры ЛПУ, претендующие на роль прайсового. */
     public record LpuContractCandidate(UUID lpuContractId) implements Detail {
+    }
+
+    /**
+     * {@code AMBIGUOUS_PRICE}: одна из строк прайса, которые действуют на одни и те же сутки. Строку называют её сроки
+     * действия, включительно с обеих сторон; пустой {@code validTo} значит «бессрочно».
+     */
+    public record PriceRowCandidate(LocalDate validFrom, @Nullable LocalDate validTo) implements Detail {
+    }
+
+    /** {@code PRICE_NOT_COVERED}: сутки подряд без строки прайса, с {@code dateFrom} до {@code dateTo} не включительно. */
+    public record UncoveredInterval(LocalDate dateFrom, LocalDate dateTo) implements Detail {
     }
 }

@@ -23,7 +23,7 @@ final class StandaloneMvc {
     static MockMvcTester of(Object... controllers) {
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controllers)
                 .setControllerAdvice(new ReferenceErrorAdvice(), new RequestErrorAdvice(), serverFailureAdvice(),
-                        new UuidParameters())
+                        new UuidParameters(), new DateParameters())
                 .build());
     }
 

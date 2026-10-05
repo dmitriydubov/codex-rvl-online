@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,8 +14,10 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
+import ru.projectx.datareference.exception.PriceNotCoveredException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 
 /**
@@ -108,6 +111,65 @@ class ReferenceErrorAdviceTest {
 
         assertThat(output).contains("WARN", "данных 1С не хватает для ответа: NO_ACTIVE_PRICE_CONTRACT",
                 "lpu_id=" + FIRST, "request_id=" + REQUEST_ID).doesNotContain("ERROR");
+    }
+
+    @Test
+    void serviceNotFound_isNotFound_namingServiceReference() {
+        controller.failWith(ReferenceNotFoundException.service(FIRST));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(404);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("SERVICE_NOT_FOUND");
+        assertThat(result).bodyJson().extractingPath("$.error.message").isEqualTo("услуга " + FIRST + " не найдена");
+    }
+
+    @Test
+    void serviceOutsidePriceContract_isUnprocessable_asNoActivePriceContract(CapturedOutput output) {
+        controller.failWith(IncompleteReferenceException.serviceOutsidePriceContract(FIRST));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(422);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NO_ACTIVE_PRICE_CONTRACT");
+        assertThat(result).bodyJson().extractingPath("$.error.message")
+                .isEqualTo("услуга не относится к прайсовому договору ЛПУ " + FIRST);
+        assertThat(output).contains("WARN", "lpu_id=" + FIRST);
+    }
+
+    @Test
+    void ambiguousPrice_isConflict_listingPriceRowsByValidity(CapturedOutput output) {
+        controller.failWith(new AmbiguousPriceException(FIRST, List.of(
+                new AmbiguousPriceException.PriceRow(LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 20)),
+                new AmbiguousPriceException.PriceRow(LocalDate.of(2026, 4, 15), null))));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(409);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("AMBIGUOUS_PRICE");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].validFrom").isEqualTo("2026-04-01");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].validTo").isEqualTo("2026-04-20");
+        assertThat(result).bodyJson().extractingPath("$.error.details[1].validFrom").isEqualTo("2026-04-15");
+        assertThat(result).bodyJson().extractingPath("$.error.details[1].validTo").isNull();
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+        assertThat(output).contains("WARN", "AMBIGUOUS_PRICE", "service_id=" + FIRST, "request_id=" + REQUEST_ID)
+                .doesNotContain("ERROR");
+    }
+
+    @Test
+    void priceNotCovered_isUnprocessable_listingUncoveredIntervals(CapturedOutput output) {
+        controller.failWith(new PriceNotCoveredException(FIRST, List.of(
+                new PriceNotCoveredException.Interval(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 12)))));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(422);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("PRICE_NOT_COVERED");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].dateFrom").isEqualTo("2026-04-10");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].dateTo").isEqualTo("2026-04-12");
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+        assertThat(output).contains("WARN", "PRICE_NOT_COVERED", "service_id=" + FIRST, "request_id=" + REQUEST_ID)
+                .doesNotContain("ERROR");
     }
 
     private MvcTestResult request() {

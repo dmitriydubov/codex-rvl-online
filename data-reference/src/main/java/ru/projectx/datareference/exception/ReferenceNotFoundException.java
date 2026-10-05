@@ -20,6 +20,7 @@ public final class ReferenceNotFoundException extends RuntimeException {
     private static final String POLICY_NOT_FOUND = "POLICY_NOT_FOUND";
     private static final String INSURANCE_CONTRACT_NOT_FOUND = "INSURANCE_CONTRACT_NOT_FOUND";
     private static final String LPU_NOT_FOUND = "LPU_NOT_FOUND";
+    private static final String SERVICE_NOT_FOUND = "SERVICE_NOT_FOUND";
 
     /** Чего не нашлось: код ошибки и текст, куда подставляется идентификатор из запроса. */
     private enum Missing {
@@ -29,7 +30,8 @@ public final class ReferenceNotFoundException extends RuntimeException {
         POLICY_BY_NUMBER(POLICY_NOT_FOUND, "в договоре страхования с external_id %s нет полиса с таким номером"),
         INSURANCE_CONTRACT(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования %s не найден"),
         INSURANCE_CONTRACT_BY_EXTERNAL_ID(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования с external_id %s не найден"),
-        LPU(LPU_NOT_FOUND, "ЛПУ %s не найдено");
+        LPU(LPU_NOT_FOUND, "ЛПУ %s не найдено"),
+        SERVICE(SERVICE_NOT_FOUND, "услуга %s не найдена");
 
         private final String code;
         private final String messageTemplate;
@@ -79,6 +81,14 @@ public final class ReferenceNotFoundException extends RuntimeException {
     /** ЛПУ нет либо оно в архиве: для каталога это одно и то же, учреждения нет. */
     public static ReferenceNotFoundException lpu(UUID id) {
         return Missing.LPU.notFound(id);
+    }
+
+    /**
+     * Услуги ЛПУ нет, она в архиве или её нет среди услуг, которые учреждение предлагает по видам обращения
+     * РВЛ. Для расчёта стоимости все три случая одинаковы: такую услугу вызывающий не мог получить из перечня.
+     */
+    public static ReferenceNotFoundException service(UUID id) {
+        return Missing.SERVICE.notFound(id);
     }
 
     public String code() {

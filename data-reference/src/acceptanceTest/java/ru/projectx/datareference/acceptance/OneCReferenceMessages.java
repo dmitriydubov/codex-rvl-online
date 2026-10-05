@@ -1,11 +1,14 @@
 package ru.projectx.datareference.acceptance;
 
+import static ru.projectx.datareference.acceptance.StepTables.flag;
+import static ru.projectx.datareference.acceptance.StepTables.flagOr;
 import static ru.projectx.datareference.acceptance.StepTables.onlyKnown;
 import static ru.projectx.datareference.acceptance.StepTables.required;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
@@ -17,8 +20,8 @@ import tools.jackson.databind.node.ObjectNode;
  * (ТЗ-4), договор ЛПУ (ТЗ-5) и программа РВЛ с перечнем учреждений (ТЗ-6). Ключ таблицы — поле контракта
  * по-русски, значение — как его прислала бы 1С.
  *
- * <p>Поля контракта, которых сценарий не называет, заполняются здесь постоянными значениями. Договор ЛПУ —
- * главный: без ссылки на главный договор и со своими ценами. Строка перечня программы — первый слой рисковой части
+ * <p>Поля контракта, которых сценарий не называет, заполняются здесь постоянными значениями. Договор ЛПУ, если
+ * сценарий не назвал иного, — главный: без ссылки на главный договор и со своими ценами. Строка перечня программы — первый слой рисковой части
  * без франшизы и без прямого прикрепления: строку без типа покрытия разбор отбрасывает, и учреждение пропало бы из
  * каталога не по правилу сценария. Все значения вымышлены.
  */
@@ -31,6 +34,11 @@ final class OneCReferenceMessages {
     private static final String SANATORIUM = "санаторий";
     private static final String DELETE_MARK = "deleteMark";
     private static final String PROGRAM_NAME = "Стенд: программа РВЛ";
+    private static final String MAIN_CONTRACT = "главный договор";
+    private static final String MAIN_CONTRACT_PRICES = "цены главного договора";
+    private static final String SOB_EXPORT = "выгружать прейскуранты в СОБ";
+    /** Имя признака в дополнительных свойствах договора ЛПУ, как его называет контракт ТЗ-5. */
+    private static final String SOB_EXPORT_PROPERTY = "Выгружать прейскуранты в систему бронирования";
 
     private static final String APPEAL_TYPES_QUEUE = "1c-usk_to_rvl-online_types-treatments-changes";
     private static final String MKB10_QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
@@ -63,17 +71,27 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.MKB10, MKB10_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /** Главный договор санатория со своими ценами (ТЗ-5). Санаторий — владелец договора. */
+    /**
+     * Договор санатория (ТЗ-5); санаторий — владелец договора. Без строк «главный договор» и «цены главного договора»
+     * договор главный и со своими ценами. Строка «выгружать прейскуранты в СОБ» — признак договора из его
+     * дополнительных свойств, а не поле сообщения.
+     */
     static OneCMessage lpuContract(Map<String, String> table) {
-        onlyKnown(table, EXTERNAL_ID, "номер", SANATORIUM, BEGIN, END);
+        onlyKnown(table, EXTERNAL_ID, "номер", SANATORIUM, BEGIN, END, MAIN_CONTRACT, MAIN_CONTRACT_PRICES, SOB_EXPORT);
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, EXTERNAL_ID))
                 .put("number", required(table, "номер"))
                 .put("ownerId", required(table, SANATORIUM))
-                .put("usePricesMainAgreement", false)
+                .put("usePricesMainAgreement", flagOr(table, MAIN_CONTRACT_PRICES, false))
                 .put("beginDate", required(table, BEGIN))
                 .put("endDate", required(table, END))
                 .put(DELETE_MARK, false);
+        Optional.ofNullable(table.get(MAIN_CONTRACT)).ifPresent(main -> data.put("mainContractId", main));
+        if (table.containsKey(SOB_EXPORT)) {
+            data.putArray("extProperties").addObject()
+                    .put("propertyName", SOB_EXPORT_PROPERTY)
+                    .putObject("value").put("value", flag(table, SOB_EXPORT));
+        }
         return new OneCMessage(OneCStream.LPU_CONTRACTS, LPU_CONTRACTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
