@@ -140,6 +140,18 @@ class AppealTypeMapperTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void messageWithoutSeveralRequiredFields_namesTheGuidFirst() {
+        ObjectNode data = appealType();
+        data.remove("name");
+        data.remove("id");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageEndingWith(" id");
+        verify(repository, never()).save(any());
+    }
+
     private AppealType saved() {
         ArgumentCaptor<AppealType> saved = ArgumentCaptor.forClass(AppealType.class);
         verify(repository).save(saved.capture());

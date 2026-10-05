@@ -123,6 +123,8 @@ class ProgramMapperTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped("программа не РВЛ"));
         verify(repository, never()).save(any());
+        verify(lpuRepository, never()).findAllByExternalIdIn(anyCollection());
+        assertThat(logged.list).isEmpty();
     }
 
     @Test
@@ -156,6 +158,8 @@ class ProgramMapperTest {
         assertThat(known.isArchive()).isTrue();
         assertThat(known.availableLpu()).isEmpty();
         assertThat(known.updatedAt()).isEqualTo(NOW);
+        verify(lpuRepository, never()).findAllByExternalIdIn(anyCollection());
+        assertThat(logged.list).isEmpty();
     }
 
     @Test
@@ -191,6 +195,18 @@ class ProgramMapperTest {
         assertThatThrownBy(() -> mapper.apply(data))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessageEndingWith(" " + field);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void messageWithoutSeveralRequiredFields_namesTheGuidFirst() {
+        ObjectNode data = program(true);
+        data.remove("name");
+        data.remove("id");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageEndingWith(" id");
         verify(repository, never()).save(any());
     }
 

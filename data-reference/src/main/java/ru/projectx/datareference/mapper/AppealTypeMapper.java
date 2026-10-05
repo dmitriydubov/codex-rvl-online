@@ -20,7 +20,7 @@ import tools.jackson.databind.node.ObjectNode;
  * его реквизиты: версий у сообщений нет, и действует последнее полученное.
  */
 @Component
-public class AppealTypeMapper extends CatalogMapper<AppealType, AppealType.Details> {
+public class AppealTypeMapper extends UnfilteredStreamMapper<AppealType, AppealType.Details> {
 
     public AppealTypeMapper(AppealTypeRepository repository, Clock clock) {
         super(OneCStream.APPEAL_TYPES, repository::findByExternalId,

@@ -129,6 +129,31 @@ class ContragentServiceMapperTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void serviceWithoutGuidUnderUnknownContract_isSkipped_becauseTheContractIsCheckedFirst() {
+        when(contractRepository.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
+        ObjectNode data = service();
+        data.remove("id");
+
+        ImportResult result = mapper.apply(data);
+
+        assertThat(result).isEqualTo(ImportResult.skipped("услуга по договору вне справочника: " + CONTRACT));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void messageWithoutSeveralRequiredFields_namesTheContractFirst() {
+        ObjectNode data = service();
+        data.remove("name");
+        data.remove("id");
+        data.remove("ownerId");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageEndingWith(" ownerId");
+        verify(repository, never()).save(any());
+    }
+
     private ContragentService saved() {
         ArgumentCaptor<ContragentService> saved = ArgumentCaptor.forClass(ContragentService.class);
         verify(repository).save(saved.capture());

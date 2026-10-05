@@ -19,7 +19,7 @@ import tools.jackson.databind.node.ObjectNode;
  * реквизиты: версий у сообщений нет, и действует последнее полученное.
  */
 @Component
-public class Mkb10Mapper extends CatalogMapper<Mkb10, Mkb10.Details> {
+public class Mkb10Mapper extends UnfilteredStreamMapper<Mkb10, Mkb10.Details> {
 
     public Mkb10Mapper(Mkb10Repository repository, Clock clock) {
         super(OneCStream.MKB10, repository::findByExternalId,

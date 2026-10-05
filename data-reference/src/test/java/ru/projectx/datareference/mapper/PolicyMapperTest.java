@@ -278,6 +278,19 @@ class PolicyMapperTest {
                 .hasMessageNotContaining("1980");
     }
 
+    @Test
+    void messageWithoutSeveralRequiredFields_namesTheGuidFirst() {
+        ObjectNode data = policy();
+        data.remove("lastName");
+        data.putArray("header");
+        data.remove("id");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageEndingWith(" id");
+        verify(repository, never()).save(any());
+    }
+
     private Policy saved() {
         ArgumentCaptor<Policy> saved = ArgumentCaptor.forClass(Policy.class);
         verify(repository).save(saved.capture());

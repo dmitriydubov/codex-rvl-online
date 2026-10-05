@@ -40,7 +40,7 @@ public class ProgramMapper implements StreamMapper {
 
     private final ProgramRepository repository;
     private final AvailableLpuReader availableLpuReader;
-    private final SnapshotUpsert<Program, Offer> upsert;
+    private final SnapshotUpsert<Program, RvlProgramSnapshot> upsert;
     private final Clock clock;
 
     public ProgramMapper(ProgramRepository repository, AvailableLpuReader availableLpuReader, Clock clock) {
@@ -68,7 +68,7 @@ public class ProgramMapper implements StreamMapper {
     private ImportResult applyRvl(UUID externalId, Program.Details details, ObjectNode data) {
         AvailableLpuReader.AvailableLpu availableLpu = availableLpuReader.read(data);
         logDropped(externalId, availableLpu);
-        return upsert.apply(externalId, new Offer(details, availableLpu.rows()), clock.instant());
+        return upsert.apply(externalId, new RvlProgramSnapshot(details, availableLpu.rows()), clock.instant());
     }
 
     private ImportResult applyWithoutRvl(UUID externalId, Program.Details details) {
@@ -85,15 +85,15 @@ public class ProgramMapper implements StreamMapper {
         return ImportResult.applied();
     }
 
-    private static Program create(UUID externalId, Offer offer, Instant now) {
-        Program program = Program.create(externalId, offer.details(), now);
-        program.replaceAvailableLpu(offer.availableLpu(), now);
+    private static Program create(UUID externalId, RvlProgramSnapshot snapshot, Instant now) {
+        Program program = Program.create(externalId, snapshot.details(), now);
+        program.replaceAvailableLpu(snapshot.availableLpu(), now);
         return program;
     }
 
-    private static void refresh(Program program, Offer offer, Instant now) {
-        program.applySnapshot(offer.details(), now);
-        program.replaceAvailableLpu(offer.availableLpu(), now);
+    private static void refresh(Program program, RvlProgramSnapshot snapshot, Instant now) {
+        program.applySnapshot(snapshot.details(), now);
+        program.replaceAvailableLpu(snapshot.availableLpu(), now);
     }
 
     private static void logDropped(UUID programId, AvailableLpuReader.AvailableLpu availableLpu) {
@@ -116,6 +116,6 @@ public class ProgramMapper implements StreamMapper {
     }
 
     /** Реквизиты программы РВЛ и перечень её учреждений из одного сообщения. */
-    private record Offer(Program.Details details, List<ProgramLpu.Row> availableLpu) {
+    private record RvlProgramSnapshot(Program.Details details, List<ProgramLpu.Row> availableLpu) {
     }
 }

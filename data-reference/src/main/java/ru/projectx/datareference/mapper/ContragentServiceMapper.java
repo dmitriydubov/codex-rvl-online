@@ -35,7 +35,7 @@ public class ContragentServiceMapper implements StreamMapper {
 
     private static final String OUTSIDE_CATALOG = "услуга по договору вне справочника: ";
 
-    private final SnapshotUpsert<ContragentService, ContractTerms> upsert;
+    private final SnapshotUpsert<ContragentService, ServiceUnderContract> upsert;
     private final LpuContractRepository contractRepository;
     private final Clock clock;
 
@@ -65,15 +65,15 @@ public class ContragentServiceMapper implements StreamMapper {
 
     private ImportResult applyUnder(LpuContract contract, ObjectNode data) {
         UUID externalId = OneCValues.requiredUuid(data, "id");
-        return upsert.apply(externalId, new ContractTerms(contract, detailsOf(data)), clock.instant());
+        return upsert.apply(externalId, new ServiceUnderContract(contract, detailsOf(data)), clock.instant());
     }
 
-    private static ContragentService create(UUID externalId, ContractTerms terms, Instant now) {
-        return ContragentService.create(externalId, terms.contract(), terms.details(), now);
+    private static ContragentService create(UUID externalId, ServiceUnderContract offered, Instant now) {
+        return ContragentService.create(externalId, offered.contract(), offered.details(), now);
     }
 
-    private static void refresh(ContragentService service, ContractTerms terms, Instant now) {
-        service.applySnapshot(terms.contract(), terms.details(), now);
+    private static void refresh(ContragentService service, ServiceUnderContract offered, Instant now) {
+        service.applySnapshot(offered.contract(), offered.details(), now);
     }
 
     private static ContragentService.Details detailsOf(ObjectNode data) {
@@ -85,6 +85,6 @@ public class ContragentServiceMapper implements StreamMapper {
     }
 
     /** Договор, по которому оказывается услуга, и реквизиты услуги из одного сообщения. */
-    private record ContractTerms(LpuContract contract, ContragentService.Details details) {
+    private record ServiceUnderContract(LpuContract contract, ContragentService.Details details) {
     }
 }

@@ -120,6 +120,19 @@ class Mkb10MapperTest {
         verify(repository, never()).save(any());
     }
 
+    @Test
+    void messageWithoutSeveralRequiredFields_namesTheGuidFirst() {
+        ObjectNode data = diagnosis();
+        data.remove("name");
+        data.remove("code");
+        data.remove("id");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageEndingWith(" id");
+        verify(repository, never()).save(any());
+    }
+
     private Mkb10 saved() {
         ArgumentCaptor<Mkb10> saved = ArgumentCaptor.forClass(Mkb10.class);
         verify(repository).save(saved.capture());

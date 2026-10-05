@@ -12,17 +12,18 @@ import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбор потока 1С, который приносит справочник целиком и без фильтра: каждое сообщение создаёт
- * запись с GUID 1С из поля {@code id} или заменяет её реквизиты последним полученным снимком.
+ * Разбор потока 1С без фильтра: принимается каждое сообщение, и оно создаёт запись с GUID 1С из поля
+ * {@code id} или заменяет её реквизиты последним полученным снимком. Так устроены справочники видов
+ * обращения и диагнозов МКБ-10, а также полисы застрахованных.
  *
- * <p>Наследник отвечает только за то, как из сообщения получается снимок его справочника.
- * Потоки с фильтром, например услуги только по известным договорам, сюда не подходят: им нужно
- * решить, принимать ли сообщение, ещё до поиска записи.
+ * <p>Наследник отвечает только за то, как из сообщения получается снимок записи. Потоки с фильтром,
+ * например услуги только по известным договорам, сюда не подходят: им нужно решить, принимать ли
+ * сообщение, ещё до поиска записи.
  *
- * @param <E> запись справочника
+ * @param <E> запись, которую создаёт или обновляет поток
  * @param <S> разобранные реквизиты сообщения
  */
-abstract class CatalogMapper<E, S> implements StreamMapper {
+abstract class UnfilteredStreamMapper<E, S> implements StreamMapper {
 
     private static final String EXTERNAL_ID = "id";
 
@@ -31,13 +32,15 @@ abstract class CatalogMapper<E, S> implements StreamMapper {
     private final Clock clock;
 
     /**
+     * @param stream поток 1С, сообщения которого разбирает наследник
      * @param finder поиск записи по GUID 1С, обычно {@code findByExternalId} репозитория
      * @param creation новая запись из первого снимка
      * @param refresh применение нового снимка к известной записи
      * @param store сохранение записи, обычно {@code save} репозитория
+     * @param clock часы, по которым ставится момент создания и изменения записи
      */
-    CatalogMapper(OneCStream stream, Function<UUID, Optional<E>> finder, SnapshotUpsert.Creation<E, S> creation,
-                  SnapshotUpsert.Refresh<E, S> refresh, Consumer<E> store, Clock clock) {
+    UnfilteredStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, SnapshotUpsert.Creation<E, S> creation,
+                           SnapshotUpsert.Refresh<E, S> refresh, Consumer<E> store, Clock clock) {
         this.stream = stream;
         this.upsert = new SnapshotUpsert<>(finder, creation, refresh, store);
         this.clock = clock;

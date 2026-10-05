@@ -41,7 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
  * но не значение, а разбирать проблемный случай нужно по строке сырья в базе.
  */
 @Component
-public class PolicyMapper extends CatalogMapper<Policy, Policy.Snapshot> {
+public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot> {
 
     private static final String HEADER = "header";
     private static final String PROGRAMS = "programms";
@@ -144,7 +144,7 @@ public class PolicyMapper extends CatalogMapper<Policy, Policy.Snapshot> {
                 OneCValues.flag(row, AVAILABILITY));
     }
 
-    /** Порядок строк в базе не хранится: табличная часть замещается целиком. */
+    /** Строки массива {@code field} сообщения: шапки, программ, условий или дополнительных свойств. */
     private static Stream<JsonNode> rowsOf(ObjectNode data, String field) {
         return StreamSupport.stream(data.path(field).spliterator(), false);
     }
