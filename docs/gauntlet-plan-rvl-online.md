@@ -222,6 +222,15 @@
   делает координатор после мержа, сессия перечислит исходы и новые классы в отчёте PR; (2) вопросы к 1С (тип очередей —
   О7, BOM и `\u0000` в телах) уже в списке вопросов к 1С (раздел 7), спецификация на ответы не опирается; (3) карантин и
   CPD — совпадает с Р1 (а) и `dry.exclude` для `entity/`.
+- 2026-10-05, **PR #48 (Ш16) и PR #50 (Ш27a) смержены владельцем 10:41 UTC** (оба после Grok APPROVED; #50 шёл от
+  `main` до #48, файлы не пересекались — `service/onec` против `service`, конфликта нет). Проверка после мержа: на `main` 97d584f
+  изменены только файлы `data-reference/src` (6 новых классов main: `StreamHandler`, `MappedStreamHandler`, `PriceListTransfer`,
+  `PriceListTransferMarkup`, `Mkb10Lookup`, `PolicySearchLookup`; в `ReferenceImportService` ветки по потоку нет); набор и
+  документы не тронуты; контрольный `gauntletFast` на `main` 97d584f зелёный (817 unit-тестов, 210 сценариев приёмки,
+  0 skipped). Ответы сессий Grok — по напоминанию координатора после
+  мержа; сессии архивируются. Этим PR координатора: `contract-service/CLAUDE.md`, «Структура пакетов» — «выбор обработчика
+  потока» с двумя путями (пункт 2 Ш16); CA-17 в разделе 2 закрыт; карточки Ш16 и Ш27a «сделан». Дорожки: приём из 1С —
+  Ш31a и Ш17 свободны; REST — этап 3 ждёт Р18, Р22, Р23.
 - 2026-10-05, **Ш27a: PR #50 открыт сессией 09:47 UTC** (CI зелёный 09:55, 210 сценариев, PIT 33/33; слит с `main` до
   открытия). Пункт 1 «переслать координатору» (владелец переслал ~10:36 UTC) — нестабильный
   `OneCConsumerPauseTest.outageFromAnotherThreadDuringResume_waitsAndStartsAFreshPause` упал второй раз за сутки под PIT →
@@ -626,7 +635,7 @@
 | CA-14, DR-17 | Мёртвый бин ObjectMapper в JacksonConfig, два бина в контексте | Ш9 |
 | CA-15, CS-07 | Интервалы двух планировщиков только в плейсхолдерах; ImportProperties.pollInterval не читается | Ш14b |
 | CA-16 | null и boolean-переключатель на пути R-03 (`LpuCatalogService.java:107-125`, `LpuServicesResponse.java:45-51`, `ReferenceQueryService.java:116-119,139-144`) и в `ProgramMapper.java:169-171` | Ш11 (REST): флаг `needPrices` снят в PR #25 (две фабрики `Service.withPrices/withoutPrices`); null договора в сборке полиса и null страхователя (`insurerOf`) остались — при следующем касании (Ш41a их не закрывает); Ш35 (ProgramMapper) |
-| CA-17 | OCP: ветка по типу потока в `ReferenceImportService.java:69-74`; общий LIKE-помощник между сервисами — `PolicySearchService.escapeLike` (`:145-148`), его вызывает `Mkb10QueryService.java:45`; `service.PriceContract` зависит от `dto.PriceContractRef.Kind` (`PriceContract.java:3,11-17`) | Ш16 (стратегия потока); LIKE — закрыт Ш10 (PR #25, `LikePatterns`); зависимость `PriceContract` от dto — отложено (3.11) |
+| CA-17 | OCP: ветка по типу потока в `ReferenceImportService.java:69-74`; общий LIKE-помощник между сервисами — `PolicySearchService.escapeLike` (`:145-148`), его вызывает `Mkb10QueryService.java:45`; `service.PriceContract` зависит от `dto.PriceContractRef.Kind` (`PriceContract.java:3,11-17`) | стратегия потока — **закрыт Ш16 (PR #48, 2026-10-05, `StreamHandler`)**; LIKE — закрыт Ш10 (PR #25, `LikePatterns`); зависимость `PriceContract` от dto — отложено (3.11) |
 | CA-18 | Новые сущности сохраняются через merge — лишний SELECT | Отложено |
 | CA-19 | Нет пределов длины query и числа codes | Р53, Ш27 |
 | CS-11 | GUID вида деятельности РВЛ и dms-product-type заданы значениями тестового контура, без переменной (`application.yml:144,150`) | Р54, Ш5 |
@@ -998,11 +1007,11 @@
 
 **Параллельные дорожки** (не больше трёх сессий одновременно; файлы дорожек не пересекаются). Состояние на 2026-10-04:
 - REST и контракт: этап 1 смержен целиком (PR #25, Ш41a — PR #31 2026-10-04); Ш13c (PR #34), Ш2 (PR #36) и Ш8+Ш25 (PR #40,
-  2026-10-04) и Ш27 (PR #46, 2026-10-05) смержены; этап 3: Ш27a в работе (сессия открыта 2026-10-05 08:33 UTC);
-  Ш38+Ш40 ждёт решений Р18 и Р22, Ш44 — Р23;
+  2026-10-04), Ш27 (PR #46) и Ш27a (PR #50, 2026-10-05) смержены; этап 3 дальше ждёт решений владельца: Ш38+Ш40 — Р18 и Р22,
+  Ш44 — Р23;
 - конфигурация и сборка: этап 2 смержен целиком (PR #18, #26, #36);
-- приём из 1С: Ш13a, Ш13c, Ш14b, Ш30+Ш31 и Ш15a смержены (PR #30, #34, #38, #42, #44) → Ш16 в работе (сессия открыта
-  2026-10-05 08:31 UTC) → Ш17 → дальше этап 4 по порядку выше.
+- приём из 1С: Ш13a, Ш13c, Ш14b, Ш30+Ш31, Ш15a и Ш16 смержены (PR #30, #34, #38, #42, #44, #48) → Ш31a (тест паузы,
+  2 ч) и Ш17 свободны → дальше этап 4 по порядку выше.
 
 ### 3.3. Этап 0 — окружение и решения первой очереди (без кода, вне итога)
 
@@ -1789,7 +1798,7 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 - Риски: Bean Validation на параметрах контроллера меняет текст и поле нарушения — формат ответа 400 должен остаться байт в
   байт прежним для уже закреплённых сценариев (`reference_errors.feature`, фичи Ш27); если штатный механизм не даёт нужного
   поля — вариант с нетранзакционным методом сервиса.
-- **PR #50 открыт сессией 2026-10-05 09:47 UTC** (session_01LYWwgbbQFmbiu2NgquRWrJ, Opus 5.5 по выбору владельца,
+- **Сделан 2026-10-05, PR #50 (открыт 09:47, смержен 10:41 UTC; факт ~1,5 ч против оценки 5 ч)** (session_01LYWwgbbQFmbiu2NgquRWrJ, Opus 5.5 по выбору владельца,
   `claude/sh27a-validate-before-transaction`). Ответы владельца на остановке «1) да … 7) да», на отчёт «2) да». Выбран фасад
   без транзакции: `Mkb10QueryService` и `PolicySearchService` проверяют вход и вызывают пакетно-видимые бины `Mkb10Lookup`
   и `PolicySearchLookup` с `@RestReadTransaction` (другой бин — прокси работает); Bean Validation отклонён обоснованно: пределы
@@ -2160,6 +2169,19 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   «Перенос в контур». В structured-формате MDC попадает целиком: проверить, что туда не кладутся ПДн.
 
 **Ш16. PriceListTransferAssembler и ReferenceImportService** — тип: рефакторинг.
+- **Сделан 2026-10-05, PR #48 (открыт 09:06, смержен 10:41 UTC)** (session_01NPR5B4WUibZo5n9BYgwVBd, Opus 5.5 xhigh,
+  `claude/sh16-stream-handlers`). Интерфейс `service.onec.StreamHandler`; `ReferenceImportService` собирает
+  `Map<OneCStream, StreamHandler>` из `List<StreamMapper>` (каждый обёрнут в `MappedStreamHandler` — маппер + запись исхода)
+  и `List<StreamHandler>` особых обработчиков; два обработчика на поток не пускают приложение в работу; веток по типу потока
+  нет (CA-17 закрыт). `PriceListTransferAssembler implements StreamHandler` — тонкий оркестратор; чистая логика в
+  `PriceListTransfer` (запечатанный `Pending`/`Mismatched`/`Assembled`) и `PriceListTransferMarkup` (record). `ImportResult`
+  закреплён тестами (Р7). PIT 60/60 (было nocov 41 у сборщика), 809 unit-тестов, 186 сценариев; reviewer 2 раунда (1 major +
+  4 minor), Grok APPROVED. Случайный RUN_ERROR на record `PriceListTransferMarkup#of` → строка allowlist (PR #49). Факт ~2 ч
+  против оценки 9 ч: логика ушла в чистые классы, дорогой закалки не понадобилось. Контрольный `gauntletFast` на `main` — 1.2.
+  **Перенос:** новых зависимостей нет; новые классы `StreamHandler`, `MappedStreamHandler`, `PriceListTransfer`,
+  `PriceListTransferMarkup`; конструктор `ReferenceImportService` — `(List<StreamMapper>, List<StreamHandler>,
+  InboundMessageService, ObjectMapper)`; `receive` → `handle`. **Остаток** (риск Grok, был и до шага): два финальных сообщения
+  в одной передаче прайсов разбираются по первому — к Ш33/Ш34 (сборка прайсов).
 - Файлы → гейты:
   - `service/onec/PriceListTransferAssembler.java` (красн.: CC@121; после Ш3 nocov 41, cov 1/70; 12 методов — на пределе
     PMD, любой новый метод роняет гейт);
@@ -2924,8 +2946,8 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
 | 4 | Ш14b Планировщики: пул, интервалы из настроек, выключатель, стирание пачками, проекция в алерте, исход разбора в журнале | `claude/sh14b-schedulers`, session_01PmmMTDoCfuCKUyP3URCbH1 | #38 | смержен 2026-10-04 19:34 UTC | ~1,5 ч сессии (Opus 5.5 xhigh, $15,4) | оценка 6 ч; без спецификации; 615 unit-тестов, 132 сценария, 33/33 мутанта, RUN_ERROR 0; reviewer 2 раунда (2 major источниками, 5 minor), Grok APPROVED; PR открыл координатор (сессия не смогла); ответы владельца по 7 пунктам в описании PR |
 | 3 | Ш8+Ш25 Исключения REST, разделение обработчика ошибок, 405 и 406 в едином формате | `claude/sh8-sh25-rest-errors`, session_0183Bbh6qv9fEhvhpgLRXVbE | #40 | смержен 2026-10-04 20:57 UTC | ~2,5 ч сессии (Opus 5.5 xhigh, $15,3) | оценка 13 ч (6 + 7); 10 сценариев (156 всего), 42/42 мутанта, RUN_ERROR 0, 117/117 Gherkin-мутантов; reviewer 2 раунда (2 major + 6 minor), Grok APPROVED; ответы владельца на остановке и «1) да» по журналу 500; репозиторий задан явно — хуки работали |
 | 4 | Ш15a Журнал в структурном формате ECS с ключами MDC | `claude/sh15a-structured-log`, session_01CVRkKC6bHJRUDdiW3RyzUT | #44 | смержен 2026-10-05 08:08 UTC | ~1,5 ч сессии (Opus 5.5 xhigh, $9,0) | оценка 4 ч; инфраструктура, без спецификации; 4 новых теста без Testcontainers; PIT нечего мутировать, 21 ручной мутант (правки main hardener'ом → правило роли, PR #45); reviewer APPROVED (4 minor), Grok APPROVED; ответ владельца «1) да» по остаточному риску; ветка слита с `main` до открытия PR |
-| 4 | Ш16 Разбор сообщений 1С: обработчик на поток вместо ветки «если прайсы», сборщик прайсов под unit-тестами | `claude/sh16-stream-handlers`, session_01NPR5B4WUibZo5n9BYgwVBd | — | открыта 2026-10-05 08:31 UTC (Opus 5.5 xhigh по рекомендации) | | оценка 9 ч; рефакторинг без спецификации; параллельно с PR #46 (файлы не пересекаются) |
-| 3 | Ш27a Проверка входа REST-чтений до транзакции | `claude/sh27a-validate-before-transaction`, session_01LYWwgbbQFmbiu2NgquRWrJ | — | открыта 2026-10-05 08:33 UTC (создана на Fable 5.1 по рекомендации; владелец переключил сессию на Opus 5.5 — его решение) | | оценка 5 ч; со спецификацией, одна остановка; параллельно с Ш16 |
+| 4 | Ш16 Разбор сообщений 1С: обработчик на поток вместо ветки «если прайсы», сборщик прайсов под unit-тестами | `claude/sh16-stream-handlers`, session_01NPR5B4WUibZo5n9BYgwVBd | #48 | смержен 2026-10-05 10:41 UTC | ~2 ч сессии (Opus 5.5 xhigh, $8,1) | оценка 9 ч; рефакторинг без спецификации; 809 unit-тестов, PIT 60/60; reviewer 2 раунда (1 major + 4 minor), Grok APPROVED; CI падал на случайном RUN_ERROR record'а → allowlist PR #49 координатора |
+| 3 | Ш27a Проверка входа REST-чтений до транзакции | `claude/sh27a-validate-before-transaction`, session_01LYWwgbbQFmbiu2NgquRWrJ | #50 | смержен 2026-10-05 10:41 UTC | ~1,5 ч сессии (создана на Fable 5.1, владелец переключил на Opus 5.5; $8,1) | оценка 5 ч; со спецификацией, одна остановка (7 решений «да»); 210 сценариев (+21), PIT 33/33, Gherkin 172/172; reviewer 2 раунда (4 minor), Grok APPROVED; п. 1 → Ш31a, п. 2 «да» (фасад вместо Bean Validation) |
 | 3 | Ш27 МКБ-10 и поиск полисов: 400 на взаимоисключающие и слишком большие параметры | `claude/sh27-exclusive-params`, session_01Fy6FikV26VcnCxN8dTtRr9 | #46 | смержен 2026-10-05 08:32 UTC | ~2,5 ч сессии без ожиданий (Opus 5.5 xhigh, $30,5) | оценка 8 ч; 2 фичи (186 сценариев всего), 37/37 мутантов, 63/63 Gherkin-мутантов, 6 RUN_ERROR сняты переносом в default-метод; reviewer 2 раунда (2 major + 11 minor); ответы владельца «2) да 3) да» → Ш27a; п. 1 и 4 — координатору (Ш27a, уведомление Заявок) |
 | 4 | Ш30+Ш31 Приём из 1С: карантин отравленного тела, пауза потребителей при недоступной базе | `claude/sh30-sh31-poison-and-pause`, session_01SvHW6yNShM4bWB9tjxN5ws | #42 | смержен 2026-10-04 22:57 UTC | ~3 ч 10 мин сессии (Fable 5.1 xhigh, $76,3) | оценка 28 ч (15 + 13); 7 сценариев (171 всего после слияния с `main`), 128/128 мутантов, RUN_ERROR 0, 43/43 Gherkin-мутантов; reviewer 2 раунда (3 major + 11 minor); Grok 2 раунда APPROVED (2 риска закрыты кодом в 75ac5ef); PR открыт на базе до PR #40 — конфликт в Javadoc приёмки и не стартовавший CI сняты слиянием `main` по указанию координатора; 5 пунктов координатору закрыты комментарием в PR |
 | — | gauntlet: allowlist RUN_ERROR `OneCContractProperties` для Ш13c; план — способ чтения UUID (Р69) | `claude/hopeful-brown-c5i29y` (координатор, gauntlet-admin) | #33 | смержен 2026-10-04 18:03 UTC | ~0,3 | Grok APPROVED; обе строки сверены координатором с тестом `filledValues_areReturnedAsGiven` |
