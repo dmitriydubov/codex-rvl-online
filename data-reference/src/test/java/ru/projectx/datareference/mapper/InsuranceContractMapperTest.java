@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.OneCContractProperties;
@@ -53,9 +54,11 @@ class InsuranceContractMapperTest {
         assertThat(mapper.stream()).isEqualTo(OneCStream.INSURANCE_CONTRACTS);
     }
 
-    @Test
-    void withoutDmsProductSetting_everyContractIsSkipped() {
-        ImportResult result = mapper(" ").apply(contract(DMS, party(INSURER, "Страхователь")));
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    void withoutDmsProductSetting_everyContractIsSkipped(String dmsProduct) {
+        ImportResult result = mapper(dmsProduct).apply(contract(DMS, party(INSURER, "Страхователь")));
 
         assertThat(result).isEqualTo(ImportResult.skipped("не задан projectx.onec.contract.dms-product-type"
                 + " — отличить ДМС от прочих продуктов страхования нечем"));

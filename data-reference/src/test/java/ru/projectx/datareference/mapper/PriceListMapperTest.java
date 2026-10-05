@@ -35,7 +35,8 @@ import tools.jackson.databind.node.ObjectNode;
  * Защищает замещение прейскуранта услуги собранной передачей. Цены принимаются только по услуге из
  * справочника, иначе передача уходит в пропуск с GUID услуги в причине и прежние цены не трогаются.
  * По известной услуге старые строки снимаются целиком и записываются строки передачи в её порядке,
- * а пустая передача очищает прейскурант. Данные вымышленные.
+ * а пустая передача очищает прейскурант. Строки разбираются после снятия старых цен, поэтому при
+ * битой строке старые цены сохраняет только откат транзакции разбора. Данные вымышленные.
  */
 class PriceListMapperTest {
 
@@ -123,7 +124,7 @@ class PriceListMapperTest {
     }
 
     @Test
-    void rowWithoutPrice_isContractViolation_andNothingIsSaved() {
+    void rowWithoutPrice_isContractViolation_andNoNewPricesAreWritten() {
         knownService();
         ObjectNode row = row(1, "830");
         row.remove("price");
@@ -132,11 +133,12 @@ class PriceListMapperTest {
         assertThatThrownBy(() -> mapper.apply(transfer(row)))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("в строке прайса нет цены");
+        verify(repository).deleteByServiceId(SERVICE_ROW_ID);
         verify(repository, never()).saveAll(any());
     }
 
     @Test
-    void rowWithoutBeginDate_isContractViolation_andNothingIsSaved() {
+    void rowWithoutBeginDate_isContractViolation_andNoNewPricesAreWritten() {
         knownService();
         ObjectNode row = row(1, "830");
         row.put("period", "0001-01-01T00:00:00+03:00");
@@ -145,6 +147,7 @@ class PriceListMapperTest {
         assertThatThrownBy(() -> mapper.apply(transfer(row)))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("в строке прайса нет даты начала действия");
+        verify(repository).deleteByServiceId(SERVICE_ROW_ID);
         verify(repository, never()).saveAll(any());
     }
 
