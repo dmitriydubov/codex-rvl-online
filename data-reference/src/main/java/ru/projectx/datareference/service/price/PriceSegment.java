@@ -10,6 +10,7 @@ import java.util.Optional;
  */
 public record PriceSegment(LocalDate from, LocalDate to, PriceLine line) {
 
+    /** Ночи отрезка считаются по тому же правилу, что ночи периода проживания: день {@code to} не оплачивается. */
     public int nights() {
         return Math.toIntExact(new StayPeriod(from, to).nights());
     }
