@@ -216,10 +216,8 @@ class OneCConsumerPauseTest {
      * новой причиной, а оба потребителя остановлены уже после того, как были запущены.
      *
      * <p>Порядок записывают сами контейнеры: запуск идёт внутри возобновления, остановка внутри новой паузы.
-     * Запись после возврата из возобновления в другом потоке ничего не доказывала бы: слушатель получает
-     * освободившийся монитор сразу и мог бы записать своё раньше. Что слушатель дождался возобновления,
-     * запоминает флаг и проверяет тест уже после него: исключение из запуска контейнера пауза перехватывает
-     * и пишет в журнал, поэтому провал ожидания внутри запуска тест бы не увидел.
+     * Итог ожидания слушателя запоминает флаг, а проверяет тест после возобновления, потому что исключение
+     * из запуска контейнера пауза перехватывает.
      */
     @Test
     void outageFromAnotherThreadDuringResume_waitsAndStartsAFreshPause() throws Exception {
@@ -345,7 +343,13 @@ class OneCConsumerPauseTest {
     }
 
     private static void stopCompletesAtOnce(MessageListenerContainer container) {
+        stopCompletesAtOnce(container, () -> { });
+    }
+
+    /** Остановка завершается сразу; перед обратным вызовом контейнер сообщает о ней {@code onStop}. */
+    private static void stopCompletesAtOnce(MessageListenerContainer container, Runnable onStop) {
         doAnswer(invocation -> {
+            onStop.run();
             invocation.getArgument(0, Runnable.class).run();
             return null;
         }).when(container).stop(any(Runnable.class));
@@ -359,11 +363,7 @@ class OneCConsumerPauseTest {
     }
 
     private static void recordStops(List<String> events, String queue, MessageListenerContainer container) {
-        doAnswer(invocation -> {
-            events.add(stopped(queue));
-            invocation.getArgument(0, Runnable.class).run();
-            return null;
-        }).when(container).stop(any(Runnable.class));
+        stopCompletesAtOnce(container, () -> events.add(stopped(queue)));
     }
 
     private static String started(String queue) {
@@ -375,14 +375,14 @@ class OneCConsumerPauseTest {
     }
 
     /**
-     * Поток стоит внутри {@code OneCConsumerPause.pause} и ждёт блокировку, которой владеет поток возобновления.
-     * Одного состояния «заблокирован» мало: оно не говорит, на чём и у кого поток ждёт. Завершившийся поток
-     * сведений о себе не отдаёт и, значит, не ждёт.
+     * Поток ждёт блокировку, которой владеет поток возобновления, и верхний кадр его стека —
+     * {@code OneCConsumerPause.pause}. Одного состояния «заблокирован» мало: оно не говорит, на чём и у кого
+     * поток ждёт. Завершившийся поток сведений о себе не отдаёт и, значит, не ждёт.
      */
     private static boolean waitsInPauseForLockOf(Thread waiting, long ownerThreadId) {
         ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(waiting.threadId(), 1);
         return info != null && info.getLockOwnerId() == ownerThreadId
-                && Arrays.stream(info.getStackTrace()).anyMatch(OneCConsumerPauseTest::isPauseCall);
+                && Arrays.stream(info.getStackTrace()).limit(1).anyMatch(OneCConsumerPauseTest::isPauseCall);
     }
 
     private static boolean isPauseCall(StackTraceElement frame) {
