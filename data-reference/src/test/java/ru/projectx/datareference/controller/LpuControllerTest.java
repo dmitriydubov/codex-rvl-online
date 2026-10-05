@@ -24,7 +24,7 @@ import ru.projectx.datareference.service.LpuCardReads;
 import ru.projectx.datareference.service.LpuCatalogReads;
 import ru.projectx.datareference.service.LpuServiceReads;
 
-/** R-01…R-03: каталог ЛПУ договора, карточка ЛПУ и услуги с ценами и без. */
+/** Каталог ЛПУ договора, карточка ЛПУ и услуги с ценами и без (R-01…R-03). */
 @ExtendWith(MockitoExtension.class)
 class LpuControllerTest {
 
