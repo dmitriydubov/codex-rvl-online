@@ -2,11 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.CucumberContextConfiguration;
 import java.util.List;
-import java.util.stream.Stream;
 import javax.sql.DataSource;
-import org.springframework.amqp.core.Declarable;
-import org.springframework.amqp.core.Declarables;
-import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -30,7 +26,9 @@ import ru.projectx.datareference.config.OneCQueueProperties;
  * <p>Стенд — настоящий PostgreSQL той же версии, что в тестах и в контуре, и настоящий RabbitMQ той же
  * версии, что у брокера 1С:УСК: сценарии приёма публикуют сообщения в очереди с именами контура, и принимает
  * их штатный слушатель. Очереди объявляет стенд, а не сервис (на контуре их заводит 1С:УСК), и объявляет
- * до старта потребителей: с {@code missing-queues-fatal} потребитель без очереди роняет контекст. TLS
+ * до старта потребителей: с {@code missing-queues-fatal} потребитель без очереди роняет контекст. Объявляет
+ * их {@link OneCStandQueues} прямо в канал, без бинов очередей, чтобы потребитель сервиса, как и на контуре,
+ * не объявлял пропавшую очередь сам. TLS
  * выключен и слушатели включены явно, иначе они брались бы из переменных окружения запускающего.
  * Расписания выключены ({@code projectx.scheduling.enabled=false}), чтобы проходы не меняли статусы посреди
  * сценария; проходы разбора, стирания и проверки базы вызывают шаги явно.
@@ -71,22 +69,24 @@ public class CucumberSpringConfiguration {
             return new RabbitMQContainer(RABBITMQ_IMAGE);
         }
 
-        /** Объявляет очереди на первом же соединении — раньше, чем потребители к ним подключатся. */
+        /** Справки об очередях для шагов сценария; очередей сам не объявляет — бинов очередей в контексте нет. */
         @Bean
         RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
             return new RabbitAdmin(connectionFactory);
         }
 
-        /** Все одиннадцать очередей контура: забытая очередь уронила бы контекст, а не прошла молча. */
+        /**
+         * Все одиннадцать очередей контура объявлены при создании бина — раньше, чем потребители запустятся: забытая
+         * очередь уронила бы контекст, а не прошла молча.
+         */
         @Bean
-        Declarables oneCQueues(OneCQueueProperties queues) {
-            List<Declarable> declarations = Stream.of(
-                            queues.policies(), queues.insuranceContracts(), queues.contragents(), queues.mkb10(),
-                            queues.lpuContracts(), queues.programs(), queues.appealTypes(), queues.lpuContacts(),
-                            queues.priceLists(), queues.priceListsFinal(), queues.contragentServices())
-                    .<Declarable>map(name -> QueueBuilder.durable(name).build())
-                    .toList();
-            return new Declarables(declarations);
+        OneCStandQueues oneCStandQueues(ConnectionFactory connectionFactory, OneCQueueProperties queues) {
+            OneCStandQueues standQueues = new OneCStandQueues(connectionFactory);
+            standQueues.declareAll(List.of(
+                    queues.policies(), queues.insuranceContracts(), queues.contragents(), queues.mkb10(),
+                    queues.lpuContracts(), queues.programs(), queues.appealTypes(), queues.lpuContacts(),
+                    queues.priceLists(), queues.priceListsFinal(), queues.contragentServices()));
+            return standQueues;
         }
 
         /**
