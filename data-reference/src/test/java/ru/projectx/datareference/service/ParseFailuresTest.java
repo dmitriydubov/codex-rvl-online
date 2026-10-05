@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
 import org.hibernate.exception.DataException;
+import org.hibernate.exception.GenericJDBCException;
 import org.hibernate.exception.LockAcquisitionException;
 import org.junit.jupiter.api.Test;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
@@ -36,6 +37,17 @@ class ParseFailuresTest {
         assertThat(failure).isEqualTo(new ParseFailure.Temporary(
                 "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
                 "CannotAcquireLockException", "55P03"));
+    }
+
+    /** Сеанс, закрытый по простою транзакции, — временный отказ: разбор повторят на новом соединении. */
+    @Test
+    void sessionClosedForIdleTransaction_isTemporary() {
+        var closed = new GenericJDBCException(PERSONAL_DATA, new SQLException(PERSONAL_DATA, "25P03"));
+
+        ParseFailure failure = failures.classify(closed);
+
+        assertThat(failure).isEqualTo(new ParseFailure.Temporary(
+                "временный отказ базы данных: JpaSystemException, SQLSTATE 25P03", "JpaSystemException", "25P03"));
     }
 
     @Test

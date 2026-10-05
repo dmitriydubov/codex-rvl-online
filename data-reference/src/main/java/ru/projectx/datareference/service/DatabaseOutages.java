@@ -40,6 +40,12 @@ import org.springframework.transaction.TransactionTimedOutException;
  * лимита времени нет, поэтому истёкшего лимита там не бывает. Другой сбой транзакции Hibernate без
  * причины из JDBC разбор тоже повторит, а когда повторы кончатся, сообщение уйдёт в отказ.
  *
+ * <p>Ещё один временный отказ узнаётся по коду SQLSTATE 25P03: сервер закрыл сеанс, потому что открытая
+ * транзакция простаивала дольше {@code idle_in_transaction_session_timeout}. Пул заменит соединение, и та же
+ * операция пройдёт. Ни Spring, ни Hibernate этот код не различают, и перевод даёт общий
+ * {@link JpaSystemException}. Остальные коды класса 25 означают ошибку в обращении с транзакцией, и повтор
+ * их не лечит, поэтому правило — ровно для 25P03.
+ *
  * <p>Вместе с отказом наружу отдаётся его описание для журнала: тип исключения после перевода и код
  * SQLSTATE драйвера, если отказ пришёл из базы. Текст исключения в описание не входит: в нём SQL и
  * сообщение драйвера, а с ними могут прийти значения строки, в том числе персональные данные полиса.
@@ -53,6 +59,9 @@ public class DatabaseOutages {
             DataAccessResourceFailureException.class,
             RecoverableDataAccessException.class,
             TransientDataAccessException.class);
+
+    /** SQLSTATE закрытого по простою транзакции сеанса (PostgreSQL: idle_in_transaction_session_timeout). */
+    private static final String IDLE_IN_TRANSACTION_SESSION_TIMEOUT = "25P03";
 
     private final PersistenceExceptionTranslator translator;
 
@@ -121,7 +130,13 @@ public class DatabaseOutages {
     }
 
     private static boolean isTemporary(Throwable failure) {
-        return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure)) || isExpiredHibernateTransaction(failure);
+        return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure))
+                || isExpiredHibernateTransaction(failure)
+                || isSessionClosedForIdleTransaction(failure);
+    }
+
+    private static boolean isSessionClosedForIdleTransaction(Throwable failure) {
+        return SqlStates.deepest(failure).filter(IDLE_IN_TRANSACTION_SESSION_TIMEOUT::equals).isPresent();
     }
 
     private static boolean isExpiredHibernateTransaction(Throwable failure) {
