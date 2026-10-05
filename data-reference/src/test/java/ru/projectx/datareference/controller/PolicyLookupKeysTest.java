@@ -80,6 +80,7 @@ class PolicyLookupKeysTest {
         "?number=П-0001&contract_id=9011c000-0000-4000-8000-000000000013",
         "?contract_id=9011c000-0000-4000-8000-000000000013",
         "?number=П-0001&contract_id=9011c000-0000-4000-8000-000000000013&contract_external_id=9011c000-0000-4000-8000-000000000013",
+        "?contract_id=9011c000-0000-4000-8000-000000000013&contract_external_id=9011c000-0000-4000-8000-000000000013",
         "?contract_id=not-a-uuid"})
     void legacyContractId_isValidationErrorNamingContractId_withoutAskingService(String parameters) {
         MvcTestResult result = mvc.get().uri(POLICIES + parameters).exchange();
