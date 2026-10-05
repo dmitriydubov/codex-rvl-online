@@ -33,6 +33,16 @@ public final class IncompleteReferenceException extends RuntimeException {
                 "у ЛПУ " + lpuId + " нет действующего договора, по которому брать цены", lpuId);
     }
 
+    /**
+     * Договор ЛПУ, по которому сейчас берутся цены, у учреждения есть, но услуга относится к другому его договору.
+     * Считать по ценам договора, который больше не прайсовый, нельзя, поэтому код тот же, что и при отсутствии
+     * договора.
+     */
+    public static IncompleteReferenceException serviceOutsidePriceContract(UUID lpuId) {
+        return new IncompleteReferenceException(NO_ACTIVE_PRICE_CONTRACT,
+                "услуга не относится к прайсовому договору ЛПУ " + lpuId, lpuId);
+    }
+
     public String code() {
         return code;
     }
