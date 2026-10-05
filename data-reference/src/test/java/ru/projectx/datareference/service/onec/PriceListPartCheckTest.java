@@ -84,6 +84,18 @@ class PriceListPartCheckTest {
                 .doesNotThrowAnyException();
     }
 
+    /** Передача уже отклонена: опоздавшая часть разделяет её отказ, даже если испорчена сама. */
+    @Test
+    void partOfRejectedTransfer_isNotChecked() {
+        ObjectNode data = batch("{\"price\":1}");
+        InboundMessage rejected = part(false);
+        rejected.markFailed("в строке прайса нет цены");
+
+        assertThatCode(() -> check.check(markupOf(data), data, List.of(rejected, processedPart())))
+                .doesNotThrowAnyException();
+        verifyNoInteractions(priceList);
+    }
+
     /** У финального сообщения строк нет; второе финальное сообщение — не забота этой проверки. */
     @Test
     void finalMessage_isNotChecked() {

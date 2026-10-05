@@ -203,6 +203,18 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.FAILED)).isEqualTo(1.0);
     }
 
+    @Test
+    void defectivePartOfRejectedTransfer_isRejectedAsLatePart() {
+        InboundMessage rejected = buffered(batchData(row(1, "100.00")), null, 1);
+        rejected.markFailed("в строке прайса нет цены");
+        InboundMessage lateBatch = message(batchData("{\"price\":100.00}"));
+
+        ImportResult result = receive(lateBatch);
+
+        assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " уже отклонена"));
+        assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
+    }
+
     /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
     @Test
     void batchWithErasedBody_isContractViolation() {

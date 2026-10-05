@@ -25,17 +25,23 @@ final class PriceListPartCheck {
     }
 
     /**
+     * Финальное сообщение строк не несёт; часть уже отклонённой передачи отклоняется отказом передачи, а не своим.
+     *
      * @param parts сообщения передачи, которые уже есть в сырье
      * @throws OneCFieldException с причиной для этой части
      */
     void check(PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
-        if (markup.batchCount() != null) {
+        if (markup.batchCount() != null || anyIn(parts, InboundStatus.FAILED)) {
             return;
         }
         StreamSupport.stream(data.path(RECORD_SET).spliterator(), false).forEach(this::checkRow);
-        if (parts.stream().anyMatch(part -> part.outcome().status() == InboundStatus.PROCESSED)) {
+        if (anyIn(parts, InboundStatus.PROCESSED)) {
             throw new OneCFieldException("лишний пакет: передача %s уже применена".formatted(markup.cid()));
         }
+    }
+
+    private static boolean anyIn(List<InboundMessage> parts, InboundStatus status) {
+        return parts.stream().anyMatch(part -> part.outcome().status() == status);
     }
 
     private void checkRow(JsonNode row) {

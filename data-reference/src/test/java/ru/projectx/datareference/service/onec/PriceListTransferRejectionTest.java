@@ -58,6 +58,19 @@ class PriceListTransferRejectionTest {
         assertThat(rejected).allSatisfy(message -> assertFailed(message, reason));
     }
 
+    /** Исчерпанные повторы — тоже отказ сборки, а не ошибка части. */
+    @Test
+    void exhaustedRetries_failEveryBufferedPartWithTransferReason() {
+        InboundMessage batch = buffered(null);
+        InboundMessage trigger = received(finalData());
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(batch));
+        String retries = "повторы исчерпаны на попытке 6: временный отказ базы данных: X, SQLSTATE 55P03";
+
+        assertThat(rejection.reject(trigger, retries)).containsExactly(trigger, batch);
+        assertFailed(trigger, "передача " + CID + " отклонена: " + retries);
+        assertFailed(batch, "передача " + CID + " отклонена: " + retries);
+    }
+
     /** Ошибка в самой части: у неё своя причина, у остальных — какое сообщение и почему сорвало передачу. */
     @Test
     void defectOfThePart_keepsItsOwnReason_andOthersPointToIt() {
