@@ -17,31 +17,40 @@ import ru.projectx.datareference.entity.InboundStatus;
 public interface InboundMessageRepository extends JpaRepository<InboundMessage, UUID> {
 
     /**
-     * Сообщения, которые пора разбирать: ещё не тронутые и дозревшие до следующей
-     * попытки. В порядке поступления — сообщения по одному объекту 1С должны применяться
-     * в том порядке, в каком их прислали, иначе старое затрёт новое.
+     * Сообщения, которые пора разбирать: ещё не тронутые и дозревшие до следующей попытки, в порядке поступления.
+     * Версий у сообщений 1С нет, в справочнике действует последнее полученное, поэтому сообщения одного потока
+     * применяются в том порядке, в каком их прислали.
      *
-     * <p>{@code SKIPPED} и {@code FAILED} сюда не попадают: они терминальные.
-     * Переобработать такую строку можно, переведя её обратно в {@code NEW} обычным
-     * SQL — например, когда починили маппер или когда наконец приехал родитель,
-     * из-за отсутствия которого сообщение было пропущено.
+     * <p>Сообщение, отложенное до повтора, держит более поздние сообщения своего потока: пока его срок не наступил,
+     * их здесь нет. Иначе более новое сообщение применилось бы раньше, а повтор старого затёр бы его. Когда срок
+     * наступил, оно идёт в пачку раньше них, потому что раньше принято; если и эта попытка не удастся, более поздние
+     * сообщения потока удержит сам проход разбора. Удержанные сообщения не занимают места в пачке, и сообщения других
+     * потоков разбираются как обычно. Окончательный отказ и части передачи прайса, ждущие остальных частей, поток не
+     * держат.
+     *
+     * <p>{@code SKIPPED} и {@code FAILED} сюда не попадают: они терминальные. Переобработать такую строку можно,
+     * переведя её обратно в {@code NEW} обычным SQL, но только помня о порядке: строка встанет в поток по своему
+     * старому моменту приёма, и её данные затрут то, что пришло после неё. Переобрабатывать безопасно последнее
+     * сообщение по объекту или все сообщения потока начиная с него.
+     *
+     * <p>Статусы записаны в запросе значениями: так PostgreSQL видит, что подзапросу подходит частичный индекс по
+     * незавершённым строкам (поток, статус, момент приёма). Сервис работает одной копией, поэтому строки не
+     * блокируются; при нескольких копиях два прохода разобрали бы одну строку дважды и порядок потока нарушился бы.
      */
-    default List<InboundMessage> findDueForImport(Instant now, Limit limit) {
-        return findByStatus(InboundStatus.NEW, InboundStatus.RETRY, now, limit);
-    }
-
     @Query("""
             select message
               from InboundMessage message
-             where message.status = :pending
-                or (message.status = :retry and message.nextRetryAt <= :now)
+             where (message.status = NEW
+                    or (message.status = RETRY and message.nextRetryAt <= :now))
+               and not exists (select earlier.messageId
+                                 from InboundMessage earlier
+                                where earlier.stream = message.stream
+                                  and earlier.status = RETRY
+                                  and earlier.nextRetryAt > :now
+                                  and earlier.receivedAt < message.receivedAt)
              order by message.receivedAt
             """)
-    List<InboundMessage> findByStatus(
-            @Param("pending") InboundStatus pending,
-            @Param("retry") InboundStatus retry,
-            @Param("now") Instant now,
-            Limit limit);
+    List<InboundMessage> findDueForImport(@Param("now") Instant now, Limit limit);
 
     /**
      * Все сообщения одной многочастной передачи, включая текущее. Нужны сборщику

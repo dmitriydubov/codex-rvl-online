@@ -22,6 +22,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.DatabaseOutages;
@@ -92,6 +93,7 @@ class ReferenceImportSchedulerStructuredJournalTest {
         when(repository.findDueForImport(any(), any())).thenReturn(List.of(message));
         when(importService.importMessage(message)).thenThrow(
                 new CannotAcquireLockException("параметры запроса: [" + PERSONAL_DATA + "]"));
+        when(inboundMessageService.recordTemporaryFailure(any(), any())).thenReturn(InboundStatus.RETRY);
 
         scheduler().importPendingMessages();
 
