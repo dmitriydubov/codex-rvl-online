@@ -222,6 +222,23 @@
   делает координатор после мержа, сессия перечислит исходы и новые классы в отчёте PR; (2) вопросы к 1С (тип очередей —
   О7, BOM и `\u0000` в телах) уже в списке вопросов к 1С (раздел 7), спецификация на ответы не опирается; (3) карантин и
   CPD — совпадает с Р1 (а) и `dry.exclude` для `entity/`.
+- 2026-10-05, **ревизия источников документации** (поручение владельца ~16:25 UTC): все адреса таблицы «Источники
+  документации» в `gauntlet/CLAUDE.md`, их запасные пути и адреса технологий из плана (Prometheus, Caffeine и Spring Cache
+  для Ш43, Actuator, Docker Hub, GitHub Actions, Maven Central) проверены `curl` из сессии координатора; версии стека
+  сверены с кэшем Gradle (Boot 4.0.7, Framework 7.0.8, Data JPA 4.0.6, Hibernate 7.2.19, Micrometer 1.16.6, Jackson 3.1.4,
+  Tomcat 11.0.22, JUnit 6.0.3, AssertJ 3.27.7, Mockito 5.20.0, Testcontainers 2.0.5, Liquibase 5.0.3, HikariCP 7.0.2,
+  PIT 1.22.1 — таблица верна, у Jackson/AssertJ/Mockito/Tomcat/Micrometer дописан патч). Изменения статусов: **открылись**
+  www.rabbitmq.com (есть адреса с версией `/docs/4.1/…`), rabbitmq.github.io, docs.junit.org (`/6.0.3/`), site.mockito.org;
+  **закрыт** docs.liquibase.com (репозиторий его исходников заархивирован — запасной путь javadoc.io и исходники по тегу);
+  по-прежнему закрыты docs.docker.com, git-scm.com, prometheus.io, docs.github.com, kubernetes.io, search.maven.org,
+  central.sonatype.com, дистрибутивы Gradle, github.com (страницы и API), базы уязвимостей (NVD, OSV, Snyk); raw-вики
+  Spring Boot отдаёт 404 (гид миграции по-прежнему открывает человек); `reference/7.0/` Spring Framework перенаправляет на
+  страницу без версии (метатег 7.0.9 при сборке 7.0.8). Новые строки таблицы: Actuator/кэш/Testcontainers в Boot,
+  Prometheus (raw), Caffeine и Spring Cache, GitHub Actions (raw github/docs), образы контейнеров (API Docker Hub,
+  mirror.gcr.io, adoptium/containers), Maven Central (maven-metadata.xml, javadoc.io), Kubernetes (raw). Рекомендация
+  владельцу для Network access: открыть docs.liquibase.com, prometheus.io, docs.docker.com, git-scm.com, docs.github.com;
+  по желанию search.maven.org, central.sonatype.com, api.osv.dev. Протокол проверки — `scratchpad/domains/results*.txt`
+  сессии координатора (в git не хранится).
 - 2026-10-05, **Ш18: PR #60 открыт сессией 15:51 UTC, смержен владельцем 16:01 UTC** (CI зелёный 15:59, слит с `main`
   87e7f1e). Остановок не было: вариант общего шага владелец утвердил «1) да» в сессии, GA-9 закрыт тестом по ТЗ-07 без Ш18a.
   Отчёт PR: пункты 2–4 координатору — закрыты комментарием в PR (Ш18a снят, `ContragentMapper` приведён раньше в Ш13c,
