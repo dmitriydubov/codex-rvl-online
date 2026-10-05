@@ -31,10 +31,10 @@ public interface PriceListItemRepository extends JpaRepository<PriceListItem, UU
     int deleteByServiceId(@Param("serviceId") UUID serviceId);
 
     /**
-     * Актуальные цены услуг для R-03, одним запросом на все услуги договора: строки,
-     * чей период ещё не закончился, — открытая {@code valid_to} читается как
-     * бесконечность (В-4). Будущие периоды отдаются, вызывающему бывает нужен заезд
-     * следующего сезона; прошедшие — нет. Порядок — по началу периода, как в ответе.
+     * Актуальные цены услуг для перечня услуг ЛПУ, одним запросом на все услуги договора: строки,
+     * срок которых ещё не закончился. Пустой {@code valid_to} значит «бессрочно». Будущие сроки
+     * отдаются, потому что вызывающему бывает нужен заезд следующего сезона, а прошедшие — нет.
+     * Порядок — по началу срока, как в ответе.
      */
     @Query("""
             select item from PriceListItem item
@@ -44,4 +44,19 @@ public interface PriceListItemRepository extends JpaRepository<PriceListItem, UU
              order by item.validFrom
             """)
     List<PriceListItem> findCurrentByServiceIdIn(Collection<UUID> serviceIds, LocalDate today);
+
+    /**
+     * Строки прайса услуги, которые действуют хотя бы на одни сутки периода проживания, одним запросом на весь
+     * период. Сутки периода идут с {@code checkIn} включительно до {@code checkOut} не включительно, а строка
+     * действует по {@code valid_to} включительно; пустой {@code valid_to} значит «бессрочно». Порядок — по началу
+     * срока действия.
+     */
+    @Query("""
+            select item from PriceListItem item
+             where item.service.id = :serviceId
+               and item.validFrom < :checkOut
+               and (item.validTo is null or item.validTo >= :checkIn)
+             order by item.validFrom
+            """)
+    List<PriceListItem> findWithinPeriodByServiceId(UUID serviceId, LocalDate checkIn, LocalDate checkOut);
 }
