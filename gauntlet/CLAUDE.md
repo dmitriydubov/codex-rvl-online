@@ -269,8 +269,9 @@
 `docs.liquibase.com`, `prometheus.io`, `docs.docker.com`, `git-scm.com`, `docs.github.com`, `kubernetes.io`,
 `central.sonatype.com`, `api.osv.dev` (проверка уязвимостей зависимостей запросом POST `/v1/query`; NVD и Snyk
 закрыты), `adoptium.net`, `search.maven.org` и `services.gradle.org`; проверено из сессии координатора в тот же день.
-Не открыты и не нужны: `github.com` (политика платформы), `stackoverflow.com`. Закрыт и может понадобиться только при
-смене версии Gradle: `downloads.gradle.org` — см. строку Maven Central.
+Не открыты и не нужны: `github.com` (политика платформы), `stackoverflow.com`. `downloads.gradle.org` (нужен при смене
+версии Gradle) владелец решил открыть («1) да», 2026-10-05); до появления в списке окружения сессия его не вызывает —
+см. строку Maven Central.
 
 **Предметная область** (для `specifier`, кодера и `reviewer`; бизнес-правила берутся только отсюда, не выдумываются):
 
