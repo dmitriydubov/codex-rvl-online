@@ -45,21 +45,24 @@ sealed interface PriceListTransfer {
     }
 
     /** Пока пришли не все обещанные пакеты, сверять счётчики рано: порядок доставки двух очередей не гарантирован. */
-    private static PriceListTransfer withFinalMessage(UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
+    private static PriceListTransfer withFinalMessage(
+            UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
+
         int expectedBatches = Objects.requireNonNull(finalMessage.batchCount());
         if (batches.size() < expectedBatches) {
             return new Pending("передача %s собрана на %d из %d сообщений"
                     .formatted(cid, batches.size(), expectedBatches));
         }
-        return checkedCounters(cid, finalMessage, batches);
+        return checkedCounters(cid, finalMessage, batches, expectedBatches);
     }
 
     /**
      * Лишний пакет или другое число строк означают, что источник прислал не то, что обещал. Применить такую
      * передачу значит записать заведомо неполный прайс и никогда об этом не узнать.
      */
-    private static PriceListTransfer checkedCounters(UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
-        int expectedBatches = Objects.requireNonNull(finalMessage.batchCount());
+    private static PriceListTransfer checkedCounters(
+            UUID cid, InboundMessage finalMessage, List<InboundMessage> batches, int expectedBatches) {
+
         int expectedRows = Objects.requireNonNull(finalMessage.rowCount());
         int actualRows = batches.stream()
                 .mapToInt(batch -> Objects.requireNonNullElse(batch.rowCount(), 0))
@@ -69,7 +72,7 @@ sealed interface PriceListTransfer {
         }
         String reason = "счётчики передачи %s не сошлись: ожидалось %d сообщений / %d строк, получено %d / %d"
                 .formatted(cid, expectedBatches, expectedRows, batches.size(), actualRows);
-        return new Mismatched(reason, wholeTransfer(finalMessage, batches));
+        return new Mismatched(reason, finalMessage, batches);
     }
 
     /** Финальное сообщение первым, за ним пакеты: в этом порядке сообщения передачи получают исход. */
@@ -85,7 +88,8 @@ sealed interface PriceListTransfer {
     }
 
     /** Передача пришла целиком, но не совпала со своими счётчиками. Прежний прайс по услуге не трогается. */
-    record Mismatched(String reason, List<InboundMessage> messages) implements PriceListTransfer {
+    record Mismatched(String reason, InboundMessage finalMessage, List<InboundMessage> batches)
+            implements PriceListTransfer {
 
         /**
          * Переводит в ошибку все сообщения передачи сразу. Исход у передачи один: если пометить только последнее
@@ -94,6 +98,7 @@ sealed interface PriceListTransfer {
          * @return сообщения с новым статусом, которые осталось сохранить
          */
         List<InboundMessage> fail() {
+            List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
             for (InboundMessage message : messages) {
                 message.markFailed(reason);
             }

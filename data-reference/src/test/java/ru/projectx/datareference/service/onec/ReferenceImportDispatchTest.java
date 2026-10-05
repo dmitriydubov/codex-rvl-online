@@ -89,6 +89,19 @@ class ReferenceImportDispatchTest {
         assertEnvelopeRejected(null, "тело сообщения стёрто по сроку хранения, разбирать нечего");
     }
 
+    /** Конверт разбирается до выбора обработчика: особый путь тоже не получает сообщение со стёртым телом. */
+    @Test
+    void erasedPayloadOfStreamWithOwnHandler_isRejectedBeforeItsHandler() {
+        when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
+        when(priceListHandler.stream()).thenReturn(OneCStream.PRICE_LISTS);
+        ReferenceImportService service = service();
+
+        assertThatThrownBy(() -> service.importMessage(message(OneCStream.PRICE_LISTS, null)))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("тело сообщения стёрто по сроку хранения, разбирать нечего");
+        verify(priceListHandler, never()).handle(any(), any());
+    }
+
     @Test
     void envelopeWithoutData_isContractViolation() {
         assertEnvelopeRejected("{\"metadata\":{}}", "в конверте сообщения нет объекта data");

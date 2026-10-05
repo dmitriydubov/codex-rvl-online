@@ -11,12 +11,12 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Применённое сообщение отмечается обработанным, пропущенное — пропущенным с причиной от маппера. Так
  * обрабатываются все потоки, у которых одно сообщение применяется само по себе.
  */
-public class MappedStreamHandler implements StreamHandler {
+class MappedStreamHandler implements StreamHandler {
 
     private final StreamMapper mapper;
     private final InboundMessageService inboundMessageService;
 
-    public MappedStreamHandler(StreamMapper mapper, InboundMessageService inboundMessageService) {
+    MappedStreamHandler(StreamMapper mapper, InboundMessageService inboundMessageService) {
         this.mapper = mapper;
         this.inboundMessageService = inboundMessageService;
     }

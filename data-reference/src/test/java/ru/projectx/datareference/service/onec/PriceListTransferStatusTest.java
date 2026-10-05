@@ -85,7 +85,7 @@ class PriceListTransferStatusTest {
 
         assertThat(transfer).isEqualTo(new PriceListTransfer.Mismatched(
                 "счётчики передачи " + CID + " не сошлись: ожидалось 1 сообщений / 2 строк, получено 2 / 2",
-                List.of(finalMessage, first, second)));
+                finalMessage, List.of(first, second)));
     }
 
     @Test
@@ -98,14 +98,14 @@ class PriceListTransferStatusTest {
 
         assertThat(transfer).isEqualTo(new PriceListTransfer.Mismatched(
                 "счётчики передачи " + CID + " не сошлись: ожидалось 2 сообщений / 5 строк, получено 2 / 3",
-                List.of(finalMessage, first, second)));
+                finalMessage, List.of(first, second)));
     }
 
     @Test
-    void mismatchedTransfer_failsEveryMessageWithReason() {
+    void mismatchedTransfer_failsEveryMessageWithReason_finalMessageFirst() {
         InboundMessage finalMessage = finalMessage(1, 5);
         InboundMessage batch = batch(1);
-        PriceListTransfer.Mismatched transfer = new PriceListTransfer.Mismatched("счётчики", List.of(finalMessage, batch));
+        PriceListTransfer.Mismatched transfer = new PriceListTransfer.Mismatched("счётчики", finalMessage, List.of(batch));
 
         List<InboundMessage> failed = transfer.fail();
 
