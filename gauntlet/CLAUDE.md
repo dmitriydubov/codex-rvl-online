@@ -268,8 +268,9 @@
 403»), тогда сразу запасной путь. По итогам ревизии владелец 2026-10-05 открыл в Network access окружения
 `docs.liquibase.com`, `prometheus.io`, `docs.docker.com`, `git-scm.com`, `docs.github.com`, `kubernetes.io`,
 `central.sonatype.com`, `api.osv.dev` (проверка уязвимостей зависимостей запросом POST `/v1/query`; NVD и Snyk
-закрыты) и `adoptium.net`; проверено из сессии координатора в тот же день. Не открыты и не нужны: `github.com`
-(политика платформы), `stackoverflow.com`; `search.maven.org` и дистрибутивы Gradle — см. строку Maven Central.
+закрыты), `adoptium.net`, `search.maven.org` и `services.gradle.org`; проверено из сессии координатора в тот же день.
+Не открыты и не нужны: `github.com` (политика платформы), `stackoverflow.com`. Закрыт и может понадобиться только при
+смене версии Gradle: `downloads.gradle.org` — см. строку Maven Central.
 
 **Предметная область** (для `specifier`, кодера и `reviewer`; бизнес-правила берутся только отсюда, не выдумываются):
 
