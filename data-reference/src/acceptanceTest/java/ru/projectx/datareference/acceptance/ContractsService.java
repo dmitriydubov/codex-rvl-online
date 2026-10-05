@@ -15,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.test.web.servlet.client.ExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
@@ -71,8 +72,7 @@ public class ContractsService {
     /** Запрос мониторинга или Kubernetes к актуатору — на его порт. */
     public ServiceResponse monitor(String path) {
         requireAbsolutePath(path);
-        lastResponse = ServiceResponse.of(monitoringClient.get().uri(path).exchange().returnResult());
-        return lastResponse;
+        return remember(monitoringClient.get().uri(path).exchange().returnResult());
     }
 
     public ServiceResponse request(String path, String requestId) {
@@ -118,8 +118,12 @@ public class ContractsService {
         requireAbsolutePath(path);
         Object[] variables = Stream.concat(Arrays.stream(uriVariables(path)), Arrays.stream(parameterValues))
                 .toArray();
-        lastResponse = ServiceResponse.of(
-                client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+        return remember(client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+    }
+
+    /** Ответ любого из двух портов — последний ответ сценария: его проверяют одни и те же шаги. */
+    private ServiceResponse remember(ExchangeResult result) {
+        lastResponse = ServiceResponse.of(result);
         return lastResponse;
     }
 

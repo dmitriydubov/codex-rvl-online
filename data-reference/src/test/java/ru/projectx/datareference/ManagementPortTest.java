@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import ru.projectx.datareference.support.IntegrationTest;
 
@@ -59,14 +60,24 @@ class ManagementPortTest {
         assertUp(get(apiPort, path));
     }
 
+    /** Порт API видят соседи: короткие пробы отдают одно состояние, без компонентов и их деталей. */
+    @ParameterizedTest
+    @ValueSource(strings = {"/livez", "/readyz"})
+    void apiPort_probesShowStatusOnly(String path) throws IOException, InterruptedException {
+        JsonNode probe = json.readTree(get(apiPort, path).body());
+
+        assertThat(probe.propertyNames()).containsExactly("status");
+    }
+
     /** Состав health и его детали видит только тот, кому открыт порт актуатора. */
     @Test
     void managementPort_showsHealthComponents() throws IOException, InterruptedException {
         HttpResponse<String> health = get(managementPort, "/actuator/health");
 
         assertThat(health.statusCode()).isEqualTo(OK);
-        assertThat(json.readTree(health.body()).path("components").path("db").path("status").asString())
-                .isEqualTo("UP");
+        JsonNode database = json.readTree(health.body()).path("components").path("db");
+        assertThat(database.path("status").asString()).isEqualTo("UP");
+        assertThat(database.path("details").path("database").asString()).isEqualTo("PostgreSQL");
     }
 
     @ParameterizedTest

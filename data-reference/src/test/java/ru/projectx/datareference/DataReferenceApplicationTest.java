@@ -43,4 +43,15 @@ class DataReferenceApplicationTest {
         assertThat(context.getBeanNamesForType(ConnectionFactory.class)).isEmpty();
         assertThat(context.getBeanNamesForType(RabbitListenerEndpointRegistry.class)).isEmpty();
     }
+
+    /**
+     * Без MANAGEMENT_PORT актуатор слушает 8081: этот порт открывает образ и публикует стенд, который
+     * переменных окружения сервиса не читает. Сам отдельный порт проверяет {@code ManagementPortTest} на
+     * случайных портах, где умолчание подменено и потому не видно. Переменную MANAGEMENT_PORT там, где идут
+     * тесты, не задают: с ней тест проверял бы её значение, а не умолчание.
+     */
+    @Test
+    void managementPort_defaultsTo8081() {
+        assertThat(context.getEnvironment().getProperty("management.server.port", Integer.class)).isEqualTo(8081);
+    }
 }
