@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
@@ -61,6 +62,9 @@ class OneCQueueIngestTest {
     @Autowired
     private RabbitListenerEndpointRegistry listeners;
 
+    @Autowired
+    private OneCQueueConsumers consumers;
+
     @BeforeEach
     void clearTables() {
         databaseCleaner.clear();
@@ -88,6 +92,19 @@ class OneCQueueIngestTest {
                 queues.policies(), queues.insuranceContracts(), queues.contragents(), queues.mkb10(),
                 queues.lpuContracts(), queues.programs(), queues.appealTypes(), queues.lpuContacts(),
                 queues.priceLists(), queues.priceListsFinal(), queues.contragentServices());
+    }
+
+    /**
+     * Компонент здоровья приёма узнаёт о подписке потребителей из подтверждений брокера, а об их остановке и замене —
+     * из известий простого контейнера слушателя: другой тип контейнера их не публикует. Поэтому проверяется, что
+     * контейнеры именно такие и что на настоящем брокере подписка каждой очереди подтверждена.
+     */
+    @Test
+    void everyQueueConsumer_isSubscribedThroughSimpleContainer() {
+        assertThat(listeners.getListenerContainers()).allSatisfy(
+                container -> assertThat(container).isInstanceOf(SimpleMessageListenerContainer.class));
+        await().atMost(DELIVERY_TIMEOUT).untilAsserted(
+                () -> assertThat(consumers.queuesWithoutConsumer()).as("очереди без подписанного потребителя").isEmpty());
     }
 
     @Test
