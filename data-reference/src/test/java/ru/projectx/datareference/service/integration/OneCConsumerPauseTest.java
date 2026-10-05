@@ -16,13 +16,17 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -208,35 +212,41 @@ class OneCConsumerPauseTest {
 
     /**
      * База «мигнула»: пока возобновление запускает потребителей, слушатель первого запущенного снова отказывает
-     * из своего потока. Его пауза ждёт конца запуска (монитор) и не пропадает: после возобновления приём снова
-     * на паузе с новой причиной, потребители остановлены второй раз.
+     * из своего потока. Его пауза ждёт конца запуска и не пропадает: после возобновления приём снова на паузе с
+     * новой причиной, а оба потребителя остановлены уже после того, как были запущены.
+     *
+     * <p>Порядок записывают сами контейнеры: запуск идёт внутри возобновления, остановка внутри новой паузы.
+     * Итог ожидания слушателя запоминает флаг, а проверяет тест после возобновления, потому что исключение
+     * из запуска контейнера пауза перехватывает.
      */
     @Test
     void outageFromAnotherThreadDuringResume_waitsAndStartsAFreshPause() throws Exception {
         OneCConsumerPause pause = pause();
         pause.pause(CONNECTION_LOST);
         when(probe.storageAvailable()).thenReturn(true);
-        List<String> order = new CopyOnWriteArrayList<>();
-        Thread listener = new Thread(() -> {
-            pause.pause(LOCK_TIMEOUT);
-            order.add("pause");
-        });
+        List<String> events = new CopyOnWriteArrayList<>();
+        recordStops(events, POLICIES, policies);
+        recordStops(events, MKB10, mkb10);
+        recordStart(events, MKB10, mkb10);
+        Thread listener = new Thread(() -> pause.pause(LOCK_TIMEOUT));
+        AtomicBoolean listenerWaitedForResume = new AtomicBoolean();
         doAnswer(invocation -> {
+            events.add(started(POLICIES));
             listener.start();
-            await().atMost(Duration.ofSeconds(10)).until(() -> listener.getState() == Thread.State.BLOCKED);
+            long resuming = Thread.currentThread().threadId();
+            await().atMost(Duration.ofSeconds(10)).until(() -> waitsInPauseForLockOf(listener, resuming));
+            listenerWaitedForResume.set(true);
             return null;
         }).when(policies).start();
 
         pause.resumeIfStorageAvailable();
-        order.add("resume");
-        listener.join(Duration.ofSeconds(10).toMillis());
 
-        assertThat(order).containsExactly("resume", "pause");
+        assertThat(listenerWaitedForResume).isTrue();
+        assertThat(listener.join(Duration.ofSeconds(10))).isTrue();
+        assertThat(events).hasSize(4);
+        assertThat(events.subList(0, 2)).containsExactlyInAnyOrder(started(POLICIES), started(MKB10));
+        assertThat(events.subList(2, 4)).containsExactlyInAnyOrder(stopped(POLICIES), stopped(MKB10));
         assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
-        verify(policies, times(2)).stop(any(Runnable.class));
-        verify(mkb10, times(2)).stop(any(Runnable.class));
-        verify(policies).start();
-        verify(mkb10).start();
     }
 
     /**
@@ -333,10 +343,50 @@ class OneCConsumerPauseTest {
     }
 
     private static void stopCompletesAtOnce(MessageListenerContainer container) {
+        stopCompletesAtOnce(container, () -> { });
+    }
+
+    /** Остановка завершается сразу; перед обратным вызовом контейнер сообщает о ней {@code onStop}. */
+    private static void stopCompletesAtOnce(MessageListenerContainer container, Runnable onStop) {
         doAnswer(invocation -> {
+            onStop.run();
             invocation.getArgument(0, Runnable.class).run();
             return null;
         }).when(container).stop(any(Runnable.class));
+    }
+
+    private static void recordStart(List<String> events, String queue, MessageListenerContainer container) {
+        doAnswer(invocation -> {
+            events.add(started(queue));
+            return null;
+        }).when(container).start();
+    }
+
+    private static void recordStops(List<String> events, String queue, MessageListenerContainer container) {
+        stopCompletesAtOnce(container, () -> events.add(stopped(queue)));
+    }
+
+    private static String started(String queue) {
+        return "запущен " + queue;
+    }
+
+    private static String stopped(String queue) {
+        return "остановлен " + queue;
+    }
+
+    /**
+     * Поток ждёт блокировку, которой владеет поток возобновления, и верхний кадр его стека —
+     * {@code OneCConsumerPause.pause}. Одного состояния «заблокирован» мало: оно не говорит, на чём и у кого
+     * поток ждёт. Завершившийся поток сведений о себе не отдаёт и, значит, не ждёт.
+     */
+    private static boolean waitsInPauseForLockOf(Thread waiting, long ownerThreadId) {
+        ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(waiting.threadId(), 1);
+        return info != null && info.getLockOwnerId() == ownerThreadId
+                && Arrays.stream(info.getStackTrace()).limit(1).anyMatch(OneCConsumerPauseTest::isPauseCall);
+    }
+
+    private static boolean isPauseCall(StackTraceElement frame) {
+        return frame.getClassName().equals(OneCConsumerPause.class.getName()) && frame.getMethodName().equals("pause");
     }
 
     private OneCConsumerPause pause() {
