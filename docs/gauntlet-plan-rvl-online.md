@@ -222,6 +222,15 @@
   делает координатор после мержа, сессия перечислит исходы и новые классы в отчёте PR; (2) вопросы к 1С (тип очередей —
   О7, BOM и `\u0000` в телах) уже в списке вопросов к 1С (раздел 7), спецификация на ответы не опирается; (3) карантин и
   CPD — совпадает с Р1 (а) и `dry.exclude` для `entity/`.
+- 2026-10-05, **Ш16: PR #48 открыт сессией 09:06 UTC** (`claude/sh16-stream-handlers`, слит с `main` d17bb90 до открытия;
+  809 unit-тестов, 186 сценариев, PIT 60/60 локально). CI `gauntlet` красный только по `mutationGate`: 2 RUN_ERROR
+  `NullReturnValsMutator` в record `PriceListTransferMarkup#of` (JVM тестов упала на `redefineClasses`; локально не
+  воспроизводится). Два пункта «переслать координатору» (владелец переслал ~09:20 UTC): (1) строка allowlist — координатор
+  прочитал тесты: `of` возвращает запись в двух местах, на `null` падают `isEqualTo(new PriceListTransferMarkup(...))` в
+  `finalMessage_carriesCountersOfWholeTransfer`/`finalMessageWithZeroBatches_isStillFinal` (ветка финального) и
+  `batch_hasNoExpectedBatches_andCountsItsOwnRows` (ветка пакета) — строка добавлена PR координатора в gauntlet-admin, после
+  мержа сессия вливает `main` и перегоняет гейты; (2) «выбор маппера» в «Структуре пакетов» контракта → «выбор обработчика
+  потока» с двумя путями — PR координатора после мержа #48, там же закрыть CA-17 (стратегия потока).
 - 2026-10-05, **PR #46 (Ш27) смержен владельцем 08:32 UTC** после уведомления Заявок (Р53 (б)). Grok APPROVED, сессия
   ответила (оба остаточных риска — в Ш27a). Проверка после мержа: на `main` ecd90a9 изменены 6 файлов main (`ReferenceApiProperties`,
   `Mkb10Controller`, `PolicyController`, `Mkb10QueryService`, `PolicySearchService`, новый `SearchInputLimits`), `application.yml`
