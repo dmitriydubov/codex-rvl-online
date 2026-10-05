@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -64,22 +65,28 @@ class ReferenceApiPropertiesTest {
 
     /**
      * Верхний предел длины ниже нижнего не пропустил бы ни одной строки поиска. Такая пара тоже не пускает
-     * сервис в работу, а равные пределы допустимы: строка ровно этой длины проходит обе проверки.
+     * сервис в работу, и отказ называет раздел и нарушенное правило.
      */
     @ParameterizedTest
-    @CsvSource({"search,1,queryLengthRangeConsistent", "mkb10,1,queryLengthRangeConsistent"})
-    void maxQueryLengthBelowMinimum_failsStartup(String section, int maxLength, String property) {
-        context.withPropertyValues("projectx.api." + section + ".max-query-length=" + maxLength)
+    @ValueSource(strings = {"search", "mkb10"})
+    void maxQueryLengthBelowMinimum_failsStartup(String section) {
+        context.withPropertyValues(queryLengthRange(section, 3, 2))
                 .run(started -> assertThat(started).getFailure()
                         .hasRootCauseInstanceOf(BindValidationException.class)
-                        .rootCause().hasMessageContaining(section + "." + property));
+                        .rootCause().hasMessageContaining(section + ".queryLengthRangeConsistent"));
     }
 
+    /** Равные пределы допустимы: строка ровно этой длины проходит обе проверки. */
     @ParameterizedTest
-    @CsvSource({"search", "mkb10"})
+    @ValueSource(strings = {"search", "mkb10"})
     void maxQueryLengthEqualToMinimum_isAccepted(String section) {
-        context.withPropertyValues("projectx.api." + section + ".max-query-length=2")
+        context.withPropertyValues(queryLengthRange(section, 3, 3))
                 .run(started -> assertThat(started).hasNotFailed());
+    }
+
+    private static String[] queryLengthRange(String section, int minLength, int maxLength) {
+        String prefix = "projectx.api." + section + ".";
+        return new String[] {prefix + "min-query-length=" + minLength, prefix + "max-query-length=" + maxLength};
     }
 
     @EnableConfigurationProperties(ReferenceApiProperties.class)
