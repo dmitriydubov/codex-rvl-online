@@ -113,7 +113,7 @@ class PolicySearchServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "и", "  и  ", "ё"})
+    @ValueSource(strings = {"", "и", "  и  ", "ё", "\uD83D\uDE00"})
     void queryShorterThanMinimum_isValidationError_namingRuleNotValue(String query) {
         assertThatThrownBy(() -> service.search(CONTRACT, query, null))
                 .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
@@ -121,6 +121,16 @@ class PolicySearchServiceTest {
                     assertThat(invalid.getMessage()).isEqualTo("не короче 2 символов");
                 });
         verifyNoInteractions(policies, insuranceContracts);
+    }
+
+    /** Нижний предел тоже считается в символах: два эмодзи — два символа, строка ищется. */
+    @Test
+    void twoCharactersOutsideBmp_areSearched() {
+        knownContract();
+        String query = OUTSIDE_BMP.repeat(2);
+        when(policies.findRankedByNames(DEFAULT_SCOPE, List.of(LikePatterns.prefix(query)))).thenReturn(List.of());
+
+        assertThat(service.search(CONTRACT, query, null).items()).isEmpty();
     }
 
     /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
@@ -216,8 +226,8 @@ class PolicySearchServiceTest {
     }
 
     private PolicySearchService serviceWith(ReferenceApiProperties api) {
-        return new PolicySearchService(policies, insuranceContracts,
-                api, new ReferenceCalendar(Clock.fixed(NOW, ZoneOffset.UTC), api));
+        var calendar = new ReferenceCalendar(Clock.fixed(NOW, ZoneOffset.UTC), api);
+        return new PolicySearchService(new PolicySearchLookup(policies, insuranceContracts, calendar), api);
     }
 
     private void knownContract() {

@@ -50,7 +50,7 @@ class Mkb10QueryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new Mkb10QueryService(mkb10, TestApiProperties.defaults());
+        service = new Mkb10QueryService(new Mkb10Lookup(mkb10), TestApiProperties.defaults());
     }
 
     @ParameterizedTest
@@ -96,7 +96,7 @@ class Mkb10QueryServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "Q", "  Q  "})
+    @ValueSource(strings = {"", "Q", "  Q  ", "\uD83D\uDE00"})
     void queryShorterThanMinimum_isValidationErrorOnQuery_namingRule(String query) {
         assertThatThrownBy(() -> service.search(query, null))
                 .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
@@ -104,6 +104,15 @@ class Mkb10QueryServiceTest {
                     assertThat(invalid.getMessage()).isEqualTo("не короче 2 символов");
                 });
         verifyNoInteractions(mkb10);
+    }
+
+    /** Нижний предел тоже считается в символах: два эмодзи — два символа, строка ищется. */
+    @Test
+    void twoCharactersOutsideBmp_areSearched() {
+        String query = OUTSIDE_BMP.repeat(2);
+        when(mkb10.findActiveByNamePattern(LikePatterns.substring(query), DEFAULT_LIMIT)).thenReturn(List.of(Q06_0));
+
+        assertThat(service.search(query, null).items()).containsExactly(item(Q06_0));
     }
 
     /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
@@ -159,7 +168,7 @@ class Mkb10QueryServiceTest {
      */
     @Test
     void queryLength_isLimitedByMkb10Setting() {
-        Mkb10QueryService configured = new Mkb10QueryService(mkb10,
+        Mkb10QueryService configured = new Mkb10QueryService(new Mkb10Lookup(mkb10),
                 TestApiProperties.withMkb10InputLimits(CONFIGURED_MAX_QUERY_LENGTH, CONFIGURED_MAX_CODES));
         String query = "ж".repeat(CONFIGURED_MAX_QUERY_LENGTH);
         when(mkb10.findActiveByNamePattern(LikePatterns.substring(query), DEFAULT_LIMIT)).thenReturn(List.of(Q06_0));
@@ -175,7 +184,7 @@ class Mkb10QueryServiceTest {
     /** То же для числа кодов: в умолчаниях оно равно максимуму выдачи МКБ-10, здесь — нет. */
     @Test
     void codesCount_isLimitedByMkb10Setting() {
-        Mkb10QueryService configured = new Mkb10QueryService(mkb10,
+        Mkb10QueryService configured = new Mkb10QueryService(new Mkb10Lookup(mkb10),
                 TestApiProperties.withMkb10InputLimits(CONFIGURED_MAX_QUERY_LENGTH, CONFIGURED_MAX_CODES));
         when(mkb10.findByCodes(distinctCodes(CONFIGURED_MAX_CODES))).thenReturn(List.of(Q06_0));
 
@@ -215,6 +224,22 @@ class Mkb10QueryServiceTest {
         Mkb10Response response = service.byCodes(List.of(" i25.1 ", "", "Z99", "z99", "  "));
 
         assertThat(response.items()).containsExactly(item(Q06_0));
+    }
+
+    /**
+     * Перечень через запятую приходит одним параметром и делится на коды ещё до сервиса. Запятая внутри кода
+     * значит, что параметр повторён и в одном из повторов стоит перечень: такого кода нет, а молча искать его
+     * значит вернуть неполный ответ.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"A00,A01", ",", "A00, "})
+    void codeWithComma_isValidationErrorOnCodes_namingRule(String code) {
+        assertThatThrownBy(() -> service.byCodes(List.of(code, "A02")))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("codes");
+                    assertThat(invalid.getMessage()).isEqualTo("коды через запятую передаются одним параметром codes");
+                });
+        verifyNoInteractions(mkb10);
     }
 
     @Test
