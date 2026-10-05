@@ -3,12 +3,15 @@ package ru.projectx.datareference.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,6 +26,7 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 /**
  * Защищает решение о судьбе сообщения 1С: что записывается при приёме, при успехе, при пропуске и при
@@ -48,6 +52,8 @@ class InboundOutcomeRecordingTest {
     @Mock
     private InboundMessageRepository repository;
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     @Test
     void store_savesTheMessageAsNewWithTheMomentOfReceipt() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -57,6 +63,7 @@ class InboundOutcomeRecordingTest {
         assertThat(stored.receipt()).isEqualTo(new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, NOW));
         assertThat(stored.payload()).isEqualTo(PAYLOAD);
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
+        assertThat(transitions()).isEmpty();
     }
 
     @Test
@@ -66,6 +73,7 @@ class InboundOutcomeRecordingTest {
         service().markProcessed(MESSAGE_ID);
 
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW));
+        assertThat(transitions()).containsExactly("PROCESSED");
     }
 
     @Test
@@ -76,6 +84,7 @@ class InboundOutcomeRecordingTest {
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 0, null, "программа не РВЛ", NOW));
+        assertThat(transitions()).containsExactly("SKIPPED");
     }
 
     @Test
@@ -86,6 +95,7 @@ class InboundOutcomeRecordingTest {
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, NOW.plus(BACKOFF.get(0)), ERROR, null));
+        assertThat(transitions()).containsExactly("RETRY");
     }
 
     @Test
@@ -109,6 +119,7 @@ class InboundOutcomeRecordingTest {
 
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(
                 InboundStatus.FAILED, 2, null, "лестница повторов исчерпана на попытке 3: " + ERROR, null));
+        assertThat(transitions()).containsExactly("FAILED");
     }
 
     @Test
@@ -119,6 +130,30 @@ class InboundOutcomeRecordingTest {
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 0, null, "в конверте нет объекта data", null));
+        assertThat(transitions()).containsExactly("FAILED");
+    }
+
+    @Test
+    void transferParts_areReadByTransferId() {
+        UUID transfer = UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000cc");
+        List<InboundMessage> parts = List.of(InboundMessage.receive(
+                new InboundReceipt(MESSAGE_ID, OneCStream.PRICE_LISTS, QUEUE, RECEIVED_AT), PAYLOAD));
+        when(repository.findByCorrelationId(transfer)).thenReturn(parts);
+
+        assertThat(service().transferParts(transfer)).isSameAs(parts);
+    }
+
+    /** Статус части передачи ставит сборщик прайсов; сервис сохраняет строку и считает переход. */
+    @Test
+    void savedTransferPart_isStoredAndCounted() {
+        InboundMessage part = InboundMessage.receive(
+                new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
+        part.markFailed("счётчики передачи не сошлись");
+
+        service().saveTransferPart(part);
+
+        verify(repository).save(part);
+        assertThat(transitions()).containsExactly("FAILED");
     }
 
     @Test
@@ -130,6 +165,13 @@ class InboundOutcomeRecordingTest {
                 .hasMessage("нет строки сырья для сообщения " + MESSAGE_ID);
     }
 
+    /** Посчитанные переходы потока сообщения, по одному на переход: здесь транзакции нет, счёт идёт сразу. */
+    private List<String> transitions() {
+        return meters.find(InboundTransitionMetrics.TRANSITIONS).tag("stream", "MKB10").counters().stream()
+                .flatMap(counter -> Collections.nCopies((int) counter.count(), counter.getId().getTag("status")).stream())
+                .toList();
+    }
+
     private InboundMessage existing() {
         InboundMessage message = InboundMessage.receive(
                 new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
@@ -139,6 +181,7 @@ class InboundOutcomeRecordingTest {
 
     private InboundMessageService service() {
         return new InboundMessageService(
-                repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC));
+                repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC),
+                new InboundTransitionMetrics(meters));
     }
 }

@@ -12,14 +12,14 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Сборка прайс-листа по услуге, который источник присылает частями (поток ТЗ-9).
+ * Сборка прайс-листа по услуге, который источник присылает частями (поток прайс-листов по услугам санаториев).
  *
  * <p>Прайс по одной услуге приходит несколькими пакетами строк и одним финальным сообщением со счётчиками, все
  * с общим идентификатором передачи. Применить такое сообщение в одиночку нельзя: прайс замещается целиком, и
@@ -30,7 +30,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p><b>Исход записывается всей передаче сразу</b>, а не одному сообщению: исход у передачи один, и сообщение,
  * которому его не проставили, навсегда осталось бы в буфере. Возвращаемое значение поэтому описывает передачу и
  * нужно вызывающему только для журнала. Готова ли передача и какой у неё исход, решает {@link PriceListTransfer};
- * здесь — чтение и запись сообщений и применение прайса.
+ * здесь — чтение и запись сообщений и применение прайса. Сообщения передачи читает и записывает
+ * {@link InboundMessageService}: там же каждый записанный статус попадает в счётчик переходов.
  */
 @Component
 public class PriceListTransferAssembler implements StreamHandler {
@@ -42,18 +43,18 @@ public class PriceListTransferAssembler implements StreamHandler {
     private static final String RECORD_SET = "recordSet";
     private static final String ROW_NUMBER = "rowNumber";
 
-    private final InboundMessageRepository inboundMessageRepository;
+    private final InboundMessageService inboundMessageService;
     private final PriceListMapper priceListMapper;
     private final ObjectMapper json;
     private final Clock clock;
 
     public PriceListTransferAssembler(
-            InboundMessageRepository inboundMessageRepository,
+            InboundMessageService inboundMessageService,
             PriceListMapper priceListMapper,
             ObjectMapper json,
             Clock clock) {
 
-        this.inboundMessageRepository = inboundMessageRepository;
+        this.inboundMessageService = inboundMessageService;
         this.priceListMapper = priceListMapper;
         this.json = json;
         this.clock = clock;
@@ -74,8 +75,8 @@ public class PriceListTransferAssembler implements StreamHandler {
     public ImportResult handle(InboundMessage message, ObjectNode data) {
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(data);
         markup.applyTo(message);
-        inboundMessageRepository.save(message);
-        return conclude(PriceListTransfer.of(markup.cid(), inboundMessageRepository.findByCorrelationId(markup.cid())));
+        inboundMessageService.saveTransferPart(message);
+        return conclude(PriceListTransfer.of(markup.cid(), inboundMessageService.transferParts(markup.cid())));
     }
 
     private ImportResult conclude(PriceListTransfer transfer) {
@@ -121,7 +122,7 @@ public class PriceListTransferAssembler implements StreamHandler {
     /** Обычный цикл, а не стрим: каждый шаг пишет в базу. */
     private void saveAll(List<InboundMessage> messages) {
         for (InboundMessage message : messages) {
-            inboundMessageRepository.save(message);
+            inboundMessageService.saveTransferPart(message);
         }
     }
 

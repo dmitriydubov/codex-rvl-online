@@ -320,12 +320,15 @@ class OneCQueueListenerJournalTest {
         return event;
     }
 
+    private final OneCIngestMetrics metrics = IngestTestMetrics.discarded();
+
     private OneCQueueListener listener() {
         return new OneCQueueListener(
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10))));
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10)), metrics),
+                metrics);
     }
 
     /** Журнал всего пакета приёма: слушатель и его помощник по отказам записи пишут в свои категории. */

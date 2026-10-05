@@ -1,0 +1,22 @@
+# Индекс под метрики очереди разбора сырых сообщений 1С.
+databaseChangeLog:
+
+  - changeSet:
+      id: 014-inbound-backlog-index
+      author: rvl-online
+      comment: >
+        Под подсчёт для метрик: сколько сообщений каждого потока ждут разбора (NEW, RETRY), ждут частей
+        передачи (BUFFERED) или ушли в отказ (FAILED) и когда принято самое давнее. Запрос идёт по
+        расписанию, раз в десятки секунд, и без индекса каждый раз перебирал бы всю таблицу сырья,
+        где почти все строки уже разобраны. Индекс частичный по той же причине, что и индекс
+        выборки разбора: разобранные строки в подсчёте не участвуют, и держать их в индексе значит
+        платить за них на каждой записи. Сырым sql: у createIndex в Liquibase нет условия
+        частичного индекса (docs.liquibase.com, change-types/create-index).
+      changes:
+        - sql:
+            sql: >
+              create index idx_inbound_message_unfinished on inbound_message (stream, status, received_at)
+              where status in ('NEW', 'RETRY', 'BUFFERED', 'FAILED')
+      rollback:
+        - sql:
+            sql: drop index if exists idx_inbound_message_unfinished

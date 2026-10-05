@@ -128,13 +128,16 @@ class OneCQueueListenerStructuredJournalTest {
         assertThat(record.path(OneCLogContext.QUEUE).asString()).isEqualTo(QUEUE);
     }
 
+    private final OneCIngestMetrics metrics = IngestTestMetrics.discarded();
+
     private OneCQueueListener listener() {
-        OneCConsumerPause pause = new OneCConsumerPause(containers, probe, Clock.fixed(NOW, ZoneOffset.UTC));
+        OneCConsumerPause pause = new OneCConsumerPause(containers, probe, Clock.fixed(NOW, ZoneOffset.UTC), metrics);
         return new OneCQueueListener(
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, pause,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10))));
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10)), metrics),
+                metrics);
     }
 
     private static String envelope(String messageId) {
