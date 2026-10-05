@@ -10,31 +10,28 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
+import ru.projectx.datareference.service.ParseFailure;
+import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ImportResult;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
 /**
  * Проход по накопленным сырым сообщениям: берёт пачку дозревших и отдаёт каждое в разбор. Что делать с
- * сообщением, знает {@link ReferenceImportService}; здесь — выборка, журнал и разбор отказов. Когда
+ * сообщением, знает {@link ReferenceImportService}; здесь — выборка, журнал и запись отказов. Когда
  * запускать проход, задаёт {@link ScheduledPasses}.
  *
- * <p>Классификация отказа живёт тут, а не внутри разбора, из-за транзакций: неудачная попытка откатывает
+ * <p>Отказ записывается тут, а не внутри разбора, из-за транзакций: неудачная попытка откатывает
  * транзакцию разбора вместе с изменениями справочника, и записать отказ можно только снаружи неё.
- * Поэтому здесь ловятся ровно два случая:
- * <ul>
- *   <li>{@link OneCFieldException} — сообщение не соответствует контракту. Ошибка постоянная: следующая
- *       попытка даст то же самое, поэтому строка сразу уходит в окончательный отказ;</li>
- *   <li>любой другой отказ — недоступная база, блокировка, таймаут — временный: строка идёт на лестницу
- *       повторов.</li>
- * </ul>
+ * Повторить разбор или сразу отклонить сообщение, решает {@link ParseFailures}: повторяется только
+ * временный отказ базы, всё остальное при повторе дало бы тот же результат.
  *
- * <p>Исход каждого сообщения виден в журнале: применено, пропущено с причиной или отказ. На время разбора в
- * MDC лежат {@code message-id} и поток сообщения, под теми же именами, что при приёме из брокера. Тела
- * сообщения и текста чужого исключения в журнале нет: через этот путь идут полисы с персональными данными.
+ * <p>Исход каждого сообщения виден в журнале: применено, пропущено с причиной, отложено до повтора или
+ * отклонено окончательно. На время разбора в MDC лежат {@code message-id} и поток сообщения, под теми же
+ * именами, что при приёме из брокера. Тела сообщения и текста чужого исключения в журнале нет: через этот
+ * путь идут полисы с персональными данными.
  */
 @Component
 public class ReferenceImportScheduler {
@@ -44,6 +41,7 @@ public class ReferenceImportScheduler {
     private final InboundMessageRepository repository;
     private final ReferenceImportService importService;
     private final InboundMessageService inboundMessageService;
+    private final ParseFailures failures;
     private final ImportProperties properties;
     private final Clock clock;
 
@@ -51,12 +49,14 @@ public class ReferenceImportScheduler {
             InboundMessageRepository repository,
             ReferenceImportService importService,
             InboundMessageService inboundMessageService,
+            ParseFailures failures,
             ImportProperties properties,
             Clock clock) {
 
         this.repository = repository;
         this.importService = importService;
         this.inboundMessageService = inboundMessageService;
+        this.failures = failures;
         this.properties = properties;
         this.clock = clock;
     }
@@ -93,19 +93,22 @@ public class ReferenceImportScheduler {
         try {
             reportOutcome(receipt, importService.importMessage(message));
         }
-        catch (OneCFieldException permanent) {
-            // Текст своего исключения разбора называет поле, но не его значение, поэтому он идёт в журнал.
-            log.warn("сообщение {} потока {} не соответствует контракту, повтор бессмыслен: {}",
-                    receipt.messageId(), receipt.stream(), permanent.getMessage());
-            inboundMessageService.recordPermanentFailure(receipt.messageId(), permanent.getMessage());
+        catch (RuntimeException failure) {
+            // Граница прохода: любая ошибка разбора одного сообщения записывается его исходом, и проход идёт дальше.
+            recordFailure(receipt, failures.classify(failure));
         }
-        catch (RuntimeException temporary) {
-            // В журнал идёт только тип отказа. Текст чужого исключения способен нести значения полей: ошибка
-            // вставки, например, печатает параметры запроса. Полный текст сохраняется в строке сырья, где он
-            // под теми же правилами доступа, что и сами данные.
-            log.warn("временная ошибка разбора сообщения {} потока {}: {}",
-                    receipt.messageId(), receipt.stream(), temporary.getClass().getName());
-            inboundMessageService.recordTemporaryFailure(receipt.messageId(), temporary.toString());
+    }
+
+    /** Окончательный отказ в журнал пишет сам сервис исходов: только он знает, кончились ли повторы. */
+    private void recordFailure(InboundReceipt receipt, ParseFailure failure) {
+        switch (failure) {
+            case ParseFailure.Temporary temporary -> {
+                log.warn("временная ошибка разбора сообщения {} потока {}: {}, SQLSTATE {}",
+                        receipt.messageId(), receipt.stream(), temporary.type(), temporary.sqlState());
+                inboundMessageService.recordTemporaryFailure(receipt.messageId(), temporary);
+            }
+            case ParseFailure.Permanent permanent ->
+                    inboundMessageService.recordPermanentFailure(receipt.messageId(), permanent);
         }
     }
 

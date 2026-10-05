@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/013-quarantine.yaml
   - include:
       file: db/changelog/014-inbound-backlog-index.yaml
+  - include:
+      file: db/changelog/015-erase-policy-reasons.yaml

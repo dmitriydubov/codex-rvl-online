@@ -124,7 +124,8 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
     /**
      * Стирает тела не больше {@code limit} строк потока полисов, принятых раньше {@code receivedBefore}, начиная
      * с самых старых, и возвращает, сколько стёрто. Нужен сроку хранения персональных данных: строки остаются,
-     * тела не читаются в память. Метод не открывает транзакцию: её открывает вызывающий, отдельную на каждую
+     * тела не читаются в память. Вместе с телом стирается причина исхода: у полиса она могла содержать текст
+     * ошибки базы со значениями полей. Метод не открывает транзакцию: её открывает вызывающий, отдельную на каждую
      * пачку.
      *
      * <p>Запрос написан на SQL PostgreSQL, потому что в языке запросов JPA у подзапроса нет ограничения числа
@@ -134,7 +135,8 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
     @Modifying
     @Query(nativeQuery = true, value = """
             update inbound_message
-               set payload = null
+               set payload = null,
+                   last_error = null
              where message_id in (select message_id
                                     from inbound_message
                                    where stream = 'POLICIES'

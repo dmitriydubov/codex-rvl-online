@@ -105,10 +105,39 @@ class OneCValuesTest {
                 .contains(LocalDate.of(2024, 10, 10));
     }
 
+    /**
+     * Нечитаемая дата — нарушение контракта с именем поля. Причина в цепочке называет тип исключения JDK, но не
+     * его текст: исключение разбора даты повторяет исходное значение, а им может оказаться дата рождения из
+     * полиса, которую вывел бы любой стек в журнале.
+     */
     @Test
-    void unparsableDate_isContractViolation() {
+    void unparsableDate_isContractViolationNamingFieldWithCauseTypeButNotValue() {
         assertThatThrownBy(() -> OneCValues.date(node("{\"beginDate\":\"10.10.2024\"}"), "beginDate"))
-                .isInstanceOf(OneCFieldException.class);
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле beginDate не является датой")
+                .cause()
+                .hasMessage("java.time.format.DateTimeParseException")
+                .hasNoCause();
+    }
+
+    /** Предел длины считается после обрезки пробелов: код 1С, дополненный пробелами, ровно в предел принимается. */
+    @Test
+    void limitedText_withinLimitAfterTrimming_isRead() {
+        assertThat(OneCValues.limitedText(node("{\"ИНН\":\" 770000000012 \"}"), "ИНН", 12))
+                .contains("770000000012");
+    }
+
+    /** Значение длиннее предела — нарушение контракта: в отказе поле и предел, значения нет. */
+    @Test
+    void limitedText_overLimit_isContractViolationNamingFieldAndLimit() {
+        assertThatThrownBy(() -> OneCValues.limitedText(node("{\"ИНН\":\"7700000000123\"}"), "ИНН", 12))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле ИНН длиннее 12 символов");
+    }
+
+    @Test
+    void limitedText_missing_isEmpty() {
+        assertThat(OneCValues.limitedText(node("{}"), "КПП", 9)).isEmpty();
     }
 
     /** Открытая дата в обязательном поле означает, что поле не заполнено. */

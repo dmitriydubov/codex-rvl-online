@@ -20,7 +20,6 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.service.InboundMessageService;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -113,14 +112,20 @@ class ReferenceImportDispatchTest {
         assertEnvelopeRejected("{\"data\":[1]}", "в конверте сообщения нет объекта data");
     }
 
+    /**
+     * Нечитаемое тело — нарушение контракта. Причина в цепочке называет тип исключения Jackson, но не его текст:
+     * Jackson цитирует кусок тела, а в теле полиса бывают персональные данные, которые вывел бы любой стек в журнале.
+     */
     @Test
-    void bodyThatIsNotJson_isContractViolation_keepingTheCause() {
+    void bodyThatIsNotJson_isContractViolation_withoutQuotingTheBody() {
         ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, json);
 
         assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, "{не json")))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("тело сообщения не читается как JSON")
-                .hasCauseInstanceOf(JacksonException.class);
+                .cause()
+                .hasMessageStartingWith("tools.jackson.")
+                .hasMessageNotContaining("не json");
     }
 
     private void assertEnvelopeRejected(String payload, String reason) {

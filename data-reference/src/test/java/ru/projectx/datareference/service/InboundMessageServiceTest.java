@@ -24,6 +24,9 @@ import tools.jackson.databind.json.JsonMapper;
 @IntegrationTest
 class InboundMessageServiceTest {
 
+    private static final ParseFailure.Temporary TIMEOUT = new ParseFailure.Temporary(
+            "временный отказ базы данных: QueryTimeoutException, SQLSTATE 57014", "QueryTimeoutException", "57014");
+
     private static final ObjectMapper JSON = JsonMapper.builder().build();
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
     private static final String PAYLOAD = """
@@ -102,13 +105,13 @@ class InboundMessageServiceTest {
     void temporaryFailure_schedulesRetryByFirstStepOfLadder() {
         UUID messageId = store();
 
-        inboundMessageService.recordTemporaryFailure(messageId, "база недоступна");
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.RETRY);
         assertThat(stored.outcome().attempt()).isEqualTo(1);
         assertThat(stored.outcome().nextRetryAt()).isEqualTo(NOW.plus(Duration.ofSeconds(30)));
-        assertThat(stored.outcome().lastError()).isEqualTo("база недоступна");
+        assertThat(stored.outcome().lastError()).isEqualTo(TIMEOUT.reason());
     }
 
     /** Умолчание лестницы — 30 с / 5 мин / 30 мин, и каждая следующая попытка идёт по ней. */
@@ -116,13 +119,13 @@ class InboundMessageServiceTest {
     void repeatedTemporaryFailures_walkDownTheLadder() {
         UUID messageId = store();
 
-        inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
-        inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
 
         assertThat(repository.findById(messageId).orElseThrow().outcome().nextRetryAt())
                 .isEqualTo(NOW.plus(Duration.ofMinutes(5)));
 
-        inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().attempt()).isEqualTo(3);
@@ -138,13 +141,13 @@ class InboundMessageServiceTest {
         UUID messageId = store();
 
         for (int failure = 0; failure < 4; failure++) {
-            inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
+            inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
         }
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.FAILED);
         assertThat(stored.outcome().nextRetryAt()).isNull();
-        assertThat(stored.outcome().lastError()).contains("лестница повторов исчерпана");
+        assertThat(stored.outcome().lastError()).isEqualTo("повторы исчерпаны на попытке 4: " + TIMEOUT.reason());
     }
 
     /** Постоянная ошибка не тратит попытки: повтор даст тот же результат. */
@@ -152,7 +155,8 @@ class InboundMessageServiceTest {
     void permanentFailure_endsWithoutRetrying() {
         UUID messageId = store();
 
-        inboundMessageService.recordPermanentFailure(messageId, "в конверте нет объекта data");
+        inboundMessageService.recordPermanentFailure(messageId,
+                new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.FAILED);
@@ -168,7 +172,7 @@ class InboundMessageServiceTest {
     @Test
     void successAfterRetry_clearsFailureTrace() {
         UUID messageId = store();
-        inboundMessageService.recordTemporaryFailure(messageId, "база недоступна");
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
 
         inboundMessageService.markProcessed(messageId);
 
