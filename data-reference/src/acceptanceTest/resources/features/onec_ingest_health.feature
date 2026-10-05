@@ -69,7 +69,7 @@
     И мониторинг запрашивает "/actuator/health"
     Тогда Дата-референс отвечает <health HTTP>
     И поле "components.onecIngest.status" ответа равно "<health status>"
-    И поле "components.onecIngest.details.sqlstate" ответа равно "<SQLSTATE отказа>"
+    И поле "components.onecIngest.details.sqlstate" ответа равно "<SQLSTATE в health>"
     И поля "components.onecIngest.details.queuesWithoutConsumer" в ответе нет
     Когда база Дата-референса снова принимает соединения
     И Дата-референс проверяет доступность базы
@@ -85,8 +85,8 @@
     И Дата-референс отвечает <readiness HTTP>
 
     Примеры:
-      | SQLSTATE отказа | очередь без потребителя | очередь в health              | health HTTP | health status | readiness HTTP |
-      | 08001           | полисы                  | 1c-usk_to_rvl-online_policies | 503         | DOWN          | 200            |
+      | SQLSTATE отказа | SQLSTATE в health | очередь без потребителя | очередь в health              | health HTTP | health status | readiness HTTP |
+      | 08001           | 08001             | полисы                  | 1c-usk_to_rvl-online_policies | 503         | DOWN          | 200            |
 
   # [Ш46] (б): очередь без потребителя видна в health и вне паузы. [RMQ-CC]: удаление очереди отменяет потребителя;
   # [AMQP], [BOOT-A]: сервис очередь заново не объявляет, после повторов его потребитель этой очереди останавливается.
