@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -38,6 +39,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
@@ -85,6 +87,13 @@ class ReferenceImportPassTest {
     void captureLog() {
         logged.start();
         schedulerLog().addAppender(logged);
+    }
+
+    /** Сервис исходов сообщает, с каким статусом осталось сообщение; здесь — обычные статусы отказов. */
+    @BeforeEach
+    void recordFailuresAsUsual() {
+        lenient().when(inboundMessageService.recordTemporaryFailure(any(), any())).thenReturn(InboundStatus.RETRY);
+        lenient().when(inboundMessageService.recordPermanentFailure(any(), any())).thenReturn(InboundStatus.FAILED);
     }
 
     @AfterEach
@@ -175,7 +184,7 @@ class ReferenceImportPassTest {
         doThrow(new CannotAcquireLockException("lock")).when(importService).importMessage(message);
         doAnswer(invocation -> {
             seen.putAll(MDC.getCopyOfContextMap());
-            return null;
+            return InboundStatus.RETRY;
         }).when(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()), any());
 
         scheduler().importPendingMessages();
