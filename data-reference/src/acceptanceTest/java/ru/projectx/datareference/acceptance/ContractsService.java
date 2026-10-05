@@ -25,8 +25,8 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * для него ({@code spring-boot-resttestclient}) — отдельный модуль, которого нет
  * на classpath и в Nexus контура.
  *
- * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Прежний клиент на
- * {@code HttpURLConnection} не умеет метод PATCH, а сценарии отказа по методу его отправляют.
+ * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Он выбран потому, что сценарии отказа
+ * по методу отправляют PATCH, а клиент на {@code HttpURLConnection} этот метод не умеет.
  *
  * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
  * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон

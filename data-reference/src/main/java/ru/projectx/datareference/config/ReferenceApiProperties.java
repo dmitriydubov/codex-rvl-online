@@ -1,6 +1,7 @@
 package ru.projectx.datareference.config;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -55,6 +56,12 @@ public record ReferenceApiProperties(
             @Min(1) @DefaultValue("50") int maxLimit,
             @Min(1) @DefaultValue("2") int minQueryLength,
             @Min(1) @DefaultValue("100") int maxQueryLength) {
+
+        /** Верхний предел длины строки не ниже нижнего: иначе не прошла бы ни одна строка поиска. */
+        @AssertTrue(message = "max-query-length не меньше min-query-length")
+        public boolean isQueryLengthRangeConsistent() {
+            return maxQueryLength >= minQueryLength;
+        }
     }
 
     /**
@@ -67,5 +74,11 @@ public record ReferenceApiProperties(
             @Min(1) @DefaultValue("2") int minQueryLength,
             @Min(1) @DefaultValue("100") int maxQueryLength,
             @Min(1) @DefaultValue("100") int maxCodes) {
+
+        /** Верхний предел длины строки не ниже нижнего: иначе не прошла бы ни одна строка поиска. */
+        @AssertTrue(message = "max-query-length не меньше min-query-length")
+        public boolean isQueryLengthRangeConsistent() {
+            return maxQueryLength >= minQueryLength;
+        }
     }
 }

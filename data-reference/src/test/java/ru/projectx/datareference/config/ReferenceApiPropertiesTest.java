@@ -62,6 +62,26 @@ class ReferenceApiPropertiesTest {
                         .rootCause().hasMessageContaining(section + "." + component));
     }
 
+    /**
+     * Верхний предел длины ниже нижнего не пропустил бы ни одной строки поиска. Такая пара тоже не пускает
+     * сервис в работу, а равные пределы допустимы: строка ровно этой длины проходит обе проверки.
+     */
+    @ParameterizedTest
+    @CsvSource({"search,1,queryLengthRangeConsistent", "mkb10,1,queryLengthRangeConsistent"})
+    void maxQueryLengthBelowMinimum_failsStartup(String section, int maxLength, String property) {
+        context.withPropertyValues("projectx.api." + section + ".max-query-length=" + maxLength)
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining(section + "." + property));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"search", "mkb10"})
+    void maxQueryLengthEqualToMinimum_isAccepted(String section) {
+        context.withPropertyValues("projectx.api." + section + ".max-query-length=2")
+                .run(started -> assertThat(started).hasNotFailed());
+    }
+
     @EnableConfigurationProperties(ReferenceApiProperties.class)
     static class ReferenceApiPropertiesBinding {
     }

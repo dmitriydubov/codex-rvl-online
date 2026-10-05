@@ -100,6 +100,26 @@ class Mkb10ControllerTest {
         verifyNoInteractions(mkb10);
     }
 
+    /** Условие «ключа другого режима нет» смотрит только на query и codes: посторонний параметр ему не мешает. */
+    @Test
+    void searchWithUnrelatedParameter_isStillSearch() {
+        when(mkb10.search("Q06", null)).thenReturn(codes("Q06"));
+
+        MvcTestResult result = mvc.get().uri(MKB10 + "?query={query}&foo=1", "Q06").exchange();
+
+        assertThat(result).bodyJson().extractingPath("$.items[*].code").asArray().containsExactly("Q06");
+    }
+
+    /** {@code limit} у перечня кодов не используется и не делает запрос подсказкой. */
+    @Test
+    void byCodesWithLimit_isStillLookupByCodes() {
+        when(mkb10.byCodes(List.of("I25.1"))).thenReturn(codes("I25.1"));
+
+        MvcTestResult result = mvc.get().uri(MKB10 + "?codes={codes}&limit=5", "I25.1").exchange();
+
+        assertThat(result).bodyJson().extractingPath("$.items[*].code").asArray().containsExactly("I25.1");
+    }
+
     /** Ручка отдаёт только JSON, поэтому запрос, который принимает только XML, отсекается ещё при выборе ручки. */
     @Test
     void search_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {

@@ -71,22 +71,25 @@ class PolicyLookupKeysTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
+    /** Условие «ключа другого способа нет» смотрит только на ключи полиса: посторонний параметр ему не мешает. */
     @Test
-    void externalIdAlone_isStillLookupByExternalId() {
+    void externalIdWithUnrelatedParameter_isStillLookupByExternalId() {
         when(policies.byExternalId(POLICY_EXTERNAL_ID)).thenReturn(policy());
 
-        MvcTestResult result = mvc.get().uri(POLICIES + "?external_id={external}", POLICY_EXTERNAL_ID).exchange();
+        MvcTestResult result = mvc.get()
+                .uri(POLICIES + "?external_id={external}&limit=5", POLICY_EXTERNAL_ID)
+                .exchange();
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(POLICY_ID.toString());
     }
 
     @Test
-    void numberWithContract_withoutExternalId_isStillLookupByNumber() {
+    void numberWithContractAndUnrelatedParameter_isStillLookupByNumber() {
         when(policies.byNumber(POLICY_NUMBER, CONTRACT_ID)).thenReturn(policy());
 
         MvcTestResult result = mvc.get()
-                .uri(POLICIES + "?number={number}&contract_id={contract}", POLICY_NUMBER, CONTRACT_ID)
+                .uri(POLICIES + "?number={number}&contract_id={contract}&query=x", POLICY_NUMBER, CONTRACT_ID)
                 .exchange();
 
         assertThat(result).hasStatusOk();
