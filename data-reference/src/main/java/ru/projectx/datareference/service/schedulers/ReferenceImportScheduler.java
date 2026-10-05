@@ -80,7 +80,7 @@ public class ReferenceImportScheduler {
         MDC.put(OneCLogContext.MESSAGE_ID, receipt.messageId().toString());
         MDC.put(OneCLogContext.STREAM, receipt.stream().name());
         try {
-            importAndClassify(message, receipt);
+            importAndClassify(message);
         }
         finally {
             MDC.remove(OneCLogContext.MESSAGE_ID);
@@ -88,7 +88,8 @@ public class ReferenceImportScheduler {
         }
     }
 
-    private void importAndClassify(InboundMessage message, InboundReceipt receipt) {
+    private void importAndClassify(InboundMessage message) {
+        InboundReceipt receipt = message.receipt();
         try {
             reportOutcome(receipt, importService.importMessage(message));
         }

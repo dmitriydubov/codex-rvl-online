@@ -161,7 +161,7 @@ public class InboundMessage {
         this.nextRetryAt = null;
     }
 
-    /** Временная ошибка: попытка засчитана, следующая назначена по лестнице задержек. */
+    /** Временная ошибка: попытка засчитана, следующая назначена через задержку из настроенного списка повторов. */
     public void markRetrying(String error, Instant nextRetryAt) {
         this.status = InboundStatus.RETRY;
         this.attempt += 1;
@@ -169,7 +169,7 @@ public class InboundMessage {
         this.nextRetryAt = nextRetryAt;
     }
 
-    /** Постоянная ошибка или исчерпанная лестница задержек: повторов больше не будет. */
+    /** Постоянная ошибка или исчерпанный список повторов: больше попыток не будет. */
     public void markFailed(String error) {
         this.status = InboundStatus.FAILED;
         this.lastError = error;
