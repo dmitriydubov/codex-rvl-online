@@ -7,14 +7,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Таймауты сеанса PostgreSQL, которые пул приложения передаёт в стартовом {@code options}
- * (Ш4): {@code application.yml} подставляет эти же значения в
+ * Таймауты сеанса PostgreSQL, которые пул приложения передаёт в стартовом {@code options}.
+ * {@code application.yml} подставляет эти же значения в
  * {@code spring.datasource.hikari.data-source-properties.options}, так что настройка одна.
- * Значения — в записи PostgreSQL, с единицей ({@code 5s}, {@code 1min}).
+ * Значения записаны так, как их понимает PostgreSQL, с единицей ({@code 5s}, {@code 1min}).
  *
- * <p>Отдельной записью они нужны проверке при старте (Ш41): пулер с
- * {@code ignore_startup_parameters} молча выбрасывает {@code options}, и сервис работал бы
- * без ограничений, а журнал был бы чист.
+ * <p>Отдельной записью они нужны проверке таймаутов при старте. Пулер с
+ * {@code ignore_startup_parameters} молча выбрасывает {@code options}, и без этой проверки
+ * сервис работал бы без ограничений, а журнал был бы чист.
  */
 @Validated
 @ConfigurationProperties("projectx.database.session-timeouts")
