@@ -14,7 +14,7 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/** X-Request-Id по Р53 (а): допустимый возвращается как есть, иначе — новый UUID, запрос не отклоняется. */
+/** Присланный X-Request-Id: допустимый возвращается как есть, иначе — новый UUID, запрос не отклоняется. */
 class RequestIdFilterTest {
 
     private static final String SIXTY_FOUR =

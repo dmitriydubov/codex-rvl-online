@@ -55,7 +55,7 @@ class ProgramControllerTest {
         verifyNoInteractions(programs);
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 проверяет {@code RequestErrorAdviceTest}. */
     @Test
     void programById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(PROGRAMS, PROGRAM_ID).accept(MediaType.APPLICATION_XML).exchange();

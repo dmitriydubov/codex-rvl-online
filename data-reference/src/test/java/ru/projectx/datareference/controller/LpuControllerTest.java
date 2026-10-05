@@ -102,7 +102,7 @@ class LpuControllerTest {
         assertThat(result).bodyJson().extractingPath("$.lpu.id").isEqualTo(LPU_ID.toString());
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 проверяет {@code RequestErrorAdviceTest}. */
     @Test
     void card_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(LPU + "/{id}", LPU_ID).accept(MediaType.APPLICATION_XML).exchange();

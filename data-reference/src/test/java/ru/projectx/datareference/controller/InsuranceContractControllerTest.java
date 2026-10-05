@@ -66,7 +66,7 @@ class InsuranceContractControllerTest {
         verifyNoInteractions(insuranceContracts);
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 проверяет {@code RequestErrorAdviceTest}. */
     @Test
     void contractById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(CONTRACTS + "/{id}", CONTRACT_ID).accept(MediaType.APPLICATION_XML)

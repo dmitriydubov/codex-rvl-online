@@ -11,7 +11,7 @@ import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 
 /**
- * Договор страхования по нашему {@code id} или по GUID 1С ({@code OQ-47}): номер, период,
+ * Договор страхования по нашему {@code id} или по GUID 1С: номер, период,
  * признак архива и страхователь. Транзакция чтения здесь, ответ собирается внутри неё.
  *
  * <p>Страхователь подтягивается вторым запросом по {@code external_insurer_id}: связь
