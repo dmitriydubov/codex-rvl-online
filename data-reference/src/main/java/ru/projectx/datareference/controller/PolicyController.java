@@ -14,20 +14,29 @@ import ru.projectx.datareference.service.PolicySearchReads;
 import ru.projectx.datareference.service.PolicyReads;
 
 /**
- * Полисы: подсказка среди действующих полисов договора (R-04), полис целиком (R-05) —
- * по нашему {@code id}, по {@code external_id} или по номеру в договоре, — и полис для сервиса
- * Договоров без персональных данных ({@code contract-view}, решение Р20 (а)).
+ * Полисы: подсказка среди действующих полисов договора, полис целиком и полис для сервиса Договоров без
+ * персональных данных ({@code contract-view}). Полис целиком читается по нашему {@code id}, по GUID 1С:УСК
+ * ({@code external_id}) или по номеру вместе с договором.
  *
- * <p>Единственное, что контроллер решает сам, — что запрос без ключа неверен, и говорит об этом
- * сам на обоих путях: без своей ручки на {@code /policies} Spring отказал бы исключением о несовпавших
- * параметрах ({@code UnsatisfiedServletRequestParameterException}), которого единый формат ошибки
- * не знает, — вышло бы 500; а {@code /policies/contract-view} ушёл бы в {@code /policies/{id}}
- * и получил бы отказ по полю {@code id}. Вызывающему же нужно «нет параметра {@code external_id}». Путь
- * {@code /policies/contract-view}, как и {@code search}, не читается как {@code /policies/{id}}:
- * Spring сначала ищет обработчик с точно таким путём без шаблонов и только без него перебирает шаблоны.
+ * <p>Контроллер сам решает только одно: каким ключом прочитан запрос. Ручка каждого ключа принимает запрос,
+ * только если ключа другого способа в нём нет. Иначе Spring молча выбрал бы ручку с большим числом совпавших
+ * параметров и прочитал полис по одному из ключей. Пустое значение ключа тоже считается переданным ключом.
+ * Запрос без ключа и запрос, где рядом с {@code external_id} стоит номер или договор, отклоняются ошибкой
+ * вызывающего с полем {@code external_id}, и у каждого своя ручка со своей причиной отказа. Без ручки на запрос
+ * без ключа Spring отказал бы исключением о несовпавших параметрах, которого единый формат ошибки не знает.
+ *
+ * <p>У {@code /policies/contract-view} своя ручка без ключа по той же причине: без неё запрос ушёл бы в
+ * {@code /policies/{id}} и получил бы отказ по полю {@code id}, а вызывающему нужно «нет параметра
+ * {@code external_id}». Пути {@code /policies/contract-view} и {@code /policies/search} не читаются как
+ * {@code /policies/{id}}: Spring сначала ищет ручку с точно таким путём без шаблонов и только без неё
+ * перебирает шаблоны.
  */
 @InternalApi
 public class PolicyController {
+
+    private static final String EXTERNAL_ID = "external_id";
+    private static final String NUMBER = "number";
+    private static final String CONTRACT_ID = "contract_id";
 
     private final PolicyReads policies;
     private final PolicySearchReads policySearch;
@@ -41,46 +50,52 @@ public class PolicyController {
         this.contractViews = contractViews;
     }
 
-    /** R-05: полис целиком. */
+    /** Полис целиком по нашему {@code id}. */
     @GetMapping("/policies/{id}")
     public PolicyResponse policy(@PathVariable UUID id) {
         return policies.byId(id);
     }
 
-    @GetMapping(path = "/policies", params = "external_id")
-    public PolicyResponse policyByExternalId(@RequestParam("external_id") UUID externalId) {
+    @GetMapping(path = "/policies", params = {EXTERNAL_ID, "!" + NUMBER, "!" + CONTRACT_ID})
+    public PolicyResponse policyByExternalId(@RequestParam(EXTERNAL_ID) UUID externalId) {
         return policies.byExternalId(externalId);
     }
 
-    @GetMapping(path = "/policies", params = {"number", "contract_id"})
-    public PolicyResponse policyByNumber(@RequestParam String number, @RequestParam("contract_id") UUID contractId) {
+    @GetMapping(path = "/policies", params = {NUMBER, CONTRACT_ID, "!" + EXTERNAL_ID})
+    public PolicyResponse policyByNumber(@RequestParam String number, @RequestParam(CONTRACT_ID) UUID contractId) {
         return policies.byNumber(number, contractId);
+    }
+
+    /** Сюда попадает запрос с {@code external_id}, которого не приняла ручка этого ключа: рядом номер или договор. */
+    @GetMapping(path = "/policies", params = EXTERNAL_ID)
+    public PolicyResponse policyByConflictingKeys() {
+        throw new InvalidRequestException(EXTERNAL_ID, "external_id не передаётся вместе с number или contract_id");
     }
 
     @GetMapping("/policies")
     public PolicyResponse policyWithoutKey() {
-        throw new InvalidRequestException("external_id", "нужен external_id либо number вместе с contract_id");
+        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id либо number вместе с contract_id");
     }
 
-    /** Полис для сервиса Договоров по нашему {@code id}: без ПДн. */
+    /** Полис для сервиса Договоров по нашему {@code id}, без персональных данных. */
     @GetMapping("/policies/{id}/contract-view")
     public PolicyContractView contractView(@PathVariable UUID id) {
         return contractViews.byId(id);
     }
 
-    /** Полис для сервиса Договоров по GUID 1С:УСК: без ПДн. */
-    @GetMapping(path = "/policies/contract-view", params = "external_id")
-    public PolicyContractView contractViewByExternalId(@RequestParam("external_id") UUID externalId) {
+    /** Полис для сервиса Договоров по GUID 1С:УСК, без персональных данных. */
+    @GetMapping(path = "/policies/contract-view", params = EXTERNAL_ID)
+    public PolicyContractView contractViewByExternalId(@RequestParam(EXTERNAL_ID) UUID externalId) {
         return contractViews.byExternalId(externalId);
     }
 
     /** Ключ по GUID 1С у полиса для Договоров один, поэтому отказ называет только его. */
     @GetMapping("/policies/contract-view")
     public PolicyContractView contractViewWithoutKey() {
-        throw new InvalidRequestException("external_id", "нужен external_id");
+        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id");
     }
 
-    /** R-04: подсказка по части ФИО или номера среди действующих полисов договора. */
+    /** Подсказка по части ФИО или номера среди действующих полисов договора. */
     @GetMapping("/policies/search")
     public PolicySearchResponse searchPolicies(
             @RequestParam("contract_external_id") UUID contractExternalId,

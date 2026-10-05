@@ -17,21 +17,20 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
 
 /**
- * Поиск полисов договора по части ФИО или номера (R-04): подсказка для поля «найти
- * сотрудника». Ищется среди действующих полисов договора с программами РВЛ —
- * базовая логика A, она в запросе репозитория.
+ * Поиск полисов договора по части ФИО или номера: подсказка для поля «найти сотрудника». Ищется среди
+ * действующих полисов договора с программами восстановительного лечения; это условие стоит в запросе
+ * репозитория.
  *
- * <p>Правила из ТЗ на API: строка нормализуется (обрезка, схлопывание пробелов,
- * нижний регистр, {@code ё → е}); есть цифры — ищем по номеру, иначе режем на токены,
- * и каждый токен должен быть префиксом фамилии, имени или отчества — так
- * «иван петр» находит и Петрова Ивана, и Иванова Петра. Ранжирование — точный номер,
- * затем совпали фамилия и имя, затем фамилия, затем остальное; внутри группы — по фамилии
- * и имени. Отбор, ранжирование и предел выдачи делает один запрос в базе
- * ({@link ru.projectx.datareference.repository.PolicySearchRepository}); здесь — правила
- * строки и пределов.
+ * <p>Строка нормализуется: обрезаются пробелы по краям, подряд идущие пробелы схлопываются, буквы приводятся
+ * к нижнему регистру, {@code ё} заменяется на {@code е}. Если в строке есть цифры, ищется номер. Иначе строка
+ * режется на слова, и каждое слово должно быть началом фамилии, имени или отчества. Так «иван петр» находит
+ * и Петрова Ивана, и Иванова Петра. Сначала идёт точный номер, затем совпавшие фамилия и имя, затем фамилия,
+ * затем остальное; внутри группы — по фамилии и имени. Отбор, порядок и предел выдачи делает один запрос в
+ * базе ({@link ru.projectx.datareference.repository.PolicySearchRepository}), а здесь проверяются строка и
+ * пределы. Длина строки сверху проверяется первой, по строке как пришла (см. {@link SearchInputLimits}).
  *
- * <p>Строка поиска — это фамилии. Она не попадает ни в журнал, ни в текст ошибки:
- * отказ называет правило, а не значение.
+ * <p>Строка поиска — это фамилии. Она не попадает ни в журнал, ни в текст ошибки: отказ называет правило,
+ * а не значение.
  */
 @Service
 public class PolicySearchService implements PolicySearchReads {
@@ -60,6 +59,7 @@ public class PolicySearchService implements PolicySearchReads {
     @Override
     @RestReadTransaction
     public PolicySearchResponse search(UUID contractExternalId, String rawQuery, @Nullable Integer requestedLimit) {
+        SearchInputLimits.requireQueryNotLongerThan(rawQuery, api.search().maxQueryLength());
         int limit = ResultLimits.resolve(requestedLimit, api.search().defaultLimit(), api.search().maxLimit());
         String query = normalize(rawQuery);
         insuranceContracts.findByExternalIdAndArchiveFalse(contractExternalId)

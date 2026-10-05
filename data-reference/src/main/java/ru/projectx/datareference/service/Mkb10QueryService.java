@@ -15,13 +15,16 @@ import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.repository.Mkb10Row;
 
 /**
- * МКБ-10 для R-07 в двух режимах: подсказка по строке и батч по перечню кодов.
+ * Справочник МКБ-10 для сервиса Заявок в двух режимах: подсказка по строке и раскрытие перечня кодов разом.
  *
- * <p>Строка, которая начинается с буквы и цифры, — это код ({@code I25}, {@code Q06.0}),
- * ищется префиксом без учёта регистра; любая другая — подстрока наименования. Архивные
- * коды в подсказку не попадают, а батчу отдаются с признаком: старые заявки ссылаются
- * на них, и показать их надо. Фильтра по ЛПУ нет: {@code lpu_mkb} не наполняется
- * ни одним потоком ({@code OQ-25}).
+ * <p>Строка, которая начинается с буквы и цифры, — это код ({@code I25}, {@code Q06.0}). Он ищется по
+ * началу кода без учёта регистра. Любая другая строка ищется как часть наименования. Архивные коды в
+ * подсказку не попадают, а в раскрытии перечня отдаются с признаком архива: старые заявки ссылаются на них,
+ * и показать их надо. Фильтра по ЛПУ (лечебно-профилактическому учреждению) нет: связь кодов с ЛПУ
+ * не приходит ни одним потоком из 1С.
+ *
+ * <p>Строка поиска и перечень кодов ограничены сверху по объёму (см. {@link SearchInputLimits}); эти
+ * пределы проверяются первыми, до обрезки пробелов и удаления повторов.
  */
 @Service
 public class Mkb10QueryService implements Mkb10Reads {
@@ -39,6 +42,7 @@ public class Mkb10QueryService implements Mkb10Reads {
     @Override
     @RestReadTransaction
     public Mkb10Response search(String rawQuery, @Nullable Integer requestedLimit) {
+        SearchInputLimits.requireQueryNotLongerThan(rawQuery, api.mkb10().maxQueryLength());
         Limit limit = Limit.of(ResultLimits.resolve(requestedLimit, api.mkb10().defaultLimit(), api.mkb10().maxLimit()));
         String query = rawQuery.trim();
         if (query.length() < api.mkb10().minQueryLength()) {
@@ -50,6 +54,7 @@ public class Mkb10QueryService implements Mkb10Reads {
     @Override
     @RestReadTransaction
     public Mkb10Response byCodes(List<String> rawCodes) {
+        SearchInputLimits.requireCodesNotMoreThan(rawCodes, api.mkb10().maxCodes());
         List<String> codes = rawCodes.stream()
                 .map(String::trim)
                 .filter(Predicate.not(String::isEmpty))
