@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Тогда;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.JsonNode;
@@ -18,6 +19,14 @@ public class OneCOutcomeSteps {
 
     private static final JsonMapper JSON = JsonMapper.shared();
     private static final String DATA = "data";
+
+    /** Исходы так, как их называет спецификация, и статусы строки сырья, которые за ними стоят. */
+    private static final Map<String, InboundStatus> OUTCOMES = Map.of(
+            "применено", InboundStatus.PROCESSED,
+            "пропущено", InboundStatus.SKIPPED,
+            "отложено до повтора", InboundStatus.RETRY,
+            "отклонено без повторов", InboundStatus.FAILED,
+            "ждёт разбора", InboundStatus.NEW);
 
     private final OneCInbox inbox;
 
@@ -45,11 +54,35 @@ public class OneCOutcomeSteps {
      */
     @Тогда("последнее сообщение 1С:УСК отложено до повтора после попытки {int} с причиной {string}")
     public void lastMessagePostponed(int attempt, String reason) {
-        InboundRow last = inbox.last();
+        assertPostponed(inbox.last(), "последнего", attempt, reason);
+    }
 
-        assertThat(last.status()).as("статус последнего сообщения").isEqualTo(InboundStatus.RETRY.name());
-        assertThat(last.attempt()).as("отложенных попыток последнего сообщения").isEqualTo(attempt);
-        assertThat(last.lastError()).as("причина отказа последнего сообщения").isEqualTo(reason);
+    /** То же для сообщения, присланного первым: оно голова потока, и его исход проверяют после более поздних. */
+    @Тогда("первое сообщение 1С:УСК отложено до повтора после попытки {int} с причиной {string}")
+    public void firstMessagePostponed(int attempt, String reason) {
+        assertPostponed(inbox.first(), "первого", attempt, reason);
+    }
+
+    /**
+     * Исходы всех строк сырья сценария в порядке приёма, словами через запятую. Незнакомое слово роняет шаг: иначе
+     * мутация значения в спецификации прошла бы незамеченной.
+     */
+    @Тогда("исходы сообщений 1С:УСК в порядке приёма — {string}")
+    public void outcomesInOrder(String outcomes) {
+        List<String> expected = Stream.of(outcomes.split(",")).map(String::strip).map(OneCOutcomeSteps::status).toList();
+
+        assertThat(inbox.statuses()).as("статусы сырья в порядке приёма").containsExactlyElementsOf(expected);
+    }
+
+    private static String status(String outcome) {
+        assertThat(OUTCOMES).as("исходы, которые знает шаг").containsKey(outcome);
+        return OUTCOMES.get(outcome).name();
+    }
+
+    private static void assertPostponed(InboundRow row, String which, int attempt, String reason) {
+        assertThat(row.status()).as("статус %s сообщения", which).isEqualTo(InboundStatus.RETRY.name());
+        assertThat(row.attempt()).as("отложенных попыток %s сообщения", which).isEqualTo(attempt);
+        assertThat(row.lastError()).as("причина отказа %s сообщения", which).isEqualTo(reason);
     }
 
     /**

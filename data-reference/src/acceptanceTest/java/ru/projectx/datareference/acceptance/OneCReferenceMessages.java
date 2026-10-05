@@ -72,6 +72,20 @@ final class OneCReferenceMessages {
     }
 
     /**
+     * Код МКБ-10 (ТЗ-4) без наименования: поле {@code name} пустое, а оно обязательное. Разбор отклоняет такое
+     * сообщение окончательно.
+     */
+    static OneCMessage mkb10WithoutName(Map<String, String> table) {
+        onlyKnown(table, EXTERNAL_ID, "код");
+        ObjectNode data = JSON.createObjectNode()
+                .put("id", required(table, EXTERNAL_ID))
+                .put("code", required(table, "код"))
+                .put("name", "")
+                .put(DELETE_MARK, false);
+        return new OneCMessage(OneCStream.MKB10, MKB10_QUEUE, data, InboundStatus.FAILED);
+    }
+
+    /**
      * Договор санатория (ТЗ-5); санаторий — владелец договора. Без строк «главный договор» и «цены главного договора»
      * договор главный и со своими ценами. Строка «выгружать прейскуранты в СОБ» — признак договора из его
      * дополнительных свойств, а не поле сообщения.
