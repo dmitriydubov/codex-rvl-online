@@ -123,6 +123,18 @@ class ServicePriceLookupTest {
     }
 
     @Test
+    void serviceOfPriceContractOutsideNonEmptyOffer_isNotFound() {
+        ContragentService offered = ReadFixtures.service(priceContract, RVL);
+        when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
+        when(offers.of(lpu.id())).thenReturn(offer(List.of(offered)));
+
+        assertThatThrownBy(() -> lookup.price(service.id(), PERIOD))
+                .isInstanceOfSatisfying(ReferenceNotFoundException.class,
+                        notFound -> assertThat(notFound.code()).isEqualTo("SERVICE_NOT_FOUND"));
+        verifyNoInteractions(priceListItems);
+    }
+
+    @Test
     void noRowsForPeriod_isRefusedForWholePeriod_namingService() {
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
         when(offers.of(lpu.id())).thenReturn(offer(List.of(service)));

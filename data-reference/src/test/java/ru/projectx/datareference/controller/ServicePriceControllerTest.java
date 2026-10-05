@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,18 @@ class ServicePriceControllerTest {
     void dateFromNotInIsoRecord_isValidationError_namingDateFrom(String dateFrom) {
         MvcTestResult result = mvc.get()
                 .uri(PRICE + "?date_from={from}&date_to=2026-04-12", SERVICE_ID, dateFrom).exchange();
+
+        assertViolation(result, "date_from", "ожидается дата yyyy-mm-dd");
+    }
+
+    /**
+     * Короткая запись даты по языку запроса (у английского — месяц/день/год) годится стандартному чтению дат
+     * Spring, но не годится сервису: принимается только yyyy-mm-dd.
+     */
+    @Test
+    void dateFromInLocalizedShortRecord_isValidationError_namingDateFrom() {
+        MvcTestResult result = mvc.get().uri(PRICE + "?date_from={from}&date_to=2026-04-12", SERVICE_ID, "4/10/26")
+                .locale(Locale.ENGLISH).exchange();
 
         assertViolation(result, "date_from", "ожидается дата yyyy-mm-dd");
     }
