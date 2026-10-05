@@ -33,4 +33,16 @@ public interface QuarantineRepository extends JpaRepository<QuarantinedMessage, 
                                    limit :limit)
             """)
     int forgetBodies(@Param("receivedBefore") Instant receivedBefore, @Param("limit") int limit);
+
+    /**
+     * Сколько тел карантинных записей, принятых раньше {@code receivedBefore}, ещё не стёрто. Тот же отбор и тот же
+     * частичный индекс, что у {@link #forgetBodies}.
+     */
+    @Query("""
+            select count(quarantined)
+              from QuarantinedMessage quarantined
+             where quarantined.body is not null
+               and quarantined.receivedAt < :receivedBefore
+            """)
+    long countBodiesReceivedBefore(@Param("receivedBefore") Instant receivedBefore);
 }

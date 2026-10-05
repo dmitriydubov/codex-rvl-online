@@ -1,8 +1,9 @@
 package ru.projectx.datareference.mapper;
 
+import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
+import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
+
 import java.time.Clock;
-import java.util.Optional;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.LpuContract;
@@ -11,67 +12,51 @@ import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.service.onec.ImportResult;
 import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * ТЗ-10: услуги контрагентов. Фильтр один — {@code ownerId} должен резолвиться в наш
- * договор; тем самым хранятся услуги только по договорам наших санаториев.
+ * Разбирает услуги санаториев из 1С:УСК (ТЗ-10). Услуга оказывается по договору с санаторием, и
+ * принимаются только услуги по договорам, которые уже есть в справочнике: так хранятся услуги
+ * только наших санаториев.
  *
- * <p>Это и тот случай, о котором контракт предупреждает отдельно: услуга может приехать
- * <b>раньше своего договора</b>, уйти в пропуск и не появиться до следующего изменения
- * в 1С. Причина пропуска пишется в строку сырья, чтобы такие сообщения можно было найти
- * и переобработать — переводом строки обратно в {@code NEW}.
+ * <p>Услуга может прийти раньше своего договора. Тогда сообщение уходит в пропуск с причиной,
+ * в которой назван GUID договора, и услуга не появится до следующего её изменения в 1С. Такие
+ * сообщения находятся по причине пропуска и обрабатываются заново, когда их строку сырья
+ * возвращают в статус {@code NEW}.
+ *
+ * <p>Версий у сообщений нет, поэтому известная услуга получает реквизиты последнего сообщения
+ * вместе с договором.
  */
 @Component
-public class ContragentServiceMapper implements StreamMapper {
+public class ContragentServiceMapper
+        extends OwnedCatalogStreamMapper<ContragentService, LpuContract, ContragentService.Details> {
 
-    private final ContragentServiceRepository repository;
-    private final LpuContractRepository contractRepository;
-    private final Clock clock;
+    private final CatalogReference<LpuContract> contracts;
 
     public ContragentServiceMapper(
             ContragentServiceRepository repository,
             LpuContractRepository contractRepository,
             Clock clock) {
 
-        this.repository = repository;
-        this.contractRepository = contractRepository;
-        this.clock = clock;
-    }
-
-    @Override
-    public OneCStream stream() {
-        return OneCStream.CONTRAGENT_SERVICES;
+        super(OneCStream.CONTRAGENT_SERVICES, repository::findByExternalId, ContragentService::create,
+                ContragentService::applySnapshot, repository::save, clock);
+        this.contracts = new CatalogReference<>(contractRepository::findByExternalId,
+                "услуга по договору вне справочника: ");
     }
 
     @Override
     public ImportResult apply(ObjectNode data) {
-        UUID ownerId = OneCValues.requiredUuid(data, "ownerId");
-        Optional<LpuContract> contract = contractRepository.findByExternalId(ownerId);
-        if (contract.isEmpty()) {
-            return ImportResult.skipped("услуга по договору вне справочника: " + ownerId);
-        }
+        return contracts.applyIfKnown(OneCValues.requiredUuid(data, "ownerId"), contract -> applyUnder(contract, data));
+    }
 
-        UUID externalId = OneCValues.requiredUuid(data, "id");
-        ContragentService.Details details = detailsOf(data);
-        Optional<ContragentService> existing = repository.findByExternalId(externalId);
-
-        if (existing.isEmpty()) {
-            repository.save(ContragentService.create(externalId, contract.get(), details, clock.instant()));
-            return ImportResult.applied();
-        }
-
-        ContragentService service = existing.get();
-        service.applySnapshot(contract.get(), details, clock.instant());
-        repository.save(service);
-        return ImportResult.applied();
+    private ImportResult applyUnder(LpuContract contract, ObjectNode data) {
+        return upsertUnder(contract, OneCValues.requiredUuid(data, "id"), detailsOf(data));
     }
 
     private static ContragentService.Details detailsOf(ObjectNode data) {
         return new ContragentService.Details(
-                OneCValues.uuid(data, "typeAppealId").orElse(null),
-                OneCValues.text(data, "code").orElse(null),
+                uuidOrNull(data, "typeAppealId"),
+                textOrNull(data, "code"),
                 OneCValues.requiredText(data, "name"),
                 OneCValues.flag(data, "deleteMark"));
     }

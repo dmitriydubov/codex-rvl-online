@@ -35,7 +35,7 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  *
  * <p>На время обработки в MDC лежат поток, очередь и, когда он прочитан, {@code message-id}:
  * по ним строка журнала находит своё сообщение. Имена ключей — {@link OneCLogContext}, общие с разбором
- * по расписанию.
+ * по расписанию. Исход каждой доставки считает {@link OneCIngestMetrics}.
  */
 @Component
 public class OneCQueueListener {
@@ -45,13 +45,15 @@ public class OneCQueueListener {
     private final OneCEnvelopeParser envelopeParser;
     private final OneCIngestService ingestService;
     private final OneCStorageFailures storageFailures;
+    private final OneCIngestMetrics metrics;
 
-    public OneCQueueListener(
-            OneCEnvelopeParser envelopeParser, OneCIngestService ingestService, OneCStorageFailures storageFailures) {
+    public OneCQueueListener(OneCEnvelopeParser envelopeParser, OneCIngestService ingestService,
+            OneCStorageFailures storageFailures, OneCIngestMetrics metrics) {
 
         this.envelopeParser = envelopeParser;
         this.ingestService = ingestService;
         this.storageFailures = storageFailures;
+        this.metrics = metrics;
     }
 
     /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
@@ -87,25 +89,29 @@ public class OneCQueueListener {
     }
 
     /**
-     * Подтверждение стоит вне {@code try} намеренно: отказ канала на подтверждении — не отказ записи.
-     * Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
+     * Подтверждение и счёт исхода стоят вне {@code try} намеренно: ни отказ канала на подтверждении, ни отказ
+     * счётчика — не отказ записи. Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
      */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {
+        IngestOutcome outcome;
         try {
-            ingest(delivery, messageId);
+            outcome = ingest(delivery, messageId);
         }
         catch (RuntimeException storageFailure) {
             storageFailures.handle(delivery, messageId, storageFailure);
             return;
         }
+        metrics.record(delivery, outcome);
         delivery.acknowledge();
     }
 
-    private void ingest(OneCDelivery delivery, UUID messageId) {
-        boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
-        if (!stored) {
-            log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
+    /** Счёт исхода — снаружи, после записи: отказ счётчика не должен выглядеть отказом базы. */
+    private IngestOutcome ingest(OneCDelivery delivery, UUID messageId) {
+        if (ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload())) {
+            return IngestOutcome.STORED;
         }
+        log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
+        return IngestOutcome.DUPLICATE;
     }
 
     /**
@@ -122,7 +128,8 @@ public class OneCQueueListener {
      * может оказаться полис. Случай почти наверняка означает поломку контракта или чужую
      * очередь, то есть касается не одного сообщения, а всех.
      */
-    private static void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
+    private void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
+        metrics.record(delivery, IngestOutcome.UNIDENTIFIED);
         log.error("сообщение потока {} из очереди {} потеряно: {} ({} байт). "
                         + "Принять его нельзя — в конверте нет пригодного message-id",
                 delivery.stream(), delivery.queue(), cause.getMessage(), delivery.rawBody().length);

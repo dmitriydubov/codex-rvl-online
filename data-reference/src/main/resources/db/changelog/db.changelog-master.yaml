@@ -31,3 +31,5 @@ databaseChangeLog:
       file: db/changelog/012-catalog-indexes.yaml
   - include:
       file: db/changelog/013-quarantine.yaml
+  - include:
+      file: db/changelog/014-inbound-backlog-index.yaml
