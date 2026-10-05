@@ -3,8 +3,6 @@ package ru.projectx.datareference.service;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,20 +26,20 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 @Service
 public class InboundMessageService {
 
-    private static final Logger log = LoggerFactory.getLogger(InboundMessageService.class);
-
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
     private final Clock clock;
     private final InboundTransitionMetrics transitions;
+    private final FinalRejectionJournal rejections;
 
     public InboundMessageService(InboundMessageRepository repository, InboundRetryProperties retryProperties,
-            Clock clock, InboundTransitionMetrics transitions) {
+            Clock clock, InboundTransitionMetrics transitions, FinalRejectionJournal rejections) {
 
         this.repository = repository;
         this.retryProperties = retryProperties;
         this.clock = clock;
         this.transitions = transitions;
+        this.rejections = rejections;
     }
 
     /**
@@ -143,16 +141,11 @@ public class InboundMessageService {
         return message.outcome().attempt() + 1;
     }
 
-    /**
-     * Окончательный отказ. В журнал идут только идентификаторы и коды: причина остаётся в строке сырья, где она
-     * под теми же правилами доступа, что и само сообщение.
-     */
-    private static void fail(InboundMessage message, String reason, ParseFailure failure) {
+    /** Окончательный отказ: строка получает причину, а журнал — запись ERROR после фиксации. */
+    private void fail(InboundMessage message, String reason, ParseFailure failure) {
         int failedAttempt = failedAttempt(message);
         message.markFailed(reason);
-        InboundReceipt receipt = message.receipt();
-        log.error("сообщение {} потока {} отклонено окончательно на попытке {}: {}, SQLSTATE {}",
-                receipt.messageId(), receipt.stream(), failedAttempt, failure.type(), failure.sqlState());
+        rejections.rejected(message.receipt(), failedAttempt, failure);
     }
 
     private InboundMessage require(UUID messageId) {

@@ -22,6 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ru.projectx.datareference.config.InboundRetryProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
@@ -115,6 +117,27 @@ class FailedMessageJournalTest {
         assertThat(logged.list).noneMatch(event -> event.getLevel() == Level.ERROR);
     }
 
+    /**
+     * В транзакции запись ждёт её фиксации: если отказ не зафиксировался, сообщение разберут снова, и журнал не
+     * должен говорить, что оно отклонено.
+     */
+    @Test
+    void permanentFailureInTransaction_isReportedOnlyAfterCommit() {
+        existing();
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service().recordPermanentFailure(MESSAGE_ID,
+                    new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
+
+            assertThat(logged.list).isEmpty();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            assertThat(logged.list).singleElement().extracting(ILoggingEvent::getLevel).isEqualTo(Level.ERROR);
+        }
+        finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
     private InboundMessage existing() {
         InboundMessage message = InboundMessage.receive(
                 new InboundReceipt(MESSAGE_ID, OneCStream.CONTRAGENTS, QUEUE, NOW), "{\"data\":{}}");
@@ -124,10 +147,10 @@ class FailedMessageJournalTest {
 
     private InboundMessageService service() {
         return new InboundMessageService(repository, new InboundRetryProperties(BACKOFF),
-                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()));
+                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()), new FinalRejectionJournal());
     }
 
     private static Logger serviceLog() {
-        return (Logger) LoggerFactory.getLogger(InboundMessageService.class);
+        return (Logger) LoggerFactory.getLogger(FinalRejectionJournal.class);
     }
 }

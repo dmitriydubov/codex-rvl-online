@@ -109,7 +109,9 @@ class SqlErrorLogTest {
         Throwable failure = catchThrowable(() -> store(mkb10("A00", poisonedName)));
 
         assertThat(SqlStates.deepest(failure)).hasValue("22P05");
-        assertThat(NestedExceptionUtils.getMostSpecificCause(failure)).hasMessageNotContaining(PERSONAL_DATA);
+        assertThat(NestedExceptionUtils.getMostSpecificCause(failure))
+                .hasMessageContaining("unsupported Unicode escape sequence")
+                .hasMessageNotContaining(PERSONAL_DATA);
         assertThat(log.getAll())
                 .doesNotContain(PERSONAL_DATA)
                 .doesNotContain("JSON data");

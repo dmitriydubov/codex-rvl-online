@@ -186,6 +186,6 @@ class InboundOutcomeRecordingTest {
     private InboundMessageService service() {
         return new InboundMessageService(
                 repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC),
-                new InboundTransitionMetrics(meters));
+                new InboundTransitionMetrics(meters), new FinalRejectionJournal());
     }
 }
