@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.service.ProgramReads;
 
-/** R-09: программа по нашему {@code id}. */
+/** Чтение программы по нашему {@code id} (R-09). */
 @ExtendWith(MockitoExtension.class)
 class ProgramControllerTest {
 
@@ -55,7 +55,7 @@ class ProgramControllerTest {
         verifyNoInteractions(programs);
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 проверяет {@code RequestErrorAdviceTest}. */
     @Test
     void programById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(PROGRAMS, PROGRAM_ID).accept(MediaType.APPLICATION_XML).exchange();

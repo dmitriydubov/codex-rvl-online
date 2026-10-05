@@ -22,7 +22,7 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
 /**
- * Проверка таймаутов при старте (Ш41): у соединения пула — значения из настройки, у соединения
+ * Проверка таймаутов при старте: у соединения пула — значения из настройки, у соединения
  * миграций — ноль. Расхождение — WARN с параметром и обоими значениями, без адресов и ПДн;
  * старт не прерывается.
  */
