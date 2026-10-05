@@ -17,7 +17,8 @@ import ru.projectx.datareference.repository.PolicyScope;
  * лимитом времени.
  *
  * <p>Сюда приходит уже проверенный вход: нормализованная строка поиска и предел выдачи. Проверяет его
- * {@link PolicySearchService} до вызова, потому что транзакция берёт соединение с базой в момент открытия.
+ * {@link PolicySearchService} до вызова, и только он вызывает этот класс; поэтому класс не виден за пределами
+ * пакета. Проверка идёт до вызова, потому что транзакция берёт соединение с базой в момент открытия.
  * Иначе при недоступной базе запрос с неверным параметром получил бы 503, и вызывающий повторял бы запрос,
  * который не пройдёт никогда.
  *
@@ -27,16 +28,17 @@ import ru.projectx.datareference.repository.PolicyScope;
  * ({@link ru.projectx.datareference.repository.PolicySearchRepository}).
  */
 @Service
-public class PolicySearchLookup {
+class PolicySearchLookup {
 
     private static final Pattern DIGIT = Pattern.compile("\\d");
-    private static final String TOKEN_SEPARATOR = " ";
+    /** Слова в нормализованной строке поиска разделены ровно одним таким пробелом. */
+    static final String WORD_SEPARATOR = " ";
 
     private final PolicyRepository policies;
     private final InsuranceContractRepository insuranceContracts;
     private final ReferenceCalendar calendar;
 
-    public PolicySearchLookup(
+    PolicySearchLookup(
             PolicyRepository policies, InsuranceContractRepository insuranceContracts, ReferenceCalendar calendar) {
 
         this.policies = policies;
@@ -61,6 +63,6 @@ public class PolicySearchLookup {
 
     private List<Policy> byNames(PolicyScope scope, String names) {
         return policies.findRankedByNames(scope,
-                Arrays.stream(names.split(TOKEN_SEPARATOR)).map(LikePatterns::prefix).toList());
+                Arrays.stream(names.split(WORD_SEPARATOR)).map(LikePatterns::prefix).toList());
     }
 }

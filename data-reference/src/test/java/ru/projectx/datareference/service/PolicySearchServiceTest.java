@@ -112,8 +112,9 @@ class PolicySearchServiceTest {
         assertThat(service.search(CONTRACT, "ив", 3).items()).isEmpty();
     }
 
+    /** Длина — в символах того, что прислано: эмодзи и «İ» по одному символу, хотя в нижнем регистре «İ» — два. */
     @ParameterizedTest
-    @ValueSource(strings = {"", "и", "  и  ", "ё", "\uD83D\uDE00"})
+    @ValueSource(strings = {"", "и", "  и  ", "ё", "\uD83D\uDE00", "\u0130"})
     void queryShorterThanMinimum_isValidationError_namingRuleNotValue(String query) {
         assertThatThrownBy(() -> service.search(CONTRACT, query, null))
                 .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {

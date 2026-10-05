@@ -29,7 +29,6 @@ import ru.projectx.datareference.dto.PolicySearchResponse;
 public class PolicySearchService implements PolicySearchReads {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
-    private static final String TOKEN_SEPARATOR = " ";
 
     private final PolicySearchLookup lookup;
     private final ReferenceApiProperties api;
@@ -43,14 +42,16 @@ public class PolicySearchService implements PolicySearchReads {
     public PolicySearchResponse search(UUID contractExternalId, String rawQuery, @Nullable Integer requestedLimit) {
         SearchInputLimits.requireQueryNotLongerThan(rawQuery, api.search().maxQueryLength());
         int limit = ResultLimits.resolve(requestedLimit, api.search().defaultLimit(), api.search().maxLimit());
-        String query = normalize(rawQuery);
-        SearchInputLimits.requireQueryNotShorterThan(query, api.search().minQueryLength());
-        return lookup.search(contractExternalId, query, limit);
+        String words = WHITESPACE.matcher(rawQuery.trim()).replaceAll(PolicySearchLookup.WORD_SEPARATOR);
+        SearchInputLimits.requireQueryNotShorterThan(words, api.search().minQueryLength());
+        return lookup.search(contractExternalId, inSearchCase(words), limit);
     }
 
-    private static String normalize(String raw) {
-        return WHITESPACE.matcher(raw.trim()).replaceAll(TOKEN_SEPARATOR)
-                .toLowerCase(Locale.ROOT)
-                .replace('ё', 'е');
+    /**
+     * Регистр меняется после проверки нижнего предела: у некоторых букв строчная форма длиннее заглавной
+     * («İ» становится двумя символами), а длина считается по тому, что прислал вызывающий.
+     */
+    private static String inSearchCase(String words) {
+        return words.toLowerCase(Locale.ROOT).replace('ё', 'е');
     }
 }
