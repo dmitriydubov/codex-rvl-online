@@ -42,3 +42,10 @@ ru.projectx.datareference.config.OneCContractProperties#filled                  
 # (final-message return), batch_hasNoExpectedBatches_andCountsItsOwnRows (batch return) — each asserts
 # isEqualTo(new PriceListTransferMarkup(...)), which fails on a null actual. Verified by the coordinator 2026-10-05.
 ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                   NullReturnValsMutator              # finalMessage_carries.../batch_hasNoExpectedBatches...: isEqualTo(new PriceListTransferMarkup(...)) on null
+
+# PriceLineTest (Ш44): closedLine_coversNightsFromFirstToLastDayInclusive asserts covers(FROM - 1 day) and covers(TO + 1 day)
+# are false — a covers() that always returns true fails both; openLine_coversEveryNightFromFirstDay builds a line with
+# validTo == null — with the null check removed, night.isAfter(null) throws NPE on the open line. Verified by the
+# coordinator 2026-10-05 against the Ш44 branch (mutationGate: 117 mutants, 114 killed, 3 RUN_ERROR, 1 of them already listed).
+ru.projectx.datareference.service.price.PriceLine#covers                           BooleanTrueReturnValsMutator       # closedLine_covers...: covers(FROM-1)/covers(TO+1) isFalse
+ru.projectx.datareference.service.price.PriceLine#covers                           RemoveConditionalMutator_EQUAL_ELSE # openLine_covers...: validTo == null dropped -> isAfter(null) NPE
