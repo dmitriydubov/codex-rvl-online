@@ -87,13 +87,13 @@ class ReferenceImportSchedulerTest {
         scheduler.importPendingMessages();
 
         assertThat(inboundMessageRepository.findDueForImport(clock.instant(), Limit.of(100)))
-                .extracting(InboundMessage::messageId)
+                .extracting(inbound -> inbound.receipt().messageId())
                 .doesNotContain(messageId);
     }
 
     /**
-     * Невалидное сообщение — постоянная ошибка: повторять бессмысленно, строка сразу
-     * уходит в терминальный отказ, не тратя попытки лестницы.
+     * Сообщение, которое не соответствует контракту, — постоянная ошибка. Повторять его бессмысленно, поэтому
+     * оно сразу завершается отказом и не расходует попытки повторов.
      */
     @Test
     void contractViolation_endsWithFailedWithoutSpendingRetries() {
@@ -102,9 +102,9 @@ class ReferenceImportSchedulerTest {
         scheduler.importPendingMessages();
 
         InboundMessage failed = inboundMessageRepository.findById(messageId).orElseThrow();
-        assertThat(failed.status()).isEqualTo(InboundStatus.FAILED);
-        assertThat(failed.attempt()).isZero();
-        assertThat(failed.lastError()).contains("code");
+        assertThat(failed.outcome().status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(failed.outcome().attempt()).isZero();
+        assertThat(failed.outcome().lastError()).contains("code");
     }
 
     /** Один битый экземпляр не должен останавливать разбор всей пачки. */
@@ -128,7 +128,7 @@ class ReferenceImportSchedulerTest {
     }
 
     private InboundStatus statusOf(UUID messageId) {
-        return inboundMessageRepository.findById(messageId).orElseThrow().status();
+        return inboundMessageRepository.findById(messageId).orElseThrow().outcome().status();
     }
 
     private static String mkb10(UUID externalId, String code) {

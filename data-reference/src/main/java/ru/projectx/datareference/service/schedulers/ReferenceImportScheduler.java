@@ -9,6 +9,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -75,8 +76,9 @@ public class ReferenceImportScheduler {
 
     /** В конце снимаются только ключи сообщения; остальные ключи MDC планировщик не трогает. */
     private void importOne(InboundMessage message) {
-        MDC.put(OneCLogContext.MESSAGE_ID, message.messageId().toString());
-        MDC.put(OneCLogContext.STREAM, message.stream().name());
+        InboundReceipt receipt = message.receipt();
+        MDC.put(OneCLogContext.MESSAGE_ID, receipt.messageId().toString());
+        MDC.put(OneCLogContext.STREAM, receipt.stream().name());
         try {
             importAndClassify(message);
         }
@@ -87,22 +89,23 @@ public class ReferenceImportScheduler {
     }
 
     private void importAndClassify(InboundMessage message) {
+        InboundReceipt receipt = message.receipt();
         try {
-            reportOutcome(message, importService.importMessage(message));
+            reportOutcome(receipt, importService.importMessage(message));
         }
         catch (OneCFieldException permanent) {
             // Текст своего исключения разбора называет поле, но не его значение, поэтому он идёт в журнал.
             log.warn("сообщение {} потока {} не соответствует контракту, повтор бессмыслен: {}",
-                    message.messageId(), message.stream(), permanent.getMessage());
-            inboundMessageService.recordPermanentFailure(message.messageId(), permanent.getMessage());
+                    receipt.messageId(), receipt.stream(), permanent.getMessage());
+            inboundMessageService.recordPermanentFailure(receipt.messageId(), permanent.getMessage());
         }
         catch (RuntimeException temporary) {
-            // В журнал — только тип отказа. Текст чужого исключения способен нести значения полей: ошибка
+            // В журнал идёт только тип отказа. Текст чужого исключения способен нести значения полей: ошибка
             // вставки, например, печатает параметры запроса. Полный текст сохраняется в строке сырья, где он
             // под теми же правилами доступа, что и сами данные.
             log.warn("временная ошибка разбора сообщения {} потока {}: {}",
-                    message.messageId(), message.stream(), temporary.getClass().getName());
-            inboundMessageService.recordTemporaryFailure(message.messageId(), temporary.toString());
+                    receipt.messageId(), receipt.stream(), temporary.getClass().getName());
+            inboundMessageService.recordTemporaryFailure(receipt.messageId(), temporary.toString());
         }
     }
 
@@ -110,12 +113,12 @@ public class ReferenceImportScheduler {
      * Причина пропуска пишется в журнал целиком: её составляют правила потоков, и в ней бывают только
      * идентификаторы и признаки справочников, а не данные застрахованных.
      */
-    private static void reportOutcome(InboundMessage message, ImportResult result) {
+    private static void reportOutcome(InboundReceipt receipt, ImportResult result) {
         switch (result) {
             case ImportResult.Applied ignored ->
-                    log.info("сообщение {} потока {} применено", message.messageId(), message.stream());
+                    log.info("сообщение {} потока {} применено", receipt.messageId(), receipt.stream());
             case ImportResult.Skipped skipped -> log.info("сообщение {} потока {} пропущено: {}",
-                    message.messageId(), message.stream(), skipped.reason());
+                    receipt.messageId(), receipt.stream(), skipped.reason());
         }
     }
 }

@@ -98,9 +98,9 @@ class OneCQueueIngestTest {
         rabbitTemplate.convertAndSend(queues.mkb10(), body);
 
         InboundMessage stored = awaitStored(messageId);
-        assertThat(stored.stream()).isEqualTo(OneCStream.MKB10);
-        assertThat(stored.sourceQueue()).isEqualTo(queues.mkb10());
-        assertThat(stored.status()).isEqualTo(InboundStatus.NEW);
+        assertThat(stored.receipt().stream()).isEqualTo(OneCStream.MKB10);
+        assertThat(stored.receipt().sourceQueue()).isEqualTo(queues.mkb10());
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
         assertThat(inboxRepository.findById(messageId)).isPresent();
     }
 
@@ -158,7 +158,7 @@ class OneCQueueIngestTest {
         rabbitTemplate.convertAndSend(queues.insuranceContracts(), messageWithId(messageId));
 
         assertThat(awaitStored(messageId))
-                .extracting(InboundMessage::stream, InboundMessage::sourceQueue)
+                .extracting(inbound -> inbound.receipt().stream(), inbound -> inbound.receipt().sourceQueue())
                 .containsExactly(OneCStream.INSURANCE_CONTRACTS, queues.insuranceContracts());
     }
 
@@ -176,10 +176,10 @@ class OneCQueueIngestTest {
         rabbitTemplate.convertAndSend(queues.priceListsFinal(), messageWithId(last));
 
         assertThat(awaitStored(batch))
-                .extracting(InboundMessage::stream, InboundMessage::sourceQueue)
+                .extracting(inbound -> inbound.receipt().stream(), inbound -> inbound.receipt().sourceQueue())
                 .containsExactly(OneCStream.PRICE_LISTS, queues.priceLists());
         assertThat(awaitStored(last))
-                .extracting(InboundMessage::stream, InboundMessage::sourceQueue)
+                .extracting(inbound -> inbound.receipt().stream(), inbound -> inbound.receipt().sourceQueue())
                 .containsExactly(OneCStream.PRICE_LISTS, queues.priceListsFinal());
     }
 
