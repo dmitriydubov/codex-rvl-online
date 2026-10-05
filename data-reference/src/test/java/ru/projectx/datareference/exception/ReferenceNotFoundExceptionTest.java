@@ -27,7 +27,7 @@ class ReferenceNotFoundExceptionTest {
                 missing(ReferenceNotFoundException::policyByExternalId,
                         "POLICY_NOT_FOUND", "полис с external_id " + ID + " не найден"),
                 missing(ReferenceNotFoundException::policyByNumber,
-                        "POLICY_NOT_FOUND", "в договоре страхования " + ID + " нет полиса с таким номером"),
+                        "POLICY_NOT_FOUND", "в договоре страхования с external_id " + ID + " нет полиса с таким номером"),
                 missing(ReferenceNotFoundException::insuranceContract,
                         "INSURANCE_CONTRACT_NOT_FOUND", "договор страхования " + ID + " не найден"),
                 missing(ReferenceNotFoundException::insuranceContractByExternalId,

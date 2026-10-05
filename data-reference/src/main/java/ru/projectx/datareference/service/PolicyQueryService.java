@@ -64,18 +64,21 @@ public class PolicyQueryService implements PolicyReads {
                 .orElseThrow(() -> ReferenceNotFoundException.policyByExternalId(externalId));
     }
 
+    /**
+     * Полис ищется по номеру и GUID договора страхования сразу, без чтения самого договора: связь полиса с
+     * договором логическая, и полис может прийти из 1С раньше своего договора. Поэтому и неизвестный договор,
+     * и отсутствие полиса в нём означают одно — полиса с таким номером в этом договоре нет.
+     */
     @Override
     @RestReadTransaction
-    public PolicyResponse byNumber(String number, UUID contractId) {
-        InsuranceContract contract = insuranceContracts.findById(contractId)
-                .orElseThrow(() -> ReferenceNotFoundException.insuranceContract(contractId));
-        List<Policy> found = policies.findAllByNumberAndExternalContractId(number, contract.externalId());
+    public PolicyResponse byNumber(String number, UUID contractExternalId) {
+        List<Policy> found = policies.findAllByNumberAndExternalContractId(number, contractExternalId);
         if (found.size() > 1) {
             throw AmbiguousReferenceException.policy(found.stream().map(Policy::id).toList());
         }
         return found.stream().findFirst()
                 .map(this::assemble)
-                .orElseThrow(() -> ReferenceNotFoundException.policyByNumber(contractId));
+                .orElseThrow(() -> ReferenceNotFoundException.policyByNumber(contractExternalId));
     }
 
     /**

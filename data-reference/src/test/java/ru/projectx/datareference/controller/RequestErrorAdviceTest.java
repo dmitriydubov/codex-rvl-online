@@ -25,8 +25,8 @@ import ru.projectx.datareference.exception.InvalidRequestException;
  * сервиса. Неверный параметр даёт 400 с именем поля, чужой путь даёт 404, чужой метод даёт 405 с
  * перечнем методов в заголовке {@code Allow}, а формат ответа, которого сервис не отдаёт, даёт 406.
  *
- * <p>Тело 406 отдаётся в JSON, хотя вызывающий просил другой формат. Без явного типа содержимого Spring
- * подбирал бы формат по заголовку {@code Accept}, не нашёл бы подходящего и отдал бы ответ без тела.
+ * <p>Тела 404, 405 и 406 отдаются в JSON, даже если вызывающий просил другой формат. Без явного типа содержимого
+ * Spring подбирал бы формат по заголовку {@code Accept}, не нашёл бы подходящего и отдал бы ответ без тела.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class RequestErrorAdviceTest {
@@ -67,6 +67,22 @@ class RequestErrorAdviceTest {
         assertThat(result).bodyJson().extractingPath("$.error.message").isEqualTo("ресурс не найден: api/unknown");
         assertThat(result).bodyJson().extractingPath("$.error.details").asArray().isEmpty();
         assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+    }
+
+    /**
+     * У чужого пути нет ручки с типом ответа, поэтому {@code Accept} без JSON до отказа не отсекается. Ответ всё равно
+     * уходит телом в едином формате, а не пустым: вызывающий видит код ошибки и {@code request_id}.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"text/xml", "application/xml", "text/plain"})
+    void unknownPath_acceptingNoJson_isStillNotFound_withJsonBody(String accept, CapturedOutput output) {
+        MvcTestResult result = mvc.get().uri(FailingController.NO_RESOURCE)
+                .header(RequestIdFilter.HEADER, REQUEST_ID).header(HttpHeaders.ACCEPT, accept).exchange();
+
+        assertThat(result).hasStatus(404);
+        assertThat(result).hasContentType(MediaType.APPLICATION_JSON);
+        assertProtocolError(result, "NOT_FOUND");
+        assertThat(output).doesNotContain("Failure in @ExceptionHandler");
     }
 
     @ParameterizedTest
@@ -132,7 +148,7 @@ class RequestErrorAdviceTest {
     void unsatisfiedParameters_isValidationError_namingExpectedParameterSets() {
         FailingController controller = new FailingController();
         controller.failWith(new UnsatisfiedServletRequestParameterException(List.of(
-                new String[] {"external_id"}, new String[] {"number", "contract_id"}), Map.of()));
+                new String[] {"external_id"}, new String[] {"number", "contract_external_id"}), Map.of()));
         mvc = StandaloneMvc.withRequestId(controller, new RequestErrorAdvice());
 
         MvcTestResult result = get(FailingController.FAILING);
@@ -141,7 +157,7 @@ class RequestErrorAdviceTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
         assertThat(result).bodyJson().extractingPath("$.error.message").isEqualTo("нарушен формат запроса");
         assertThat(result).bodyJson().extractingPath("$.error.details[*].field").asArray()
-                .containsExactly("external_id", "number,contract_id");
+                .containsExactly("external_id", "number,contract_external_id");
         assertThat(result).bodyJson().extractingPath("$.error.details[*].reason").asArray()
                 .containsOnly("нужен этот набор параметров");
         assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);

@@ -26,7 +26,7 @@ public final class ReferenceNotFoundException extends RuntimeException {
         PROGRAM(PROGRAM_NOT_FOUND, "программа страхования %s не найдена"),
         POLICY(POLICY_NOT_FOUND, "полис %s не найден"),
         POLICY_BY_EXTERNAL_ID(POLICY_NOT_FOUND, "полис с external_id %s не найден"),
-        POLICY_BY_NUMBER(POLICY_NOT_FOUND, "в договоре страхования %s нет полиса с таким номером"),
+        POLICY_BY_NUMBER(POLICY_NOT_FOUND, "в договоре страхования с external_id %s нет полиса с таким номером"),
         INSURANCE_CONTRACT(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования %s не найден"),
         INSURANCE_CONTRACT_BY_EXTERNAL_ID(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования с external_id %s не найден"),
         LPU(LPU_NOT_FOUND, "ЛПУ %s не найдено");
@@ -64,8 +64,8 @@ public final class ReferenceNotFoundException extends RuntimeException {
     }
 
     /** Номер полиса в текст не идёт: вызывающий его и так знает, а в журнале он лишний. */
-    public static ReferenceNotFoundException policyByNumber(UUID contractId) {
-        return Missing.POLICY_BY_NUMBER.notFound(contractId);
+    public static ReferenceNotFoundException policyByNumber(UUID contractExternalId) {
+        return Missing.POLICY_BY_NUMBER.notFound(contractExternalId);
     }
 
     public static ReferenceNotFoundException insuranceContract(UUID id) {

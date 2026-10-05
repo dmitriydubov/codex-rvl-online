@@ -16,14 +16,17 @@ import ru.projectx.datareference.service.PolicyReads;
 /**
  * Полисы: подсказка среди действующих полисов договора, полис целиком и полис для сервиса Договоров без
  * персональных данных ({@code contract-view}). Полис целиком читается по нашему {@code id}, по GUID 1С:УСК
- * ({@code external_id}) или по номеру вместе с договором.
+ * ({@code external_id}) или по номеру вместе с GUID договора страхования из 1С ({@code contract_external_id}).
  *
  * <p>Контроллер сам решает только одно: каким ключом прочитан запрос. Ручка каждого ключа принимает запрос,
  * только если ключа другого способа в нём нет. Иначе Spring молча выбрал бы ручку с большим числом совпавших
  * параметров и прочитал полис по одному из ключей. Пустое значение ключа тоже считается переданным ключом.
- * Запрос без ключа и запрос, где рядом с {@code external_id} стоит номер или договор, отклоняются ошибкой
- * вызывающего с полем {@code external_id}, и у каждого своя ручка со своей причиной отказа. Без ручки на запрос
- * без ключа Spring отказал бы исключением о несовпавших параметрах, которого единый формат ошибки не знает.
+ * Каждый неверный набор ключей получает свою ручку со своим отказом. Рядом с {@code external_id} стоит номер или
+ * договор — отказ по полю {@code external_id}. Передан прежний ключ договора {@code contract_id} (наш id) — отказ
+ * по нему: сервис принимает договор только по GUID 1С, и вызывающему нужно знать, какой параметр заменить. Передана
+ * половина ключа по номеру — отказ называет недостающую половину. Ключа нет вовсе — отказ по полю
+ * {@code external_id}. Без ручки на запрос без ключа Spring отказал бы исключением о несовпавших параметрах,
+ * которого единый формат ошибки не знает.
  *
  * <p>У {@code /policies/contract-view} своя ручка без ключа по той же причине: без неё запрос ушёл бы в
  * {@code /policies/{id}} и получил бы отказ по полю {@code id}, а вызывающему нужно «нет параметра
@@ -36,7 +39,8 @@ public class PolicyController {
 
     private static final String EXTERNAL_ID = "external_id";
     private static final String NUMBER = "number";
-    private static final String CONTRACT_ID = "contract_id";
+    private static final String CONTRACT_EXTERNAL_ID = "contract_external_id";
+    private static final String LEGACY_CONTRACT_ID = "contract_id";
 
     private final PolicyReads policies;
     private final PolicySearchReads policySearch;
@@ -56,25 +60,42 @@ public class PolicyController {
         return policies.byId(id);
     }
 
-    @GetMapping(path = "/policies", params = {EXTERNAL_ID, "!" + NUMBER, "!" + CONTRACT_ID})
+    @GetMapping(path = "/policies",
+            params = {EXTERNAL_ID, "!" + NUMBER, "!" + CONTRACT_EXTERNAL_ID, "!" + LEGACY_CONTRACT_ID})
     public PolicyResponse policyByExternalId(@RequestParam(EXTERNAL_ID) UUID externalId) {
         return policies.byExternalId(externalId);
     }
 
-    @GetMapping(path = "/policies", params = {NUMBER, CONTRACT_ID, "!" + EXTERNAL_ID})
-    public PolicyResponse policyByNumber(@RequestParam String number, @RequestParam(CONTRACT_ID) UUID contractId) {
-        return policies.byNumber(number, contractId);
+    /** Без договора сюда же попадает номер: обязательный {@code contract_external_id} отказывает по своему имени. */
+    @GetMapping(path = "/policies", params = {NUMBER, "!" + EXTERNAL_ID, "!" + LEGACY_CONTRACT_ID})
+    public PolicyResponse policyByNumber(
+            @RequestParam String number, @RequestParam(CONTRACT_EXTERNAL_ID) UUID contractExternalId) {
+
+        return policies.byNumber(number, contractExternalId);
+    }
+
+    @GetMapping(path = "/policies",
+            params = {CONTRACT_EXTERNAL_ID, "!" + NUMBER, "!" + EXTERNAL_ID, "!" + LEGACY_CONTRACT_ID})
+    public PolicyResponse policyByContractWithoutNumber() {
+        throw new InvalidRequestException(NUMBER, RequestErrorAdvice.REQUIRED_PARAMETER);
     }
 
     /** Сюда попадает запрос с {@code external_id}, которого не приняла ручка этого ключа: рядом номер или договор. */
     @GetMapping(path = "/policies", params = EXTERNAL_ID)
     public PolicyResponse policyByConflictingKeys() {
-        throw new InvalidRequestException(EXTERNAL_ID, "external_id не передаётся вместе с number или contract_id");
+        throw new InvalidRequestException(EXTERNAL_ID,
+                "external_id не передаётся вместе с number или contract_external_id");
+    }
+
+    @GetMapping(path = "/policies", params = {LEGACY_CONTRACT_ID, "!" + EXTERNAL_ID})
+    public PolicyResponse policyByLegacyContractId() {
+        throw new InvalidRequestException(LEGACY_CONTRACT_ID,
+                "не принимается: договор передаётся параметром contract_external_id");
     }
 
     @GetMapping("/policies")
     public PolicyResponse policyWithoutKey() {
-        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id либо number вместе с contract_id");
+        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id либо number вместе с contract_external_id");
     }
 
     /** Полис для сервиса Договоров по нашему {@code id}, без персональных данных. */

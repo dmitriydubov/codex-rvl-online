@@ -14,12 +14,16 @@ import java.util.stream.Stream;
  * так отличает предел в символах от предела в байтах. Пробелы по краям проверяют, что длина считается до
  * обрезки. Коды перечня идут по порядку: латинская буква и две цифры ({@code A00}, {@code A01}, …,
  * {@code A99}, {@code B00}); таких кодов в справочнике сценария нет, поэтому принятый запрос получает 200.
+ *
+ * <p>Для запросов у предела длины строки запроса самого сервера строка поиска состоит из латинской буквы «q»: она
+ * занимает один байт и не кодируется, поэтому длина запроса равна числу букв плюс путь.
  */
 public class SearchInputSteps {
 
     private static final String QUERY = "query";
     private static final String CODES = "codes";
     private static final String LETTER = "ж";
+    private static final String LATIN_LETTER = "q";
     private static final String EDGE_SPACE = " ";
     private static final int EDGE_SPACES = 2;
     private static final String CODE_SEPARATOR = ",";
@@ -41,6 +45,11 @@ public class SearchInputSteps {
     @Когда("сервис Договоров/Заявок запрашивает {string} с query из {int} букв «ж» и ещё одной")
     public void requestsQueryOfLettersAndOneMore(String path, int letters) {
         requestsQueryOfLetters(path, letters + 1);
+    }
+
+    @Когда("сервис Договоров/Заявок запрашивает {string} с query из {int} латинских букв «q»")
+    public void requestsQueryOfLatinLetters(String path, int letters) {
+        contracts.requestWithParameter(path, QUERY, LATIN_LETTER.repeat(letters));
     }
 
     @Когда("сервис Договоров/Заявок запрашивает {string} с query из {int} символов: пробел, буквы «ж», пробел")
