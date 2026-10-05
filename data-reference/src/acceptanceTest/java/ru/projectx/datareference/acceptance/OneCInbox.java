@@ -1,12 +1,14 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
+import ru.projectx.datareference.entity.OneCStream;
 
 /**
  * Сырьё 1С:УСК в сценарии: строки {@code inbound_message} со статусом {@code NEW}, какие оставил бы
@@ -31,8 +33,11 @@ public class OneCInbox {
     private static final String MESSAGE_IDS = "select message_id from inbound_message order by received_at";
     private static final String STORED = "select exists(select 1 from inbound_message where message_id = :messageId)";
     private static final String ROW = """
-            select status, last_error, cast(payload as text) as payload
+            select status, attempt, last_error, cast(payload as text) as payload
             from inbound_message where message_id = :messageId
+            """;
+    private static final String AGE = """
+            update inbound_message set received_at = now() - cast(:age as interval) where message_id = :messageId
             """;
 
     private final JdbcClient jdbc;
@@ -79,9 +84,36 @@ public class OneCInbox {
     public InboundRow last() {
         return jdbc.sql(ROW)
                 .param("messageId", received.getLast().messageId())
-                .query((row, number) -> new InboundRow(
-                        row.getString("status"), row.getString("last_error"), row.getString("payload")))
+                .query((row, number) -> new InboundRow(row.getString("status"), row.getInt("attempt"),
+                        row.getString("last_error"), row.getString("payload")))
                 .single();
+    }
+
+    /** Сообщение, присланное последним шагом «1С:УСК прислала …». */
+    public OneCMessage lastMessage() {
+        return received.getLast();
+    }
+
+    /** Последнее присланное сообщение потока: следующее сообщение сценария ссылается на него. */
+    public OneCMessage lastOf(OneCStream stream) {
+        return received.reversed().stream()
+                .filter(message -> message.stream() == stream)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("сценарий не присылал сообщений потока " + stream));
+    }
+
+    /**
+     * Отодвигает момент приёма последнего сообщения в прошлое на {@code age}: часы стенда не остановлены, а ждать
+     * срок хранения нельзя.
+     */
+    public void ageLast(Duration age) {
+        int aged = jdbc.sql(AGE)
+                .param("age", age.toSeconds() + " seconds")
+                .param("messageId", received.getLast().messageId())
+                .update();
+        if (aged != 1) {
+            throw new IllegalStateException("в сырье нет строки последнего сообщения");
+        }
     }
 
     /** Конверт, присланный последним шагом «1С:УСК прислала …», в том виде, в каком его сохранил бы приём. */

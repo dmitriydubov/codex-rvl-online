@@ -47,7 +47,10 @@ class InboundOutcomeRecordingTest {
     private static final Instant RECEIVED_AT = Instant.parse("2026-03-14T09:00:00Z");
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
     private static final List<Duration> BACKOFF = List.of(Duration.ofSeconds(30), Duration.ofMinutes(5));
-    private static final String ERROR = "база недоступна";
+    private static final ParseFailure.Temporary LOCK_TIMEOUT = new ParseFailure.Temporary(
+            "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
+            "CannotAcquireLockException", "55P03");
+    private static final String ERROR = LOCK_TIMEOUT.reason();
 
     @Mock
     private InboundMessageRepository repository;
@@ -91,7 +94,7 @@ class InboundOutcomeRecordingTest {
     void firstTemporaryFailure_schedulesTheFirstStepOfTheLadder() {
         InboundMessage message = existing();
 
-        service().recordTemporaryFailure(MESSAGE_ID, ERROR);
+        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, NOW.plus(BACKOFF.get(0)), ERROR, null));
@@ -103,7 +106,7 @@ class InboundOutcomeRecordingTest {
         InboundMessage message = existing();
         message.markRetrying("первая ошибка", NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, ERROR);
+        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, NOW.plus(BACKOFF.get(1)), ERROR, null));
@@ -115,10 +118,10 @@ class InboundOutcomeRecordingTest {
         message.markRetrying("первая ошибка", NOW);
         message.markRetrying("вторая ошибка", NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, ERROR);
+        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(
-                InboundStatus.FAILED, 2, null, "лестница повторов исчерпана на попытке 3: " + ERROR, null));
+                InboundStatus.FAILED, 2, null, "повторы исчерпаны на попытке 3: " + ERROR, null));
         assertThat(transitions()).containsExactly("FAILED");
     }
 
@@ -126,7 +129,8 @@ class InboundOutcomeRecordingTest {
     void permanentFailure_failsTheMessageAtOnce() {
         InboundMessage message = existing();
 
-        service().recordPermanentFailure(MESSAGE_ID, "в конверте нет объекта data");
+        service().recordPermanentFailure(MESSAGE_ID,
+                new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 0, null, "в конверте нет объекта data", null));
@@ -182,6 +186,6 @@ class InboundOutcomeRecordingTest {
     private InboundMessageService service() {
         return new InboundMessageService(
                 repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC),
-                new InboundTransitionMetrics(meters));
+                new InboundTransitionMetrics(meters), new FinalRejectionJournal());
     }
 }

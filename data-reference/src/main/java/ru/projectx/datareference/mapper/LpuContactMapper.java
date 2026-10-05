@@ -20,7 +20,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбирает адрес и регион санатория из потока контактной информации 1С:УСК (ТЗ-8). Тем же потоком
+ * Разбирает адрес и регион санатория из потока контактной информации 1С:УСК. Тем же потоком
  * идут телефоны и почта всех контрагентов 1С, поэтому фильтров два: сообщение должно относиться
  * к санаторию из справочника, а из его строк нужны только действительные адреса.
  *
@@ -77,7 +77,7 @@ public class LpuContactMapper implements StreamMapper {
     private static UUID contragentOf(ObjectNode data) {
         return filterValue(data)
                 .or(() -> firstRecordOwner(data))
-                .orElseThrow(() -> new OneCFieldException("в сообщении ТЗ-8 не найден GUID контрагента"));
+                .orElseThrow(() -> new OneCFieldException("в сообщении контактной информации не найден GUID контрагента"));
     }
 
     private static Optional<UUID> filterValue(JsonNode data) {

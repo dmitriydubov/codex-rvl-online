@@ -30,6 +30,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.FinalRejectionJournal;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import tools.jackson.databind.json.JsonMapper;
@@ -226,7 +227,7 @@ class PriceListTransferAssemblerTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         InboundMessageService inboundMessageService = new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
-                new InboundTransitionMetrics(meters));
+                new InboundTransitionMetrics(meters), new FinalRejectionJournal());
         return new PriceListTransferAssembler(inboundMessageService, priceListMapper, json, clock);
     }
 

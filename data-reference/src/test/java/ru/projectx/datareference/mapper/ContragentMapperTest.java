@@ -2,6 +2,7 @@ package ru.projectx.datareference.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -16,12 +17,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.service.onec.ImportResult;
@@ -163,6 +166,76 @@ class ContragentMapperTest {
         assertThat(saved.getValue()).isSameAs(known);
         assertThat(known.name()).isEqualTo("АО «Страховщик»");
         assertThat(known.inn()).isEqualTo("7700000000");
+    }
+
+    /**
+     * ИНН и КПП хранятся в колонках на 12 и 9 символов. Длиннее — не реквизит, а испорченное значение: сообщение
+     * отклоняется с именем поля и пределом, ничего не сохраняется. Пробелы по краям в длину не входят.
+     */
+    @ParameterizedTest
+    @CsvSource({"true, ИНН, 12", "true, КПП, 9", "false, ИНН, 12", "false, КПП, 9"})
+    void requisiteLongerThanItsColumn_isContractViolation(boolean sanatorium, String field, int limit) {
+        ObjectNode data = sanatorium ? sanatorium(RVL) : insurer();
+        data.put(field, "7".repeat(limit + 1));
+
+        assertThatThrownBy(() -> mapper(RVL).apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле %s длиннее %d символов".formatted(field, limit));
+        verify(lpuRepository, never()).save(any());
+        verify(insurerRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ИНН, 12", "КПП, 9"})
+    void sanatoriumRequisiteAtItsLimitWithSpaces_isSavedTrimmed(String field, int limit) {
+        ObjectNode data = sanatorium(RVL);
+        data.put(field, " " + "7".repeat(limit) + " ");
+
+        mapper(RVL).apply(data);
+
+        Lpu saved = savedLpu();
+        assertThat("ИНН".equals(field) ? saved.inn() : saved.kpp()).isEqualTo("7".repeat(limit));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ИНН, 12", "КПП, 9"})
+    void insurerRequisiteAtItsLimitWithSpaces_isSavedTrimmed(String field, int limit) {
+        ObjectNode data = insurer();
+        data.put(field, " " + "7".repeat(limit) + " ");
+
+        mapper(RVL).apply(data);
+
+        ArgumentCaptor<Insurer> saved = ArgumentCaptor.forClass(Insurer.class);
+        verify(insurerRepository).save(saved.capture());
+        Insurer insurer = saved.getValue();
+        assertThat("ИНН".equals(field) ? insurer.inn() : insurer.kpp()).isEqualTo("7".repeat(limit));
+    }
+
+    /**
+     * Необязательный реквизит, которого нет в сообщении 1С, хранится как отсутствующий, а не как пустая строка:
+     * иначе соседние сервисы получили бы «пустое значение» вместо «нет значения».
+     */
+    @Test
+    void sanatoriumWithoutOptionalDetails_storesThemAsAbsent() {
+        when(lpuRepository.findByExternalId(CONTRAGENT)).thenReturn(Optional.empty());
+
+        mapper(RVL).apply(sanatorium(RVL));
+
+        Lpu saved = savedLpu();
+        assertThat(saved.fullName()).isNull();
+        assertThat(saved.kpp()).isNull();
+        assertThat(saved.phone()).isNull();
+        assertThat(saved.email()).isNull();
+    }
+
+    @Test
+    void insurerWithoutOptionalDetails_storesThemAsAbsent() {
+        mapper(RVL).apply(insurer());
+
+        ArgumentCaptor<Insurer> saved = ArgumentCaptor.forClass(Insurer.class);
+        verify(insurerRepository).save(saved.capture());
+        assertThat(saved.getValue().fullName()).isNull();
+        assertThat(saved.getValue().kpp()).isNull();
     }
 
     private ContragentMapper mapper(String rvlActivity) {

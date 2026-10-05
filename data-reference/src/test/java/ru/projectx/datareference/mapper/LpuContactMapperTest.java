@@ -182,7 +182,7 @@ class LpuContactMapperTest {
 
         assertThatThrownBy(() -> mapper.apply(data))
                 .isInstanceOf(OneCFieldException.class)
-                .hasMessage("в сообщении ТЗ-8 не найден GUID контрагента");
+                .hasMessage("в сообщении контактной информации не найден GUID контрагента");
         verifyNoInteractions(repository);
     }
 

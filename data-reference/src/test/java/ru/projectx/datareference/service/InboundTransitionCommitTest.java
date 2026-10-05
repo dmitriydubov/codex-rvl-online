@@ -23,6 +23,9 @@ import ru.projectx.datareference.support.IntegrationTest;
 @IntegrationTest
 class InboundTransitionCommitTest {
 
+    private static final ParseFailure.Temporary TIMEOUT = new ParseFailure.Temporary(
+            "временный отказ базы данных: QueryTimeoutException, SQLSTATE 57014", "QueryTimeoutException", "57014");
+
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
 
     @Autowired
@@ -72,7 +75,7 @@ class InboundTransitionCommitTest {
         double before = transitions(InboundStatus.RETRY);
 
         transactions.executeWithoutResult(status -> {
-            inboundMessageService.recordTemporaryFailure(messageId, "timeout");
+            inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
             status.setRollbackOnly();
         });
 

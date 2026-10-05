@@ -40,6 +40,14 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class ContragentMapper implements StreamMapper {
 
+    /**
+     * Длина колонок {@code inn} и {@code kpp} в справочниках санаториев и страхователей. Контракт длину не
+     * называет, поэтому предел задают колонки: значение длиннее — испорченное, и сообщение отклоняется.
+     */
+    private static final int INN_LENGTH = 12;
+    private static final int KPP_LENGTH = 9;
+    private static final String INN = "ИНН";
+    private static final String KPP = "КПП";
     private static final String ACTIVITIES = "typesActivities";
     private static final String ACTIVITY_GUID = "guidTypeActivities";
     private static final String RVL_ACTIVITY_NOT_CANONICAL =
@@ -153,28 +161,36 @@ public class ContragentMapper implements StreamMapper {
                 .anyMatch(activityId::equals);
     }
 
-    /** Имена полей здесь кириллические, потому что это ключи JSON из 1С, а не наш словарь. */
     private static Lpu.Details lpuDetailsOf(ObjectNode data) {
-        return new Lpu.Details(
-                OneCValues.requiredText(data, "Наименование"),
-                optionalText(data, "НаименованиеПолное"),
-                optionalText(data, "ИНН"),
-                optionalText(data, "КПП"),
-                optionalText(data, "Телефон"),
-                optionalText(data, "EMAIL"),
-                OneCValues.flag(data, "deleteMark"));
+        CommonFields common = CommonFields.of(data);
+        return new Lpu.Details(common.name(), common.fullName(), common.inn(), common.kpp(),
+                optionalText(data, "Телефон"), optionalText(data, "EMAIL"), common.deleteMark());
     }
 
     private static Insurer.Details insurerDetailsOf(ObjectNode data) {
-        return new Insurer.Details(
-                OneCValues.requiredText(data, "Наименование"),
-                optionalText(data, "НаименованиеПолное"),
-                optionalText(data, "ИНН"),
-                optionalText(data, "КПП"),
-                OneCValues.flag(data, "deleteMark"));
+        CommonFields common = CommonFields.of(data);
+        return new Insurer.Details(common.name(), common.fullName(), common.inn(), common.kpp(), common.deleteMark());
     }
 
     private static @Nullable String optionalText(ObjectNode data, String field) {
         return OneCValues.text(data, field).orElse(null);
+    }
+
+    /**
+     * Поля, общие для санатория и страхователя: наименования, реквизиты и пометка удаления. Читаются в одном
+     * месте, чтобы правила реквизитов не разошлись между двумя справочниками. Имена полей кириллические, потому
+     * что это ключи JSON из 1С, а не наш словарь.
+     */
+    private record CommonFields(
+            String name, @Nullable String fullName, @Nullable String inn, @Nullable String kpp, boolean deleteMark) {
+
+        static CommonFields of(ObjectNode data) {
+            return new CommonFields(
+                    OneCValues.requiredText(data, "Наименование"),
+                    optionalText(data, "НаименованиеПолное"),
+                    OneCValues.limitedText(data, INN, INN_LENGTH).orElse(null),
+                    OneCValues.limitedText(data, KPP, KPP_LENGTH).orElse(null),
+                    OneCValues.flag(data, "deleteMark"));
+        }
     }
 }

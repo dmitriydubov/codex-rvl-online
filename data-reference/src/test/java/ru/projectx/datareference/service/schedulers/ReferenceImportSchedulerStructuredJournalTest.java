@@ -19,12 +19,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.DatabaseOutages;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
+import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.StructuredJournal;
@@ -103,7 +106,7 @@ class ReferenceImportSchedulerStructuredJournalTest {
 
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
-                ImportSettings.defaults().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), ImportSettings.defaults().build(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static InboundMessage received() {

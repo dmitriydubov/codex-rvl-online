@@ -89,6 +89,19 @@ public final class OneCValues {
         return text(data, field).orElseThrow(missing(NO_REQUIRED_TEXT_MESSAGE, field));
     }
 
+    /**
+     * Строка поля, которая обязана поместиться в {@code maxLength} символов после обрезки пробелов. Длиннее —
+     * значит испорчено: реквизит такой длины не бывает, а база отвергла бы запись с текстом ошибки, в котором
+     * видно значение. Отказ называет поле и предел, но не значение.
+     */
+    public static Optional<String> limitedText(JsonNode data, String field, int maxLength) {
+        Optional<String> value = text(data, field);
+        if (value.filter(text -> text.length() > maxLength).isPresent()) {
+            throw new OneCFieldException("поле %s длиннее %d символов".formatted(field, maxLength));
+        }
+        return value;
+    }
+
     /** Отсутствующий флаг считается {@code false}, потому что контракт не различает «нет» и «не задано». */
     public static boolean flag(JsonNode data, String field) {
         return data.path(field).asBoolean(false);

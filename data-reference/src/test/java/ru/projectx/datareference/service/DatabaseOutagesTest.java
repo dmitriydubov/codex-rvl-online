@@ -9,8 +9,10 @@ import java.util.stream.Stream;
 import org.hibernate.LazyInitializationException;
 import org.hibernate.TransactionException;
 import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.GenericJDBCException;
 import org.hibernate.exception.JDBCConnectionException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.dao.CannotAcquireLockException;
@@ -106,6 +108,85 @@ class DatabaseOutagesTest {
     @ParameterizedTest
     @MethodSource("permanentFailures")
     void permanentFailure_isNotAnOutage(Exception failure) {
+        assertThat(outages.recognize(failure)).isEmpty();
+    }
+
+    /**
+     * Постоянный отказ базы тоже описывается для журнала: тип после перевода и SQLSTATE. По ним разбор сообщений
+     * 1С:УСК называет причину окончательного отказа, не повторяя текста ошибки базы.
+     */
+    @Test
+    void permanentDatabaseFailure_isDescribedByTranslatedTypeWithSqlState() {
+        var overflow = new ConstraintViolationException(TEXT, new SQLException(TEXT, "23514"), "ck_percent");
+
+        Optional<DatabaseOutages.Outage> described = outages.describe(overflow);
+
+        assertThat(described).hasValue(new DatabaseOutages.Outage("DataIntegrityViolationException", "23514"));
+    }
+
+    /** Временный отказ описывается так же, как его распознаёт {@code recognize}. */
+    @Test
+    void temporaryFailure_isDescribedLikeItIsRecognized() {
+        var lost = new JDBCConnectionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE));
+
+        assertThat(outages.describe(lost)).isEqualTo(outages.recognize(lost)).isPresent();
+    }
+
+    /**
+     * Ошибка не из базы не описывается, даже если переводчик называет её ошибкой доступа к данным: обычные
+     * {@code IllegalStateException} и {@code IllegalArgumentException} он считает неверным вызовом JPA.
+     */
+    @Test
+    void failureOutsideTheDatabase_isNotDescribed() {
+        assertThat(outages.describe(new IllegalStateException(TEXT))).isEmpty();
+        assertThat(outages.describe(new IllegalArgumentException(TEXT))).isEmpty();
+        assertThat(outages.describe(new Exception(TEXT))).isEmpty();
+    }
+
+    /**
+     * Отказ на входе в транзакцию — исключение транзакций Spring, а не доступа к данным, но это временный отказ
+     * базы, и он описывается так же, как распознаётся: своим типом и SQLSTATE драйвера.
+     */
+    @Test
+    void transactionLevelOutage_isDescribedByItsOwnTypeWithSqlState() {
+        var noConnection = new CannotCreateTransactionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE));
+
+        assertThat(outages.describe(noConnection))
+                .hasValue(new DatabaseOutages.Outage("CannotCreateTransactionException", CONNECTION_FAILURE));
+    }
+
+    /** Исключение JPA без перевода в Hibernate — тоже отказ базы, и описывается переведённым типом. */
+    @Test
+    void persistenceException_isDescribed() {
+        assertThat(outages.describe(new jakarta.persistence.PersistenceException(TEXT)))
+                .hasValue(new DatabaseOutages.Outage("JpaSystemException", "нет"));
+    }
+
+    /** Уже переведённое исключение Spring описывается своим типом. */
+    @Test
+    void springDataAccessFailure_isDescribedByItsOwnType() {
+        assertThat(outages.describe(new DataIntegrityViolationException(TEXT)))
+                .hasValue(new DatabaseOutages.Outage("DataIntegrityViolationException", "нет"));
+    }
+
+    /**
+     * Сеанс, закрытый сервером по простою открытой транзакции (25P03), — временный отказ: пул заменит
+     * соединение, и та же операция пройдёт. Перевод даёт общий {@code JpaSystemException}, поэтому отказ
+     * узнаётся по коду. Так REST отвечает 503, а разбор сообщения 1С:УСК идёт на повтор.
+     */
+    @Test
+    void sessionClosedForIdleTransaction_isTemporary_recognizedBySqlState() {
+        var closed = new GenericJDBCException(TEXT, new SQLException(TEXT, "25P03"));
+
+        assertThat(outages.recognize(closed)).hasValue(new DatabaseOutages.Outage("JpaSystemException", "25P03"));
+    }
+
+    /** Остальные коды класса 25 — ошибки кода в обращении с транзакцией: повтор их не лечит. */
+    @ParameterizedTest
+    @ValueSource(strings = {"25001", "25P02"})
+    void otherTransactionStateCodes_areNotOutages(String sqlState) {
+        var failure = new GenericJDBCException(TEXT, new SQLException(TEXT, sqlState));
+
         assertThat(outages.recognize(failure)).isEmpty();
     }
 }
