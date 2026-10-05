@@ -27,6 +27,8 @@ public class DatabaseAvailabilitySteps {
 
     private static final int AFTER_LOCK_RELEASE = 100;
     private static final Duration STOP_TIMEOUT = Duration.ofSeconds(30);
+    /** Запас на подтверждение подписок и на остановку контейнера, который после повторов не нашёл свою очередь. */
+    private static final Duration SUBSCRIBE_TIMEOUT = Duration.ofSeconds(30);
 
     private final SwitchableDataSource dataSource;
     private final OneCConsumerPause pause;
@@ -66,7 +68,7 @@ public class DatabaseAvailabilitySteps {
     public void storageChecked() {
         await().atMost(STOP_TIMEOUT).until(pause::consumersStopped);
         pause.resumeIfStorageAvailable();
-        await().atMost(STOP_TIMEOUT).until(this::everyRunningContainerSubscribedOrStopped);
+        await().atMost(SUBSCRIBE_TIMEOUT).until(this::everyRunningContainerSubscribedOrStopped);
     }
 
     private boolean everyRunningContainerSubscribedOrStopped() {
