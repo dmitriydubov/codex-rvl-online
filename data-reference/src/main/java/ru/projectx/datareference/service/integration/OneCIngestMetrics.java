@@ -2,8 +2,11 @@ package ru.projectx.datareference.service.integration;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.binder.MeterBinder;
-import java.util.Objects;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
@@ -18,12 +21,13 @@ import ru.projectx.datareference.entity.OneCStream;
  * <p>Метки — поток, очередь и исход. Все три принимают немного заранее известных значений. Идентификатора
  * сообщения и тела в метках нет и быть не должно: каждое новое значение метки — новый ряд в Prometheus.
  *
- * <p>Ряды заводятся при старте нулями на каждую очередь из настроек и каждый исход: нулевой ряд есть с самого
+ * <p>Ряды заводятся при создании нулями на каждую очередь из настроек и каждый исход: нулевой ряд есть с самого
  * старта, и правило «потеряно хоть одно сообщение» видит первую же потерю как рост с нуля, а отсутствующий ряд
- * неотличим от сломанного экспорта.
+ * неотличим от сломанного экспорта. Счёт доставки из этих очередей поэтому в реестр не обращается — только
+ * увеличивает готовый счётчик.
  */
 @Component
-class OneCIngestMetrics implements MeterBinder {
+class OneCIngestMetrics {
 
     static final String DELIVERIES = "onec.ingest.deliveries";
     static final String PAUSES = "onec.ingest.pauses";
@@ -32,47 +36,45 @@ class OneCIngestMetrics implements MeterBinder {
     private static final String UNKNOWN_QUEUE = "unknown";
 
     private final MeterRegistry registry;
-    private final OneCQueueProperties queues;
+    private final Map<SeriesKey, Counter> deliveries;
+    private final Counter pauses;
 
     OneCIngestMetrics(MeterRegistry registry, OneCQueueProperties queues) {
         this.registry = registry;
-        this.queues = queues;
+        this.deliveries = Stream.of(OneCQueue.values())
+                .flatMap(queue -> Stream.of(IngestOutcome.values())
+                        .map(outcome -> new SeriesKey(queue.stream(), queue.nameIn(queues), outcome)))
+                .collect(Collectors.toUnmodifiableMap(Function.identity(), key -> key.register(registry)));
+        this.pauses = Counter.builder(PAUSES)
+                .description("Остановки потребителей очередей 1С:УСК из-за того, что база не принимает записи")
+                .register(registry);
     }
 
-    /** Заводит нулевые ряды доставок на каждую очередь и каждый исход и ряд остановок. */
-    @Override
-    public void bindTo(MeterRegistry target) {
-        for (OneCQueue queue : OneCQueue.values()) {
-            for (IngestOutcome outcome : IngestOutcome.values()) {
-                deliveries(queue.stream(), queue.nameIn(queues), outcome).register(target);
-            }
-        }
-        pauses().register(target);
-    }
-
-    /** Считает доставку с её исходом. */
+    /** Считает доставку с её исходом. Доставку не из очереди настроек — под своей очередью или {@code unknown}. */
     void record(OneCDelivery delivery, IngestOutcome outcome) {
-        deliveries(delivery.stream(), Objects.requireNonNullElse(delivery.queue(), UNKNOWN_QUEUE), outcome)
-                .register(registry)
+        SeriesKey key = new SeriesKey(
+                delivery.stream(), Optional.ofNullable(delivery.queue()).orElse(UNKNOWN_QUEUE), outcome);
+        Optional.ofNullable(deliveries.get(key))
+                .orElseGet(() -> key.register(registry))
                 .increment();
     }
 
     /** Считает остановку потребителей всех очередей из-за недоступной базы. */
     void paused() {
-        pauses().register(registry).increment();
+        pauses.increment();
     }
 
-    private static Counter.Builder deliveries(OneCStream stream, String queue, IngestOutcome outcome) {
-        return Counter.builder(DELIVERIES)
-                .description("Доставки из очередей 1С:УСК по исходу: сохранено, дубль, карантин, потеряно без "
-                        + "message-id, возвращено в очередь, отказ базы")
-                .tag("stream", stream.name())
-                .tag("queue", queue)
-                .tag("outcome", outcome.tagValue());
-    }
+    /** Ряд счётчика доставок: поток, очередь и исход. */
+    private record SeriesKey(OneCStream stream, String queue, IngestOutcome outcome) {
 
-    private static Counter.Builder pauses() {
-        return Counter.builder(PAUSES)
-                .description("Остановки потребителей очередей 1С:УСК из-за того, что база не принимает записи");
+        Counter register(MeterRegistry registry) {
+            return Counter.builder(DELIVERIES)
+                    .description("Доставки из очередей 1С:УСК по исходу: сохранено, дубль, карантин, потеряно без "
+                            + "message-id, возвращено в очередь, отказ базы")
+                    .tag("stream", stream.name())
+                    .tag("queue", queue)
+                    .tag("outcome", outcome.tagValue())
+                    .register(registry);
+        }
     }
 }

@@ -95,8 +95,8 @@ class OneCQueueListenerTest {
     }
 
     /**
-     * Сырьё записано, а счётчик отказал: это не отказ базы. Приём не встаёт на паузу, карантина нет; сообщение
-     * остаётся неподтверждённым и вернётся дублем, который подтвердится.
+     * Сырьё записано, а счётчик отказал: это не отказ базы. Приём не встаёт на паузу, в карантин ничего не пишется,
+     * а исключение уходит из слушателя как есть.
      */
     @Test
     void metricsFailureAfterStorage_isNotTakenForStorageFailure() throws IOException {
@@ -474,12 +474,25 @@ class OneCQueueListenerTest {
                 ingestMetrics);
     }
 
-    /** Реестр, который отказывает на любом счётчике: так выглядит сломанный экспорт метрик. */
+    /** Реестр, у которого любой счётчик отказывает на увеличении: так выглядит сломанный экспорт метрик. */
     private static final class FailingMeterRegistry extends SimpleMeterRegistry {
 
         @Override
         protected Counter newCounter(Meter.Id id) {
+            return new FailingCounter(id);
+        }
+    }
+
+    private record FailingCounter(Meter.Id getId) implements Counter {
+
+        @Override
+        public void increment(double amount) {
             throw new IllegalStateException("реестр метрик недоступен");
+        }
+
+        @Override
+        public double count() {
+            return 0;
         }
     }
 

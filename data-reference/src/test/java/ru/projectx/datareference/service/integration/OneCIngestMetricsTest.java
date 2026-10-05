@@ -30,7 +30,7 @@ class OneCIngestMetricsTest {
         assertThat(deliveries("POLICIES", POLICIES_QUEUE, "stored").count()).isEqualTo(2.0);
         assertThat(deliveries("MKB10", MKB10_QUEUE, "duplicate").count()).isEqualTo(1.0);
         assertThat(registry.find(OneCIngestMetrics.DELIVERIES).tag("outcome", "duplicate")
-                .tag("stream", "POLICIES").counter()).isNull();
+                .tag("stream", "POLICIES").tag("queue", POLICIES_QUEUE).counter()).isNull();
     }
 
     @Test
@@ -39,7 +39,7 @@ class OneCIngestMetricsTest {
             metrics.record(delivery(OneCStream.MKB10, MKB10_QUEUE), outcome);
         }
 
-        assertThat(registry.find(OneCIngestMetrics.DELIVERIES).counters())
+        assertThat(registry.find(OneCIngestMetrics.DELIVERIES).tag("queue", MKB10_QUEUE).counters())
                 .extracting(counter -> counter.getId().getTag("outcome"))
                 .containsExactlyInAnyOrder(
                         "stored", "duplicate", "quarantined", "unidentified", "returned", "storage_outage");
@@ -66,9 +66,7 @@ class OneCIngestMetricsTest {
      * свой поток — у прайсов две очереди на один поток.
      */
     @Test
-    void binding_registersZeroSeriesForEveryQueueAndOutcome() {
-        metrics.bindTo(registry);
-
+    void creation_registersZeroSeriesForEveryQueueAndOutcome() {
         assertThat(registry.find(OneCIngestMetrics.DELIVERIES).counters())
                 .hasSize(OneCQueue.values().length * IngestOutcome.values().length)
                 .allSatisfy(counter -> assertThat(counter.count()).isZero());
@@ -83,9 +81,7 @@ class OneCIngestMetricsTest {
 
     /** Заведённый заранее ряд и ряд, в который считает доставка, — один и тот же ряд. */
     @Test
-    void deliveryAfterBinding_countsIntoTheRegisteredSeries() {
-        metrics.bindTo(registry);
-
+    void deliveryFromConfiguredQueue_countsIntoTheRegisteredSeries() {
         metrics.record(delivery(OneCStream.POLICIES, "q-policies"), IngestOutcome.QUARANTINED);
 
         assertThat(deliveries("POLICIES", "q-policies", "quarantined").count()).isEqualTo(1.0);
