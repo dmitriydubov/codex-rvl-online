@@ -112,6 +112,19 @@ class ServicePriceQueryServiceTest {
         verifyNoInteractions(lookup);
     }
 
+    /** Период, в котором ночей больше, чем помещается в int, — тот же отказ по пределу, а не сбой подсчёта. */
+    @Test
+    void periodBeyondIntRange_isRefusedAsTooLong_withoutReadingDatabase() {
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
+
+        assertThatThrownBy(() -> prices.price(SERVICE_ID, LocalDate.MIN, LocalDate.MAX))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("date_to");
+                    assertThat(invalid.getMessage()).isEqualTo("не больше 366 ночей после date_from");
+                });
+        verifyNoInteractions(lookup);
+    }
+
     /** Предел берётся из настройки, а не из числа в коде: и граница, и текст отказа следуют за ней. */
     @Test
     void configuredMaxNights_decidesBoundaryAndReason() {
