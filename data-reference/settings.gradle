@@ -4,15 +4,15 @@
  * в своих репозиториях и общих артефактов с этим сервисом не имеют.
  *
  * Репозитории зависят от того, где идёт сборка:
- *   - облачная сессия Claude Code (CLAUDE_CODE_REMOTE) и GitHub Actions (GITHUB_ACTIONS) —
+ *   - внешняя сборка (переменная окружения CLAUDE_CODE_REMOTE или GITHUB_ACTIONS равна true) —
  *     только публичные: портал плагинов Gradle и Maven Central;
  *   - всё остальное, то есть рабочий контур, — только Nexus контура.
  * Принудительно: -PpublicRepositories=true|false.
  *
- * Выбор хранится в gradle.ext: build.gradle по нему же решает, подключать ли набор
- * gauntlet. pluginManagement {} обязан быть первым выражением файла и вычисляется
- * отдельно от остального, поэтому переключатель объявлен внутри него, а адрес Nexus
- * повторён ниже, а не вынесен в переменную.
+ * Выбор хранится в gradle.ext: build.gradle по нему же решает, подключать ли внешний
+ * набор проверок качества. pluginManagement {} обязан быть первым выражением файла
+ * и вычисляется отдельно от остального, поэтому переключатель объявлен внутри него,
+ * а адрес Nexus повторён ниже, а не вынесен в переменную.
  */
 pluginManagement {
     gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
@@ -40,7 +40,7 @@ dependencyResolutionManagement {
 /*
  * Рабочий контур без переключателя — только Nexus. Чтобы переключить вручную, замените
  * оба блока выше этими. Строку gradle.ext.gauntletEnabled ниже оставьте как есть: без
- * gradle.ext.publicRepositories она даёт false, и набор gauntlet не подключается:
+ * gradle.ext.publicRepositories она даёт false, и набор проверок не подключается:
  *
  * pluginManagement {
  *     repositories {
@@ -56,10 +56,10 @@ dependencyResolutionManagement {
  */
 
 /*
- * Набор gauntlet (гейты качества для работы Claude Code) подключается, когда каталог
- * ../gauntlet лежит рядом и репозитории публичные: плагин мутаций PIT опубликован только
- * на портале плагинов Gradle, которого в Nexus контура нет. В рабочий контур каталог
- * gauntlet/ не переносится, так что там набор выключен в любом случае.
+ * Внешний набор проверок качества подключается, когда его каталог лежит рядом с модулем
+ * (путь — в условии ниже) и репозитории публичные: плагин мутаций PIT опубликован только
+ * на портале плагинов Gradle, которого в Nexus контура нет. В рабочий контур каталог набора
+ * не переносится, так что там набор выключен в любом случае.
  * Принудительно: -Pgauntlet=true|false.
  */
 gradle.ext.gauntletEnabled = file('../gauntlet/gauntlet.gradle').isFile() &&

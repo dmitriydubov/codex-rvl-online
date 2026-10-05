@@ -2,7 +2,6 @@ package ru.projectx.datareference.service.price;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 /**
@@ -11,8 +10,9 @@ import java.util.Optional;
  */
 public record PriceSegment(LocalDate from, LocalDate to, PriceLine line) {
 
+    /** Ночи отрезка считаются по тому же правилу, что ночи периода проживания: день {@code to} не оплачивается. */
     public int nights() {
-        return Math.toIntExact(ChronoUnit.DAYS.between(from, to));
+        return Math.toIntExact(new StayPeriod(from, to).nights());
     }
 
     /** Сумма по цене без скидки. Копейки сохраняются: цена умножается на целое число ночей. */
