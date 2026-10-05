@@ -25,6 +25,10 @@ import org.springframework.validation.annotation.Validated;
  * должно быть можно без выпуска новой версии. Умолчания в коде нет, потому что это значения справочника
  * контура. Когда 1С пришлёт идентификаторы видов обращения, их место здесь же.
  *
+ * <p><b>Предел длины периода</b> в расчёте стоимости размещения — наибольшее число ночей между заездом и
+ * выездом. Путёвка в санаторий длится недели, а не годы; предел с запасом в високосный год отсекает
+ * опечатки в датах и запросы на века вперёд ещё до чтения базы.
+ *
  * <p><b>Лимит времени чтения</b> — сколько секунд REST-чтение может ждать базу, прежде чем ответить 503.
  * Применяет его аннотация транзакции чтения, которая читает то же свойство. Здесь он проверяется на старте
  * и сверяется с ожиданием блокировки в пуле соединений: лимит должен быть меньше.
@@ -34,6 +38,7 @@ import org.springframework.validation.annotation.Validated;
  *                           регистра и пробелов по краям, см. {@code RvlAppealTypes}
  * @param search             пределы поиска полисов договора
  * @param mkb10              пределы поиска по МКБ-10 и перечня кодов
+ * @param price              предел длины периода в расчёте стоимости размещения
  * @param readTimeoutSeconds лимит времени REST-чтения, целые секунды
  */
 @Validated
@@ -43,6 +48,7 @@ public record ReferenceApiProperties(
         @NotEmpty List<@NotBlank String> rvlAppealTypes,
         @Valid @DefaultValue Search search,
         @Valid @DefaultValue Mkb10 mkb10,
+        @Valid @DefaultValue Price price,
         @Min(1) int readTimeoutSeconds) {
 
     /**
@@ -68,6 +74,13 @@ public record ReferenceApiProperties(
             @Min(1) @DefaultValue("2") int minQueryLength,
             @Min(1) @DefaultValue("100") int maxQueryLength,
             @Min(1) @DefaultValue("100") int maxCodes) implements QueryLengthRange {
+    }
+
+    /**
+     * Наибольшая длина периода в расчёте стоимости, в ночах: выезд не дальше {@code maxNights} суток после заезда.
+     * Ночи считаются так же, как в ответе расчёта, день выезда не оплачивается.
+     */
+    public record Price(@Min(1) @DefaultValue("366") int maxNights) {
     }
 
     /**

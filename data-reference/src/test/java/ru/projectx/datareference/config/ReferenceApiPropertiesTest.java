@@ -21,6 +21,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class ReferenceApiPropertiesTest {
 
     private static final int DEFAULT_INPUT_LIMIT = 100;
+    private static final int DEFAULT_MAX_NIGHTS = 366;
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(ReferenceApiPropertiesBinding.class)
@@ -34,6 +35,37 @@ class ReferenceApiPropertiesTest {
             assertThat(api.mkb10().maxQueryLength()).isEqualTo(DEFAULT_INPUT_LIMIT);
             assertThat(api.mkb10().maxCodes()).isEqualTo(DEFAULT_INPUT_LIMIT);
         });
+    }
+
+    /** Предел длины периода расчёта стоимости по умолчанию — год с високосным запасом, 366 ночей. */
+    @Test
+    void stayLimit_defaultsTo366Nights() {
+        context.run(started -> assertThat(started.getBean(ReferenceApiProperties.class).price().maxNights())
+                .isEqualTo(DEFAULT_MAX_NIGHTS));
+    }
+
+    /** Предел длины периода читается из своего свойства: опечатка в имени молча оставила бы умолчание. */
+    @Test
+    void stayLimit_isBoundFromItsProperty() {
+        context.withPropertyValues("projectx.api.price.max-nights=21")
+                .run(started -> assertThat(started.getBean(ReferenceApiProperties.class).price().maxNights())
+                        .isEqualTo(21));
+    }
+
+    /** С нулевым пределом сервис отказывал бы в расчёте любого периода, поэтому такое значение роняет запуск. */
+    @Test
+    void zeroStayLimit_failsStartup() {
+        context.withPropertyValues("projectx.api.price.max-nights=0")
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining("price.maxNights"));
+    }
+
+    /** Предел в одну ночь допустим: это наименьший период расчёта. */
+    @Test
+    void oneNightStayLimit_isAccepted() {
+        context.withPropertyValues("projectx.api.price.max-nights=1")
+                .run(started -> assertThat(started).hasNotFailed());
     }
 
     /** Каждый предел читается из своего свойства: опечатка в имени молча оставила бы умолчание. */

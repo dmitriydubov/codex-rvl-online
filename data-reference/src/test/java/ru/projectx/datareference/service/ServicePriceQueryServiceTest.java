@@ -19,10 +19,11 @@ import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
+import ru.projectx.datareference.support.TestApiProperties;
 
 /**
- * Период проверяется до чтения базы: выезд не позже заезда — ошибка вызывающего, и она даёт 400 даже при
- * недоступной базе. Верный период уходит на чтение как есть, а считается по прочитанным строкам прайса уже после
+ * Период проверяется до чтения базы: выезд не позже заезда и период длиннее предела ночей — ошибки вызывающего,
+ * и они дают 400 даже при недоступной базе. Верный период уходит на чтение как есть, а считается по прочитанным строкам прайса уже после
  * транзакции.
  */
 @ExtendWith(MockitoExtension.class)
@@ -36,7 +37,7 @@ class ServicePriceQueryServiceTest {
 
     @Test
     void checkOutNextDay_isOneNight_pricedByRowsReadByLookup() {
-        ServicePriceQueryService prices = new ServicePriceQueryService(lookup);
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
         NamedRef service = new NamedRef(SERVICE_ID, UUID.randomUUID(), "Размещение");
         PriceLine line = new PriceLine(UUID.randomUUID(), APRIL_10, null, new BigDecimal("7300.00"), null);
         when(lookup.source(SERVICE_ID, new StayPeriod(APRIL_10, APRIL_10.plusDays(1))))
@@ -51,7 +52,7 @@ class ServicePriceQueryServiceTest {
 
     @Test
     void noRowsForPeriod_isRefusedForWholePeriod_namingService() {
-        ServicePriceQueryService prices = new ServicePriceQueryService(lookup);
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
         StayPeriod period = new StayPeriod(APRIL_10, APRIL_10.plusDays(2));
         when(lookup.source(SERVICE_ID, period)).thenReturn(
                 new PricedService(new NamedRef(SERVICE_ID, UUID.randomUUID(), "Размещение"), List.of()));
@@ -66,7 +67,7 @@ class ServicePriceQueryServiceTest {
 
     @Test
     void checkOutOnCheckInDay_isRefused_namingDateTo_withoutReadingDatabase() {
-        ServicePriceQueryService prices = new ServicePriceQueryService(lookup);
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
 
         assertThatThrownBy(() -> prices.price(SERVICE_ID, APRIL_10, APRIL_10))
                 .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
@@ -78,10 +79,63 @@ class ServicePriceQueryServiceTest {
 
     @Test
     void checkOutBeforeCheckIn_isRefused() {
-        ServicePriceQueryService prices = new ServicePriceQueryService(lookup);
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
 
         assertThatThrownBy(() -> prices.price(SERVICE_ID, APRIL_10, APRIL_10.minusDays(1)))
                 .isInstanceOf(InvalidRequestException.class);
+        verifyNoInteractions(lookup);
+    }
+
+    /** Ровно предел ночей — верный период: он уходит на чтение, а не отклоняется. */
+    @Test
+    void stayOfExactlyMaxNights_isReadFromDatabase() {
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
+        StayPeriod period = new StayPeriod(APRIL_10, LocalDate.of(2027, 4, 11));
+        when(lookup.source(SERVICE_ID, period)).thenReturn(new PricedService(
+                new NamedRef(SERVICE_ID, UUID.randomUUID(), "Размещение"),
+                List.of(new PriceLine(UUID.randomUUID(), APRIL_10, null, new BigDecimal("1000.00"), null))));
+
+        ServicePriceResponse response = prices.price(SERVICE_ID, period.checkIn(), period.checkOut());
+
+        assertThat(response.total().nights()).isEqualTo(366);
+    }
+
+    @Test
+    void stayOneNightLongerThanMax_isRefused_namingDateToAndLimit_withoutReadingDatabase() {
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
+
+        assertThatThrownBy(() -> prices.price(SERVICE_ID, APRIL_10, LocalDate.of(2027, 4, 12)))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("date_to");
+                    assertThat(invalid.getMessage()).isEqualTo("не больше 366 ночей после date_from");
+                });
+        verifyNoInteractions(lookup);
+    }
+
+    /** Предел берётся из настройки, а не из числа в коде: и граница, и текст отказа следуют за ней. */
+    @Test
+    void configuredMaxNights_decidesBoundaryAndReason() {
+        ServicePriceQueryService prices =
+                new ServicePriceQueryService(lookup, TestApiProperties.withPriceMaxNights(30));
+        StayPeriod allowed = new StayPeriod(APRIL_10, APRIL_10.plusDays(30));
+        when(lookup.source(SERVICE_ID, allowed)).thenReturn(
+                new PricedService(new NamedRef(SERVICE_ID, UUID.randomUUID(), "Размещение"), List.of(
+                        new PriceLine(UUID.randomUUID(), APRIL_10, null, new BigDecimal("1000.00"), null))));
+
+        assertThat(prices.price(SERVICE_ID, allowed.checkIn(), allowed.checkOut()).total().nights()).isEqualTo(30);
+        assertThatThrownBy(() -> prices.price(SERVICE_ID, APRIL_10, APRIL_10.plusDays(31)))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid ->
+                        assertThat(invalid.getMessage()).isEqualTo("не больше 30 ночей после date_from"));
+    }
+
+    /** Выезд намного раньше заезда — по-прежнему ошибка порядка дат, а не длины: порядок проверяется первым. */
+    @Test
+    void longReversedStay_isRefusedForDateOrder() {
+        ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
+
+        assertThatThrownBy(() -> prices.price(SERVICE_ID, LocalDate.of(9999, 12, 31), APRIL_10))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid ->
+                        assertThat(invalid.getMessage()).isEqualTo("позже date_from"));
         verifyNoInteractions(lookup);
     }
 }
