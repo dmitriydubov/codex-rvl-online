@@ -116,7 +116,7 @@ class SqlErrorLogTest {
 
     /** Полный текст ошибки остаётся в строке сырья — значит, ПДн в ошибке действительно были. */
     private String lastErrorOf(UUID messageId) {
-        return inboundMessageRepository.findById(messageId).orElseThrow().lastError();
+        return inboundMessageRepository.findById(messageId).orElseThrow().outcome().lastError();
     }
 
     private static String mkb10(String code, String name) {

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
@@ -60,14 +61,14 @@ class PriceListTransferMarkupTest {
     @Test
     void markup_putsMessageIntoBuffer() {
         InboundMessage message = InboundMessage.receive(
-                UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", "{}", Instant.EPOCH);
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", Instant.EPOCH), "{}");
 
         new PriceListTransferMarkup(CID, 2, 3).applyTo(message);
 
-        assertThat(message.status()).isEqualTo(InboundStatus.BUFFERED);
-        assertThat(message.correlationId()).isEqualTo(CID);
-        assertThat(message.batchCount()).isEqualTo(2);
-        assertThat(message.rowCount()).isEqualTo(3);
+        assertThat(message.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(message.transferPart().correlationId()).isEqualTo(CID);
+        assertThat(message.transferPart().batchCount()).isEqualTo(2);
+        assertThat(message.transferPart().rowCount()).isEqualTo(3);
     }
 
     private static ObjectNode node(String text) {

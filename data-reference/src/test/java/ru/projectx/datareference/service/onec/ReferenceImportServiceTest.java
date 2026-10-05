@@ -70,7 +70,7 @@ class ReferenceImportServiceTest {
 
         importService.importMessage(message(messageId));
 
-        assertThat(inboundMessageRepository.findById(messageId).orElseThrow().status())
+        assertThat(inboundMessageRepository.findById(messageId).orElseThrow().outcome().status())
                 .isEqualTo(InboundStatus.PROCESSED);
     }
 
@@ -109,8 +109,8 @@ class ReferenceImportServiceTest {
         importService.importMessage(message(skippedId));
 
         InboundMessage skipped = inboundMessageRepository.findById(skippedId).orElseThrow();
-        assertThat(skipped.status()).isEqualTo(InboundStatus.SKIPPED);
-        assertThat(skipped.lastError()).isNotBlank();
+        assertThat(skipped.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+        assertThat(skipped.outcome().lastError()).isNotBlank();
     }
 
     /** Конверт без data — постоянная ошибка: повтор даст ровно то же самое. */

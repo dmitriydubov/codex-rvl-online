@@ -21,6 +21,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
@@ -67,10 +68,10 @@ class PriceListTransferAssemblerTest {
         ImportResult result = receive(batch);
 
         assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " ждёт финального сообщения"));
-        assertThat(batch.status()).isEqualTo(InboundStatus.BUFFERED);
-        assertThat(batch.correlationId()).isEqualTo(CID);
-        assertThat(batch.batchCount()).isNull();
-        assertThat(batch.rowCount()).isEqualTo(2);
+        assertThat(batch.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(batch.transferPart().correlationId()).isEqualTo(CID);
+        assertThat(batch.transferPart().batchCount()).isNull();
+        assertThat(batch.transferPart().rowCount()).isEqualTo(2);
         verify(repository).save(batch);
         verify(priceListMapper, never()).apply(any());
     }
@@ -83,10 +84,10 @@ class PriceListTransferAssemblerTest {
         ImportResult result = receive(finalMessage);
 
         assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " собрана на 0 из 2 сообщений"));
-        assertThat(finalMessage.status()).isEqualTo(InboundStatus.BUFFERED);
-        assertThat(finalMessage.correlationId()).isEqualTo(CID);
-        assertThat(finalMessage.batchCount()).isEqualTo(2);
-        assertThat(finalMessage.rowCount()).isEqualTo(3);
+        assertThat(finalMessage.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(finalMessage.transferPart().correlationId()).isEqualTo(CID);
+        assertThat(finalMessage.transferPart().batchCount()).isEqualTo(2);
+        assertThat(finalMessage.transferPart().rowCount()).isEqualTo(3);
     }
 
     /** Строки всех пакетов идут в применение одним набором по возрастанию номера, как их пронумеровал источник. */
@@ -104,8 +105,8 @@ class PriceListTransferAssemblerTest {
                 {"keyValue":"%s","recordSet":[%s,%s,%s]}"""
                 .formatted(SERVICE_ID, row(1, "100.00"), row(2, "200.00"), row(3, "300.00"))));
         assertThat(List.of(finalMessage, first, second)).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.PROCESSED);
-            assertThat(message.processedAt()).isEqualTo(NOW);
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+            assertThat(message.outcome().processedAt()).isEqualTo(NOW);
         });
         verifySavedAfterBuffering(finalMessage, first, second);
     }
@@ -120,9 +121,9 @@ class PriceListTransferAssemblerTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped("услуги нет"));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.SKIPPED);
-            assertThat(message.lastError()).isEqualTo("услуги нет");
-            assertThat(message.processedAt()).isEqualTo(NOW);
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+            assertThat(message.outcome().lastError()).isEqualTo("услуги нет");
+            assertThat(message.outcome().processedAt()).isEqualTo(NOW);
         });
         verifySavedAfterBuffering(finalMessage, batch);
     }
@@ -138,8 +139,8 @@ class PriceListTransferAssemblerTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped(reason));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.FAILED);
-            assertThat(message.lastError()).isEqualTo(reason);
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
+            assertThat(message.outcome().lastError()).isEqualTo(reason);
         });
         verifySavedAfterBuffering(finalMessage, batch);
         verify(priceListMapper, never()).apply(any());
@@ -191,7 +192,8 @@ class PriceListTransferAssemblerTest {
     }
 
     private static InboundMessage message(String data) {
-        return InboundMessage.receive(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", envelope(data), NOW);
+        return InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW), envelope(data));
     }
 
     private ObjectNode dataOf(InboundMessage message) {

@@ -82,7 +82,7 @@ class PriceListTransferTest {
     void batchWithoutFinalMessage_waitsInBuffer() {
         UUID batchId = importBatch(rows(1, "4999.95"));
 
-        assertThat(inboundMessageRepository.findById(batchId).orElseThrow().status())
+        assertThat(inboundMessageRepository.findById(batchId).orElseThrow().outcome().status())
                 .isEqualTo(InboundStatus.BUFFERED);
         assertThat(priceRepository.count()).isZero();
     }
@@ -107,7 +107,7 @@ class PriceListTransferTest {
         importFinal(1, 1);
 
         assertThat(inboundMessageRepository.findByCorrelationId(CID))
-                .extracting(InboundMessage::status)
+                .extracting(inbound -> inbound.outcome().status())
                 .containsOnly(InboundStatus.PROCESSED);
     }
 
@@ -140,9 +140,9 @@ class PriceListTransferTest {
 
         assertThat(priceRepository.count()).isZero();
         assertThat(inboundMessageRepository.findByCorrelationId(CID))
-                .extracting(InboundMessage::status)
+                .extracting(inbound -> inbound.outcome().status())
                 .containsOnly(InboundStatus.FAILED);
-        assertThat(inboundMessageRepository.findByCorrelationId(CID).getFirst().lastError())
+        assertThat(inboundMessageRepository.findByCorrelationId(CID).getFirst().outcome().lastError())
                 .contains("счётчики передачи");
     }
 
@@ -168,7 +168,7 @@ class PriceListTransferTest {
 
         assertThat(priceRepository.count()).isZero();
         assertThat(inboundMessageRepository.findByCorrelationId(CID))
-                .extracting(InboundMessage::status)
+                .extracting(inbound -> inbound.outcome().status())
                 .containsOnly(InboundStatus.SKIPPED);
     }
 

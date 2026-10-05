@@ -6,8 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.InboundRetryProperties;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
 /**
@@ -40,7 +41,8 @@ public class InboundMessageService {
      */
     @Transactional
     public InboundMessage store(UUID messageId, OneCStream stream, String sourceQueue, String payload) {
-        return repository.save(InboundMessage.receive(messageId, stream, sourceQueue, payload, clock.instant()));
+        InboundReceipt receipt = new InboundReceipt(messageId, stream, sourceQueue, clock.instant());
+        return repository.save(InboundMessage.receive(receipt, payload));
     }
 
     /**
@@ -73,7 +75,7 @@ public class InboundMessageService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordTemporaryFailure(UUID messageId, String error) {
         InboundMessage message = require(messageId);
-        int nextAttempt = message.attempt() + 1;
+        int nextAttempt = message.outcome().attempt() + 1;
 
         retryProperties.delayBeforeAttempt(nextAttempt).ifPresentOrElse(
                 delay -> message.markRetrying(error, clock.instant().plus(delay)),

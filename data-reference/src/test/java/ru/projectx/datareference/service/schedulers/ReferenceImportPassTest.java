@@ -33,6 +33,7 @@ import org.slf4j.MDC;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Limit;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
@@ -113,7 +114,7 @@ class ReferenceImportPassTest {
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("сообщение " + message.messageId() + " потока MKB10 применено");
+                    .isEqualTo("сообщение " + message.receipt().messageId() + " потока MKB10 применено");
         });
     }
 
@@ -129,7 +130,8 @@ class ReferenceImportPassTest {
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("сообщение " + message.messageId() + " потока MKB10 пропущено: программа не РВЛ");
+                    .isEqualTo("сообщение " + message.receipt().messageId()
+                            + " потока MKB10 пропущено: программа не РВЛ");
         });
     }
 
@@ -150,7 +152,7 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        assertThat(seen).containsEntry(OneCLogContext.MESSAGE_ID, message.messageId().toString())
+        assertThat(seen).containsEntry(OneCLogContext.MESSAGE_ID, message.receipt().messageId().toString())
                 .containsEntry(OneCLogContext.STREAM, OneCStream.MKB10.name());
         assertThat(MDC.get(OneCLogContext.MESSAGE_ID)).isNull();
         assertThat(MDC.get(OneCLogContext.STREAM)).isNull();
@@ -167,11 +169,11 @@ class ReferenceImportPassTest {
         doAnswer(invocation -> {
             seen.putAll(MDC.getCopyOfContextMap());
             return null;
-        }).when(inboundMessageService).recordPermanentFailure(message.messageId(), "не задано поле code");
+        }).when(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), "не задано поле code");
 
         scheduler().importPendingMessages();
 
-        assertThat(seen).containsEntry(OneCLogContext.MESSAGE_ID, message.messageId().toString());
+        assertThat(seen).containsEntry(OneCLogContext.MESSAGE_ID, message.receipt().messageId().toString());
         assertThat(logged.list).singleElement()
                 .satisfies(event -> assertThat(event.getMDCPropertyMap())
                         .containsEntry(OneCLogContext.STREAM, OneCStream.MKB10.name()));
@@ -188,11 +190,11 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordPermanentFailure(message.messageId(), "не задано поле code");
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), "не задано поле code");
         verify(inboundMessageService, never()).recordTemporaryFailure(any(), any());
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getFormattedMessage()).isEqualTo("сообщение " + message.messageId()
+            assertThat(event.getFormattedMessage()).isEqualTo("сообщение " + message.receipt().messageId()
                     + " потока MKB10 не соответствует контракту, повтор бессмыслен: не задано поле code");
         });
     }
@@ -207,12 +209,13 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordTemporaryFailure(message.messageId(), failure.toString());
+        verify(inboundMessageService).recordTemporaryFailure(message.receipt().messageId(), failure.toString());
         verify(inboundMessageService, never()).recordPermanentFailure(any(), any());
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).isEqualTo("временная ошибка разбора сообщения "
-                    + message.messageId() + " потока MKB10: org.springframework.dao.CannotAcquireLockException");
+                    + message.receipt().messageId()
+                    + " потока MKB10: org.springframework.dao.CannotAcquireLockException");
         });
     }
 
@@ -236,7 +239,7 @@ class ReferenceImportPassTest {
     }
 
     private static InboundMessage received() {
-        return InboundMessage.receive(UUID.randomUUID(), OneCStream.MKB10, QUEUE, "{}", NOW);
+        return InboundMessage.receive(new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, NOW), "{}");
     }
 
     private static Logger schedulerLog() {

@@ -20,6 +20,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.CannotAcquireLockException;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -65,14 +66,15 @@ class ReferenceImportSchedulerStructuredJournalTest {
 
     @Test
     void importOutcome_carriesMessageIdAndStream(CapturedOutput output) {
-        InboundMessage message = InboundMessage.receive(UUID.randomUUID(), OneCStream.MKB10, QUEUE, "{}", NOW);
+        InboundMessage message = received();
         when(repository.findDueForImport(any(), any())).thenReturn(List.of(message));
         when(importService.importMessage(message)).thenReturn(applied());
 
         scheduler().importPendingMessages();
 
         JsonNode outcome = StructuredJournal.recordWith(output, "применено");
-        assertThat(outcome.path(OneCLogContext.MESSAGE_ID).asString()).isEqualTo(message.messageId().toString());
+        assertThat(outcome.path(OneCLogContext.MESSAGE_ID).asString())
+                .isEqualTo(message.receipt().messageId().toString());
         assertThat(outcome.path(OneCLogContext.STREAM).asString()).isEqualTo(OneCStream.MKB10.name());
     }
 
@@ -83,7 +85,7 @@ class ReferenceImportSchedulerStructuredJournalTest {
      */
     @Test
     void temporaryFailure_carriesMessageIdAndStreamButNoFailureText(CapturedOutput output) {
-        InboundMessage message = InboundMessage.receive(UUID.randomUUID(), OneCStream.MKB10, QUEUE, "{}", NOW);
+        InboundMessage message = received();
         when(repository.findDueForImport(any(), any())).thenReturn(List.of(message));
         when(importService.importMessage(message)).thenThrow(
                 new CannotAcquireLockException("параметры запроса: [" + PERSONAL_DATA + "]"));
@@ -92,7 +94,8 @@ class ReferenceImportSchedulerStructuredJournalTest {
 
         JsonNode warning = StructuredJournal.recordWith(output, "временная ошибка разбора");
         assertThat(warning.path("log").path("level").asString()).isEqualTo("WARN");
-        assertThat(warning.path(OneCLogContext.MESSAGE_ID).asString()).isEqualTo(message.messageId().toString());
+        assertThat(warning.path(OneCLogContext.MESSAGE_ID).asString())
+                .isEqualTo(message.receipt().messageId().toString());
         assertThat(warning.path(OneCLogContext.STREAM).asString()).isEqualTo(OneCStream.MKB10.name());
         assertThat(warning.has("error")).isFalse();
         assertThat(output.getAll()).doesNotContain(PERSONAL_DATA);
@@ -101,5 +104,9 @@ class ReferenceImportSchedulerStructuredJournalTest {
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
                 ImportSettings.defaults().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static InboundMessage received() {
+        return InboundMessage.receive(new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, NOW), "{}");
     }
 }

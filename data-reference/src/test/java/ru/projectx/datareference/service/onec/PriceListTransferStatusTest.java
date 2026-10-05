@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
@@ -111,8 +112,8 @@ class PriceListTransferStatusTest {
 
         assertThat(failed).containsExactly(finalMessage, batch);
         assertThat(failed).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.FAILED);
-            assertThat(message.lastError()).isEqualTo("счётчики");
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
+            assertThat(message.outcome().lastError()).isEqualTo("счётчики");
         });
     }
 
@@ -126,8 +127,8 @@ class PriceListTransferStatusTest {
 
         assertThat(processed).containsExactly(finalMessage, batch);
         assertThat(processed).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.PROCESSED);
-            assertThat(message.processedAt()).isEqualTo(PROCESSED_AT);
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+            assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
         });
     }
 
@@ -141,9 +142,9 @@ class PriceListTransferStatusTest {
 
         assertThat(skipped).containsExactly(finalMessage, batch);
         assertThat(skipped).allSatisfy(message -> {
-            assertThat(message.status()).isEqualTo(InboundStatus.SKIPPED);
-            assertThat(message.lastError()).isEqualTo("услуги нет");
-            assertThat(message.processedAt()).isEqualTo(PROCESSED_AT);
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+            assertThat(message.outcome().lastError()).isEqualTo("услуги нет");
+            assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
         });
     }
 
@@ -160,6 +161,7 @@ class PriceListTransferStatusTest {
     }
 
     private static InboundMessage received() {
-        return InboundMessage.receive(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", "{}", RECEIVED_AT);
+        return InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", RECEIVED_AT), "{}");
     }
 }

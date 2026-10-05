@@ -74,8 +74,8 @@ class PersonalDataRetentionTest {
 
         InboundMessage stored = inboundMessageRepository.findById(messageId).orElseThrow();
         assertThat(stored.payload()).isNull();
-        assertThat(stored.stream()).isEqualTo(OneCStream.POLICIES);
-        assertThat(stored.receivedAt()).isNotNull();
+        assertThat(stored.receipt().stream()).isEqualTo(OneCStream.POLICIES);
+        assertThat(stored.receipt().receivedAt()).isNotNull();
     }
 
     /**

@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -32,7 +33,8 @@ class MissingMapperTest {
 
         UUID messageId = UUID.randomUUID();
         InboundMessage message = InboundMessage.receive(
-                messageId, OneCStream.MKB10, "очередь", envelope("{\"id\":\"" + messageId + "\"}"), Instant.now());
+                new InboundReceipt(messageId, OneCStream.MKB10, "очередь", Instant.now()),
+                envelope("{\"id\":\"" + messageId + "\"}"));
 
         ImportResult result = importService.importMessage(message);
 
