@@ -15,22 +15,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.projectx.datareference.dto.ServicePriceResponse;
+import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
-import ru.projectx.datareference.exception.PriceNotCoveredException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
 
 /**
  * Расчёт стоимости считает только услугу, которую учреждение отдаёт в перечне своих услуг: тот же отбор по
  * прайсовому договору и видам обращения РВЛ. Порядок отказов: сначала учреждение и его прайсовый договор, затем
- * договор услуги, затем сама услуга, и только потом прайс. Строки прайса читаются одним запросом за весь период.
+ * архив самой услуги, затем её договор, затем отбор по видам обращения, и только потом прайс. Строки прайса читаются
+ * одним запросом за весь период и отдаются расчёту как есть.
  */
 @ExtendWith(MockitoExtension.class)
 class ServicePriceLookupTest {
@@ -61,17 +63,31 @@ class ServicePriceLookupTest {
     }
 
     @Test
-    void offeredService_isPricedByRowsReadForWholePeriod() {
+    void offeredService_isNamedAndCarriesRowsReadForWholePeriod() {
+        PriceListItem item = ReadFixtures.price(service, "3500.00");
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
         when(offers.of(lpu.id())).thenReturn(offer(List.of(service)));
         when(priceListItems.findWithinPeriodByServiceId(service.id(), PERIOD.checkIn(), PERIOD.checkOut()))
-                .thenReturn(List.of(ReadFixtures.price(service, "3500.00")));
+                .thenReturn(List.of(item));
 
-        ServicePriceResponse response = lookup.price(service.id(), PERIOD);
+        PricedService priced = lookup.source(service.id(), PERIOD);
 
-        assertThat(response.service().id()).isEqualTo(service.id());
-        assertThat(response.total().nights()).isEqualTo(2);
-        assertThat(response.total().amount()).isEqualByComparingTo("7000.00");
+        assertThat(priced.service()).isEqualTo(new NamedRef(service.id(), service.externalId(), service.name()));
+        assertThat(priced.lines()).containsExactly(PriceLine.of(item));
+    }
+
+    @Test
+    void archivedServiceOfAnotherContract_isNotFound_notDataError() {
+        LpuContract mainContract = ReadFixtures.lpuContract(lpu, null, false);
+        ContragentService archived = ContragentService.create(UUID.randomUUID(), mainContract,
+                new ContragentService.Details(RVL, "У-1", "Размещение", true), ReadFixtures.NOW);
+        when(contragentServices.findById(archived.id())).thenReturn(Optional.of(archived));
+        when(offers.of(lpu.id())).thenReturn(offer(List.of(service)));
+
+        assertThatThrownBy(() -> lookup.source(archived.id(), PERIOD))
+                .isInstanceOfSatisfying(ReferenceNotFoundException.class,
+                        notFound -> assertThat(notFound.code()).isEqualTo("SERVICE_NOT_FOUND"));
+        verifyNoInteractions(priceListItems);
     }
 
     @Test
@@ -79,7 +95,7 @@ class ServicePriceLookupTest {
         UUID unknown = UUID.randomUUID();
         when(contragentServices.findById(unknown)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> lookup.price(unknown, PERIOD))
+        assertThatThrownBy(() -> lookup.source(unknown, PERIOD))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
                         notFound -> assertThat(notFound.code()).isEqualTo("SERVICE_NOT_FOUND"));
         verifyNoInteractions(offers, priceListItems);
@@ -90,7 +106,7 @@ class ServicePriceLookupTest {
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
         when(offers.of(lpu.id())).thenThrow(ReferenceNotFoundException.lpu(lpu.id()));
 
-        assertThatThrownBy(() -> lookup.price(service.id(), PERIOD))
+        assertThatThrownBy(() -> lookup.source(service.id(), PERIOD))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
                         notFound -> assertThat(notFound.code()).isEqualTo("LPU_NOT_FOUND"));
         verifyNoInteractions(priceListItems);
@@ -103,7 +119,7 @@ class ServicePriceLookupTest {
         when(contragentServices.findById(mainContractService.id())).thenReturn(Optional.of(mainContractService));
         when(offers.of(lpu.id())).thenReturn(offer(List.of(service)));
 
-        assertThatThrownBy(() -> lookup.price(mainContractService.id(), PERIOD))
+        assertThatThrownBy(() -> lookup.source(mainContractService.id(), PERIOD))
                 .isInstanceOfSatisfying(IncompleteReferenceException.class, incomplete -> {
                     assertThat(incomplete.code()).isEqualTo("NO_ACTIVE_PRICE_CONTRACT");
                     assertThat(incomplete.lpuId()).isEqualTo(lpu.id());
@@ -116,7 +132,7 @@ class ServicePriceLookupTest {
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
         when(offers.of(lpu.id())).thenReturn(offer(List.of()));
 
-        assertThatThrownBy(() -> lookup.price(service.id(), PERIOD))
+        assertThatThrownBy(() -> lookup.source(service.id(), PERIOD))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
                         notFound -> assertThat(notFound.code()).isEqualTo("SERVICE_NOT_FOUND"));
         verifyNoInteractions(priceListItems);
@@ -128,25 +144,10 @@ class ServicePriceLookupTest {
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
         when(offers.of(lpu.id())).thenReturn(offer(List.of(offered)));
 
-        assertThatThrownBy(() -> lookup.price(service.id(), PERIOD))
+        assertThatThrownBy(() -> lookup.source(service.id(), PERIOD))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
                         notFound -> assertThat(notFound.code()).isEqualTo("SERVICE_NOT_FOUND"));
         verifyNoInteractions(priceListItems);
-    }
-
-    @Test
-    void noRowsForPeriod_isRefusedForWholePeriod_namingService() {
-        when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
-        when(offers.of(lpu.id())).thenReturn(offer(List.of(service)));
-        when(priceListItems.findWithinPeriodByServiceId(service.id(), PERIOD.checkIn(), PERIOD.checkOut()))
-                .thenReturn(List.of());
-
-        assertThatThrownBy(() -> lookup.price(service.id(), PERIOD))
-                .isInstanceOfSatisfying(PriceNotCoveredException.class, notCovered -> {
-                    assertThat(notCovered.serviceId()).isEqualTo(service.id());
-                    assertThat(notCovered.intervals()).containsExactly(
-                            new PriceNotCoveredException.Interval(PERIOD.checkIn(), PERIOD.checkOut()));
-                });
     }
 
     private LpuOffer offer(List<ContragentService> services) {

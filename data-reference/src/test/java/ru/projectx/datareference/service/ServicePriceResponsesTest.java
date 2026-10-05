@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
-import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.service.price.PriceBreakdown;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.PriceSegment;
@@ -25,8 +25,7 @@ class ServicePriceResponsesTest {
     private static final LocalDate APRIL_12 = LocalDate.of(2026, 4, 12);
     private static final LocalDate APRIL_13 = LocalDate.of(2026, 4, 13);
 
-    private final ContragentService service = ReadFixtures.service(
-            ReadFixtures.lpuContract(ReadFixtures.lpu(UUID.randomUUID(), false), null, false), UUID.randomUUID());
+    private final NamedRef service = new NamedRef(UUID.randomUUID(), UUID.randomUUID(), "Размещение");
 
     @Test
     void discountOnEverySegment_makesDiscountedTotalTheBasis() {
@@ -36,6 +35,9 @@ class ServicePriceResponsesTest {
 
         ServicePriceResponse response = ServicePriceResponses.of(service, new StayPeriod(APRIL_10, APRIL_13), breakdown);
 
+        assertThat(response.service()).isSameAs(service);
+        assertThat(response.dateFrom()).isEqualTo(APRIL_10);
+        assertThat(response.dateTo()).isEqualTo(APRIL_13);
         assertThat(response.total()).isEqualTo(new ServicePriceResponse.Total(3, new BigDecimal("11000.00"),
                 new BigDecimal("9600.00"), ServicePriceResponse.Basis.DISCOUNT));
         assertThat(response.segments()).containsExactly(

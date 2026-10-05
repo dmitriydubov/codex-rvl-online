@@ -2,7 +2,6 @@ package ru.projectx.datareference.service;
 
 import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
-import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.service.price.PriceBreakdown;
 import ru.projectx.datareference.service.price.PriceSegment;
 import ru.projectx.datareference.service.price.StayPeriod;
@@ -16,9 +15,9 @@ final class ServicePriceResponses {
     private ServicePriceResponses() {
     }
 
-    static ServicePriceResponse of(ContragentService service, StayPeriod period, PriceBreakdown breakdown) {
+    static ServicePriceResponse of(NamedRef service, StayPeriod period, PriceBreakdown breakdown) {
         return new ServicePriceResponse(
-                new NamedRef(service.id(), service.externalId(), service.name()),
+                service,
                 period.checkIn(),
                 period.checkOut(),
                 breakdown.segments().stream().map(ServicePriceResponses::segment).toList(),

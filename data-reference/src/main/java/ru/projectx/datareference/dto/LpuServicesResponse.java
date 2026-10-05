@@ -52,7 +52,7 @@ public record LpuServicesResponse(NamedRef lpu, PriceContractRef priceContract, 
 
     /**
      * Строка прайса как есть, с обеими ценами. Какая из сумм основная для сооплаты, здесь не решается: это
-     * отмечает расчёт стоимости услуги за период (журнал решений по REST, правило В-6в).
+     * отмечает расчёт стоимости услуги за период.
      */
     public record Price(
             BigDecimal price,

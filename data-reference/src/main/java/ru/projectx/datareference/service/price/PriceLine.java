@@ -23,9 +23,4 @@ public record PriceLine(
     public static PriceLine of(PriceListItem item) {
         return new PriceLine(item.id(), item.validFrom(), item.validTo(), item.price(), item.priceWithDiscount());
     }
-
-    /** Действует ли строка на ночь, которая начинается в этот день. */
-    boolean covers(LocalDate night) {
-        return !night.isBefore(validFrom) && (validTo == null || !night.isAfter(validTo));
-    }
 }

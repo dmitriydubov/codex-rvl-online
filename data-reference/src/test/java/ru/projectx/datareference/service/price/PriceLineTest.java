@@ -12,32 +12,11 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.PriceListItem;
 
-/**
- * Строка прайса действует с первого дня по последний включительно, а пустой последний день значит «бессрочно».
- * Ошибка на границе дала бы лишние или непокрытые сутки и неверную сумму.
- */
+/** Строка прайса для расчёта берётся из сохранённой строки как есть: сроки действия и обе цены. */
 class PriceLineTest {
 
     private static final LocalDate FROM = LocalDate.of(2026, 4, 1);
     private static final LocalDate TO = LocalDate.of(2026, 4, 30);
-
-    private final PriceLine closed = PriceLines.line(FROM, TO, "1000.00", null);
-    private final PriceLine open = PriceLines.line(FROM, null, "1000.00", null);
-
-    @Test
-    void closedLine_coversNightsFromFirstToLastDayInclusive() {
-        assertThat(closed.covers(FROM)).isTrue();
-        assertThat(closed.covers(TO)).isTrue();
-        assertThat(closed.covers(FROM.minusDays(1))).isFalse();
-        assertThat(closed.covers(TO.plusDays(1))).isFalse();
-    }
-
-    @Test
-    void openLine_coversEveryNightFromFirstDay() {
-        assertThat(open.covers(FROM)).isTrue();
-        assertThat(open.covers(LocalDate.of(2999, 12, 31))).isTrue();
-        assertThat(open.covers(FROM.minusDays(1))).isFalse();
-    }
 
     @Test
     void of_takesDatesAndBothPricesFromStoredRow() {

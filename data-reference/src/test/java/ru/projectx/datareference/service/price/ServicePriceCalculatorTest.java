@@ -123,6 +123,38 @@ class ServicePriceCalculatorTest {
                 .isInstanceOf(AmbiguousPriceException.class);
     }
 
+    @Test
+    void lineReachingBeyondBothEndsOfPeriod_isCutToPeriod() {
+        PriceLine line = PriceLines.line(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "4000.00", null);
+
+        PriceBreakdown breakdown = calculate(APRIL_10, MAY_5, List.of(line));
+
+        assertThat(breakdown.segments()).containsExactly(new PriceSegment(APRIL_10, MAY_5, line));
+    }
+
+    @Test
+    void linesOutsidePeriod_areIgnored() {
+        PriceLine inside = PriceLines.line(APRIL_10, null, "4000.00", null);
+        PriceLine endedDayBeforeCheckIn = PriceLines.line(LocalDate.of(2026, 3, 1), APRIL_10.minusDays(1), "1.00", null);
+        PriceLine startsOnCheckOutDay = PriceLines.line(MAY_5, null, "2.00", null);
+
+        PriceBreakdown breakdown = calculate(APRIL_10, MAY_5, List.of(endedDayBeforeCheckIn, inside, startsOnCheckOutDay));
+
+        assertThat(breakdown.segments()).containsExactly(new PriceSegment(APRIL_10, MAY_5, inside));
+    }
+
+    /** Расчёт идёт по границам строк прайса, поэтому период на тысячи лет не перебирается по суткам. */
+    @Test
+    void periodOfThousandsOfYears_isPricedByLineBoundaries() {
+        LocalDate checkOut = LocalDate.of(9999, 12, 31);
+        PriceLine line = PriceLines.line(LocalDate.of(2000, 1, 1), null, "1.00", null);
+
+        PriceBreakdown breakdown = calculate(LocalDate.of(2000, 1, 1), checkOut, List.of(line));
+
+        assertThat(breakdown.nights()).isEqualTo(2_921_939);
+        assertThat(breakdown.amount()).isEqualByComparingTo("2921939.00");
+    }
+
     private static PriceBreakdown calculate(LocalDate checkIn, LocalDate checkOut, List<PriceLine> lines) {
         return ServicePriceCalculator.calculate(SERVICE_ID, new StayPeriod(checkIn, checkOut), lines);
     }
