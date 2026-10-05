@@ -9,6 +9,7 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -70,7 +71,7 @@ public class ReferenceImportService {
     @Transactional
     public ImportResult importMessage(InboundMessage message) {
         ObjectNode data = dataOf(message);
-        return handlerFor(message.stream())
+        return handlerFor(message.receipt().stream())
                 .map(handler -> handler.handle(message, data))
                 .orElseGet(() -> skipWithoutHandler(message));
     }
@@ -85,8 +86,9 @@ public class ReferenceImportService {
      * появится, строку разбирают заново, вернув ей статус {@code NEW}.
      */
     private ImportResult skipWithoutHandler(InboundMessage message) {
-        String reason = "маппера для потока " + message.stream() + " ещё нет";
-        inboundMessageService.markSkipped(message.messageId(), reason);
+        InboundReceipt receipt = message.receipt();
+        String reason = "маппера для потока " + receipt.stream() + " ещё нет";
+        inboundMessageService.markSkipped(receipt.messageId(), reason);
         return ImportResult.skipped(reason);
     }
 

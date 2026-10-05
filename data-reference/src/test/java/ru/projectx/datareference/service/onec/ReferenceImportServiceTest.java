@@ -20,10 +20,11 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Путь одного сообщения: сырьё → маппер → строка справочника → статус сырья.
+ * Защищает путь одного сообщения 1С через разбор: сохранённое тело разбирается, данные попадают в справочник,
+ * а исход записывается в строку сообщения.
  *
- * <p>Справочник здесь взят самый простой (МКБ-10, ТЗ-4) намеренно: проверяется
- * механизм разбора, а не правила конкретного потока.
+ * <p>Справочник взят самый простой, МКБ-10, намеренно. Здесь проверяется механизм разбора, а не правила
+ * конкретного потока.
  */
 @IntegrationTest
 class ReferenceImportServiceTest {
@@ -70,7 +71,7 @@ class ReferenceImportServiceTest {
 
         importService.importMessage(message(messageId));
 
-        assertThat(inboundMessageRepository.findById(messageId).orElseThrow().status())
+        assertThat(inboundMessageRepository.findById(messageId).orElseThrow().outcome().status())
                 .isEqualTo(InboundStatus.PROCESSED);
     }
 
@@ -109,8 +110,8 @@ class ReferenceImportServiceTest {
         importService.importMessage(message(skippedId));
 
         InboundMessage skipped = inboundMessageRepository.findById(skippedId).orElseThrow();
-        assertThat(skipped.status()).isEqualTo(InboundStatus.SKIPPED);
-        assertThat(skipped.lastError()).isNotBlank();
+        assertThat(skipped.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+        assertThat(skipped.outcome().lastError()).isNotBlank();
     }
 
     /** Конверт без data — постоянная ошибка: повтор даст ровно то же самое. */

@@ -32,13 +32,13 @@ sealed interface PriceListTransfer {
      */
     static PriceListTransfer of(UUID cid, List<InboundMessage> correlated) {
         List<InboundMessage> buffered = correlated.stream()
-                .filter(message -> message.status() == InboundStatus.BUFFERED)
+                .filter(message -> message.outcome().status() == InboundStatus.BUFFERED)
                 .toList();
         List<InboundMessage> batches = buffered.stream()
-                .filter(message -> message.batchCount() == null)
+                .filter(message -> message.transferPart().batchCount() == null)
                 .toList();
         return buffered.stream()
-                .filter(message -> message.batchCount() != null)
+                .filter(message -> message.transferPart().batchCount() != null)
                 .findFirst()
                 .map(finalMessage -> withFinalMessage(cid, finalMessage, batches))
                 .orElseGet(() -> new Pending("передача %s ждёт финального сообщения".formatted(cid)));
@@ -48,7 +48,7 @@ sealed interface PriceListTransfer {
     private static PriceListTransfer withFinalMessage(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
 
-        int expectedBatches = Objects.requireNonNull(finalMessage.batchCount());
+        int expectedBatches = Objects.requireNonNull(finalMessage.transferPart().batchCount());
         if (batches.size() < expectedBatches) {
             return new Pending("передача %s собрана на %d из %d сообщений"
                     .formatted(cid, batches.size(), expectedBatches));
@@ -63,9 +63,9 @@ sealed interface PriceListTransfer {
     private static PriceListTransfer checkedCounters(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches, int expectedBatches) {
 
-        int expectedRows = Objects.requireNonNull(finalMessage.rowCount());
+        int expectedRows = Objects.requireNonNull(finalMessage.transferPart().rowCount());
         int actualRows = batches.stream()
-                .mapToInt(batch -> Objects.requireNonNullElse(batch.rowCount(), 0))
+                .mapToInt(batch -> Objects.requireNonNullElse(batch.transferPart().rowCount(), 0))
                 .sum();
         if (batches.size() == expectedBatches && actualRows == expectedRows) {
             return new Assembled(finalMessage, batches);

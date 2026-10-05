@@ -49,11 +49,11 @@ class InboundMessageServiceTest {
         UUID messageId = store();
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.NEW);
-        assertThat(stored.attempt()).isZero();
-        assertThat(stored.receivedAt()).isEqualTo(NOW);
-        assertThat(stored.nextRetryAt()).isNull();
-        assertThat(stored.lastError()).isNull();
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
+        assertThat(stored.outcome().attempt()).isZero();
+        assertThat(stored.receipt().receivedAt()).isEqualTo(NOW);
+        assertThat(stored.outcome().nextRetryAt()).isNull();
+        assertThat(stored.outcome().lastError()).isNull();
     }
 
     /**
@@ -70,8 +70,8 @@ class InboundMessageServiceTest {
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(JSON.readTree(stored.payload())).isEqualTo(JSON.readTree(PAYLOAD));
-        assertThat(stored.stream()).isEqualTo(OneCStream.MKB10);
-        assertThat(stored.sourceQueue()).isEqualTo(QUEUE);
+        assertThat(stored.receipt().stream()).isEqualTo(OneCStream.MKB10);
+        assertThat(stored.receipt().sourceQueue()).isEqualTo(QUEUE);
     }
 
     @Test
@@ -81,8 +81,8 @@ class InboundMessageServiceTest {
         inboundMessageService.markProcessed(messageId);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.PROCESSED);
-        assertThat(stored.processedAt()).isEqualTo(NOW);
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+        assertThat(stored.outcome().processedAt()).isEqualTo(NOW);
     }
 
     /** Пропуск без причины неотличим от «данных не было» — причина обязана сохраниться. */
@@ -93,9 +93,9 @@ class InboundMessageServiceTest {
         inboundMessageService.markSkipped(messageId, "контрагент без вида деятельности РВЛ");
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.SKIPPED);
-        assertThat(stored.lastError()).isEqualTo("контрагент без вида деятельности РВЛ");
-        assertThat(stored.processedAt()).isEqualTo(NOW);
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+        assertThat(stored.outcome().lastError()).isEqualTo("контрагент без вида деятельности РВЛ");
+        assertThat(stored.outcome().processedAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -105,10 +105,10 @@ class InboundMessageServiceTest {
         inboundMessageService.recordTemporaryFailure(messageId, "база недоступна");
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.RETRY);
-        assertThat(stored.attempt()).isEqualTo(1);
-        assertThat(stored.nextRetryAt()).isEqualTo(NOW.plus(Duration.ofSeconds(30)));
-        assertThat(stored.lastError()).isEqualTo("база недоступна");
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.RETRY);
+        assertThat(stored.outcome().attempt()).isEqualTo(1);
+        assertThat(stored.outcome().nextRetryAt()).isEqualTo(NOW.plus(Duration.ofSeconds(30)));
+        assertThat(stored.outcome().lastError()).isEqualTo("база недоступна");
     }
 
     /** Умолчание лестницы — 30 с / 5 мин / 30 мин, и каждая следующая попытка идёт по ней. */
@@ -119,14 +119,14 @@ class InboundMessageServiceTest {
         inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
         inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
 
-        assertThat(repository.findById(messageId).orElseThrow().nextRetryAt())
+        assertThat(repository.findById(messageId).orElseThrow().outcome().nextRetryAt())
                 .isEqualTo(NOW.plus(Duration.ofMinutes(5)));
 
         inboundMessageService.recordTemporaryFailure(messageId, "таймаут");
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.attempt()).isEqualTo(3);
-        assertThat(stored.nextRetryAt()).isEqualTo(NOW.plus(Duration.ofMinutes(30)));
+        assertThat(stored.outcome().attempt()).isEqualTo(3);
+        assertThat(stored.outcome().nextRetryAt()).isEqualTo(NOW.plus(Duration.ofMinutes(30)));
     }
 
     /**
@@ -142,9 +142,9 @@ class InboundMessageServiceTest {
         }
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.FAILED);
-        assertThat(stored.nextRetryAt()).isNull();
-        assertThat(stored.lastError()).contains("лестница повторов исчерпана");
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(stored.outcome().nextRetryAt()).isNull();
+        assertThat(stored.outcome().lastError()).contains("лестница повторов исчерпана");
     }
 
     /** Постоянная ошибка не тратит попытки: повтор даст тот же результат. */
@@ -155,10 +155,10 @@ class InboundMessageServiceTest {
         inboundMessageService.recordPermanentFailure(messageId, "в конверте нет объекта data");
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.FAILED);
-        assertThat(stored.attempt()).isZero();
-        assertThat(stored.nextRetryAt()).isNull();
-        assertThat(stored.lastError()).isEqualTo("в конверте нет объекта data");
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(stored.outcome().attempt()).isZero();
+        assertThat(stored.outcome().nextRetryAt()).isNull();
+        assertThat(stored.outcome().lastError()).isEqualTo("в конверте нет объекта data");
     }
 
     /**
@@ -173,9 +173,9 @@ class InboundMessageServiceTest {
         inboundMessageService.markProcessed(messageId);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
-        assertThat(stored.status()).isEqualTo(InboundStatus.PROCESSED);
-        assertThat(stored.nextRetryAt()).isNull();
-        assertThat(stored.lastError()).isNull();
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+        assertThat(stored.outcome().nextRetryAt()).isNull();
+        assertThat(stored.outcome().lastError()).isNull();
     }
 
     private UUID store() {

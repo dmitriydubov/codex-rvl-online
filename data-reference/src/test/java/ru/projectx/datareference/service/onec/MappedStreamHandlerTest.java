@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
@@ -71,6 +72,6 @@ class MappedStreamHandlerTest {
     }
 
     private static InboundMessage message() {
-        return InboundMessage.receive(MESSAGE_ID, OneCStream.MKB10, "очередь", "{}", Instant.EPOCH);
+        return InboundMessage.receive(new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, "очередь", Instant.EPOCH), "{}");
     }
 }
