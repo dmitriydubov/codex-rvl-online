@@ -1,0 +1,92 @@
+package ru.projectx.datareference.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static ru.projectx.datareference.support.OneCMessages.envelope;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionOperations;
+import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
+import ru.projectx.datareference.support.DatabaseCleaner;
+import ru.projectx.datareference.support.IntegrationTest;
+
+/**
+ * Счёт переходов статусов с настоящим менеджером транзакций и PostgreSQL: переход считается при фиксации, откат
+ * его не считает, а запись временной ошибки в своей транзакции ({@code REQUIRES_NEW}) считается при фиксации своей
+ * транзакции, даже если внешняя потом откатилась. Синхронизацию без базы проверяет {@code InboundTransitionMetricsTest}.
+ */
+@IntegrationTest
+class InboundTransitionCommitTest {
+
+    private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
+
+    @Autowired
+    private InboundMessageService inboundMessageService;
+
+    @Autowired
+    private TransactionOperations transactions;
+
+    @Autowired
+    private MeterRegistry registry;
+
+    @Autowired
+    private DatabaseCleaner databaseCleaner;
+
+    @BeforeEach
+    void clearTables() {
+        databaseCleaner.clear();
+    }
+
+    @Test
+    void committedTransition_isCountedOnce() {
+        UUID messageId = stored();
+        double before = transitions(InboundStatus.PROCESSED);
+
+        transactions.executeWithoutResult(status -> inboundMessageService.markProcessed(messageId));
+
+        assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(before + 1);
+    }
+
+    @Test
+    void rolledBackTransition_isNotCounted() {
+        UUID messageId = stored();
+        double before = transitions(InboundStatus.PROCESSED);
+
+        transactions.executeWithoutResult(status -> {
+            inboundMessageService.markProcessed(messageId);
+            status.setRollbackOnly();
+        });
+
+        assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(before);
+    }
+
+    /** Временная ошибка пишется после отката разбора, в своей транзакции: её фиксация и считается. */
+    @Test
+    void temporaryFailureInItsOwnTransaction_isCountedDespiteOuterRollback() {
+        UUID messageId = stored();
+        double before = transitions(InboundStatus.RETRY);
+
+        transactions.executeWithoutResult(status -> {
+            inboundMessageService.recordTemporaryFailure(messageId, "timeout");
+            status.setRollbackOnly();
+        });
+
+        assertThat(transitions(InboundStatus.RETRY)).isEqualTo(before + 1);
+    }
+
+    private UUID stored() {
+        UUID messageId = UUID.randomUUID();
+        inboundMessageService.store(messageId, OneCStream.MKB10, QUEUE, envelope("{\"id\":\"%s\"}".formatted(messageId)));
+        return messageId;
+    }
+
+    private double transitions(InboundStatus status) {
+        return registry.get(InboundTransitionMetrics.TRANSITIONS)
+                .tag("stream", OneCStream.MKB10.name()).tag("status", status.name()).counter().count();
+    }
+}

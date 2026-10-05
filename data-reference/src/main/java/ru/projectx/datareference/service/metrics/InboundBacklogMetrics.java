@@ -25,7 +25,8 @@ import ru.projectx.datareference.entity.OneCStream;
  * базу при каждом скрейпе было бы хуже: скрейп ждал бы базу, а когда база недоступна — до её таймаутов, и
  * Prometheus терял бы вместе с этими метриками все остальные именно тогда, когда они нужнее всего. Цена — значения
  * отстают от базы не больше чем на интервал обновления; насколько, показывает {@value #STALENESS}. Если обновление
- * не удалось, остаётся прежний снимок, а отставание растёт.
+ * не удалось, остаётся прежний снимок, а отставание растёт. До первого чтения снимок пуст и помечен 1970 годом:
+ * нули в это время — не данные, и отставание в десятки лет говорит об этом прямо.
  *
  * <p>Ряды заведены заранее на каждый поток и статус, а не только на те, где сейчас есть сообщения: пропавший ряд в
  * Prometheus неотличим от сломанного экспорта, а ноль — однозначен.
@@ -53,7 +54,7 @@ public class InboundBacklogMetrics implements MeterBinder {
     public InboundBacklogMetrics(InboundBacklogReads reads, Clock clock) {
         this.reads = reads;
         this.clock = clock;
-        this.backlog = InboundBacklog.empty(clock.instant());
+        this.backlog = InboundBacklog.empty(Instant.EPOCH);
     }
 
     /**

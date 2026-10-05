@@ -74,6 +74,13 @@ class InboundBacklogMetricsTest {
         assertThat(gauge(InboundBacklogMetrics.STUCK_TRANSFERS).value()).isZero();
     }
 
+    /** До первого чтения снимок помечен 1970 годом: отставание сразу показывает, что данных ещё нет. */
+    @Test
+    void beforeFirstRefresh_stalenessCountsFromEpoch() {
+        assertThat(timeGauge(InboundBacklogMetrics.STALENESS).value(TimeUnit.SECONDS))
+                .isEqualTo((double) STARTED.getEpochSecond());
+    }
+
     @Test
     void refresh_publishesCountsOfTheSnapshot() {
         when(reads.read()).thenReturn(new InboundBacklog(List.of(

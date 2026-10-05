@@ -89,26 +89,29 @@ public class OneCQueueListener {
     }
 
     /**
-     * Подтверждение стоит вне {@code try} намеренно: отказ канала на подтверждении — не отказ записи.
-     * Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
+     * Подтверждение и счёт исхода стоят вне {@code try} намеренно: ни отказ канала на подтверждении, ни отказ
+     * счётчика — не отказ записи. Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
      */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {
+        IngestOutcome outcome;
         try {
-            ingest(delivery, messageId);
+            outcome = ingest(delivery, messageId);
         }
         catch (RuntimeException storageFailure) {
             storageFailures.handle(delivery, messageId, storageFailure);
             return;
         }
+        metrics.record(delivery, outcome);
         delivery.acknowledge();
     }
 
-    private void ingest(OneCDelivery delivery, UUID messageId) {
-        boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
-        metrics.record(delivery, stored ? IngestOutcome.STORED : IngestOutcome.DUPLICATE);
-        if (!stored) {
-            log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
+    /** Счёт исхода — снаружи, после записи: отказ счётчика не должен выглядеть отказом базы. */
+    private IngestOutcome ingest(OneCDelivery delivery, UUID messageId) {
+        if (ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload())) {
+            return IngestOutcome.STORED;
         }
+        log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
+        return IngestOutcome.DUPLICATE;
     }
 
     /**

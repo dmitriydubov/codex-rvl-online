@@ -12,8 +12,7 @@ import ru.projectx.datareference.repository.QuarantineRepository;
 
 /**
  * Запросы к принятым от 1С:УСК сообщениям старше порога для задач по расписанию: срока хранения персональных
- * данных ({@link PersonalDataRetention}), проверки зависших передач прайсов ({@link StuckTransferAlert}) и метрик,
- * которые показывают, сколько того и другого накопилось.
+ * данных ({@link PersonalDataRetention}) и проверки зависших передач прайсов ({@link StuckTransferAlert}).
  *
  * <p>Задачи задают давность — «старше тридцати суток», «дольше часа», — а запросу нужен момент. Здесь
  * давность превращается в момент по часам сервиса: принято раньше, чем «сейчас минус порог». Часы
@@ -59,21 +58,6 @@ public class AgedInboundMessages {
      */
     public List<BufferedTransfer> transfersBufferedLongerThan(Duration age, int limit) {
         return repository.findTransfersBufferedBefore(receivedBefore(age), Limit.of(limit));
-    }
-
-    /** Сколько передач прайсов ждут своих частей дольше {@code age}. Тела не читаются. */
-    public long countTransfersBufferedLongerThan(Duration age) {
-        return repository.countTransfersBufferedBefore(receivedBefore(age));
-    }
-
-    /** Сколько тел полисов, принятых раньше, чем {@code age} назад, ещё не стёрто. */
-    public long countPolicyPayloadsOlderThan(Duration age) {
-        return repository.countPolicyPayloadsReceivedBefore(receivedBefore(age));
-    }
-
-    /** Сколько тел карантинных сообщений, принятых раньше, чем {@code age} назад, ещё не стёрто. */
-    public long countQuarantineBodiesOlderThan(Duration age) {
-        return quarantine.countBodiesReceivedBefore(receivedBefore(age));
     }
 
     private Instant receivedBefore(Duration age) {

@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service.metrics;
 
+import java.time.Duration;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
@@ -8,8 +9,9 @@ import ru.projectx.datareference.config.MetricsProperties;
 
 /**
  * Расписание обновления метрик очереди разбора: раз в заданный интервал снимок перечитывается из базы. Интервал
- * берётся из настроек метрик, уже проверенных на старте. Пока расписания выключены (так делают тесты), Spring этот
- * класс не вызывает, и снимок остаётся пустым, пока его не обновят явно.
+ * берётся из настроек метрик, уже проверенных на старте. Первое чтение — сразу после старта: до него метрики
+ * показывают пустой снимок, и чем короче это окно, тем лучше. Пока расписания выключены (так делают тесты), Spring
+ * этот класс не вызывает, и снимок остаётся пустым, пока его не обновят явно.
  */
 @Component
 public class InboundBacklogSchedule implements SchedulingConfigurer {
@@ -25,6 +27,6 @@ public class InboundBacklogSchedule implements SchedulingConfigurer {
     @Override
     public void configureTasks(ScheduledTaskRegistrar registrar) {
         registrar.addFixedDelayTask(new FixedDelayTask(
-                metrics::refresh, properties.backlogRefreshInterval(), properties.backlogRefreshInterval()));
+                metrics::refresh, properties.backlogRefreshInterval(), Duration.ZERO));
     }
 }

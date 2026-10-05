@@ -16,14 +16,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
-import ru.projectx.datareference.service.schedulers.AgedInboundMessages;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
  * Сборка снимка очереди разбора из ответов базы, без базы: каждая строка группировки становится парой «поток,
- * статус» со своим числом и самым давним сообщением, каждый подсчёт получает свой порог из настроек импорта,
- * момент снимка — текущее время часов. Как база считает, проверяет {@link InboundBacklogReadsTest}.
+ * статус» со своим числом и самым давним сообщением, каждый подсчёт получает момент «сейчас минус свой порог из
+ * настроек импорта», момент снимка — текущее время часов. Как база считает, проверяет {@link InboundBacklogReadsTest}.
  *
  * <p>Пороги нарочно разные: перепутанный порог не совпадёт с заглушкой, и строгие заглушки Mockito уронят тест.
  */
@@ -39,7 +39,7 @@ class InboundBacklogSnapshotTest {
     private InboundMessageRepository repository;
 
     @Mock
-    private AgedInboundMessages agedMessages;
+    private QuarantineRepository quarantine;
 
     @Test
     void snapshot_carriesEveryStatusRowCountsAndTheCurrentMoment() {
@@ -49,9 +49,9 @@ class InboundBacklogSnapshotTest {
                 row(OneCStream.POLICIES, InboundStatus.NEW, 2, oldestNew),
                 row(OneCStream.MKB10, InboundStatus.FAILED, 1, oldestFailed));
         when(repository.countUnfinishedByStreamAndStatus()).thenReturn(rows);
-        when(agedMessages.countTransfersBufferedLongerThan(STUCK_THRESHOLD)).thenReturn(3L);
-        when(agedMessages.countPolicyPayloadsOlderThan(PAYLOAD_TTL)).thenReturn(4L);
-        when(agedMessages.countQuarantineBodiesOlderThan(QUARANTINE_TTL)).thenReturn(5L);
+        when(repository.countTransfersBufferedBefore(NOW.minus(STUCK_THRESHOLD))).thenReturn(3L);
+        when(repository.countPolicyPayloadsReceivedBefore(NOW.minus(PAYLOAD_TTL))).thenReturn(4L);
+        when(quarantine.countBodiesReceivedBefore(NOW.minus(QUARANTINE_TTL))).thenReturn(5L);
 
         InboundBacklog backlog = reads().read();
 
@@ -62,7 +62,7 @@ class InboundBacklogSnapshotTest {
     }
 
     private InboundBacklogReads reads() {
-        return new InboundBacklogReads(repository, agedMessages,
+        return new InboundBacklogReads(repository, quarantine,
                 ImportSettings.defaults().stuckTransferThreshold(STUCK_THRESHOLD).payloadTtl(PAYLOAD_TTL)
                         .quarantineTtl(QUARANTINE_TTL).build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));

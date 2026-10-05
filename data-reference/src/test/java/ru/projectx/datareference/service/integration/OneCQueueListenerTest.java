@@ -17,6 +17,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.rabbitmq.client.Channel;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -90,6 +92,21 @@ class OneCQueueListenerTest {
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
         assertThat(outcomes()).containsExactly("stored");
+    }
+
+    /**
+     * Сырьё записано, а счётчик отказал: это не отказ базы. Приём не встаёт на паузу, карантина нет; сообщение
+     * остаётся неподтверждённым и вернётся дублем, который подтвердится.
+     */
+    @Test
+    void metricsFailureAfterStorage_isNotTakenForStorageFailure() throws IOException {
+        when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
+        OneCQueueListener listener = listener(Duration.ofMillis(1), IngestTestMetrics.on(new FailingMeterRegistry()));
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> listener.receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel));
+
+        verifyNoInteractions(consumers, quarantineService, channel);
     }
 
     /** Дубль не считается ошибкой: сырьё уже лежит, и брокеру достаточно подтверждения. */
@@ -445,12 +462,25 @@ class OneCQueueListenerTest {
      * Настоящие пять секунд здесь были бы просто пятью секундами прогона.
      */
     private OneCQueueListener listener(Duration duplicateDeliveryBackoff) {
+        return listener(duplicateDeliveryBackoff, metrics);
+    }
+
+    private OneCQueueListener listener(Duration duplicateDeliveryBackoff, OneCIngestMetrics ingestMetrics) {
         return new OneCQueueListener(
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), metrics),
-                metrics);
+                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), ingestMetrics),
+                ingestMetrics);
+    }
+
+    /** Реестр, который отказывает на любом счётчике: так выглядит сломанный экспорт метрик. */
+    private static final class FailingMeterRegistry extends SimpleMeterRegistry {
+
+        @Override
+        protected Counter newCounter(Meter.Id id) {
+            throw new IllegalStateException("реестр метрик недоступен");
+        }
     }
 
     /** Исходы посчитанных доставок, по одному на доставку, с потоком и очередью этой доставки. */

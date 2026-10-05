@@ -13,7 +13,7 @@ import org.springframework.scheduling.config.IntervalTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import ru.projectx.datareference.config.MetricsProperties;
 
-/** Обновление метрик очереди разбора — одна задача с паузой между проходами из настроек метрик. */
+/** Обновление метрик очереди разбора — одна задача с паузой между проходами из настроек метрик, первая — сразу. */
 @ExtendWith(MockitoExtension.class)
 class InboundBacklogScheduleTest {
 
@@ -31,7 +31,7 @@ class InboundBacklogScheduleTest {
         List<IntervalTask> tasks = registrar.getFixedDelayTaskList();
         assertThat(tasks).hasSize(1);
         assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(REFRESH_INTERVAL);
-        assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(REFRESH_INTERVAL);
+        assertThat(tasks.getFirst().getInitialDelayDuration()).isZero();
         assertThat(registrar.getFixedRateTaskList()).isEmpty();
         assertThat(registrar.getCronTaskList()).isEmpty();
         tasks.getFirst().getRunnable().run();

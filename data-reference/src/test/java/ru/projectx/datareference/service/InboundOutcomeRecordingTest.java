@@ -63,7 +63,7 @@ class InboundOutcomeRecordingTest {
         assertThat(stored.receipt()).isEqualTo(new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, NOW));
         assertThat(stored.payload()).isEqualTo(PAYLOAD);
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
-        assertThat(meters.find(InboundTransitionMetrics.TRANSITIONS).counters()).isEmpty();
+        assertThat(transitions()).isEmpty();
     }
 
     @Test

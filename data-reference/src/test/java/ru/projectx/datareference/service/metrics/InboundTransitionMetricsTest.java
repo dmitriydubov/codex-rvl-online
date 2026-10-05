@@ -81,14 +81,13 @@ class InboundTransitionMetricsTest {
 
         assertThat(transitions("MKB10", "RETRY").count()).isEqualTo(1.0);
         assertThat(transitions("PRICE_LISTS", "BUFFERED").count()).isEqualTo(1.0);
-        assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters()).hasSize(2);
+        assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
+                .filteredOn(counter -> counter.count() > 0).hasSize(2);
     }
 
-    /** Нулевые ряды на каждый поток и каждый статус, в который переводит разбор; NEW ставит приём, не разбор. */
+    /** Нулевые ряды с самого создания: на каждый поток и каждый статус, в который переводит разбор. */
     @Test
-    void binding_registersZeroSeriesForEveryStreamAndTargetStatus() {
-        metrics.bindTo(registry);
-
+    void creation_registersZeroSeriesForEveryStreamAndTargetStatus() {
         assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
                 .hasSize(OneCStream.values().length * 5)
                 .allSatisfy(counter -> assertThat(counter.count()).isZero());
@@ -97,24 +96,19 @@ class InboundTransitionMetricsTest {
                 .containsOnly("PROCESSED", "SKIPPED", "BUFFERED", "RETRY", "FAILED");
     }
 
-    /** Заведённый заранее ряд и ряд, в который считает переход, — один и тот же ряд. */
+    /** NEW ставит приём, а не разбор: такой «переход» не считается и нового ряда не заводит. */
     @Test
-    void transitionAfterBinding_countsIntoTheRegisteredSeries() {
-        metrics.bindTo(registry);
-        InboundMessage message = message(OneCStream.CONTRAGENTS);
-        message.markProcessed(NOW);
+    void newStatus_isNotCounted() {
+        metrics.record(message(OneCStream.MKB10));
 
-        metrics.record(message);
-
-        assertThat(transitions("CONTRAGENTS", "PROCESSED").count()).isEqualTo(1.0);
-        assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters()).hasSize(OneCStream.values().length * 5);
+        assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).tag("status", "NEW").counter()).isNull();
+        assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
+                .allSatisfy(counter -> assertThat(counter.count()).isZero());
     }
 
     @Test
     void counter_isDescribed() {
-        metrics.record(message(OneCStream.MKB10));
-
-        assertThat(transitions("MKB10", "NEW").getId().getDescription()).startsWith("Переходы сырых сообщений 1С");
+        assertThat(transitions("MKB10", "FAILED").getId().getDescription()).startsWith("Переходы сырых сообщений 1С");
     }
 
     private Counter transitions(String stream, String status) {
