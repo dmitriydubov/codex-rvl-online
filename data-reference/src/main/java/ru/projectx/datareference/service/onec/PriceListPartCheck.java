@@ -31,13 +31,17 @@ final class PriceListPartCheck {
      * @throws OneCFieldException с причиной для этой части
      */
     void check(PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
-        if (markup.batchCount() != null || anyIn(parts, InboundStatus.FAILED)) {
+        if (!isBatchOfOpenTransfer(markup, parts)) {
             return;
         }
         StreamSupport.stream(data.path(RECORD_SET).spliterator(), false).forEach(this::checkRow);
         if (anyIn(parts, InboundStatus.PROCESSED)) {
             throw new OneCFieldException("лишний пакет: передача %s уже применена".formatted(markup.cid()));
         }
+    }
+
+    private static boolean isBatchOfOpenTransfer(PriceListTransferMarkup markup, List<InboundMessage> parts) {
+        return markup.batchCount() == null && !anyIn(parts, InboundStatus.FAILED);
     }
 
     private static boolean anyIn(List<InboundMessage> parts, InboundStatus status) {
