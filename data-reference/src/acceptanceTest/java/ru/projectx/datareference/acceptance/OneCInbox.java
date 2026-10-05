@@ -36,6 +36,13 @@ public class OneCInbox {
             select status, attempt, last_error, cast(payload as text) as payload
             from inbound_message where message_id = :messageId
             """;
+    private static final String RETRY_DUE = """
+            update inbound_message set next_retry_at = now() - interval '1 second' where status = 'RETRY'
+            """;
+    private static final String RETURN_TO_PARSING = """
+            update inbound_message set status = 'NEW', next_retry_at = null, last_error = null, processed_at = null
+            where message_id = :messageId
+            """;
     private static final String AGE = """
             update inbound_message set received_at = now() - cast(:age as interval) where message_id = :messageId
             """;
@@ -82,11 +89,41 @@ public class OneCInbox {
 
     /** Строка сырья сообщения, присланного последним шагом «1С:УСК прислала …». */
     public InboundRow last() {
+        return row(received.getLast().messageId());
+    }
+
+    private InboundRow row(UUID messageId) {
         return jdbc.sql(ROW)
-                .param("messageId", received.getLast().messageId())
+                .param("messageId", messageId)
                 .query((row, number) -> new InboundRow(row.getString("status"), row.getInt("attempt"),
                         row.getString("last_error"), row.getString("payload")))
                 .single();
+    }
+
+    /** Строка сырья сообщения, присланного первым шагом «1С:УСК прислала …». */
+    public InboundRow first() {
+        return row(received.getFirst().messageId());
+    }
+
+    /**
+     * Срок повтора наступил у всех сообщений, отложенных до повтора: часы стенда не остановлены, а ждать лестницу
+     * повторов нельзя, поэтому срок переносится в прошлое.
+     */
+    public void retryDueNow() {
+        if (jdbc.sql(RETRY_DUE).update() == 0) {
+            throw new IllegalStateException("в сырье нет сообщений, отложенных до повтора");
+        }
+    }
+
+    /**
+     * Последнее сообщение снова ждёт разбора, как после ручной переобработки дежурным: тело и момент приёма прежние,
+     * исход стёрт.
+     */
+    public void returnLastToParsing() {
+        int returned = jdbc.sql(RETURN_TO_PARSING).param("messageId", received.getLast().messageId()).update();
+        if (returned != 1) {
+            throw new IllegalStateException("в сырье нет строки последнего сообщения");
+        }
     }
 
     /** Сообщение, присланное последним шагом «1С:УСК прислала …». */

@@ -55,6 +55,11 @@ public class OneCSteps {
         inbox.receive(OneCReferenceMessages.mkb10(code));
     }
 
+    @Дано("1С:УСК прислала код МКБ-10 без наименования:")
+    public void mkb10WithoutNameSent(Map<String, String> code) {
+        inbox.receive(OneCReferenceMessages.mkb10WithoutName(code));
+    }
+
     @Дано("1С:УСК прислала договор ЛПУ:")
     public void lpuContractSent(Map<String, String> contract) {
         inbox.receive(OneCReferenceMessages.lpuContract(contract));
