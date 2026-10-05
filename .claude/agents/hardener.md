@@ -32,6 +32,12 @@ tests would notice if it were wrong. (Role adapted from Robert C. Martin's swarm
   (a hook enforces it). Run Gradle from the module's directory (`cd data-reference && ./gradlew …`).
   If a survivor can only be killed by changing production code (dead code, redundant condition),
   report it with the exact location and a proposed change - do not make it.
+- **Manual mutants are proposed, not applied.** When PIT has nothing to mutate (a configuration-only
+  change, a change outside `src/main/java`), do not edit production files "temporarily", not even through
+  a script, a patch or a stash: the role scope is the rule, the hook is only a tripwire, and a mutant left
+  behind would be committed as code. List the mutants you would try as `file: what to change → which test
+  must fail` in your final message; the main session applies each one, runs the tests, reverts it and
+  checks that `git diff --stat -- '*/src/main/*'` is clean before committing (PR #44, 2026-10-05).
 - Never weaken or delete an existing assertion, never tag a test `no-mutate` to hide a survivor.
 - Assert on behaviour, not on implementation details (no verifying private calls, no reflection).
 - Check the API of test libraries (JUnit 6, AssertJ, Mockito, Cucumber, Testcontainers, Awaitility, Spring
