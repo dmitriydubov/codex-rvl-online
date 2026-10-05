@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service;
 
+import jakarta.persistence.PersistenceException;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.DataAccessException;
@@ -34,9 +35,10 @@ import org.springframework.transaction.TransactionTimedOutException;
  * сообщает своим {@code TransactionException} без причины из JDBC, и перевод даёт
  * {@link JpaSystemException}, не различая его с другими сбоями транзакции. Для чтений REST такой
  * сбой всё равно временный, поэтому и он даёт 503: чтение ничего не меняет, и повтор безопасен.
- * Это сознательно широкое правило именно для чтений. Планировщику разбора сырья, если он возьмёт
- * этот класс, оно не подходит как есть: там сбой транзакции, не связанный с лимитом, повторять
- * нельзя, и проверку нужно сузить до истёкшего лимита.
+ * Это сознательно широкое правило для чтений. Разбор сообщений 1С:УСК по расписанию спрашивает
+ * этот же перечень, решая, повторить разбор или сразу отклонить сообщение. У транзакции разбора
+ * лимита времени нет, поэтому истёкшего лимита там не бывает. Другой сбой транзакции Hibernate без
+ * причины из JDBC разбор тоже повторит, а когда повторы кончатся, сообщение уйдёт в отказ.
  *
  * <p>Вместе с отказом наружу отдаётся его описание для журнала: тип исключения после перевода и код
  * SQLSTATE драйвера, если отказ пришёл из базы. Текст исключения в описание не входит: в нём SQL и
@@ -65,14 +67,40 @@ public class DatabaseOutages {
      * @return описание отказа для журнала или пусто, когда ошибка постоянная
      */
     public Optional<Outage> recognize(Exception failure) {
+        return translated(failure)
+                .filter(DatabaseOutages::isTemporary)
+                .map(DatabaseOutages::outageOf);
+    }
+
+    /**
+     * Описание любого отказа базы, временного или постоянного: тип после перевода и SQLSTATE. Постоянный отказ
+     * базы — например, значение, которое не помещается в колонку, — повтором не лечится, но назвать его в журнале
+     * нужно так же, без текста исключения.
+     *
+     * <p>Из базы ошибка пришла, если это исключение доступа к данным Spring или исключение JPA и Hibernate.
+     * Переводчик называет ошибкой доступа к данным и обычные {@link IllegalStateException} и
+     * {@link IllegalArgumentException}, считая их неверным вызовом JPA, но их бросает и любой другой код: ошибкой
+     * базы они не считаются.
+     *
+     * @param failure ошибка, с которой закончилась операция
+     * @return описание или пусто, если ошибка пришла не из базы
+     */
+    public Optional<Outage> describe(Exception failure) {
+        if (failure instanceof DataAccessException || failure instanceof PersistenceException) {
+            return translated(failure).map(DatabaseOutages::outageOf);
+        }
+        return recognize(failure);
+    }
+
+    private Optional<Throwable> translated(Exception failure) {
         if (!(failure instanceof RuntimeException runtime)) {
             return Optional.empty();
         }
-        Throwable classified = translate(runtime);
-        if (!isTemporary(classified)) {
-            return Optional.empty();
-        }
-        return Optional.of(new Outage(typeOf(classified), sqlState(classified)));
+        return Optional.of(translate(runtime));
+    }
+
+    private static Outage outageOf(Throwable classified) {
+        return new Outage(typeOf(classified), sqlState(classified));
     }
 
     /**
@@ -106,7 +134,7 @@ public class DatabaseOutages {
     }
 
     /**
-     * Что писать в журнал о временном отказе: тип исключения и SQLSTATE драйвера.
+     * Что писать в журнал об отказе базы: тип исключения и SQLSTATE драйвера.
      *
      * @param type     простое имя класса исключения после перевода; у обёртки истёкшего лимита Hibernate —
      *                 вместе с именем причины, через косую черту

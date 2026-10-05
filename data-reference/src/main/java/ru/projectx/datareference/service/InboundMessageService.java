@@ -3,6 +3,8 @@ package ru.projectx.datareference.service;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,14 +18,17 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 /**
  * Сохраняет сообщения 1С в том виде, в каком они пришли, и записывает, чем закончилась их обработка.
  *
- * <p>Здесь в одном месте решается, что делать с сообщением дальше. После временной ошибки назначается следующая
- * попытка через задержку из настроенного списка повторов. Постоянная ошибка сразу завершает обработку отказом.
+ * <p>Здесь в одном месте решается, что делать с сообщением дальше. После временного отказа базы назначается
+ * следующая попытка через задержку из настроенного списка повторов. Постоянная ошибка сразу завершает обработку
+ * отказом. Каждый окончательный отказ разбора виден в журнале записью ERROR.
  * Пропуск записывается с причиной. Ни слушатель очереди, ни разбор потока этих решений не принимают, иначе
  * правила в разных местах со временем разойдутся. Каждый записанный здесь исход разбора попадает в счётчик
  * переходов статусов ({@link InboundTransitionMetrics}).
  */
 @Service
 public class InboundMessageService {
+
+    private static final Logger log = LoggerFactory.getLogger(InboundMessageService.class);
 
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
@@ -80,34 +85,34 @@ public class InboundMessageService {
     }
 
     /**
-     * Записывает временную ошибку. Следующая попытка назначается через задержку из настроенного списка повторов.
-     * Когда список исчерпан, обработка завершается отказом.
+     * Записывает временный отказ базы. Следующая попытка назначается через задержку из настроенного списка
+     * повторов. Когда список исчерпан, обработка завершается отказом, и он виден в журнале записью ERROR.
      *
      * <p>Метод открывает собственную транзакцию. Транзакция вызывающего к этому моменту уже откатилась вместе
      * с неудавшимися изменениями, и запись об ошибке в ней не сохранилась бы.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordTemporaryFailure(UUID messageId, String error) {
+    public void recordTemporaryFailure(UUID messageId, ParseFailure.Temporary failure) {
         InboundMessage message = require(messageId);
-        int nextAttempt = message.outcome().attempt() + 1;
+        int failedAttempt = failedAttempt(message);
 
-        retryProperties.delayBeforeAttempt(nextAttempt).ifPresentOrElse(
-                delay -> message.markRetrying(error, clock.instant().plus(delay)),
-                () -> message.markFailed("лестница повторов исчерпана на попытке %d: %s"
-                        .formatted(nextAttempt, error)));
+        retryProperties.delayBeforeAttempt(failedAttempt).ifPresentOrElse(
+                delay -> message.markRetrying(failure.reason(), clock.instant().plus(delay)),
+                () -> fail(message, "повторы исчерпаны на попытке %d: %s".formatted(failedAttempt, failure.reason()),
+                        failure));
         transitions.record(message);
     }
 
     /**
-     * Записывает постоянную ошибку и сразу завершает обработку отказом. Так бывает, когда сообщение не
-     * соответствует контракту: следующая попытка дала бы тот же результат.
+     * Записывает постоянную ошибку и сразу завершает обработку отказом: следующая попытка дала бы тот же
+     * результат. Отказ виден в журнале записью ERROR.
      *
      * <p>Метод открывает собственную транзакцию, потому что транзакция вызывающего к этому моменту уже откатилась.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordPermanentFailure(UUID messageId, String error) {
+    public void recordPermanentFailure(UUID messageId, ParseFailure.Permanent failure) {
         InboundMessage message = require(messageId);
-        message.markFailed(error);
+        fail(message, failure.reason(), failure);
         transitions.record(message);
     }
 
@@ -128,6 +133,26 @@ public class InboundMessageService {
     public void saveTransferPart(InboundMessage message) {
         repository.save(message);
         transitions.record(message);
+    }
+
+    /**
+     * Номер попытки, которая сейчас не удалась. Счётчик в строке считает только отложенные попытки, поэтому
+     * неудавшаяся — следующая за ними.
+     */
+    private static int failedAttempt(InboundMessage message) {
+        return message.outcome().attempt() + 1;
+    }
+
+    /**
+     * Окончательный отказ. В журнал идут только идентификаторы и коды: причина остаётся в строке сырья, где она
+     * под теми же правилами доступа, что и само сообщение.
+     */
+    private static void fail(InboundMessage message, String reason, ParseFailure failure) {
+        int failedAttempt = failedAttempt(message);
+        message.markFailed(reason);
+        InboundReceipt receipt = message.receipt();
+        log.error("сообщение {} потока {} отклонено окончательно на попытке {}: {}, SQLSTATE {}",
+                receipt.messageId(), receipt.stream(), failedAttempt, failure.type(), failure.sqlState());
     }
 
     private InboundMessage require(UUID messageId) {

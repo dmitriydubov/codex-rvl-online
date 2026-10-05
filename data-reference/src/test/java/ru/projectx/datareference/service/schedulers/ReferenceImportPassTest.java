@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.schedulers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -15,6 +16,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -31,14 +33,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
+import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.DatabaseOutages;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
+import ru.projectx.datareference.service.ParseFailure;
+import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 
@@ -48,7 +55,7 @@ import ru.projectx.datareference.support.ImportSettings;
  * проверяет {@link ReferenceImportSchedulerTest}.
  *
  * <p>Журнал проверяется целиком: исход каждого сообщения виден в нём строкой, а запись о временной ошибке
- * обязана нести тип отказа и не нести его текста — через этот путь идут и полисы, а текст ошибки вставки
+ * обязана нести тип отказа и SQLSTATE и не нести его текста — через этот путь идут и полисы, а текст ошибки вставки
  * печатает параметры запроса. На время разбора сообщения в MDC лежат его {@code message-id} и поток, под
  * теми же именами, что при приёме из брокера.
  */
@@ -165,11 +172,11 @@ class ReferenceImportPassTest {
         InboundMessage message = received();
         Map<String, String> seen = new HashMap<>();
         when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
-        doThrow(new OneCFieldException("не задано поле code")).when(importService).importMessage(message);
+        doThrow(new CannotAcquireLockException("lock")).when(importService).importMessage(message);
         doAnswer(invocation -> {
             seen.putAll(MDC.getCopyOfContextMap());
             return null;
-        }).when(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), "не задано поле code");
+        }).when(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()), any());
 
         scheduler().importPendingMessages();
 
@@ -181,7 +188,10 @@ class ReferenceImportPassTest {
         assertThat(MDC.get(OneCLogContext.STREAM)).isNull();
     }
 
-    /** Нарушение контракта постоянно: строка сразу в терминальный отказ, с причиной. */
+    /**
+     * Нарушение контракта постоянно: строка сразу в окончательный отказ со своим текстом разбора. Запись ERROR
+     * об этом пишет сервис исходов, сам проход журнал не дублирует.
+     */
     @Test
     void contractViolation_isRecordedAsPermanentFailure() {
         InboundMessage message = received();
@@ -190,32 +200,63 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), "не задано поле code");
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+                new ParseFailure.Permanent("не задано поле code", "OneCFieldException", "нет"));
         verify(inboundMessageService, never()).recordTemporaryFailure(any(), any());
-        assertThat(logged.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getFormattedMessage()).isEqualTo("сообщение " + message.receipt().messageId()
-                    + " потока MKB10 не соответствует контракту, повтор бессмыслен: не задано поле code");
-        });
+        assertThat(logged.list).isEmpty();
     }
 
-    /** Любой другой отказ временный: полный текст — в строку сырья, в журнал — только тип. */
+    /** Значение, которое база не принимает, при повторе не примет и через полчаса: сразу окончательный отказ. */
     @Test
-    void otherFailure_isRecordedAsTemporaryWithoutItsTextInLog() {
+    void valueRejectedByDatabase_isRecordedAsPermanentFailureWithoutItsText() {
         InboundMessage message = received();
-        CannotAcquireLockException failure = new CannotAcquireLockException("параметры запроса: [значения полей]");
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        doThrow(new DataIntegrityViolationException("параметры запроса: [значения полей]",
+                new SQLException("numeric field overflow", "22003")))
+                .when(importService).importMessage(message);
+
+        scheduler().importPendingMessages();
+
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+                new ParseFailure.Permanent(
+                        "база данных отклонила запись: DataIntegrityViolationException, SQLSTATE 22003",
+                        "DataIntegrityViolationException", "22003"));
+        verify(inboundMessageService, never()).recordTemporaryFailure(any(), any());
+    }
+
+    /** Ошибка в коде разбора повтором не лечится: сразу окончательный отказ, в причине только тип. */
+    @Test
+    void unexpectedFailure_isRecordedAsPermanentFailureNamedByType() {
+        InboundMessage message = received();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        doThrow(new IllegalStateException("значения полей")).when(importService).importMessage(message);
+
+        scheduler().importPendingMessages();
+
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+                new ParseFailure.Permanent("непредвиденная ошибка разбора: IllegalStateException",
+                        "IllegalStateException", "нет"));
+    }
+
+    /** Временный отказ базы идёт на повтор: в причину и в журнал — тип и SQLSTATE, без текста отказа. */
+    @Test
+    void databaseOutage_isRecordedAsTemporaryWithoutItsText() {
+        InboundMessage message = received();
+        CannotAcquireLockException failure = new CannotAcquireLockException("параметры запроса: [значения полей]",
+                new SQLException("lock", "55P03"));
         when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
         doThrow(failure).when(importService).importMessage(message);
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordTemporaryFailure(message.receipt().messageId(), failure.toString());
+        verify(inboundMessageService).recordTemporaryFailure(message.receipt().messageId(), new ParseFailure.Temporary(
+                "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
+                "CannotAcquireLockException", "55P03"));
         verify(inboundMessageService, never()).recordPermanentFailure(any(), any());
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).isEqualTo("временная ошибка разбора сообщения "
-                    + message.receipt().messageId()
-                    + " потока MKB10: org.springframework.dao.CannotAcquireLockException");
+                    + message.receipt().messageId() + " потока MKB10: CannotAcquireLockException, SQLSTATE 55P03");
         });
     }
 
@@ -235,7 +276,7 @@ class ReferenceImportPassTest {
 
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
-                ImportSettings.defaults().batchSize(BATCH_SIZE).build(), Clock.fixed(NOW, ZoneOffset.UTC));
+                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), ImportSettings.defaults().batchSize(BATCH_SIZE).build(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static InboundMessage received() {

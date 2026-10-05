@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionOperations;
+import ru.projectx.datareference.entity.InboundOutcome;
+import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.repository.BufferedTransfer;
@@ -94,6 +96,27 @@ class AgedInboundMessagesQueryTest {
         assertThat(forget(10)).isZero();
         assertThat(payloadOf(fresh)).isNotNull();
         assertThat(payloadOf(reference)).isNotNull();
+    }
+
+    /**
+     * Причина исхода полиса стирается вместе с телом: раньше в ней мог оказаться текст чужой ошибки со значениями
+     * полей. У справочного потока причина остаётся, как и тело: по ним сообщение переобрабатывают.
+     */
+    @Test
+    void forgetPolicyPayloads_erasesTheReasonTogetherWithTheBody() {
+        UUID policy = store(OneCStream.POLICIES, Duration.ofDays(40));
+        UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
+        testJdbc.update("update inbound_message set status = 'FAILED', last_error = 'причина' where message_id in (?, ?)",
+                policy, reference);
+
+        forget(10);
+
+        InboundOutcome erased = inboundMessageRepository.findById(policy).orElseThrow().outcome();
+        assertThat(payloadOf(policy)).isNull();
+        assertThat(erased.lastError()).isNull();
+        assertThat(erased.status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(inboundMessageRepository.findById(reference).orElseThrow().outcome().lastError())
+                .isEqualTo("причина");
     }
 
     /**

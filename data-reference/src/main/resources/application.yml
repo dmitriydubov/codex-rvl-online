@@ -28,7 +28,7 @@ spring:
   # уходит строка «${DB_PASSWORD}» как есть, и запуск падает на миграциях с
   # «password authentication failed».
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/data_reference}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/data_reference?logServerErrorDetail=false}
     username: ${DB_USERNAME:data_reference}
     password: ${DB_PASSWORD}
     # Таймауты соединений пула приложения. Без них запрос, упёршийся в чужую блокировку
@@ -69,6 +69,13 @@ spring:
         # рубеж на случай, когда сервер не ответит вовсе, даже отменой по
         # statement_timeout: поэтому больше него. Соединение после него закрывается.
         socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:60}
+        # Без подробностей сервера в тексте ошибки (pgjdbc: logServerErrorDetail, по
+        # умолчанию true). Подробности PostgreSQL называют значения строки: «Key (email)=(…)
+        # already exists», а в полисах это персональные данные. Сервис сам текст ошибки базы
+        # никуда не пишет, но его выводит любой стек в журнале. Код SQLSTATE от этого не
+        # меняется. Для соединения миграций тот же параметр стоит в умолчании DB_URL выше:
+        # свойства пула до него не доходят, и окружение, задающее DB_URL, добавляет его само.
+        logServerErrorDetail: false
 
   jpa:
     # Схему ведёт Liquibase. Hibernate её не трогает: ddl-auto на живой базе — это

@@ -77,7 +77,7 @@ public class LpuContactMapper implements StreamMapper {
     private static UUID contragentOf(ObjectNode data) {
         return filterValue(data)
                 .or(() -> firstRecordOwner(data))
-                .orElseThrow(() -> new OneCFieldException("в сообщении ТЗ-8 не найден GUID контрагента"));
+                .orElseThrow(() -> new OneCFieldException("в сообщении контактной информации не найден GUID контрагента"));
     }
 
     private static Optional<UUID> filterValue(JsonNode data) {

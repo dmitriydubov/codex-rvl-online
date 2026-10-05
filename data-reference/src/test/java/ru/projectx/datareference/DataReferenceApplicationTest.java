@@ -65,7 +65,8 @@ class DataReferenceApplicationTest {
     /**
      * Prometheus забирает метрики приёма и разбора с той же ручки, что и метрики самого Spring Boot. Ряды
      * приёма и разбора есть сразу после старта, ещё до первого сообщения: нулевой ряд для правил оповещения
-     * однозначнее отсутствующего. Метрика слушателей очередей Spring AMQP здесь не проверяется: в этом контексте
+     * однозначнее отсутствующего. Ряд переходов проверяется на наличие, а не на ноль: контекст общий с другими
+     * тестами, и разбор в них уже мог отклонить сообщение. Метрика слушателей очередей Spring AMQP здесь не проверяется: в этом контексте
      * брокера нет.
      */
     @Test
@@ -77,7 +78,7 @@ class DataReferenceApplicationTest {
                         + "stream=\"POLICIES\"} 0.0")
                 .contains("onec_ingest_pauses_total 0.0")
                 .contains("onec_ingest_paused 0.0")
-                .contains("onec_inbound_transitions_total{status=\"FAILED\",stream=\"MKB10\"} 0.0")
+                .containsPattern("onec_inbound_transitions_total\\{status=\"FAILED\",stream=\"MKB10\"} \\d+\\.\\d")
                 .contains("onec_inbound_messages{status=\"NEW\",stream=\"POLICIES\"} 0.0")
                 .contains("onec_inbound_pending_oldest_age_seconds{stream=\"PRICE_LISTS\"} 0.0")
                 .contains("onec_price_transfers_stuck 0.0")
