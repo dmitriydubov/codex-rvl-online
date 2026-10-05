@@ -246,7 +246,8 @@
   сессии. Ш45: PR #67 открыт и смержен за ~30 минут (без подписки — событий не было, проверка вручную); Grok APPROVED,
   сессия ответила; 4 пункта остановки → Ш45a (владелец «1) да»), Ш48, уточнение правила 15 в `gauntlet/CLAUDE.md` и
   `contract-service/CLAUDE.md` (фичи и `src/acceptanceTest` не чистятся; сборочные файлы — решением владельца). Проверка
-  после мержа — карточка Ш45, раздел 5; контрольный `gauntletFast` на `main` 32fdde6 — см. ниже. Сессия Ш45 заархивирована.
+  после мержа — карточка Ш45, раздел 5; контрольный `gauntletFast` на `main` 32fdde6 зелёный (1073 unit- и интеграционных
+  тестов, 264 сценария приёмки, 0 skipped, exit 0). Сессия Ш45 заархивирована.
   Слот освободился — **открыта Ш44a** 17:50 UTC от `main` 32fdde6 на Opus 5.5 (session_01VqYWomroVSQ2afxxq8TSVu,
   `claude/sh44a-price-period-limit`); Ш47 — по следующему слоту, Ш45a+Ш48 одной маленькой сессией после него.
 - 2026-10-05, **Ш24: PR #62 открыт сессией 16:39 UTC, смержен владельцем 16:47 UTC** (слит с `main` 9a003b3 после PR #59,
@@ -2954,7 +2955,8 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   исполняемый код не менялся. Повторный grep координатора по `src/main` и `src/test` на `main` 32fdde6 (PR, GitHub, gauntlet,
   Ш…, Р…, OQ-, роли, «решение владельца», ветки, Claude, CLAUDE.md, фазы): 9 строк, все — предметная область («ветка А/Б»
   ТЗ-3 в `Insurer`, `Lpu`, changeSet 004, `ContragentImportTest`; «ветка» кода в `SnapshotUpsertTest`, `MissingMapperTest`,
-  `OneCValuesTest`). Grok APPROVED, сессия ответила. Контрольный `gauntletFast` на `main` 32fdde6 — итог в записи 1.2.
+  `OneCValuesTest`). Grok APPROVED, сессия ответила. Контрольный `gauntletFast` на `main` 32fdde6 зелёный (1073 unit- и
+  интеграционных тестов, 264 сценария приёмки, 0 skipped, exit 0, 5 мин 9 с).
   Остатки: Ш45a (комментарии сборки, владелец «1) да»), Ш48 (unit-тест `InboxService.registerIfNew`).
   **Остановка 2026-10-05 17:4x UTC** (пункты «переслать координатору», ответы переданы сессии триггером): 1) комментарии
   с упоминанием gauntlet, Claude Code и GitHub в `settings.gradle`, `build.gradle`, `Dockerfile`, `docker-compose.yml` —
