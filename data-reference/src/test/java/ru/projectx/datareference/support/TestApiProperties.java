@@ -23,12 +23,18 @@ public final class TestApiProperties {
     private static final int MAX_QUERY_LENGTH = 100;
     private static final int MAX_CODES = 100;
     private static final int READ_TIMEOUT_SECONDS = 3;
+    private static final int MAX_NIGHTS = 366;
 
     private TestApiProperties() {
     }
 
     public static ReferenceApiProperties defaults() {
-        return withSearchLimits(search(MAX_QUERY_LENGTH), mkb10(MAX_QUERY_LENGTH, MAX_CODES));
+        return withPriceMaxNights(MAX_NIGHTS);
+    }
+
+    /** Умолчания, кроме предела длины периода расчёта стоимости в ночах. */
+    public static ReferenceApiProperties withPriceMaxNights(int maxNights) {
+        return properties(search(MAX_QUERY_LENGTH), mkb10(MAX_QUERY_LENGTH, MAX_CODES), maxNights);
     }
 
     /**
@@ -50,8 +56,14 @@ public final class TestApiProperties {
     private static ReferenceApiProperties withSearchLimits(
             ReferenceApiProperties.Search search, ReferenceApiProperties.Mkb10 mkb10) {
 
-        return new ReferenceApiProperties(
-                ZONE, List.of(RVL_AND_SKL, RVL_IN_RUSSIA), search, mkb10, READ_TIMEOUT_SECONDS);
+        return properties(search, mkb10, MAX_NIGHTS);
+    }
+
+    private static ReferenceApiProperties properties(
+            ReferenceApiProperties.Search search, ReferenceApiProperties.Mkb10 mkb10, int maxNights) {
+
+        return new ReferenceApiProperties(ZONE, List.of(RVL_AND_SKL, RVL_IN_RUSSIA), search, mkb10,
+                new ReferenceApiProperties.Price(maxNights), READ_TIMEOUT_SECONDS);
     }
 
     private static ReferenceApiProperties.Search search(int maxQueryLength) {

@@ -1,10 +1,12 @@
 package ru.projectx.datareference.acceptance;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
+import java.time.Duration;
 import org.springframework.http.HttpMethod;
 import tools.jackson.databind.JsonNode;
 
@@ -23,6 +25,9 @@ import tools.jackson.databind.JsonNode;
 public class RequestSteps {
 
     private static final int OK = 200;
+    /** Запас на повторы потребителя, который ищет пропавшую очередь (три по 5 с), и на остановку его контейнера. */
+    private static final Duration UNTIL_TIMEOUT = Duration.ofSeconds(45);
+    private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
 
     private final ContractsService contracts;
 
@@ -44,6 +49,17 @@ public class RequestSteps {
     @Когда("мониторинг запрашивает {string}")
     public void monitoringRequests(String path) {
         contracts.request(path);
+    }
+
+    /**
+     * Повторяет запрос, пока строковое поле ответа не примет ожидаемое значение: так ждут изменения, которое сервис
+     * замечает не сразу. Дальше шаги проверяют последний ответ.
+     */
+    @Когда("мониторинг запрашивает {string}, пока поле {string} ответа не станет равно {string}")
+    public void monitoringRequestsUntil(String path, String field, String expected) {
+        await().atMost(UNTIL_TIMEOUT).pollInterval(POLL_INTERVAL)
+                .until(() -> contracts.request(path).field(field),
+                        value -> value.isString() && expected.equals(value.asString()));
     }
 
     @Когда("сервис Договоров/Заявок запрашивает {string} с X-Request-Id {string}")
