@@ -8,7 +8,6 @@ import java.util.function.Function;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.onec.ImportResult;
 import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -23,38 +22,20 @@ import tools.jackson.databind.node.ObjectNode;
  * @param <E> запись, которую создаёт или обновляет поток
  * @param <S> разобранные реквизиты сообщения
  */
-abstract class UnfilteredStreamMapper<E, S> implements StreamMapper {
+abstract class UnfilteredStreamMapper<E, S> extends CatalogStreamMapper<E, S> {
 
     private static final String EXTERNAL_ID = "id";
 
-    private final OneCStream stream;
-    private final SnapshotUpsert<E, S> upsert;
-    private final Clock clock;
-
-    /**
-     * @param stream поток 1С, сообщения которого разбирает наследник
-     * @param finder поиск записи по GUID 1С, обычно {@code findByExternalId} репозитория
-     * @param creation новая запись из первого снимка
-     * @param refresh применение нового снимка к известной записи
-     * @param store сохранение записи, обычно {@code save} репозитория
-     * @param clock часы, по которым ставится момент создания и изменения записи
-     */
+    /** Параметры те же, что у {@link CatalogStreamMapper}. */
     UnfilteredStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, SnapshotUpsert.Creation<E, S> creation,
                            SnapshotUpsert.Refresh<E, S> refresh, Consumer<E> store, Clock clock) {
-        this.stream = stream;
-        this.upsert = new SnapshotUpsert<>(finder, creation, refresh, store);
-        this.clock = clock;
-    }
-
-    @Override
-    public final OneCStream stream() {
-        return stream;
+        super(stream, finder, creation, refresh, store, clock);
     }
 
     /** GUID записи читается раньше снимка: без него сообщение нарушает контракт, что бы ни было в остальных полях. */
     @Override
     public final ImportResult apply(ObjectNode data) {
-        return upsert.apply(OneCValues.requiredUuid(data, EXTERNAL_ID), snapshotOf(data), clock.instant());
+        return upsert(OneCValues.requiredUuid(data, EXTERNAL_ID), snapshotOf(data));
     }
 
     /**
