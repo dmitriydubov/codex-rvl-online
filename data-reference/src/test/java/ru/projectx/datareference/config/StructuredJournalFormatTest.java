@@ -19,8 +19,8 @@ import tools.jackson.databind.JsonNode;
  * становятся его полями.
  *
  * <p>Сборщик журналов контура разбирает записи по полям, а не по тексту. По полям {@code messageId},
- * {@code stream}, {@code queue} и {@code requestId} находится вся история сообщения 1С или запроса. В простом
- * текстовом формате Spring Boot этих ключей в строке не было вовсе.
+ * {@code stream}, {@code queue} и {@code requestId} находится вся история сообщения 1С или запроса. Без
+ * структурного формата ключи MDC в строку журнала не выводятся.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class StructuredJournalFormatTest {
