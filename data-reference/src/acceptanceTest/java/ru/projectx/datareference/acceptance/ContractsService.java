@@ -8,12 +8,14 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.test.web.servlet.client.ExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
@@ -31,6 +33,9 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
  * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон
  * приёмки до таймаута CI, не называя сценарий.
+ *
+ * <p>Мониторинг ходит тем же клиентом, но на порт актуатора ({@code local.management.port}): на порту API
+ * актуатора нет. Его ответ — тоже последний ответ, и проверяют его те же шаги.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -45,21 +50,29 @@ public class ContractsService {
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
     private final RestTestClient client;
+    private final RestTestClient monitoringClient;
     private @Nullable ServiceResponse lastResponse;
     private @Nullable String obtainedId;
 
-    public ContractsService(@LocalServerPort int port) {
+    public ContractsService(@LocalServerPort int port, @LocalManagementPort int managementPort) {
         HttpClient http = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(CONNECT_TIMEOUT)
                 .build();
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
         requests.setReadTimeout(READ_TIMEOUT);
-        this.client = RestTestClient.bindToServer(requests).baseUrl("http://localhost:" + port).build();
+        this.client = clientOn(requests, port);
+        this.monitoringClient = clientOn(requests, managementPort);
     }
 
     public ServiceResponse request(String path) {
         return exchange(HttpMethod.GET, path, headers -> { });
+    }
+
+    /** Запрос мониторинга или Kubernetes к актуатору — на его порт. */
+    public ServiceResponse monitor(String path) {
+        requireAbsolutePath(path);
+        return remember(monitoringClient.get().uri(path).exchange().returnResult());
     }
 
     public ServiceResponse request(String path, String requestId) {
@@ -105,8 +118,12 @@ public class ContractsService {
         requireAbsolutePath(path);
         Object[] variables = Stream.concat(Arrays.stream(uriVariables(path)), Arrays.stream(parameterValues))
                 .toArray();
-        lastResponse = ServiceResponse.of(
-                client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+        return remember(client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+    }
+
+    /** Ответ любого из двух портов — последний ответ сценария: его проверяют одни и те же шаги. */
+    private ServiceResponse remember(ExchangeResult result) {
+        lastResponse = ServiceResponse.of(result);
         return lastResponse;
     }
 
@@ -119,6 +136,10 @@ public class ContractsService {
         if (!path.startsWith(PATH_ROOT)) {
             throw new IllegalArgumentException("путь запроса в сценарии должен начинаться с «/»: " + path);
         }
+    }
+
+    private static RestTestClient clientOn(JdkClientHttpRequestFactory requests, int port) {
+        return RestTestClient.bindToServer(requests).baseUrl("http://localhost:" + port).build();
     }
 
     private Object[] uriVariables(String path) {

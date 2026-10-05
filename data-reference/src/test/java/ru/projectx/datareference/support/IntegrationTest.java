@@ -7,6 +7,7 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.AliasFor;
 
 /**
  * Тест поднимает приложение целиком на настоящем PostgreSQL, с остановленными часами.
@@ -56,4 +57,11 @@ import org.springframework.context.annotation.Import;
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
 public @interface IntegrationTest {
+
+    /**
+     * Без настоящего сервера (по умолчанию) — быстрее, и контекст общий у всех таких тестов. Сервер на случайных
+     * портах нужен тому, кто проверяет сами порты: актуатор отвечает на своём порту, и без сервера его нет вовсе.
+     */
+    @AliasFor(annotation = SpringBootTest.class)
+    SpringBootTest.WebEnvironment webEnvironment() default SpringBootTest.WebEnvironment.MOCK;
 }

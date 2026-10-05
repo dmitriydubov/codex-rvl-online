@@ -11,7 +11,7 @@ import org.springframework.http.HttpMethod;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Запросы сервисов Договоров и Заявок, а также мониторинга к ручке здоровья. {@code {id}} в пути означает
+ * Запросы сервисов Договоров и Заявок, а также мониторинга к ручке здоровья (на порту актуатора). {@code {id}} в пути означает
  * id, полученный на шаге «Дано»: так потребитель и работает, он хранит наш id и адресует им запись.
  *
  * <p>Оба потребителя ходят одним HTTP-клиентом и одними шагами. Запись «сервис Договоров/Заявок» в
@@ -45,10 +45,10 @@ public class RequestSteps {
         contracts.request(path);
     }
 
-    /** Ручку здоровья читают Kubernetes и мониторинг — тем же HTTP, что и соседние сервисы. */
+    /** Ручку здоровья читают Kubernetes и мониторинг — на порту актуатора, а не на порту API соседей. */
     @Когда("мониторинг запрашивает {string}")
     public void monitoringRequests(String path) {
-        contracts.request(path);
+        contracts.monitor(path);
     }
 
     /**
@@ -58,7 +58,7 @@ public class RequestSteps {
     @Когда("мониторинг запрашивает {string}, пока поле {string} ответа не станет равно {string}")
     public void monitoringRequestsUntil(String path, String field, String expected) {
         await().atMost(UNTIL_TIMEOUT).pollInterval(POLL_INTERVAL)
-                .until(() -> contracts.request(path).field(field),
+                .until(() -> contracts.monitor(path).field(field),
                         value -> value.isString() && expected.equals(value.asString()));
     }
 

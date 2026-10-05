@@ -37,8 +37,9 @@
 # только с самой машины: порт опубликован на 127.0.0.1. Клиенту в контейнере на Linux
 # host.docker.internal его не покажет — такой клиент подключают к сети этого compose
 # (data-reference_default, адрес http://data-reference-stand:8080) или запускают с network_mode: host.
-# /actuator/health отвечает UP, как только сервис поднят, — раньше, чем данные заложены
-# и разобраны. Данные готовы, когда запрос примера 09 — полис для сервиса Договоров без ПДн
+# /actuator/health (порт актуатора, http://localhost:8081) отвечает UP, как только сервис
+# поднят, — раньше, чем данные заложены и разобраны. Данные готовы, когда запрос примера 09 —
+# полис для сервиса Договоров без ПДн
 # (/internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5) — отвечает 200.
 # Повторный up данных не дублирует.
 # Сброс: docker compose --profile stand down -v. Удаляет все тома проекта — и базу, общую
@@ -129,8 +130,12 @@ services:
       RABBITMQ_PASSWORD: data_reference
       RABBITMQ_SSL_ENABLED: "false"
       RABBITMQ_LISTENER_AUTO_STARTUP: ${RABBITMQ_LISTENER_AUTO_STARTUP:-false}
+      # Тот же порт, что опубликован ниже, откуда бы он ни пришёл: из .env или из окружения.
+      MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     ports:
       - "127.0.0.1:8080:8080"
+      # Актуатор (health, prometheus) — на своём порту, MANAGEMENT_PORT из .env, умолчание 8081.
+      - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -154,6 +159,8 @@ services:
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
       - "127.0.0.1:8080:8080"
+      # Актуатор — на своём порту; .env стенд не читает, порт — умолчание application.yml.
+      - "127.0.0.1:8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
