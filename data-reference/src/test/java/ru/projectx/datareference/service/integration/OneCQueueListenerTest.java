@@ -17,10 +17,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.rabbitmq.client.Channel;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -74,6 +77,10 @@ class OneCQueueListenerTest {
     @Mock
     private Channel channel;
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
+    private final OneCIngestMetrics metrics = IngestTestMetrics.on(meters);
+
     @Test
     void storedMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
@@ -82,6 +89,7 @@ class OneCQueueListenerTest {
 
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+        assertThat(outcomes()).containsExactly("stored");
     }
 
     /** Дубль не считается ошибкой: сырьё уже лежит, и брокеру достаточно подтверждения. */
@@ -92,6 +100,7 @@ class OneCQueueListenerTest {
         listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
 
         verify(channel).basicAck(DELIVERY_TAG, false);
+        assertThat(outcomes()).containsExactly("duplicate");
     }
 
     /** Сырьё сохраняется целиком и как есть, потому что разбирает его планировщик, а не слушатель. */
@@ -133,6 +142,7 @@ class OneCQueueListenerTest {
 
         verify(consumers).pause(new StorageOutage(CONNECTION_FAILURE, DataAccessResourceFailureException.class.getName()));
         verifyNoInteractions(channel);
+        assertThat(outcomes()).containsExactly("storage_outage");
     }
 
     /** Блокировка дольше lock_timeout — тоже временный отказ хранилища: та же пауза, а не возврат в очередь. */
@@ -182,6 +192,7 @@ class OneCQueueListenerTest {
         assertThat(rejected.getValue().body()).isEqualTo(raw);
         verify(channel).basicAck(DELIVERY_TAG, false);
         verifyNoInteractions(consumers);
+        assertThat(outcomes()).containsExactly("quarantined");
     }
 
     /** Подтверждение — только после того, как карантин зафиксирован, иначе отказ записи карантина потерял бы сообщение. */
@@ -220,6 +231,7 @@ class OneCQueueListenerTest {
 
         verify(consumers).pause(new StorageOutage(CONNECTION_FAILURE, DataAccessResourceFailureException.class.getName()));
         verifyNoInteractions(channel);
+        assertThat(outcomes()).containsExactly("storage_outage");
     }
 
     /**
@@ -236,6 +248,7 @@ class OneCQueueListenerTest {
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
         verifyNoInteractions(consumers);
+        assertThat(outcomes()).containsExactly("quarantined");
     }
 
     /**
@@ -251,6 +264,7 @@ class OneCQueueListenerTest {
         verify(channel).basicNack(DELIVERY_TAG, false, true);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
         verifyNoInteractions(consumers, quarantineService);
+        assertThat(outcomes()).containsExactly("returned");
     }
 
     /**
@@ -264,6 +278,7 @@ class OneCQueueListenerTest {
         verify(channel).basicAck(DELIVERY_TAG, false);
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
         verifyNoInteractions(ingestService);
+        assertThat(outcomes()).containsExactly("unidentified");
     }
 
     /**
@@ -434,7 +449,15 @@ class OneCQueueListenerTest {
                 new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL)));
+                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), metrics),
+                metrics);
+    }
+
+    /** Исходы посчитанных доставок, по одному на доставку, с потоком и очередью этой доставки. */
+    private List<String> outcomes() {
+        return meters.find(OneCIngestMetrics.DELIVERIES).tag("stream", "MKB10").tag("queue", QUEUE).counters().stream()
+                .flatMap(counter -> Collections.nCopies((int) counter.count(), counter.getId().getTag("outcome")).stream())
+                .toList();
     }
 
     /** Отказ базы на теле с JSON-escape нулевого символа: класс 22, как его бросает запись сырья. */

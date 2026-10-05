@@ -35,7 +35,7 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
  *
  * <p>На время обработки в MDC лежат поток, очередь и, когда он прочитан, {@code message-id}:
  * по ним строка журнала находит своё сообщение. Имена ключей — {@link OneCLogContext}, общие с разбором
- * по расписанию.
+ * по расписанию. Исход каждой доставки считает {@link OneCIngestMetrics}.
  */
 @Component
 public class OneCQueueListener {
@@ -45,13 +45,15 @@ public class OneCQueueListener {
     private final OneCEnvelopeParser envelopeParser;
     private final OneCIngestService ingestService;
     private final OneCStorageFailures storageFailures;
+    private final OneCIngestMetrics metrics;
 
-    public OneCQueueListener(
-            OneCEnvelopeParser envelopeParser, OneCIngestService ingestService, OneCStorageFailures storageFailures) {
+    public OneCQueueListener(OneCEnvelopeParser envelopeParser, OneCIngestService ingestService,
+            OneCStorageFailures storageFailures, OneCIngestMetrics metrics) {
 
         this.envelopeParser = envelopeParser;
         this.ingestService = ingestService;
         this.storageFailures = storageFailures;
+        this.metrics = metrics;
     }
 
     /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
@@ -103,6 +105,7 @@ public class OneCQueueListener {
 
     private void ingest(OneCDelivery delivery, UUID messageId) {
         boolean stored = ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload());
+        metrics.record(delivery, stored ? IngestOutcome.STORED : IngestOutcome.DUPLICATE);
         if (!stored) {
             log.debug("сообщение {} из очереди {} уже принималось — дубль", messageId, delivery.queue());
         }
@@ -122,7 +125,8 @@ public class OneCQueueListener {
      * может оказаться полис. Случай почти наверняка означает поломку контракта или чужую
      * очередь, то есть касается не одного сообщения, а всех.
      */
-    private static void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
+    private void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
+        metrics.record(delivery, IngestOutcome.UNIDENTIFIED);
         log.error("сообщение потока {} из очереди {} потеряно: {} ({} байт). "
                         + "Принять его нельзя — в конверте нет пригодного message-id",
                 delivery.stream(), delivery.queue(), cause.getMessage(), delivery.rawBody().length);

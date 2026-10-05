@@ -61,4 +61,30 @@ class DataReferenceApplicationTest {
                 .hasStatusOk().bodyJson().extractingPath("$.status").isEqualTo("UP");
         assertThat(mvc.get().uri("/actuator/env").exchange()).hasStatus(404);
     }
+
+    /**
+     * Prometheus забирает метрики приёма и разбора с той же ручки, что и метрики самого Spring Boot. Ряды
+     * приёма и разбора есть сразу после старта, ещё до первого сообщения: нулевой ряд для правил оповещения
+     * однозначнее отсутствующего. Метрика слушателей очередей Spring AMQP здесь не проверяется: в этом контексте
+     * брокера нет.
+     */
+    @Test
+    void prometheusEndpoint_exposesIngestAndParsingMetrics() {
+        assertThat(mvc.get().uri("/actuator/prometheus").exchange())
+                .hasStatusOk()
+                .bodyText()
+                .contains("onec_ingest_deliveries_total{outcome=\"unidentified\",queue=\"1c-usk_to_rvl-online_policies\","
+                        + "stream=\"POLICIES\"} 0.0")
+                .contains("onec_ingest_pauses_total 0.0")
+                .contains("onec_ingest_paused 0.0")
+                .contains("onec_inbound_transitions_total{status=\"FAILED\",stream=\"MKB10\"} 0.0")
+                .contains("onec_inbound_messages{status=\"NEW\",stream=\"POLICIES\"} 0.0")
+                .contains("onec_inbound_pending_oldest_age_seconds{stream=\"PRICE_LISTS\"} 0.0")
+                .contains("onec_price_transfers_stuck 0.0")
+                .contains("onec_retention_overdue_policy_payloads 0.0")
+                .contains("onec_retention_overdue_quarantine_bodies 0.0")
+                .contains("# TYPE onec_inbound_backlog_staleness_seconds gauge")
+                .contains("# HELP onec_inbound_messages Сырые сообщения 1С по потоку и статусу")
+                .contains("hikaricp_connections");
+    }
 }

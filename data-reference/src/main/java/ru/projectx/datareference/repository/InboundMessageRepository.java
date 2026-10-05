@@ -76,6 +76,52 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
             Limit limit);
 
     /**
+     * Сколько сообщений каждого потока лежит в каждом незавершённом статусе — ждут разбора ({@code NEW},
+     * {@code RETRY}), ждут частей передачи ({@code BUFFERED}) или ушли в отказ ({@code FAILED}) — и когда принято
+     * самое давнее из них. Строка на пару «поток, статус»; пар без сообщений в ответе нет. Нужен метрикам: запрос
+     * считает, а не выбирает строки, и тела не читает.
+     *
+     * <p>Статусы записаны в запросе значениями, а не параметрами: так PostgreSQL при любом плане видит, что подходит
+     * частичный индекс по незавершённым строкам, и не перебирает всю таблицу сырья, где почти все строки разобраны.
+     */
+    @Query("""
+            select message.stream as stream,
+                   message.status as status,
+                   count(message) as messages,
+                   min(message.receivedAt) as oldestReceivedAt
+              from InboundMessage message
+             where message.status in (NEW, RETRY, BUFFERED, FAILED)
+             group by message.stream, message.status
+            """)
+    List<StatusBacklog> countUnfinishedByStreamAndStatus();
+
+    /**
+     * Сколько многочастных передач в буфере ждут своих частей с момента раньше {@code receivedBefore}. Первая часть
+     * передачи принята раньше этого момента тогда и только тогда, когда раньше него принята хотя бы одна её часть,
+     * поэтому достаточно сосчитать разные передачи среди таких строк. Тела не читаются.
+     */
+    @Query("""
+            select count(distinct message.correlationId)
+              from InboundMessage message
+             where message.status = BUFFERED
+               and message.receivedAt < :receivedBefore
+            """)
+    long countTransfersBufferedBefore(@Param("receivedBefore") Instant receivedBefore);
+
+    /**
+     * Сколько тел полисов, принятых раньше {@code receivedBefore}, ещё не стёрто. Тот же отбор, что у
+     * {@link #forgetPolicyPayloads}, и тот же частичный индекс; поток записан значением по той же причине.
+     */
+    @Query("""
+            select count(message)
+              from InboundMessage message
+             where message.stream = POLICIES
+               and message.payload is not null
+               and message.receivedAt < :receivedBefore
+            """)
+    long countPolicyPayloadsReceivedBefore(@Param("receivedBefore") Instant receivedBefore);
+
+    /**
      * Стирает тела не больше {@code limit} строк потока полисов, принятых раньше {@code receivedBefore}, начиная
      * с самых старых, и возвращает, сколько стёрто. Нужен сроку хранения персональных данных: строки остаются,
      * тела не читаются в память. Метод не открывает транзакцию: её открывает вызывающий, отдельную на каждую

@@ -56,6 +56,27 @@ class AgedInboundMessagesTest {
         assertThat(agedMessages().transfersBufferedLongerThan(Duration.ofHours(1), 20)).isSameAs(stuck);
     }
 
+    @Test
+    void countTransfersBufferedLongerThan_countsTransfersStartedBeforeNowMinusAge() {
+        when(repository.countTransfersBufferedBefore(NOW.minus(Duration.ofHours(1)))).thenReturn(4L);
+
+        assertThat(agedMessages().countTransfersBufferedLongerThan(Duration.ofHours(1))).isEqualTo(4L);
+    }
+
+    @Test
+    void countPolicyPayloadsOlderThan_countsRowsReceivedBeforeNowMinusAge() {
+        when(repository.countPolicyPayloadsReceivedBefore(NOW.minus(Duration.ofDays(30)))).thenReturn(9L);
+
+        assertThat(agedMessages().countPolicyPayloadsOlderThan(Duration.ofDays(30))).isEqualTo(9L);
+    }
+
+    @Test
+    void countQuarantineBodiesOlderThan_countsRowsReceivedBeforeNowMinusAge() {
+        when(quarantine.countBodiesReceivedBefore(NOW.minus(Duration.ofDays(7)))).thenReturn(2L);
+
+        assertThat(agedMessages().countQuarantineBodiesOlderThan(Duration.ofDays(7))).isEqualTo(2L);
+    }
+
     private AgedInboundMessages agedMessages() {
         return new AgedInboundMessages(repository, quarantine, Clock.fixed(NOW, ZoneOffset.UTC));
     }
