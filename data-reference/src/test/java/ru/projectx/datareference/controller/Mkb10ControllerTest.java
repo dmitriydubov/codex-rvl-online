@@ -9,6 +9,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -18,13 +20,17 @@ import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.service.Mkb10Reads;
 
-/** R-07: подсказка по МКБ-10, раскрытие перечня кодов и запрос без ключа. */
+/**
+ * Ручка МКБ-10 выбирает режим по ключу запроса: подсказка по строке или раскрытие перечня кодов. Запрос без
+ * ключа и запрос с ключами обоих режимов сразу отклоняются ошибкой вызывающего, и сервис чтения не вызывается.
+ */
 @ExtendWith(MockitoExtension.class)
 class Mkb10ControllerTest {
 
     private static final String MKB10 = InternalApi.BASE_PATH + "/mkb10";
     private static final UUID CODE_ID = UUID.fromString("3b100000-0000-4000-8000-000000000001");
     private static final UUID CODE_EXTERNAL_ID = UUID.fromString("3b100000-0000-4000-8000-000000000002");
+    private static final String QUERY_WITH_CODES_REASON = "query и codes вместе не передаются: нужен один из них";
 
     @Mock
     private Mkb10Reads mkb10;
@@ -76,7 +82,25 @@ class Mkb10ControllerTest {
         verifyNoInteractions(mkb10);
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 — забота Ш25. */
+    /**
+     * Строка поиска и перечень кодов — два разных режима. Запрос с обоими ключами отклоняется целиком, а не
+     * уходит внутренней ошибкой из-за двух равных по точности ручек. Пустой {@code codes} тоже считается
+     * переданным ключом, а недопустимый {@code limit} не проверяется: режим не выбран.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"?query=I25&codes=I25.1,Q06", "?query=I25&codes=", "?query=I25&codes=I25.1&limit=0"})
+    void queryWithCodes_isValidationErrorNamingQuery_withoutAskingService(String parameters) {
+        MvcTestResult result = mvc.get().uri(MKB10 + parameters).exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().hasSize(1);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("query");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(QUERY_WITH_CODES_REASON);
+        verifyNoInteractions(mkb10);
+    }
+
+    /** Ручка отдаёт только JSON, поэтому запрос, который принимает только XML, отсекается ещё при выборе ручки. */
     @Test
     void search_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(MKB10 + "?query={query}", "Q06").accept(MediaType.APPLICATION_XML)

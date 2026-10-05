@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,11 +25,16 @@ import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.repository.Mkb10Row;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/** R-07: выбор режима поиска, шаблон, пределы и раскрытие перечня кодов. Сам SQL — в Mkb10ApiTest. */
+/**
+ * Поиск по МКБ-10 до базы: выбор режима поиска, шаблон, пределы строки, выдачи и перечня кодов и раскрытие
+ * перечня. Сам SQL проверяет Mkb10ApiTest на настоящей базе.
+ */
 @ExtendWith(MockitoExtension.class)
 class Mkb10QueryServiceTest {
 
     private static final Limit DEFAULT_LIMIT = Limit.of(20);
+    private static final int MAX_QUERY_LENGTH = 100;
+    private static final int MAX_CODES = 100;
     private static final Mkb10Row Q06_0 = new Mkb10Row(UUID.fromString("6b1d0000-0000-4000-8000-000000000002"),
             UUID.fromString("6b1d0000-0000-4000-8000-000000000012"), "Q06.0", "Амиелия", 3, "Q06", false);
 
@@ -94,6 +101,49 @@ class Mkb10QueryServiceTest {
         verifyNoInteractions(mkb10);
     }
 
+    /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
+    @Test
+    void queryAtMaximumLength_isSearched() {
+        String query = "ж".repeat(MAX_QUERY_LENGTH);
+        when(mkb10.findActiveByNamePattern(LikePatterns.substring(query), DEFAULT_LIMIT)).thenReturn(List.of());
+
+        assertThat(service.search(query, null).items()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Q", " "})
+    void queryLongerThanMaximum_asReceived_isValidationErrorOnQuery_namingRule(String filler) {
+        String query = " " + filler.repeat(MAX_QUERY_LENGTH - 1) + " ";
+
+        assertThatThrownBy(() -> service.search(query, null))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("query");
+                    assertThat(invalid.getMessage()).isEqualTo("не длиннее 100 символов");
+                });
+        verifyNoInteractions(mkb10);
+    }
+
+    /** Повторы считаются: число кодов — по запросу как пришёл, а в базу уходят только разные коды. */
+    @Test
+    void codesAtMaximumCount_withRepeat_areLookedUp() {
+        List<String> codes = Stream.concat(distinctCodes(MAX_CODES - 1).stream(), Stream.of("A00")).toList();
+        when(mkb10.findByCodes(distinctCodes(MAX_CODES - 1))).thenReturn(List.of(Q06_0));
+
+        assertThat(service.byCodes(codes).items()).containsExactly(item(Q06_0));
+    }
+
+    @Test
+    void codesOverMaximumCount_asReceived_isValidationErrorOnCodes_namingRule() {
+        List<String> codes = Stream.concat(distinctCodes(MAX_CODES).stream(), Stream.of("A00")).toList();
+
+        assertThatThrownBy(() -> service.byCodes(codes))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("codes");
+                    assertThat(invalid.getMessage()).isEqualTo("не больше 100 кодов");
+                });
+        verifyNoInteractions(mkb10);
+    }
+
     @Test
     void byCodes_trimsUpperCasesAndDeduplicates_skippingBlank() {
         when(mkb10.findByCodes(List.of("I25.1", "Z99"))).thenReturn(List.of(Q06_0));
@@ -111,6 +161,10 @@ class Mkb10QueryServiceTest {
                     assertThat(invalid.getMessage()).isEqualTo("хотя бы один код");
                 });
         verifyNoInteractions(mkb10);
+    }
+
+    private static List<String> distinctCodes(int count) {
+        return IntStream.range(0, count).mapToObj(index -> "A%02d".formatted(index)).toList();
     }
 
     private static Mkb10Code item(Mkb10Row row) {

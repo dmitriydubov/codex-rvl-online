@@ -20,6 +20,8 @@ public final class TestApiProperties {
     private static final int MKB10_DEFAULT_LIMIT = 20;
     private static final int MKB10_MAX_LIMIT = 100;
     private static final int MIN_QUERY_LENGTH = 2;
+    private static final int MAX_QUERY_LENGTH = 100;
+    private static final int MAX_CODES = 100;
     private static final int READ_TIMEOUT_SECONDS = 3;
 
     private TestApiProperties() {
@@ -29,8 +31,10 @@ public final class TestApiProperties {
         return new ReferenceApiProperties(
                 ZONE,
                 List.of(RVL_AND_SKL, RVL_IN_RUSSIA),
-                new ReferenceApiProperties.Search(SEARCH_DEFAULT_LIMIT, SEARCH_MAX_LIMIT, MIN_QUERY_LENGTH),
-                new ReferenceApiProperties.Mkb10(MKB10_DEFAULT_LIMIT, MKB10_MAX_LIMIT, MIN_QUERY_LENGTH),
+                new ReferenceApiProperties.Search(
+                        SEARCH_DEFAULT_LIMIT, SEARCH_MAX_LIMIT, MIN_QUERY_LENGTH, MAX_QUERY_LENGTH),
+                new ReferenceApiProperties.Mkb10(
+                        MKB10_DEFAULT_LIMIT, MKB10_MAX_LIMIT, MIN_QUERY_LENGTH, MAX_QUERY_LENGTH, MAX_CODES),
                 READ_TIMEOUT_SECONDS);
     }
 }

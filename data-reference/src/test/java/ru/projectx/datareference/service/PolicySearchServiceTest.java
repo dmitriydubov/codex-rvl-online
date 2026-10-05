@@ -36,8 +36,8 @@ import ru.projectx.datareference.repository.PolicyScope;
 import ru.projectx.datareference.support.TestApiProperties;
 
 /**
- * R-04 до базы: нормализация строки, выбор режима (номер или ФИО), шаблоны, предел и отказы.
- * Отбор, ранжирование и предел в SQL — в PolicyApiTest на настоящем PostgreSQL.
+ * Поиск полисов договора до базы: нормализация строки, выбор режима (номер или ФИО), шаблоны, пределы и
+ * отказы. Отбор, ранжирование и предел выдачи в SQL проверяет PolicyApiTest на настоящем PostgreSQL.
  */
 @ExtendWith(MockitoExtension.class)
 class PolicySearchServiceTest {
@@ -47,6 +47,7 @@ class PolicySearchServiceTest {
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 3, 14);
     private static final PolicyScope DEFAULT_SCOPE = new PolicyScope(CONTRACT, TODAY, 10);
+    private static final int MAX_QUERY_LENGTH = 100;
 
     @Mock
     private PolicyRepository policies;
@@ -115,6 +116,29 @@ class PolicySearchServiceTest {
                 .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
                     assertThat(invalid.field()).isEqualTo("query");
                     assertThat(invalid.getMessage()).isEqualTo("не короче 2 символов");
+                });
+        verifyNoInteractions(policies, insuranceContracts);
+    }
+
+    /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
+    @Test
+    void queryAtMaximumLength_isSearched() {
+        knownContract();
+        String query = "ж".repeat(MAX_QUERY_LENGTH);
+        when(policies.findRankedByNames(DEFAULT_SCOPE, List.of(LikePatterns.prefix(query)))).thenReturn(List.of());
+
+        assertThat(service.search(CONTRACT, query, null).items()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ж", " "})
+    void queryLongerThanMaximum_asReceived_isValidationError_namingRuleNotValue(String filler) {
+        String query = " " + filler.repeat(MAX_QUERY_LENGTH - 1) + " ";
+
+        assertThatThrownBy(() -> service.search(CONTRACT, query, null))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("query");
+                    assertThat(invalid.getMessage()).isEqualTo("не длиннее 100 символов");
                 });
         verifyNoInteractions(policies, insuranceContracts);
     }

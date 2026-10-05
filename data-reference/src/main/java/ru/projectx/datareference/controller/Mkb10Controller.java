@@ -9,11 +9,19 @@ import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.Mkb10Reads;
 
 /**
- * Справочник МКБ-10 (R-07): подсказка по коду или наименованию и раскрытие перечня кодов.
- * Запрос без ключа — «нет параметра», а не «не найдено».
+ * Справочник МКБ-10 для сервиса Заявок: подсказка по коду или наименованию и раскрытие перечня кодов разом.
+ *
+ * <p>Режим выбирает ключ запроса: {@code query} или {@code codes}. Каждая ручка режима принимает запрос,
+ * только если ключа другого режима в нём нет. Запрос без ключа — это ошибка «нет параметра», а не «не
+ * найдено». Запрос с обоими ключами — тоже ошибка вызывающего: сервис не угадывает, какой режим имелся в
+ * виду. Без отдельной ручки на этот случай Spring нашёл бы две одинаково подходящие ручки и ответил бы
+ * внутренней ошибкой 500.
  */
 @InternalApi
 public class Mkb10Controller {
+
+    private static final String QUERY = "query";
+    private static final String CODES = "codes";
 
     private final Mkb10Reads mkb10;
 
@@ -21,22 +29,27 @@ public class Mkb10Controller {
         this.mkb10 = mkb10;
     }
 
-    /** R-07: подсказка по МКБ-10 — по коду или по наименованию. */
-    @GetMapping(path = "/mkb10", params = "query")
+    /** Подсказка по МКБ-10: по началу кода или по части наименования. */
+    @GetMapping(path = "/mkb10", params = {QUERY, "!" + CODES})
     public Mkb10Response searchMkb10(
             @RequestParam String query, @RequestParam(required = false) @Nullable Integer limit) {
 
         return mkb10.search(query, limit);
     }
 
-    /** R-07: раскрыть перечень кодов разом, вместе с архивными. */
-    @GetMapping(path = "/mkb10", params = "codes")
+    /** Перечень кодов разом, вместе с архивными: старые заявки ссылаются и на них. */
+    @GetMapping(path = "/mkb10", params = {CODES, "!" + QUERY})
     public Mkb10Response mkb10ByCodes(@RequestParam List<String> codes) {
         return mkb10.byCodes(codes);
     }
 
+    @GetMapping(path = "/mkb10", params = {QUERY, CODES})
+    public Mkb10Response mkb10WithBothKeys() {
+        throw new InvalidRequestException(QUERY, "query и codes вместе не передаются: нужен один из них");
+    }
+
     @GetMapping("/mkb10")
     public Mkb10Response mkb10WithoutKey() {
-        throw new InvalidRequestException("query", "нужен query либо codes");
+        throw new InvalidRequestException(QUERY, "нужен query либо codes");
     }
 }
