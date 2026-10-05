@@ -27,10 +27,22 @@ sealed interface PriceListTransfer {
         List<InboundMessage> buffered = correlated.stream()
                 .filter(message -> message.outcome().status() == InboundStatus.BUFFERED)
                 .toList();
-        if (correlated.stream().anyMatch(message -> message.outcome().status() == InboundStatus.FAILED)) {
+        if (isRejected(correlated)) {
             return new Rejected("передача %s уже отклонена".formatted(cid), buffered);
         }
         return assembling(cid, buffered);
+    }
+
+    /**
+     * Передача отклонена, если среди её частей есть отказ, а применённых нет: у применённой передачи отказ бывает
+     * только у лишнего пакета.
+     */
+    static boolean isRejected(List<InboundMessage> correlated) {
+        return anyIn(correlated, InboundStatus.FAILED) && !anyIn(correlated, InboundStatus.PROCESSED);
+    }
+
+    private static boolean anyIn(List<InboundMessage> messages, InboundStatus status) {
+        return messages.stream().anyMatch(message -> message.outcome().status() == status);
     }
 
     private static PriceListTransfer assembling(UUID cid, List<InboundMessage> buffered) {

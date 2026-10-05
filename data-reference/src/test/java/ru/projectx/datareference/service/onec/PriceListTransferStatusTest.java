@@ -90,6 +90,21 @@ class PriceListTransferStatusTest {
                 "передача " + CID + " уже отклонена", List.of(lateFinal, lateBatch)));
     }
 
+    /** У применённой передачи отказ бывает только у лишнего пакета: сама передача не отклонена. */
+    @Test
+    void appliedTransferWithRejectedSurplusBatch_isNotRejected() {
+        InboundMessage applied = batch(1);
+        applied.markProcessed(PROCESSED_AT);
+        InboundMessage surplus = batch(1);
+        surplus.markFailed("лишний пакет");
+
+        assertThat(PriceListTransfer.isRejected(List.of(applied, surplus))).isFalse();
+        assertThat(PriceListTransfer.isRejected(List.of(surplus))).isTrue();
+        assertThat(PriceListTransfer.isRejected(List.of(applied))).isFalse();
+        assertThat(PriceListTransfer.of(CID, List.of(applied, surplus, batch(1))))
+                .isInstanceOf(PriceListTransfer.Pending.class);
+    }
+
     @Test
     void rejectedTransfer_failsEveryLatePartWithReason() {
         InboundMessage lateFinal = finalMessage(1, 1);

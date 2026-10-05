@@ -91,9 +91,21 @@ class PriceListPartCheckTest {
         InboundMessage rejected = part(false);
         rejected.markFailed("в строке прайса нет цены");
 
-        assertThatCode(() -> check.check(markupOf(data), data, List.of(rejected, processedPart())))
+        assertThatCode(() -> check.check(markupOf(data), data, List.of(rejected, part(true))))
                 .doesNotThrowAnyException();
         verifyNoInteractions(priceList);
+    }
+
+    /** Отказ лишнего пакета не делает применённую передачу отклонённой: следующий лишний пакет — тоже лишний. */
+    @Test
+    void secondSurplusBatchOfAppliedTransfer_isSurplus() {
+        ObjectNode data = batch("{\"rowNumber\":1}");
+        InboundMessage firstSurplus = part(false);
+        firstSurplus.markFailed("лишний пакет");
+
+        assertThatThrownBy(() -> check.check(markupOf(data), data, List.of(processedPart(), firstSurplus)))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("лишний пакет: передача " + CID + " уже применена");
     }
 
     /** У финального сообщения строк нет; второе финальное сообщение — не забота этой проверки. */

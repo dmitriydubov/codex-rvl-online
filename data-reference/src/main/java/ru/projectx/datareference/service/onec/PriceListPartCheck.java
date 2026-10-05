@@ -35,17 +35,13 @@ final class PriceListPartCheck {
             return;
         }
         StreamSupport.stream(data.path(RECORD_SET).spliterator(), false).forEach(this::checkRow);
-        if (anyIn(parts, InboundStatus.PROCESSED)) {
+        if (parts.stream().anyMatch(part -> part.outcome().status() == InboundStatus.PROCESSED)) {
             throw new OneCFieldException("лишний пакет: передача %s уже применена".formatted(markup.cid()));
         }
     }
 
     private static boolean isBatchOfOpenTransfer(PriceListTransferMarkup markup, List<InboundMessage> parts) {
-        return markup.batchCount() == null && !anyIn(parts, InboundStatus.FAILED);
-    }
-
-    private static boolean anyIn(List<InboundMessage> parts, InboundStatus status) {
-        return parts.stream().anyMatch(part -> part.outcome().status() == status);
+        return markup.batchCount() == null && !PriceListTransfer.isRejected(parts);
     }
 
     private void checkRow(JsonNode row) {
