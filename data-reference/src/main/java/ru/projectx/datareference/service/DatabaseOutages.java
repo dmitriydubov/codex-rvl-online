@@ -3,6 +3,7 @@ package ru.projectx.datareference.service;
 import jakarta.persistence.PersistenceException;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.RecoverableDataAccessException;
@@ -59,6 +60,12 @@ public class DatabaseOutages {
             DataAccessResourceFailureException.class,
             RecoverableDataAccessException.class,
             TransientDataAccessException.class);
+
+    /** Признаки временного отказа: тип из перечня, истёкший лимит транзакции Hibernate, сеанс закрыт по простою. */
+    private static final List<Predicate<Throwable>> TEMPORARY_RULES = List.of(
+            DatabaseOutages::isTemporaryType,
+            DatabaseOutages::isExpiredHibernateTransaction,
+            DatabaseOutages::isSessionClosedForIdleTransaction);
 
     /** SQLSTATE закрытого по простою транзакции сеанса (PostgreSQL: idle_in_transaction_session_timeout). */
     private static final String IDLE_IN_TRANSACTION_SESSION_TIMEOUT = "25P03";
@@ -130,9 +137,11 @@ public class DatabaseOutages {
     }
 
     private static boolean isTemporary(Throwable failure) {
-        return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure))
-                || isExpiredHibernateTransaction(failure)
-                || isSessionClosedForIdleTransaction(failure);
+        return TEMPORARY_RULES.stream().anyMatch(rule -> rule.test(failure));
+    }
+
+    private static boolean isTemporaryType(Throwable failure) {
+        return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure));
     }
 
     private static boolean isSessionClosedForIdleTransaction(Throwable failure) {
