@@ -4,8 +4,6 @@ import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
 import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
-import java.time.Instant;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.LpuContract;
@@ -14,7 +12,6 @@ import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.service.onec.ImportResult;
 import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -31,49 +28,29 @@ import tools.jackson.databind.node.ObjectNode;
  * вместе с договором.
  */
 @Component
-public class ContragentServiceMapper implements StreamMapper {
+public class ContragentServiceMapper
+        extends OwnedCatalogStreamMapper<ContragentService, LpuContract, ContragentService.Details> {
 
-    private static final String OUTSIDE_CATALOG = "услуга по договору вне справочника: ";
-
-    private final SnapshotUpsert<ContragentService, ServiceUnderContract> upsert;
-    private final LpuContractRepository contractRepository;
-    private final Clock clock;
+    private final CatalogReference<LpuContract> contracts;
 
     public ContragentServiceMapper(
             ContragentServiceRepository repository,
             LpuContractRepository contractRepository,
             Clock clock) {
 
-        this.upsert = new SnapshotUpsert<>(repository::findByExternalId, ContragentServiceMapper::create,
-                ContragentServiceMapper::refresh, repository::save);
-        this.contractRepository = contractRepository;
-        this.clock = clock;
-    }
-
-    @Override
-    public OneCStream stream() {
-        return OneCStream.CONTRAGENT_SERVICES;
+        super(OneCStream.CONTRAGENT_SERVICES, repository::findByExternalId, ContragentService::create,
+                ContragentService::applySnapshot, repository::save, clock);
+        this.contracts = new CatalogReference<>(contractRepository::findByExternalId,
+                "услуга по договору вне справочника: ");
     }
 
     @Override
     public ImportResult apply(ObjectNode data) {
-        UUID ownerId = OneCValues.requiredUuid(data, "ownerId");
-        return contractRepository.findByExternalId(ownerId)
-                .map(contract -> applyUnder(contract, data))
-                .orElseGet(() -> ImportResult.skipped(OUTSIDE_CATALOG + ownerId));
+        return contracts.applyIfKnown(OneCValues.requiredUuid(data, "ownerId"), contract -> applyUnder(contract, data));
     }
 
     private ImportResult applyUnder(LpuContract contract, ObjectNode data) {
-        UUID externalId = OneCValues.requiredUuid(data, "id");
-        return upsert.apply(externalId, new ServiceUnderContract(contract, detailsOf(data)), clock.instant());
-    }
-
-    private static ContragentService create(UUID externalId, ServiceUnderContract offered, Instant now) {
-        return ContragentService.create(externalId, offered.contract(), offered.details(), now);
-    }
-
-    private static void refresh(ContragentService service, ServiceUnderContract offered, Instant now) {
-        service.applySnapshot(offered.contract(), offered.details(), now);
+        return upsertUnder(contract, OneCValues.requiredUuid(data, "id"), detailsOf(data));
     }
 
     private static ContragentService.Details detailsOf(ObjectNode data) {
@@ -82,9 +59,5 @@ public class ContragentServiceMapper implements StreamMapper {
                 textOrNull(data, "code"),
                 OneCValues.requiredText(data, "name"),
                 OneCValues.flag(data, "deleteMark"));
-    }
-
-    /** Договор, по которому оказывается услуга, и реквизиты услуги из одного сообщения. */
-    private record ServiceUnderContract(LpuContract contract, ContragentService.Details details) {
     }
 }

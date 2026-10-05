@@ -1,12 +1,14 @@
 package ru.projectx.datareference.mapper;
 
+import static ru.projectx.datareference.mapper.OptionalFields.amountOrNull;
+import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
+import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
+
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.StreamSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,26 +24,25 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * ТЗ-9: прейскурант по одной услуге, полным срезом.
+ * Замещает прейскурант санатория по одной услуге полным срезом из 1С:УСК (ТЗ-9).
  *
- * <p><b>Не реализует {@code StreamMapper}</b>, в отличие от остальных мапперов, и это
- * не оплошность: сюда приходит не сообщение источника, а уже <i>собранная передача</i> —
- * объединение нескольких сообщений. Сборкой занимается
- * {@code service.onec.PriceListTransferAssembler}; здесь остаётся бизнес-часть: чья это
- * услуга и замещение цен.
+ * <p>В отличие от остальных мапперов, этот не разбирает отдельное сообщение источника. 1С присылает
+ * прейскурант по услуге несколькими сообщениями, и сюда приходит уже собранная передача: строки всех
+ * её сообщений вместе. Собирает передачу {@code service.onec.PriceListTransferAssembler}, а здесь
+ * остаются правила справочника: принимаются только цены услуг, которые есть в справочнике, и старые
+ * цены услуги целиком заменяются новыми.
  *
- * <p>Пустой набор строк — <b>легальный случай</b> ({@code countMessages = 0}): прайс
- * по услуге очищается. Поэтому пустота не повод для пропуска, и различать «цен нет»
- * и «передача неполная» здесь не нужно — неполную передачу сборщик сюда не отдаёт.
+ * <p>Пустой набор строк — штатный случай: 1С так сообщает, что цен по услуге больше нет, и прейскурант
+ * услуги очищается. Неполную передачу сборщик сюда не отдаёт, поэтому пустота здесь всегда означает
+ * «цен нет».
  */
 @Component
 public class PriceListMapper {
 
     private static final Logger log = LoggerFactory.getLogger(PriceListMapper.class);
-    private static final String RECORD_SET = "recordSet";
 
     private final PriceListItemRepository repository;
-    private final ContragentServiceRepository serviceRepository;
+    private final CatalogReference<ContragentService> services;
     private final Clock clock;
 
     public PriceListMapper(
@@ -50,58 +51,66 @@ public class PriceListMapper {
             Clock clock) {
 
         this.repository = repository;
-        this.serviceRepository = serviceRepository;
+        this.services = new CatalogReference<>(serviceRepository::findByExternalId, "прайс по услуге вне справочника: ");
         this.clock = clock;
     }
 
     /**
-     * Замещает прайс по услуге целиком.
+     * Замещает прейскурант услуги целиком. Услуга вне справочника даёт пропуск с GUID услуги в причине,
+     * и прежние цены не трогаются.
      *
-     * @param transfer собранная передача: {@code keyValue} с GUID услуги и
-     *                 {@code recordSet} со строками всех пакетов по возрастанию номера
+     * @param transfer собранная передача: {@code keyValue} с GUID услуги и {@code recordSet} со строками
+     *                 всех её сообщений по возрастанию номера строки
+     * @throws OneCFieldException если в передаче нет GUID услуги или строка без цены или даты начала
      */
     public ImportResult apply(ObjectNode transfer) {
-        UUID serviceExternalId = OneCValues.requiredUuid(transfer, "keyValue");
-        Optional<ContragentService> service = serviceRepository.findByExternalId(serviceExternalId);
-        if (service.isEmpty()) {
-            return ImportResult.skipped("прайс по услуге вне справочника: " + serviceExternalId);
-        }
+        return services.applyIfKnown(OneCValues.requiredUuid(transfer, "keyValue"),
+                service -> replacePrices(service, transfer));
+    }
 
+    private ImportResult replacePrices(ContragentService service, ObjectNode transfer) {
         Instant now = clock.instant();
-        int removed = repository.deleteByServiceId(service.get().id());
+        int removed = repository.deleteByServiceId(service.id());
         List<PriceListItem> items = rowsOf(transfer).stream()
-                .map(row -> PriceListItem.of(service.get(), row, now))
+                .map(row -> PriceListItem.of(service, row, now))
                 .toList();
         repository.saveAll(items);
 
-        log.debug("прайс услуги {}: снято строк {}, записано {}", serviceExternalId, removed, items.size());
+        log.debug("прайс услуги {}: снято строк {}, записано {}", service.externalId(), removed, items.size());
         return ImportResult.applied();
     }
 
     private static List<PriceListItem.Row> rowsOf(ObjectNode transfer) {
-        return StreamSupport.stream(transfer.path(RECORD_SET).spliterator(), false)
+        return StreamSupport.stream(transfer.path("recordSet").spliterator(), false)
                 .map(PriceListMapper::rowOf)
                 .toList();
     }
 
     /**
-     * У двух дат периода разные правила: начало обязательно, а конец допускает открытую
-     * дату — {@code 3000-01-01} источника означает «пока не заменят» и превращается
-     * в пусто общим правилом преобразования.
+     * У двух дат периода разные правила. Начало обязательно, а конец может быть открытым: дата
+     * {@code 3000-01-01} у 1С значит «пока цену не заменят», и общее правило чтения дат делает её пустой.
+     * Цена и дата начала читаются первыми, чтобы отказ называл их, а не другое поле.
      */
     private static PriceListItem.Row rowOf(JsonNode row) {
-        BigDecimal price = OneCValues.amount(row, "price")
-                .orElseThrow(() -> new OneCFieldException("в строке прайса нет цены"));
-        LocalDate validFrom = OneCValues.date(row, "period")
-                .orElseThrow(() -> new OneCFieldException("в строке прайса нет даты начала действия"));
-
+        BigDecimal price = priceOf(row);
+        LocalDate validFrom = validFromOf(row);
         return new PriceListItem.Row(
-                OneCValues.text(row, "nameService").orElse(null),
-                OneCValues.text(row, "serviceCode").orElse(null),
-                OneCValues.text(row, "serviceCodeForPF").orElse(null),
+                textOrNull(row, "nameService"),
+                textOrNull(row, "serviceCode"),
+                textOrNull(row, "serviceCodeForPF"),
                 price,
-                OneCValues.amount(row, "priceWithDiscount").orElse(null),
+                amountOrNull(row, "priceWithDiscount"),
                 validFrom,
-                OneCValues.date(row, "periodTo").orElse(null));
+                dateOrNull(row, "periodTo"));
+    }
+
+    private static BigDecimal priceOf(JsonNode row) {
+        return OneCValues.amount(row, "price")
+                .orElseThrow(() -> new OneCFieldException("в строке прайса нет цены"));
+    }
+
+    private static LocalDate validFromOf(JsonNode row) {
+        return OneCValues.date(row, "period")
+                .orElseThrow(() -> new OneCFieldException("в строке прайса нет даты начала действия"));
     }
 }
