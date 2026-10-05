@@ -9,7 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.projectx.datareference.config.InboundRetryProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -27,6 +30,8 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -55,6 +60,8 @@ class PriceListTransferAssemblerTest {
 
     private final List<InboundMessage> correlated = new ArrayList<>();
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     @Test
     void handlesPriceListStream() {
         assertThat(assembler().stream()).isEqualTo(OneCStream.PRICE_LISTS);
@@ -74,6 +81,7 @@ class PriceListTransferAssemblerTest {
         assertThat(batch.transferPart().rowCount()).isEqualTo(2);
         verify(repository).save(batch);
         verify(priceListMapper, never()).apply(any());
+        assertThat(transitions(InboundStatus.BUFFERED)).isEqualTo(1.0);
     }
 
     /** Финальное сообщение узнаётся по наличию счётчиков, а не по их значению: ноль пакетов тоже легален. */
@@ -109,6 +117,8 @@ class PriceListTransferAssemblerTest {
             assertThat(message.outcome().processedAt()).isEqualTo(NOW);
         });
         verifySavedAfterBuffering(finalMessage, first, second);
+        assertThat(transitions(InboundStatus.BUFFERED)).isEqualTo(1.0);
+        assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(3.0);
     }
 
     @Test
@@ -126,6 +136,7 @@ class PriceListTransferAssemblerTest {
             assertThat(message.outcome().processedAt()).isEqualTo(NOW);
         });
         verifySavedAfterBuffering(finalMessage, batch);
+        assertThat(transitions(InboundStatus.SKIPPED)).isEqualTo(2.0);
     }
 
     /** Счётчики не сошлись — вся передача в ошибку, а прайс не применяется вовсе. */
@@ -144,6 +155,7 @@ class PriceListTransferAssemblerTest {
         });
         verifySavedAfterBuffering(finalMessage, batch);
         verify(priceListMapper, never()).apply(any());
+        assertThat(transitions(InboundStatus.FAILED)).isEqualTo(2.0);
     }
 
     /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
@@ -184,6 +196,12 @@ class PriceListTransferAssemblerTest {
         }
     }
 
+    /** Сколько переходов в статус посчитано по потоку прайсов. */
+    private double transitions(InboundStatus status) {
+        return meters.get(InboundTransitionMetrics.TRANSITIONS)
+                .tag("stream", OneCStream.PRICE_LISTS.name()).tag("status", status.name()).counter().count();
+    }
+
     private InboundMessage buffered(String data, Integer batchCount, int rowCount) {
         InboundMessage message = message(data);
         message.markBuffered(CID, batchCount, rowCount);
@@ -205,7 +223,11 @@ class PriceListTransferAssemblerTest {
     }
 
     private PriceListTransferAssembler assembler() {
-        return new PriceListTransferAssembler(repository, priceListMapper, json, Clock.fixed(NOW, ZoneOffset.UTC));
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        InboundMessageService inboundMessageService = new InboundMessageService(
+                repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
+                new InboundTransitionMetrics(meters));
+        return new PriceListTransferAssembler(inboundMessageService, priceListMapper, json, clock);
     }
 
     private static String batchData(String... rows) {

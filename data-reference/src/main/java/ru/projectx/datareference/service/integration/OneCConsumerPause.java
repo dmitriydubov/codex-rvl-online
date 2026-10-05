@@ -47,16 +47,18 @@ public class OneCConsumerPause {
     private final ObjectProvider<RabbitListenerEndpointRegistry> containers;
     private final IngestStorageProbe probe;
     private final Clock clock;
+    private final OneCIngestMetrics metrics;
     /** Монитор, под которым меняется состояние паузы: пауза и возобновление не пересекаются. */
     private final Object lifecycle = new Object();
     private volatile @Nullable PauseState state;
 
-    public OneCConsumerPause(
-            ObjectProvider<RabbitListenerEndpointRegistry> containers, IngestStorageProbe probe, Clock clock) {
+    public OneCConsumerPause(ObjectProvider<RabbitListenerEndpointRegistry> containers, IngestStorageProbe probe,
+            Clock clock, OneCIngestMetrics metrics) {
 
         this.containers = containers;
         this.probe = probe;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /** Останавливает работающих потребителей очередей 1С:УСК; во время паузы ничего не делает. */
@@ -69,6 +71,7 @@ public class OneCConsumerPause {
             Map<String, CompletableFuture<Void>> stops = runningQueues().stream()
                     .collect(Collectors.toMap(queue -> queue, queue -> new CompletableFuture<>()));
             state = PauseState.of(outage, clock.instant(), stops);
+            metrics.paused();
             log.warn("приём из 1С:УСК приостановлен до восстановления базы: {} SQLSTATE {}; останавливаются потребители {}",
                     outage.failureType(), outage.sqlState(), stops.keySet());
             stops.forEach(this::stopConsumer);
@@ -102,9 +105,14 @@ public class OneCConsumerPause {
     }
 
     /**
-     * Пауза снимается до запуска: первый же запущенный потребитель может снова отказать и поставить новую
-     * паузу, и она не должна пропасть вместе со старой. Пауза, прочитанная до проверки базы, к этому моменту
-     * могла смениться другой — тогда возобновлять нечего, новой паузой займётся следующая проверка.
+     * Работает под монитором {@code lifecycle}. Потребители принимают сообщения в своих потоках, и первый же
+     * запущенный может снова получить отказ базы. Его вызов {@link #pause} ждёт на том же мониторе, пока запуск
+     * всех контейнеров не закончится, и застаёт паузу уже снятой — поэтому ставит новую, а не пропадает вместе
+     * со старой. Защищает такой отказ именно монитор: в каком порядке внутри него снимается пауза и запускаются
+     * контейнеры, для другого потока не видно.
+     *
+     * <p>Пауза, прочитанная до проверки базы, к этому моменту могла смениться другой — тогда возобновлять
+     * нечего, новой паузой займётся следующая проверка.
      */
     private void resume(PauseState current) {
         if (!current.equals(state)) {

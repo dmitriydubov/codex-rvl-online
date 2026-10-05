@@ -21,7 +21,7 @@ import ru.projectx.datareference.service.QuarantineService;
  * </ul>
  *
  * <p>В журнал идут тип исключения и код, но не текст ошибки: ошибка вставки печатает параметры запроса, а
- * этим путём проходят полисы с персональными данными.
+ * этим путём проходят полисы с персональными данными. Исход доставки считает {@link OneCIngestMetrics}.
  */
 @Component
 class OneCStorageFailures {
@@ -31,11 +31,15 @@ class OneCStorageFailures {
     private final QuarantineService quarantine;
     private final OneCConsumerPause consumers;
     private final IngestProperties properties;
+    private final OneCIngestMetrics metrics;
 
-    OneCStorageFailures(QuarantineService quarantine, OneCConsumerPause consumers, IngestProperties properties) {
+    OneCStorageFailures(QuarantineService quarantine, OneCConsumerPause consumers, IngestProperties properties,
+            OneCIngestMetrics metrics) {
+
         this.quarantine = quarantine;
         this.consumers = consumers;
         this.properties = properties;
+        this.metrics = metrics;
     }
 
     /** Отвечает брокеру за сообщение, сырьё которого не записалось из-за {@code failure}. */
@@ -43,7 +47,7 @@ class OneCStorageFailures {
         switch (OneCStorageFailure.of(failure)) {
             case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
             case OneCStorageFailure.DuplicateRace ignored -> returnAfterPause(delivery, messageId, failure);
-            case OneCStorageFailure.Outage outage -> pauseConsumers(messageId, outage.outage());
+            case OneCStorageFailure.Outage outage -> pauseConsumers(delivery, messageId, outage.outage());
         }
     }
 
@@ -54,6 +58,7 @@ class OneCStorageFailures {
      */
     private void quarantine(OneCDelivery delivery, UUID messageId, String sqlState) throws IOException {
         if (storeInQuarantine(delivery, messageId, sqlState)) {
+            metrics.record(delivery, IngestOutcome.QUARANTINED);
             delivery.acknowledge();
         }
     }
@@ -65,7 +70,7 @@ class OneCStorageFailures {
             return true;
         }
         catch (RuntimeException storageFailure) {
-            return quarantinedByConcurrentDelivery(messageId, storageFailure);
+            return quarantinedByConcurrentDelivery(delivery, messageId, storageFailure);
         }
     }
 
@@ -74,12 +79,14 @@ class OneCStorageFailures {
      * упала на ключе (23505). Запись уже есть — первая доставка её закоммитила, иначе ключ не столкнулся бы, — и
      * второй достаточно подтверждения. Любой другой отказ записи карантина — отказ хранилища.
      */
-    private boolean quarantinedByConcurrentDelivery(UUID messageId, RuntimeException storageFailure) {
+    private boolean quarantinedByConcurrentDelivery(
+            OneCDelivery delivery, UUID messageId, RuntimeException storageFailure) {
+
         if (OneCStorageFailure.of(storageFailure) instanceof OneCStorageFailure.DuplicateRace) {
             log.debug("сообщение {} уже положила в карантин параллельная доставка", messageId);
             return true;
         }
-        pauseConsumers(messageId, OneCStorageFailure.Outage.of(storageFailure).outage());
+        pauseConsumers(delivery, messageId, OneCStorageFailure.Outage.of(storageFailure).outage());
         return false;
     }
 
@@ -94,11 +101,13 @@ class OneCStorageFailures {
         log.warn("сырьё сообщения {} не сохранено, вернём источнику через {}: {}",
                 messageId, properties.duplicateDeliveryBackoff(), failure.getClass().getName());
         pauseBeforeRedelivery();
+        metrics.record(delivery, IngestOutcome.RETURNED);
         delivery.returnToQueue();
     }
 
     /** Сообщение остаётся неподтверждённым намеренно: в очередь его вернёт остановка контейнера. */
-    private void pauseConsumers(UUID messageId, StorageOutage outage) {
+    private void pauseConsumers(OneCDelivery delivery, UUID messageId, StorageOutage outage) {
+        metrics.record(delivery, IngestOutcome.STORAGE_OUTAGE);
         log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, outage.failureType(), outage.sqlState());
         consumers.pause(outage);
     }

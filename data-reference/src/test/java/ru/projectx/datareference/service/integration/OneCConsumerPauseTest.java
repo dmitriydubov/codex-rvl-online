@@ -16,6 +16,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.time.Clock;
@@ -80,6 +81,8 @@ class OneCConsumerPauseTest {
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
     @BeforeEach
     void captureLog() {
         logged.start();
@@ -105,6 +108,21 @@ class OneCConsumerPauseTest {
         when(disabled.isRunning()).thenReturn(false);
         stopCompletesAtOnce(policies);
         stopCompletesAtOnce(mkb10);
+    }
+
+    /** Счётчик остановок растёт на каждую новую паузу и не растёт на повторный отказ во время паузы. */
+    @Test
+    void pauseCounter_countsNewPausesOnly() {
+        OneCConsumerPause pause = pause();
+
+        pause.pause(CONNECTION_LOST);
+        pause.pause(LOCK_TIMEOUT);
+        assertThat(meters.get(OneCIngestMetrics.PAUSES).counter().count()).isEqualTo(1.0);
+
+        when(probe.storageAvailable()).thenReturn(true);
+        pause.resumeIfStorageAvailable();
+        pause.pause(LOCK_TIMEOUT);
+        assertThat(meters.get(OneCIngestMetrics.PAUSES).counter().count()).isEqualTo(2.0);
     }
 
     /** Остановка — с обратным вызовом: контейнер отменяет потребителя сразу, а конца обработки ждёт не в потоке слушателя. */
@@ -390,7 +408,8 @@ class OneCConsumerPauseTest {
     }
 
     private OneCConsumerPause pause() {
-        return new OneCConsumerPause(registryProvider, probe, Clock.fixed(NOW, ZoneOffset.UTC));
+        return new OneCConsumerPause(
+                registryProvider, probe, Clock.fixed(NOW, ZoneOffset.UTC), IngestTestMetrics.on(meters));
     }
 
     private static Logger pauseLog() {

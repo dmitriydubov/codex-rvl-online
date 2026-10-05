@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -10,6 +11,7 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 /**
  * Сохраняет сообщения 1С в том виде, в каком они пришли, и записывает, чем закончилась их обработка.
@@ -17,7 +19,8 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
  * <p>Здесь в одном месте решается, что делать с сообщением дальше. После временной ошибки назначается следующая
  * попытка через задержку из настроенного списка повторов. Постоянная ошибка сразу завершает обработку отказом.
  * Пропуск записывается с причиной. Ни слушатель очереди, ни разбор потока этих решений не принимают, иначе
- * правила в разных местах со временем разойдутся.
+ * правила в разных местах со временем разойдутся. Каждый записанный здесь исход разбора попадает в счётчик
+ * переходов статусов ({@link InboundTransitionMetrics}).
  */
 @Service
 public class InboundMessageService {
@@ -25,11 +28,15 @@ public class InboundMessageService {
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
     private final Clock clock;
+    private final InboundTransitionMetrics transitions;
 
-    public InboundMessageService(InboundMessageRepository repository, InboundRetryProperties retryProperties, Clock clock) {
+    public InboundMessageService(InboundMessageRepository repository, InboundRetryProperties retryProperties,
+            Clock clock, InboundTransitionMetrics transitions) {
+
         this.repository = repository;
         this.retryProperties = retryProperties;
         this.clock = clock;
+        this.transitions = transitions;
     }
 
     /**
@@ -54,7 +61,9 @@ public class InboundMessageService {
      */
     @Transactional
     public void markProcessed(UUID messageId) {
-        require(messageId).markProcessed(clock.instant());
+        InboundMessage message = require(messageId);
+        message.markProcessed(clock.instant());
+        transitions.record(message);
     }
 
     /**
@@ -65,7 +74,9 @@ public class InboundMessageService {
      */
     @Transactional
     public void markSkipped(UUID messageId, String reason) {
-        require(messageId).markSkipped(reason, clock.instant());
+        InboundMessage message = require(messageId);
+        message.markSkipped(reason, clock.instant());
+        transitions.record(message);
     }
 
     /**
@@ -84,6 +95,7 @@ public class InboundMessageService {
                 delay -> message.markRetrying(error, clock.instant().plus(delay)),
                 () -> message.markFailed("лестница повторов исчерпана на попытке %d: %s"
                         .formatted(nextAttempt, error)));
+        transitions.record(message);
     }
 
     /**
@@ -94,7 +106,28 @@ public class InboundMessageService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordPermanentFailure(UUID messageId, String error) {
-        require(messageId).markFailed(error);
+        InboundMessage message = require(messageId);
+        message.markFailed(error);
+        transitions.record(message);
+    }
+
+    /**
+     * Все сообщения многочастной передачи {@code correlationId}: сборщику прайсов нужна передача целиком. Читает в
+     * транзакции вызывающего — той же, в которой сборщик потом запишет исход передачи.
+     */
+    @Transactional
+    public List<InboundMessage> transferParts(UUID correlationId) {
+        return repository.findByCorrelationId(correlationId);
+    }
+
+    /**
+     * Сохраняет статус, который сборщик прайсов поставил сообщению своей передачи: в буфер, разобрано, пропущено или
+     * отказ. Работает в транзакции вызывающего — исход передачи и изменения прайса фиксируются вместе.
+     */
+    @Transactional
+    public void saveTransferPart(InboundMessage message) {
+        repository.save(message);
+        transitions.record(message);
     }
 
     private InboundMessage require(UUID messageId) {
