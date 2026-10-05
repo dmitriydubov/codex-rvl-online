@@ -269,7 +269,7 @@
 |---|---|
 | Правила и контракт `data-reference` | `contract-service/CLAUDE.md`: «Контракт 1С:УСК», «Соседи по контуру», «Структура пакетов», «Как пишем код» |
 | Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/1C_data/*.pdf`, `contract-service/project_files/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ) |
-| REST `data-reference` | `project_files/ТЗ API Data-reference.pdf` |
+| REST `data-reference` | `project_files/ТЗ API Data-reference.pdf` вместе с `project_files/Журнал решений REST.md` (правила В-4…В-9 и решения владельца; при расхождении прав журнал); предлагаемые правки ТЗ — `project_files/edit/` |
 | Точки интеграции, схемы процесса | `project_files/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/RVL on-line. Схемы процесса и флоу.pdf` |
 | Структуры данных, ФТ, вопросы и ответы | `project_files/Структура БД v.0.2.pdf`, `project_files/Структура данных (Сервис договоров).pdf`, `project_files/Структура данных Сервис Заявок v.2.pdf`, `project_files/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/Вопросы и ответы по РВЛ.pdf` |
 | ЛК застрахованного (`contract-service`) | `contract-service/project_files/` (требования к лендингу и ЛК, примеры документов) |
