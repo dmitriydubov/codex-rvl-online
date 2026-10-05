@@ -1,7 +1,6 @@
 package ru.projectx.datareference.service;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
@@ -41,16 +40,16 @@ public class ServicePriceQueryService implements ServicePriceReads {
         if (!checkOut.isAfter(checkIn)) {
             throw new InvalidRequestException(CHECK_OUT, CHECK_OUT_AFTER_CHECK_IN);
         }
-        requireNotLongerThanAllowed(checkIn, checkOut);
         StayPeriod period = new StayPeriod(checkIn, checkOut);
+        requireNotLongerThanAllowed(period);
         PricedService priced = lookup.source(serviceId, period);
         return ServicePriceResponses.of(priced.service(), period,
                 ServicePriceCalculator.calculate(serviceId, period, priced.lines()));
     }
 
-    private void requireNotLongerThanAllowed(LocalDate checkIn, LocalDate checkOut) {
+    private void requireNotLongerThanAllowed(StayPeriod period) {
         int maxNights = api.price().maxNights();
-        if (ChronoUnit.DAYS.between(checkIn, checkOut) > maxNights) {
+        if (period.nights() > maxNights) {
             throw new InvalidRequestException(CHECK_OUT, STAY_LIMIT_PREFIX + maxNights + STAY_LIMIT_SUFFIX);
         }
     }

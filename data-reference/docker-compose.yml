@@ -46,7 +46,7 @@
 # с профилем app, и данные брокера; только базу — docker volume rm data-reference_postgres-data
 # после down без -v.
 #
-# В облачной сессии Claude Code контейнеры не выходят в сеть, а Docker Hub отвечает 429:
+# Там, где контейнеры не выходят в сеть, а Docker Hub отвечает 429 (Too Many Requests):
 # в .env — JAR_SOURCE=host и JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jre,
 # образ базы — заранее из зеркала:
 #   docker pull mirror.gcr.io/library/postgres:16.10-alpine
