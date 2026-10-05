@@ -37,3 +37,8 @@ ru.projectx.datareference.dto.InsuranceContractResponse#of                   Rem
 # rvlContract() contains "РВЛ", dmsProduct() contains "Личное страхование"; Optional.empty fails each contains.
 ru.projectx.datareference.config.OneCContractProperties#rvlActivity                 EmptyObjectReturnValsMutator       # filledValues...: rvlActivity() contains GUID
 ru.projectx.datareference.config.OneCContractProperties#filled                      EmptyObjectReturnValsMutator       # filledValues...: rvlContract()/dmsProduct() contain values
+
+# PriceListTransferMarkupTest (Ш16, PR #48): finalMessage_carriesCountersOfWholeTransfer and finalMessageWithZeroBatches_isStillFinal
+# (final-message return), batch_hasNoExpectedBatches_andCountsItsOwnRows (batch return) — each asserts
+# isEqualTo(new PriceListTransferMarkup(...)), which fails on a null actual. Verified by the coordinator 2026-10-05.
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                   NullReturnValsMutator              # finalMessage_carries.../batch_hasNoExpectedBatches...: isEqualTo(new PriceListTransferMarkup(...)) on null
