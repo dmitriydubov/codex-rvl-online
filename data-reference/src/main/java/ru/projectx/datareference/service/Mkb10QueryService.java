@@ -8,11 +8,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
-import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.repository.Mkb10Repository;
-import ru.projectx.datareference.repository.Mkb10Row;
 
 /**
  * Справочник МКБ-10 для сервиса Заявок в двух режимах: подсказка по строке и раскрытие перечня кодов разом.
@@ -23,38 +20,40 @@ import ru.projectx.datareference.repository.Mkb10Row;
  * и показать их надо. Фильтра по ЛПУ (лечебно-профилактическому учреждению) нет: связь кодов с ЛПУ
  * не приходит ни одним потоком из 1С.
  *
- * <p>Строка поиска и перечень кодов ограничены сверху по объёму (см. {@link SearchInputLimits}); эти
- * пределы проверяются первыми, до обрезки пробелов и удаления повторов.
+ * <p>Здесь проверяется вход, а читает базу {@link Mkb10Lookup}. Сам этот класс транзакцию не открывает
+ * намеренно: неверный параметр отклоняется ошибкой вызывающего, даже когда база недоступна. Верхние пределы
+ * строки и перечня проверяются первыми, до обрезки пробелов и удаления повторов (см. {@link SearchInputLimits}).
  */
 @Service
 public class Mkb10QueryService implements Mkb10Reads {
 
     private static final Pattern CODE_START = Pattern.compile("^[A-Za-z][0-9]");
+    private static final String CODES = "codes";
+    private static final String CODE_SEPARATOR = ",";
 
-    private final Mkb10Repository mkb10;
+    private final Mkb10Lookup lookup;
     private final ReferenceApiProperties api;
 
-    public Mkb10QueryService(Mkb10Repository mkb10, ReferenceApiProperties api) {
-        this.mkb10 = mkb10;
+    public Mkb10QueryService(Mkb10Lookup lookup, ReferenceApiProperties api) {
+        this.lookup = lookup;
         this.api = api;
     }
 
     @Override
-    @RestReadTransaction
     public Mkb10Response search(String rawQuery, @Nullable Integer requestedLimit) {
         SearchInputLimits.requireQueryNotLongerThan(rawQuery, api.mkb10().maxQueryLength());
         Limit limit = Limit.of(ResultLimits.resolve(requestedLimit, api.mkb10().defaultLimit(), api.mkb10().maxLimit()));
         String query = rawQuery.trim();
-        if (query.length() < api.mkb10().minQueryLength()) {
-            throw new InvalidRequestException("query", "не короче " + api.mkb10().minQueryLength() + " символов");
-        }
-        return response(CODE_START.matcher(query).lookingAt() ? byCodePrefix(query, limit) : byName(query, limit));
+        SearchInputLimits.requireQueryNotShorterThan(query, api.mkb10().minQueryLength());
+        return CODE_START.matcher(query).lookingAt()
+                ? lookup.activeByCodePrefix(query, limit)
+                : lookup.activeByName(query, limit);
     }
 
     @Override
-    @RestReadTransaction
     public Mkb10Response byCodes(List<String> rawCodes) {
         SearchInputLimits.requireCodesNotMoreThan(rawCodes, api.mkb10().maxCodes());
+        requireOneCodePerValue(rawCodes);
         List<String> codes = rawCodes.stream()
                 .map(String::trim)
                 .filter(Predicate.not(String::isEmpty))
@@ -62,23 +61,19 @@ public class Mkb10QueryService implements Mkb10Reads {
                 .distinct()
                 .toList();
         if (codes.isEmpty()) {
-            throw new InvalidRequestException("codes", "хотя бы один код");
+            throw new InvalidRequestException(CODES, "хотя бы один код");
         }
-        return response(mkb10.findByCodes(codes));
+        return lookup.byCodes(codes);
     }
 
-    private List<Mkb10Row> byCodePrefix(String query, Limit limit) {
-        return mkb10.findActiveByCodePrefix(LikePatterns.prefix(query.toUpperCase(Locale.ROOT)), limit);
-    }
-
-    private List<Mkb10Row> byName(String query, Limit limit) {
-        return mkb10.findActiveByNamePattern(LikePatterns.substring(query.toLowerCase(Locale.ROOT)), limit);
-    }
-
-    private static Mkb10Response response(List<Mkb10Row> rows) {
-        return new Mkb10Response(rows.stream()
-                .map(row -> new Mkb10Code(row.id(), row.externalId(), row.code(), row.name(),
-                        row.hierarchyLevel(), row.parentCode(), row.isArchive()))
-                .toList());
+    /**
+     * В коде МКБ-10 запятой не бывает, поэтому код с запятой — ошибка вызывающего. Молча искать такой код значит
+     * вернуть неполный ответ. Так выглядит перечень через запятую, присланный в одном из нескольких параметров
+     * {@code codes}: перечень делится на коды, только когда он пришёл единственным параметром.
+     */
+    private static void requireOneCodePerValue(List<String> codes) {
+        if (codes.stream().anyMatch(code -> code.contains(CODE_SEPARATOR))) {
+            throw new InvalidRequestException(CODES, "коды через запятую передаются одним параметром codes");
+        }
     }
 }
