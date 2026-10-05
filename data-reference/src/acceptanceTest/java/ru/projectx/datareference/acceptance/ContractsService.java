@@ -3,8 +3,10 @@ package ru.projectx.datareference.acceptance;
 import io.cucumber.spring.ScenarioScope;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.ScopedProxyMode;
@@ -23,8 +25,8 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * для него ({@code spring-boot-resttestclient}) — отдельный модуль, которого нет
  * на classpath и в Nexus контура.
  *
- * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Прежний клиент на
- * {@code HttpURLConnection} не умеет метод PATCH, а сценарии отказа по методу его отправляют.
+ * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Он выбран потому, что сценарии отказа
+ * по методу отправляют PATCH, а клиент на {@code HttpURLConnection} этот метод не умеет.
  *
  * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
  * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон
@@ -37,6 +39,8 @@ public class ContractsService {
     /** Переменная URI-шаблона: id, полученный на шаге «Дано». */
     private static final String OBTAINED_ID = "{id}";
     private static final String PATH_ROOT = "/";
+    private static final String QUERY_START = "?";
+    private static final String PARAMETER_SEPARATOR = "&";
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
@@ -62,6 +66,17 @@ public class ContractsService {
         return exchange(HttpMethod.GET, path, headers -> headers.set(ServiceResponse.REQUEST_ID, requestId));
     }
 
+    /**
+     * Запрос с ещё одним параметром, значение которого уходит переменной URI-шаблона. Клиент кодирует такое
+     * значение целиком: пробел становится {@code %20}, запятая — {@code %2C}, кириллица — байтами UTF-8, и
+     * сервер получает ровно ту строку, которую собрал шаг.
+     */
+    public ServiceResponse requestWithParameter(String path, String parameter, String value) {
+        String separator = path.contains(QUERY_START) ? PARAMETER_SEPARATOR : QUERY_START;
+        String template = path + separator + parameter + "={" + parameter + "}";
+        return exchange(HttpMethod.GET, template, headers -> { }, value);
+    }
+
     public ServiceResponse send(HttpMethod method, String path) {
         return exchange(method, path, headers -> { });
     }
@@ -84,10 +99,14 @@ public class ContractsService {
                 .orElseThrow(() -> new IllegalStateException("сценарий не получил id на шаге «Дано»"));
     }
 
-    private ServiceResponse exchange(HttpMethod method, String path, Consumer<HttpHeaders> headers) {
+    private ServiceResponse exchange(
+            HttpMethod method, String path, Consumer<HttpHeaders> headers, Object... parameterValues) {
+
         requireAbsolutePath(path);
+        Object[] variables = Stream.concat(Arrays.stream(uriVariables(path)), Arrays.stream(parameterValues))
+                .toArray();
         lastResponse = ServiceResponse.of(
-                client.method(method).uri(path, uriVariables(path)).headers(headers).exchange().returnResult());
+                client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
         return lastResponse;
     }
 
