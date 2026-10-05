@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service.onec;
 
+import java.util.UUID;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -29,9 +30,10 @@ class MappedStreamHandler implements StreamHandler {
     @Override
     public ImportResult handle(InboundMessage message, ObjectNode data) {
         ImportResult result = mapper.apply(data);
+        UUID messageId = message.receipt().messageId();
         switch (result) {
-            case ImportResult.Applied ignored -> inboundMessageService.markProcessed(message.messageId());
-            case ImportResult.Skipped skipped -> inboundMessageService.markSkipped(message.messageId(), skipped.reason());
+            case ImportResult.Applied ignored -> inboundMessageService.markProcessed(messageId);
+            case ImportResult.Skipped skipped -> inboundMessageService.markSkipped(messageId, skipped.reason());
         }
         return result;
     }

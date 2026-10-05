@@ -98,14 +98,14 @@ class ConsumerStandTest {
     }
 
     /**
-     * Страхователь — пропуск с причиной, а не ошибка: так ТЗ-3 отличает «санаторием
-     * не стал» от «санатория не присылали» (contract-service/CLAUDE.md), строка
-     * в {@code insurers} при этом создана.
+     * Страхователь в потоке контрагентов записывается пропуском с причиной, а не ошибкой. Так в базе видно,
+     * что контрагент пришёл, но санаторием не оказался, а не что санатория не присылали. Строка в таблице
+     * {@code insurers} при этом создаётся.
      */
     @Test
     void seed_isImportedByScheduler() {
         assertThat(inboundMessages.findAll())
-                .extracting(message -> message.messageId().toString(), InboundMessage::status)
+                .extracting(message -> message.receipt().messageId().toString(), inbound -> inbound.outcome().status())
                 .containsExactlyInAnyOrder(
                         tuple(SANATORIUM_MESSAGE, InboundStatus.PROCESSED),
                         tuple(INSURER_MESSAGE, InboundStatus.SKIPPED),
@@ -113,9 +113,9 @@ class ConsumerStandTest {
                         tuple(PROGRAM_MESSAGE, InboundStatus.PROCESSED),
                         tuple(POLICY_MESSAGE, InboundStatus.PROCESSED));
         assertThat(inboundMessages.findAll())
-                .filteredOn(message -> message.status() == InboundStatus.SKIPPED)
+                .filteredOn(message -> message.outcome().status() == InboundStatus.SKIPPED)
                 .singleElement()
-                .extracting(InboundMessage::lastError)
+                .extracting(inbound -> inbound.outcome().lastError())
                 .asString()
                 .contains("справочник страхователей");
     }
@@ -126,7 +126,7 @@ class ConsumerStandTest {
 
         assertThat(inboundMessages.findAll())
                 .hasSize(5)
-                .noneMatch(message -> message.status() == InboundStatus.NEW);
+                .noneMatch(message -> message.outcome().status() == InboundStatus.NEW);
     }
 
     /**

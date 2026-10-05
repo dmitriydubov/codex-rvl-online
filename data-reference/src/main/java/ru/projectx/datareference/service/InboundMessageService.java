@@ -6,17 +6,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.InboundRetryProperties;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
 /**
- * Хранение сырья из 1С и фиксация исхода его обработки.
+ * Сохраняет сообщения 1С в том виде, в каком они пришли, и записывает, чем закончилась их обработка.
  *
- * <p>Здесь собрано решение «что делать с сообщением дальше»: временная ошибка двигает
- * строку по лестнице повторов, постоянная сразу завершает её отказом, а пропуск
- * записывается с причиной. Ни одно из этих решений не должно приниматься в слушателе
- * или в маппере — иначе они разъедутся.
+ * <p>Здесь в одном месте решается, что делать с сообщением дальше. После временной ошибки назначается следующая
+ * попытка через задержку из настроенного списка повторов. Постоянная ошибка сразу завершает обработку отказом.
+ * Пропуск записывается с причиной. Ни слушатель очереди, ни разбор потока этих решений не принимают, иначе
+ * правила в разных местах со временем разойдутся.
  */
 @Service
 public class InboundMessageService {
@@ -34,46 +35,50 @@ public class InboundMessageService {
     /**
      * Сохраняет сообщение целиком, со статусом {@code NEW}.
      *
-     * <p>Транзакция — вызывающего: запись в журнал входящих и сохранение сырья обязаны
-     * коммититься вместе. Сообщение, отмеченное принятым, но не сохранённое, потеряно
-     * навсегда — брокер его больше не пришлёт, а дедупликация уже считает его известным.
+     * <p>Метод работает в транзакции вызывающего, потому что отметка в журнале входящих и сохранение тела должны
+     * фиксироваться вместе. Если сообщение отмечено принятым, но не сохранено, оно потеряно навсегда: брокер его
+     * больше не пришлёт, а проверка повторов уже считает его известным.
      */
     @Transactional
     public InboundMessage store(UUID messageId, OneCStream stream, String sourceQueue, String payload) {
-        return repository.save(InboundMessage.receive(messageId, stream, sourceQueue, payload, clock.instant()));
+        InboundReceipt receipt = new InboundReceipt(messageId, stream, sourceQueue, clock.instant());
+        return repository.save(InboundMessage.receive(receipt, payload));
     }
 
     /**
-     * Сообщение разложено по таблицам.
+     * Отмечает, что сообщение разложено по таблицам справочников.
      *
-     * <p>Транзакция — вызывающего, и это существенно: изменения справочников и смена
-     * статуса обязаны коммититься вместе. Разъединить их значит получить либо сырьё,
-     * применённое дважды (статус не записался), либо потерянное (статус записался,
-     * изменения откатились).
+     * <p>Метод работает в транзакции вызывающего, потому что изменения справочников и смена статуса должны
+     * фиксироваться вместе. Если статус не запишется, сообщение применят второй раз. Если откатятся изменения,
+     * а статус останется, сообщение будет потеряно.
      */
     @Transactional
     public void markProcessed(UUID messageId) {
         require(messageId).markProcessed(clock.instant());
     }
 
-    /** Сообщение не прошло фильтр потока. Тоже в транзакции вызывающего — см. {@link #markProcessed}. */
+    /**
+     * Отмечает, что сообщение не прошло отбор своего потока, и сохраняет причину.
+     *
+     * <p>Метод работает в транзакции вызывающего: пропуск и изменения, которые разбор успел сделать, должны
+     * фиксироваться или откатываться вместе.
+     */
     @Transactional
     public void markSkipped(UUID messageId, String reason) {
         require(messageId).markSkipped(reason, clock.instant());
     }
 
     /**
-     * Временная ошибка: назначает следующую попытку по лестнице, а когда она исчерпана —
-     * завершает строку отказом.
+     * Записывает временную ошибку. Следующая попытка назначается через задержку из настроенного списка повторов.
+     * Когда список исчерпан, обработка завершается отказом.
      *
-     * <p>Своя транзакция, отдельная от транзакции вызывающего: к этому моменту она уже
-     * откатилась вместе с неудавшимися изменениями, и запись отказа в ней не сохранилась
-     * бы.
+     * <p>Метод открывает собственную транзакцию. Транзакция вызывающего к этому моменту уже откатилась вместе
+     * с неудавшимися изменениями, и запись об ошибке в ней не сохранилась бы.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordTemporaryFailure(UUID messageId, String error) {
         InboundMessage message = require(messageId);
-        int nextAttempt = message.attempt() + 1;
+        int nextAttempt = message.outcome().attempt() + 1;
 
         retryProperties.delayBeforeAttempt(nextAttempt).ifPresentOrElse(
                 delay -> message.markRetrying(error, clock.instant().plus(delay)),
@@ -82,10 +87,10 @@ public class InboundMessageService {
     }
 
     /**
-     * Постоянная ошибка — невалидное сообщение, чужая схема. Повторять бессмысленно:
-     * следующая попытка даст то же самое.
+     * Записывает постоянную ошибку и сразу завершает обработку отказом. Так бывает, когда сообщение не
+     * соответствует контракту: следующая попытка дала бы тот же результат.
      *
-     * <p>Своя транзакция по той же причине, что и у {@link #recordTemporaryFailure}.
+     * <p>Метод открывает собственную транзакцию, потому что транзакция вызывающего к этому моменту уже откатилась.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordPermanentFailure(UUID messageId, String error) {
