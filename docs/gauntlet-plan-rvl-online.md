@@ -251,7 +251,11 @@
   mirror.gcr.io, adoptium/containers), Maven Central (maven-metadata.xml, javadoc.io), Kubernetes (raw). Рекомендация
   владельцу для Network access: открыть docs.liquibase.com, prometheus.io, docs.docker.com, git-scm.com, docs.github.com;
   по желанию search.maven.org, central.sonatype.com, api.osv.dev. Протокол проверки — `scratchpad/domains/results*.txt`
-  сессии координатора (в git не хранится).
+  сессии координатора (в git не хранится). **Ответ владельца «1) добавил все предложенные»** (~16:47 UTC): повторная
+  проверка из сессии — открылись docs.liquibase.com, prometheus.io, docs.docker.com, git-scm.com, docs.github.com,
+  kubernetes.io, central.sonatype.com, search.maven.org, api.osv.dev (POST `/v1/query` отвечает), adoptium.net,
+  services.gradle.org; **остался закрыт downloads.gradle.org** — на него перенаправляет services.gradle.org при скачивании
+  дистрибутива (нужен только при смене версии Gradle). Статусы в таблице источников обновлены (PR #63).
 - 2026-10-05, **Ш18: PR #60 открыт сессией 15:51 UTC, смержен владельцем 16:01 UTC** (CI зелёный 15:59, слит с `main`
   87e7f1e). Остановок не было: вариант общего шага владелец утвердил «1) да» в сессии, GA-9 закрыт тестом по ТЗ-07 без Ш18a.
   Отчёт PR: пункты 2–4 координатору — закрыты комментарием в PR (Ш18a снят, `ContragentMapper` приведён раньше в Ш13c,
