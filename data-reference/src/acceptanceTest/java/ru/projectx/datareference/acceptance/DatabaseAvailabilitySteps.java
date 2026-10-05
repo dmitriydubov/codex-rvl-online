@@ -8,7 +8,9 @@ import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
 import java.time.Duration;
 import javax.sql.DataSource;
+import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import ru.projectx.datareference.service.integration.OneCConsumerPause;
+import ru.projectx.datareference.service.integration.OneCConsumerSubscriptions;
 
 /**
  * Недоступность базы Дата-референса в сценарии: пул соединений сервиса отказывает на каждом запросе соединения
@@ -28,11 +30,17 @@ public class DatabaseAvailabilitySteps {
 
     private final SwitchableDataSource dataSource;
     private final OneCConsumerPause pause;
+    private final RabbitListenerEndpointRegistry containers;
+    private final OneCConsumerSubscriptions subscriptions;
 
-    public DatabaseAvailabilitySteps(DataSource dataSource, OneCConsumerPause pause) {
+    public DatabaseAvailabilitySteps(DataSource dataSource, OneCConsumerPause pause,
+            RabbitListenerEndpointRegistry containers, OneCConsumerSubscriptions subscriptions) {
+
         assertThat(dataSource).as("пул соединений стенда с выключателем").isInstanceOf(SwitchableDataSource.class);
         this.dataSource = (SwitchableDataSource) dataSource;
         this.pause = pause;
+        this.containers = containers;
+        this.subscriptions = subscriptions;
     }
 
     @Дано("каждое соединение с базой Дата-референса отказывает с SQLSTATE {string}")
@@ -48,11 +56,22 @@ public class DatabaseAvailabilitySteps {
     /**
      * Проверка — как её запустило бы расписание: к этому моменту остановка потребителей уже завершена (в
      * работающем сервисе между отказом и проверкой проходят секунды, здесь ожидание явное).
+     *
+     * <p>После проверки шаг ждёт, пока у каждого запущенного контейнера брокер подтвердит подписку или контейнер
+     * остановится. Подтверждение приходит из потока клиента брокера чуть позже, чем запуск контейнера возвращает
+     * управление, и без ожидания следующий шаг иногда застал бы потребителя за миг до подписки. В работающем сервисе
+     * между проверкой и запросом мониторинга проходят секунды.
      */
     @Когда("Дата-референс проверяет доступность базы")
     public void storageChecked() {
         await().atMost(STOP_TIMEOUT).until(pause::consumersStopped);
         pause.resumeIfStorageAvailable();
+        await().atMost(STOP_TIMEOUT).until(this::everyRunningContainerSubscribedOrStopped);
+    }
+
+    private boolean everyRunningContainerSubscribedOrStopped() {
+        return containers.getListenerContainerIds().stream()
+                .allMatch(queue -> !containers.getListenerContainer(queue).isRunning() || subscriptions.subscribed(queue));
     }
 
     @After(order = AFTER_LOCK_RELEASE)

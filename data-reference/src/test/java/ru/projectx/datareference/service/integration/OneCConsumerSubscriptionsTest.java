@@ -33,15 +33,30 @@ class OneCConsumerSubscriptionsTest {
 
     @Test
     void brokerConfirmedSubscription_onlyThatQueueIsSubscribed() {
-        subscriptions.consumeOk(consumeOk(mock(Channel.class), POLICIES));
+        subscriptions.consumeOk(consumeOk(openChannel(), POLICIES));
 
         assertThat(subscriptions.subscribed(POLICIES)).isTrue();
         assertThat(subscriptions.subscribed(MKB10)).isFalse();
     }
 
+    /**
+     * Остановленный потребитель закрывает свой канал. Если известие об остановке не пришло (контейнер остановили, пока
+     * потребитель перезапускался) или подтверждение подписки пришло уже после него, закрытый канал всё равно не
+     * считается подпиской.
+     */
+    @Test
+    void subscriptionOnClosedChannel_isNotSubscribedWithoutAnyStopEvent() {
+        Channel channel = openChannel();
+        subscriptions.consumeOk(consumeOk(channel, POLICIES));
+
+        when(channel.isOpen()).thenReturn(false);
+
+        assertThat(subscriptions.subscribed(POLICIES)).isFalse();
+    }
+
     @Test
     void consumerStopped_queueIsNoLongerSubscribed() {
-        Channel channel = mock(Channel.class);
+        Channel channel = openChannel();
         subscriptions.consumeOk(consumeOk(channel, POLICIES));
 
         subscriptions.consumerStopped(new AsyncConsumerStoppedEvent(policiesContainer, consumerOn(channel)));
@@ -51,34 +66,34 @@ class OneCConsumerSubscriptionsTest {
 
     @Test
     void consumerReplacedAfterFailure_queueIsNoLongerSubscribedUntilNewConfirmation() {
-        Channel failed = mock(Channel.class);
+        Channel failed = openChannel();
         subscriptions.consumeOk(consumeOk(failed, POLICIES));
 
         subscriptions.consumerRestarted(new AsyncConsumerRestartedEvent(
-                policiesContainer, consumerOn(failed), consumerOn(mock(Channel.class))));
+                policiesContainer, consumerOn(failed), consumerOn(openChannel())));
 
         assertThat(subscriptions.subscribed(POLICIES)).isFalse();
     }
 
     @Test
     void lateStopOfPreviousConsumer_keepsSubscriptionOfNewOne() {
-        Channel previous = mock(Channel.class);
-        Channel current = mock(Channel.class);
+        Channel previous = openChannel();
+        Channel current = openChannel();
         subscriptions.consumeOk(consumeOk(previous, POLICIES));
         subscriptions.consumeOk(consumeOk(current, POLICIES));
 
         subscriptions.consumerStopped(new AsyncConsumerStoppedEvent(policiesContainer, consumerOn(previous)));
         subscriptions.consumerRestarted(new AsyncConsumerRestartedEvent(
-                policiesContainer, consumerOn(previous), consumerOn(mock(Channel.class))));
+                policiesContainer, consumerOn(previous), consumerOn(openChannel())));
 
         assertThat(subscriptions.subscribed(POLICIES)).isTrue();
     }
 
     @Test
     void stopOfOneContainer_keepsOtherQueuesSubscribed() {
-        Channel policiesChannel = mock(Channel.class);
+        Channel policiesChannel = openChannel();
         subscriptions.consumeOk(consumeOk(policiesChannel, POLICIES));
-        subscriptions.consumeOk(consumeOk(mock(Channel.class), MKB10));
+        subscriptions.consumeOk(consumeOk(openChannel(), MKB10));
 
         subscriptions.consumerStopped(new AsyncConsumerStoppedEvent(policiesContainer, consumerOn(policiesChannel)));
 
@@ -87,7 +102,7 @@ class OneCConsumerSubscriptionsTest {
 
     @Test
     void eventsFromUnknownSources_changeNothing() {
-        Channel channel = mock(Channel.class);
+        Channel channel = openChannel();
         subscriptions.consumeOk(consumeOk(channel, POLICIES));
 
         subscriptions.consumeOk(new ConsumeOkEvent(new Object(), MKB10, "tag"));
@@ -96,6 +111,12 @@ class OneCConsumerSubscriptionsTest {
 
         assertThat(subscriptions.subscribed(MKB10)).isFalse();
         assertThat(subscriptions.subscribed(POLICIES)).isTrue();
+    }
+
+    private static Channel openChannel() {
+        Channel channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(true);
+        return channel;
     }
 
     private static ConsumeOkEvent consumeOk(Channel channel, String queue) {
