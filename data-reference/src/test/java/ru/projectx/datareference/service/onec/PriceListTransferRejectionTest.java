@@ -73,6 +73,21 @@ class PriceListTransferRejectionTest {
                 .formatted(CID, trigger.receipt().messageId()));
     }
 
+    /** Своя же запись в буфере — не другая часть: отклонённая часть в ответе одна, её копия не трогается. */
+    @Test
+    void ownBufferedCopy_isNotRejectedAsAnotherPart() {
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        InboundMessage ownCopy = InboundMessage.receive(trigger.receipt(), envelope(batchData(GOOD_ROW)));
+        ownCopy.markBuffered(CID, null, 1);
+        InboundMessage batch = buffered(null);
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(ownCopy, batch));
+
+        List<InboundMessage> rejected = rejection.reject(trigger, "исчерпаны повторы");
+
+        assertThat(rejected).containsExactly(trigger, batch);
+        assertThat(ownCopy.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+    }
+
     @Test
     void rowBreakingPriceListRules_isDefectOfThePart() {
         InboundMessage finalMessage = buffered(1);
