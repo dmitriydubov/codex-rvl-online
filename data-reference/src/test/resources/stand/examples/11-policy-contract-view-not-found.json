@@ -1,5 +1,5 @@
 {
-  "description": "404 на неизвестный id полиса для сервиса Договоров (Ш39a): единый формат ошибки, код POLICY_NOT_FOUND, присланный X-Request-Id — в заголовке ответа и в error.request_id.",
+  "description": "404 на неизвестный id полиса для сервиса Договоров: единый формат ошибки, код POLICY_NOT_FOUND, присланный X-Request-Id — в заголовке ответа и в error.request_id.",
   "placeholders": {},
   "request": {
     "method": "GET",

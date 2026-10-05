@@ -14,7 +14,7 @@ package ru.projectx.datareference.support;
  * <p>Нет ни Docker, ни {@code TEST_POSTGRES_URL} — тесты с базой <b>падают</b>, а не
  * пропускаются: контекст не поднимается, и Testcontainers называет причину
  * («Could not find a valid Docker environment»). Пропущенный тест выглядит в отчёте как
- * проверенный, а гейты качества пропуски запрещают.
+ * проверенный, поэтому тесты с базой не пропускаются никогда.
  */
 public final class TestDatabase {
 
