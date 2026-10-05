@@ -211,6 +211,33 @@ class ContragentMapperTest {
         assertThat("ИНН".equals(field) ? insurer.inn() : insurer.kpp()).isEqualTo("7".repeat(limit));
     }
 
+    /**
+     * Необязательный реквизит, которого нет в сообщении 1С, хранится как отсутствующий, а не как пустая строка:
+     * иначе соседние сервисы получили бы «пустое значение» вместо «нет значения».
+     */
+    @Test
+    void sanatoriumWithoutOptionalDetails_storesThemAsAbsent() {
+        when(lpuRepository.findByExternalId(CONTRAGENT)).thenReturn(Optional.empty());
+
+        mapper(RVL).apply(sanatorium(RVL));
+
+        Lpu saved = savedLpu();
+        assertThat(saved.fullName()).isNull();
+        assertThat(saved.kpp()).isNull();
+        assertThat(saved.phone()).isNull();
+        assertThat(saved.email()).isNull();
+    }
+
+    @Test
+    void insurerWithoutOptionalDetails_storesThemAsAbsent() {
+        mapper(RVL).apply(insurer());
+
+        ArgumentCaptor<Insurer> saved = ArgumentCaptor.forClass(Insurer.class);
+        verify(insurerRepository).save(saved.capture());
+        assertThat(saved.getValue().fullName()).isNull();
+        assertThat(saved.getValue().kpp()).isNull();
+    }
+
     private ContragentMapper mapper(String rvlActivity) {
         var contract = new OneCContractProperties(rvlActivity, null, null, "Адрес", List.of());
         return new ContragentMapper(lpuRepository, insurerRepository, contract, clock);

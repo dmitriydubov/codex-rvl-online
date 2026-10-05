@@ -141,6 +141,18 @@ class DatabaseOutagesTest {
         assertThat(outages.describe(new Exception(TEXT))).isEmpty();
     }
 
+    /**
+     * Отказ на входе в транзакцию — исключение транзакций Spring, а не доступа к данным, но это временный отказ
+     * базы, и он описывается так же, как распознаётся: своим типом и SQLSTATE драйвера.
+     */
+    @Test
+    void transactionLevelOutage_isDescribedByItsOwnTypeWithSqlState() {
+        var noConnection = new CannotCreateTransactionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE));
+
+        assertThat(outages.describe(noConnection))
+                .hasValue(new DatabaseOutages.Outage("CannotCreateTransactionException", CONNECTION_FAILURE));
+    }
+
     /** Исключение JPA без перевода в Hibernate — тоже отказ базы, и описывается переведённым типом. */
     @Test
     void persistenceException_isDescribed() {
