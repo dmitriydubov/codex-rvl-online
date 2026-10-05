@@ -182,6 +182,23 @@ class InboundMessageServiceTest {
         assertThat(stored.outcome().lastError()).isNull();
     }
 
+    /**
+     * Отказ, пришедший после фиксации исхода, читает статус из базы в своей транзакции: применённое сообщение остаётся
+     * применённым, попытки не тратятся.
+     */
+    @Test
+    void temporaryFailureAfterProcessed_keepsStoredOutcome() {
+        UUID messageId = store();
+        inboundMessageService.markProcessed(messageId);
+
+        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+
+        InboundMessage stored = repository.findById(messageId).orElseThrow();
+        assertThat(stored.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+        assertThat(stored.outcome().attempt()).isZero();
+        assertThat(stored.outcome().nextRetryAt()).isNull();
+    }
+
     private UUID store() {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.MKB10, QUEUE, PAYLOAD);

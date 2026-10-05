@@ -169,14 +169,16 @@ public class InboundMessageService {
 
     /**
      * Зафиксированный исход не перезаписывается: повтор поверх него разобрал бы сообщение заново, а отказ отправил бы
-     * дежурному уже применённое сообщение. Переход не считается — его не было. В журнал идёт тип отказа и SQLSTATE, без
-     * текста исключения.
+     * дежурному уже применённое сообщение. Переход в этот исход считается здесь: он зафиксирован, но счётчик
+     * переходов увеличивается только после фиксации, о которой транзакция разбора так и не узнала. В журнал идёт тип
+     * отказа и SQLSTATE, без текста исключения.
      */
-    private static InboundStatus keepCommitted(InboundMessage message, ParseFailure failure) {
+    private InboundStatus keepCommitted(InboundMessage message, ParseFailure failure) {
         InboundReceipt receipt = message.receipt();
         InboundStatus committed = message.outcome().status();
-        log.warn("отказ после фиксации исхода сообщения {} потока {}: исход {} сохранён, отказ {}, SQLSTATE {}",
-                receipt.messageId(), receipt.stream(), committed, failure.type(), failure.sqlState());
+        log.warn("отказ после фиксации исхода сообщения {} потока {}: исход {} сохранён, повтора не будет, отказ {}, "
+                + "SQLSTATE {}", receipt.messageId(), receipt.stream(), committed, failure.type(), failure.sqlState());
+        transitions.record(message);
         return committed;
     }
 

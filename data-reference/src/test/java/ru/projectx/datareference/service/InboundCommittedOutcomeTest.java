@@ -36,7 +36,8 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
  * Отказ, пришедший после того, как исход разбора уже зафиксирован. Так бывает, когда соединение обрывается сразу
  * после фиксации: база изменения приняла, а приложение видит обрыв и считает попытку неудачной. Записать поверх
  * зафиксированного исхода повтор или отказ значит разобрать сообщение заново или отправить применённое сообщение
- * дежурному. Поэтому исход сохраняется, переход статуса не считается, а в журнал идёт предупреждение.
+ * дежурному. Поэтому исход сохраняется, а в журнал идёт предупреждение. Переход в зафиксированный исход
+ * считается здесь: счётчик транзакции разбора увеличивается только после фиксации, о которой она не узнала.
  *
  * <p>Сервис возвращает статус, с которым сообщение осталось: по нему планировщик решает, держит ли сообщение свой
  * поток.
@@ -80,7 +81,8 @@ class InboundCommittedOutcomeTest {
 
         assertThat(left).isEqualTo(InboundStatus.PROCESSED);
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW));
-        assertThat(countedTransitions()).isZero();
+        assertThat(counted(InboundStatus.PROCESSED)).isEqualTo(1);
+        assertThat(countedTransitions()).isEqualTo(1);
     }
 
     /** Предупреждение называет сообщение, поток, сохранённый статус и отказ — тип и SQLSTATE, без текста. */
@@ -93,7 +95,8 @@ class InboundCommittedOutcomeTest {
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).isEqualTo("отказ после фиксации исхода сообщения " + MESSAGE_ID
-                    + " потока MKB10: исход SKIPPED сохранён, отказ DataAccessResourceFailureException, SQLSTATE 08006");
+                    + " потока MKB10: исход SKIPPED сохранён, повтора не будет, отказ DataAccessResourceFailureException, "
+                    + "SQLSTATE 08006");
         });
     }
 
@@ -114,7 +117,7 @@ class InboundCommittedOutcomeTest {
 
         assertThat(left).isEqualTo(InboundStatus.PROCESSED);
         assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
-        assertThat(countedTransitions()).isZero();
+        assertThat(counted(InboundStatus.FAILED)).isZero();
         assertThat(logged.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
@@ -143,6 +146,12 @@ class InboundCommittedOutcomeTest {
         existing();
 
         assertThat(service().recordPermanentFailure(MESSAGE_ID, COMMIT_FAILED)).isEqualTo(InboundStatus.FAILED);
+    }
+
+    /** Сколько переходов потока MKB10 в статус {@code status} посчитано. */
+    private double counted(InboundStatus status) {
+        return meters.get(InboundTransitionMetrics.TRANSITIONS).tag("stream", "MKB10").tag("status", status.name())
+                .counter().count();
     }
 
     /** Сколько переходов статусов посчитано по всем потокам и статусам. */

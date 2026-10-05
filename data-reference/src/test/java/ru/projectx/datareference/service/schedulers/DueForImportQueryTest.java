@@ -91,6 +91,15 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).isEmpty();
     }
 
+    /** Более позднее сообщение, чей срок повтора наступил, ждёт, пока не наступит срок более раннего. */
+    @Test
+    void laterDueRetry_waitsForEarlierRetryNotYetDue() {
+        retrying(OneCStream.MKB10, ago(60), NOW.plusSeconds(30));
+        retrying(OneCStream.MKB10, ago(30), NOW.minusSeconds(1));
+
+        assertThat(due(WHOLE_BATCH)).isEmpty();
+    }
+
     /** Держит только более раннее: отложенное сообщение, принятое позже, не мешает тому, что принято раньше. */
     @Test
     void laterRetry_doesNotHoldEarlierMessage() {
