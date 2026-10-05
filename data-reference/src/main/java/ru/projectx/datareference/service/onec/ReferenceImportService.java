@@ -5,10 +5,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.core.JacksonException;
@@ -17,90 +18,79 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбор одного сообщения: превращение сырья из 1С в строки справочника.
+ * Разбор одного сообщения 1С: превращение сохранённого сырья в строки справочника.
  *
- * <p>Весь путь одного сообщения, сверху вниз:
- * <ol>
- *   <li>по потоку сообщения выбирается маппер — свой на каждое ТЗ;</li>
- *   <li>из конверта {@code {data, metadata}} достаётся {@code data};</li>
- *   <li>маппер применяет правила своего потока: фильтры, контроль версии, upsert;</li>
- *   <li>исход записывается в ту же строку сырья.</li>
- * </ol>
+ * <p>Путь сообщения читается сверху вниз. Из конверта {@code {data, metadata}} достаётся {@code data}, затем
+ * по потоку сообщения выбирается его обработчик. Обработчик применяет правила своего потока и записывает исход
+ * в строку сырья. У большинства потоков обработчик — маппер потока с записью исхода. Поток с особым путём, как
+ * прайс-листы, которые приходят частями, приносит свой обработчик отдельным компонентом, и этот класс при этом
+ * не меняется.
  *
- * <p><b>Транзакция одна на сообщение, и это существенно.</b> Изменения справочника
- * и новый статус строки сырья коммитятся вместе. Разъединить их значит получить либо
- * сообщение, применённое дважды (статус не записался), либо потерянное (статус
- * записался, изменения откатились).
+ * <p><b>Транзакция одна на сообщение, и это существенно.</b> Изменения справочника и новый статус строки сырья
+ * фиксируются вместе. Если их разъединить, сообщение либо применится дважды, когда статус не записался, либо
+ * потеряется, когда статус записался, а изменения откатились.
  *
- * <p>Когда повторять и что делать с отказом — не здесь: исключение улетает наверх,
- * к шедулеру, потому что записывать отказ нужно уже <i>после</i> отката этой транзакции.
+ * <p>Когда повторять и что делать с отказом, решает не этот класс. Исключение уходит к планировщику разбора,
+ * потому что отказ записывается уже после отката этой транзакции.
  */
 @Service
 public class ReferenceImportService {
 
     private static final String DATA_FIELD = "data";
 
-    private final Map<OneCStream, StreamMapper> mappers;
-    private final PriceListTransferAssembler priceListAssembler;
+    private final Map<OneCStream, StreamHandler> handlers;
     private final InboundMessageService inboundMessageService;
     private final ObjectMapper json;
 
+    /**
+     * @param mappers           мапперы потоков с обычным путём: каждый становится обработчиком своего потока
+     * @param dedicatedHandlers обработчики потоков с особым путём
+     * @throws IllegalStateException если у одного потока оказалось два обработчика
+     */
     public ReferenceImportService(
             List<StreamMapper> mappers,
-            PriceListTransferAssembler priceListAssembler,
+            List<StreamHandler> dedicatedHandlers,
             InboundMessageService inboundMessageService,
             ObjectMapper json) {
 
-        this.mappers = mappers.stream()
-                .collect(Collectors.toUnmodifiableMap(StreamMapper::stream, Function.identity()));
-        this.priceListAssembler = priceListAssembler;
+        this.handlers = Stream.concat(
+                        mappers.stream().map(mapper -> new MappedStreamHandler(mapper, inboundMessageService)),
+                        dedicatedHandlers.stream())
+                .collect(Collectors.toUnmodifiableMap(StreamHandler::stream, Function.identity()));
         this.inboundMessageService = inboundMessageService;
         this.json = json;
     }
 
     /**
-     * @throws OneCFieldException если сообщение не соответствует контракту — ошибка
-     *         постоянная, повторять её бессмысленно
+     * Разбирает сообщение и записывает исход в его строку сырья.
+     *
+     * @throws OneCFieldException если сообщение не соответствует контракту; это постоянная ошибка, повторять
+     *         её бессмысленно
      */
     @Transactional
     public ImportResult importMessage(InboundMessage message) {
         ObjectNode data = dataOf(message);
-
-        // Прайсы (ТЗ-9) приходят частями, и применить одно сообщение нельзя. У них свой
-        // путь: сборщик копит части и ведёт статусы сразу всей передачи, а не этой одной
-        // строки, — поэтому исход записывает он сам, и общая ветка ниже сюда не годится.
-        if (message.stream() == OneCStream.PRICE_LISTS) {
-            return priceListAssembler.receive(message, data);
-        }
-
-        ImportResult result = mapperFor(message.stream())
-                .map(mapper -> mapper.apply(data))
-                .orElseGet(() -> ImportResult.skipped("маппера для потока " + message.stream() + " ещё нет"));
-        recordOutcome(message, result);
-        return result;
+        return handlerFor(message.stream())
+                .map(handler -> handler.handle(message, data))
+                .orElseGet(() -> skipWithoutHandler(message));
     }
 
-    private void recordOutcome(InboundMessage message, ImportResult result) {
-        switch (result) {
-            case ImportResult.Applied ignored -> inboundMessageService.markProcessed(message.messageId());
-            case ImportResult.Skipped skipped -> inboundMessageService.markSkipped(message.messageId(), skipped.reason());
-        }
+    private Optional<StreamHandler> handlerFor(OneCStream stream) {
+        return Optional.ofNullable(handlers.get(stream));
     }
 
     /**
-     * Отсутствующий маппер — это пропуск, а не отказ. Потоки подключаются постепенно,
-     * и сообщение потока, до которого ещё не дошли руки, обязано дождаться своего
-     * маппера в разобранном виде, а не в виде ошибки. Разбирается оно переводом строки
-     * обратно в {@code NEW}, когда маппер появится.
+     * Поток без обработчика — пропуск, а не отказ. Потоки подключаются постепенно, и сообщение потока, до
+     * которого ещё не дошли руки, ждёт своего маппера в разобранном виде, а не в виде ошибки. Когда маппер
+     * появится, строку разбирают заново, вернув ей статус {@code NEW}.
      */
-    private Optional<StreamMapper> mapperFor(OneCStream stream) {
-        return Optional.ofNullable(mappers.get(stream));
+    private ImportResult skipWithoutHandler(InboundMessage message) {
+        String reason = "маппера для потока " + message.stream() + " ещё нет";
+        inboundMessageService.markSkipped(message.messageId(), reason);
+        return ImportResult.skipped(reason);
     }
 
-    /**
-     * Полезная нагрузка лежит в {@code data} конверта; {@code metadata} нужна приёму,
-     * а не разбору — на этом шаге из неё уже всё взято.
-     */
+    /** Полезная нагрузка лежит в {@code data} конверта; {@code metadata} нужна была приёму, а не разбору. */
     private ObjectNode dataOf(InboundMessage message) {
         JsonNode data = readTree(message).get(DATA_FIELD);
         if (data == null || !data.isObject()) {
@@ -112,16 +102,16 @@ public class ReferenceImportService {
     private JsonNode readTree(InboundMessage message) {
         String payload = message.payload();
         if (payload == null) {
-            // Так выглядит строка полиса, у которой вышел срок хранения тела. Повторить
-            // её нечем: недостающее может прислать только источник.
+            // Так выглядит строка полиса, у которой вышел срок хранения тела. Повторить её нечем: недостающее
+            // может прислать только источник.
             throw new OneCFieldException("тело сообщения стёрто по сроку хранения, разбирать нечего");
         }
         try {
             return json.readTree(payload);
         }
         catch (JacksonException malformed) {
-            // До таблицы доходит только то, что PostgreSQL принял в jsonb, так что
-            // случай почти невозможный — но «почти» здесь не повод для тихого NPE.
+            // В таблицу попадает только то, что PostgreSQL принял как JSON, так что случай почти невозможный.
+            // Но и тогда нужна внятная постоянная ошибка, а не обращение к пустой ссылке дальше по разбору.
             throw new OneCFieldException("тело сообщения не читается как JSON", malformed);
         }
     }

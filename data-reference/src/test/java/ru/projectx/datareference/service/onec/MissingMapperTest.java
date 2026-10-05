@@ -28,7 +28,7 @@ class MissingMapperTest {
     void streamWithoutMapper_isSkippedWithReason() {
         InboundMessageService inboundMessageService = mock(InboundMessageService.class);
         ReferenceImportService importService = new ReferenceImportService(
-                List.of(), mock(PriceListTransferAssembler.class), inboundMessageService, JsonMapper.builder().build());
+                List.of(), List.of(), inboundMessageService, JsonMapper.builder().build());
 
         UUID messageId = UUID.randomUUID();
         InboundMessage message = InboundMessage.receive(

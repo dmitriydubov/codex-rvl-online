@@ -1,0 +1,76 @@
+package ru.projectx.datareference.service.onec;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.Instant;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.exception.OneCFieldException;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * Защищает разметку сообщения передачи прайс-листа: к какой передаче оно относится, финальное ли оно и сколько
+ * в нём строк.
+ *
+ * <p>По этой разметке сборка находит части передачи и сверяет счётчики, не разбирая тела заново. Перепутать
+ * финальное сообщение с пакетом значит никогда не собрать передачу или собрать её неполной.
+ */
+class PriceListTransferMarkupTest {
+
+    private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    @Test
+    void batch_hasNoExpectedBatches_andCountsItsOwnRows() {
+        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+                {"cid":"%s","recordSet":[{"rowNumber":1},{"rowNumber":2}]}""".formatted(CID)));
+
+        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, null, 2));
+    }
+
+    @Test
+    void finalMessage_carriesCountersOfWholeTransfer() {
+        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+                {"cid":"%s","countMessages":2,"countRows":3}""".formatted(CID)));
+
+        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
+    }
+
+    /** Ноль пакетов — легальная передача, которая очищает прайс; финальное узнаётся по наличию счётчика. */
+    @Test
+    void finalMessageWithZeroBatches_isStillFinal() {
+        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+                {"cid":"%s","countMessages":0,"countRows":0}""".formatted(CID)));
+
+        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 0, 0));
+    }
+
+    @Test
+    void messageWithoutTransferId_isContractViolation() {
+        assertThatThrownBy(() -> PriceListTransferMarkup.of(node("{\"recordSet\":[]}")))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessageContaining("cid");
+    }
+
+    @Test
+    void markup_putsMessageIntoBuffer() {
+        InboundMessage message = InboundMessage.receive(
+                UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", "{}", Instant.EPOCH);
+
+        new PriceListTransferMarkup(CID, 2, 3).applyTo(message);
+
+        assertThat(message.status()).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(message.correlationId()).isEqualTo(CID);
+        assertThat(message.batchCount()).isEqualTo(2);
+        assertThat(message.rowCount()).isEqualTo(3);
+    }
+
+    private static ObjectNode node(String text) {
+        return JSON.readValue(text, ObjectNode.class);
+    }
+}
