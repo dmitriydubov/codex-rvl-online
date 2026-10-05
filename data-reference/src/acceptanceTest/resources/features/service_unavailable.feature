@@ -68,9 +68,9 @@
     И поле "error.request_id" ответа равно заголовку X-Request-Id ответа
 
     Примеры:
-      | поиск                                                                                 | данные               | запрос                                   | статус | код                 |
+      | поиск                                                                                | данные               | запрос                                   | статус | код                 |
       | /internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | полисы               | /internal/v1/policies/{id}/contract-view | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea     | договоры страхования | /internal/v1/insurance-contracts/{id}    | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea    | договоры страхования | /internal/v1/insurance-contracts/{id}    | 503    | SERVICE_UNAVAILABLE |
 
   # [Р20]: полис R-05 — ручка сервиса Заявок. [ТЗ-Д] «Коды ответов», «Формат ошибки»; [Р24] — как для Договоров.
   Структура сценария: База не отвечает вовремя — сервису Заявок 503 в едином формате ошибки на полис
@@ -90,8 +90,8 @@
   # [API] R-05: полис по id, по external_id и по номеру вместе с договором; ответ несёт программы полиса и их условия
   # обслуживания — табличные части, которые читаются уже после того, как полис найден. Долгая операция на них — тот же
   # временный отказ базы: [ТЗ-Д] «Коды ответов» — 503, [Р24] — SERVICE_UNAVAILABLE в едином формате, а не внутренняя
-  # ошибка, которую сервис Заявок не повторяет. [Р20]: R-05 — ручка сервиса Заявок. Для запроса по номеру id договора
-  # страхования берётся из ответа на поиск договора по external_id.
+  # ошибка, которую сервис Заявок не повторяет. [Р20]: R-05 — ручка сервиса Заявок. Полис по номеру читается вместе
+  # с GUID договора страхования из 1С (contract_external_id, решение владельца Р19 п. 2, «Журнал решений REST.md»).
   Структура сценария: Табличные части полиса не отвечают вовремя — сервису Заявок 503 на полис по id, по external_id и по номеру
     Дано сервис Заявок получил id из ответа на "<поиск>"
     И данные "<данные>" в базе Дата-референса заблокированы долгой операцией
@@ -103,13 +103,13 @@
     И поле "error.request_id" ответа равно заголовку X-Request-Id ответа
 
     Примеры:
-      | поиск                                                                             | данные                      | запрос                                                                 | статус | код                 |
-      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5            | программы полиса            | /internal/v1/policies/{id}                                             | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5            | условия обслуживания полиса | /internal/v1/policies/{id}                                             | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5            | программы полиса            | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5            | условия обслуживания полиса | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea | программы полиса            | /internal/v1/policies?number=СТЕНД-0001&contract_id={id}               | 503    | SERVICE_UNAVAILABLE |
-      | /internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea | условия обслуживания полиса | /internal/v1/policies?number=СТЕНД-0001&contract_id={id}               | 503    | SERVICE_UNAVAILABLE |
+      | поиск                                                                  | данные                      | запрос                                                                                            | статус | код                 |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | программы полиса            | /internal/v1/policies/{id}                                                                        | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | условия обслуживания полиса | /internal/v1/policies/{id}                                                                        | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | программы полиса            | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5                            | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | условия обслуживания полиса | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5                            | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | программы полиса            | /internal/v1/policies?number=СТЕНД-0001&contract_external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea | 503    | SERVICE_UNAVAILABLE |
+      | /internal/v1/policies?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | условия обслуживания полиса | /internal/v1/policies?number=СТЕНД-0001&contract_external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea | 503    | SERVICE_UNAVAILABLE |
 
   # [ТЗ-Д] «Коды ответов»: 503 — недоступность временная; «Общие правила»: GET повторять можно; [Р24]: вызывающий
   # повторяет запрос. Когда база снова отвечает, тот же запрос проходит как обычно — отказ не залипает.
@@ -124,7 +124,7 @@
     И поле "id" ответа равно полученному id
 
     Примеры:
-      | поиск                                                                                 | данные | запрос                                   | статус при блокировке | статус после |
+      | поиск                                                                                | данные | запрос                                   | статус при блокировке | статус после |
       | /internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5 | полисы | /internal/v1/policies/{id}/contract-view | 503                   | 200          |
 
   # [ТЗ-Д] «Коды ответов»: недоступность временная; «Общие правила»: GET повторять можно; [Р24]: сервис Заявок

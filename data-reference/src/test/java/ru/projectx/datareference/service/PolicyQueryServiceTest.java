@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -34,7 +35,6 @@ class PolicyQueryServiceTest {
 
     private static final UUID ID = UUID.fromString("d0000000-0000-4000-8000-000000000001");
     private static final UUID EXTERNAL_ID = UUID.fromString("d0000000-0000-4000-8000-000000000002");
-    private static final UUID CONTRACT_ID = UUID.fromString("d0000000-0000-4000-8000-000000000003");
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("d0000000-0000-4000-8000-000000000004");
     private static final UUID RVL_PROGRAM = UUID.fromString("d0000000-0000-4000-8000-000000000005");
     private static final UUID ARCHIVED_PROGRAM = UUID.fromString("d0000000-0000-4000-8000-000000000006");
@@ -105,53 +105,51 @@ class PolicyQueryServiceTest {
     }
 
     @Test
-    void byNumber_findsTheOnlyPolicyOfContract() {
-        knownContract();
+    void byNumber_findsTheOnlyPolicyOfContract_byContractGuid() {
         when(insuranceContracts.findByExternalId(CONTRACT_EXTERNAL_ID))
                 .thenReturn(Optional.of(ReadFixtures.contract(CONTRACT_EXTERNAL_ID, null)));
         when(policies.findAllByNumberAndExternalContractId(NUMBER, CONTRACT_EXTERNAL_ID))
                 .thenReturn(List.of(ReadFixtures.policy(CONTRACT_EXTERNAL_ID, List.of(), List.of())));
 
-        assertThat(service.byNumber(NUMBER, CONTRACT_ID).number()).isEqualTo(NUMBER);
+        assertThat(service.byNumber(NUMBER, CONTRACT_EXTERNAL_ID).number()).isEqualTo(NUMBER);
+    }
+
+    /** Связь полиса с договором логическая: полис, пришедший из 1С раньше договора, находится и без него. */
+    @Test
+    void byNumber_policyArrivedBeforeItsContract_isFound_withoutContract() {
+        when(insuranceContracts.findByExternalId(CONTRACT_EXTERNAL_ID)).thenReturn(Optional.empty());
+        when(policies.findAllByNumberAndExternalContractId(NUMBER, CONTRACT_EXTERNAL_ID))
+                .thenReturn(List.of(ReadFixtures.policy(CONTRACT_EXTERNAL_ID, List.of(), List.of())));
+
+        PolicyResponse found = service.byNumber(NUMBER, CONTRACT_EXTERNAL_ID);
+
+        assertThat(found.number()).isEqualTo(NUMBER);
+        assertThat(found.contract()).isNull();
     }
 
     @Test
     void byNumber_twoPolicies_isAmbiguous() {
-        knownContract();
         when(policies.findAllByNumberAndExternalContractId(NUMBER, CONTRACT_EXTERNAL_ID)).thenReturn(List.of(
                 ReadFixtures.policy(CONTRACT_EXTERNAL_ID, List.of(), List.of()),
                 ReadFixtures.policy(CONTRACT_EXTERNAL_ID, List.of(), List.of())));
 
-        assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_ID))
+        assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_EXTERNAL_ID))
                 .isInstanceOfSatisfying(AmbiguousReferenceException.class, ambiguous -> {
                     assertThat(ambiguous.code()).isEqualTo("AMBIGUOUS_POLICY");
                     assertThat(ambiguous.candidateIds()).hasSize(2);
                 });
     }
 
+    /** Нет полиса или ещё нет договора — для вызывающего одно и то же: полиса с таким номером в договоре нет. */
     @Test
-    void byNumber_none_isPolicyNotFound_namingContractNotNumber() {
-        knownContract();
+    void byNumber_none_isPolicyNotFound_namingContractNotNumber_withoutLookingUpContract() {
         when(policies.findAllByNumberAndExternalContractId(NUMBER, CONTRACT_EXTERNAL_ID)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_ID))
+        assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_EXTERNAL_ID))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class, notFound -> {
                     assertThat(notFound.code()).isEqualTo("POLICY_NOT_FOUND");
-                    assertThat(notFound.getMessage()).contains(CONTRACT_ID.toString()).doesNotContain(NUMBER);
+                    assertThat(notFound.getMessage()).contains(CONTRACT_EXTERNAL_ID.toString()).doesNotContain(NUMBER);
                 });
-    }
-
-    @Test
-    void byNumber_unknownContract_isInsuranceContractNotFound() {
-        when(insuranceContracts.findById(CONTRACT_ID)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.byNumber(NUMBER, CONTRACT_ID))
-                .isInstanceOfSatisfying(ReferenceNotFoundException.class,
-                        notFound -> assertThat(notFound.code()).isEqualTo("INSURANCE_CONTRACT_NOT_FOUND"));
-    }
-
-    private void knownContract() {
-        when(insuranceContracts.findById(CONTRACT_ID))
-                .thenReturn(Optional.of(ReadFixtures.contract(CONTRACT_EXTERNAL_ID, null)));
+        verifyNoInteractions(insuranceContracts);
     }
 }

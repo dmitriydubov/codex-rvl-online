@@ -8,7 +8,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
 /**
- * Проверки ответа на уровне HTTP: заголовок {@code Allow}, тип содержимого и пустое тело.
+ * Проверки ответа на уровне HTTP: заголовок {@code Allow}, тип содержимого, пустое тело и отсутствие
+ * заголовка {@code X-Request-Id} у ответа, который отдал сам сервер, а не сервис.
  *
  * <p>{@code Allow} сравнивается как перечень методов без учёта порядка и пробелов после запятой. Лишний,
  * недостающий или повторённый метод проверку проваливает. Тип содержимого сравнивается по типу и
@@ -42,5 +43,10 @@ public class ProtocolResponseSteps {
     @Тогда("тело ответа пустое")
     public void bodyIsEmpty() {
         assertThat(contracts.lastResponse().bodyBytes()).as("размер тела ответа в байтах").isZero();
+    }
+
+    @Тогда("заголовка X-Request-Id в ответе нет")
+    public void noRequestId() {
+        assertThat(contracts.lastResponse().requestIds()).as("заголовки X-Request-Id ответа").isEmpty();
     }
 }

@@ -58,7 +58,7 @@ class UuidParameterRecordTest {
             "/programs/{v} => id",
             "/policies/{v} => id",
             "/policies?external_id={v} => external_id",
-            "/policies?number=1&contract_id={v} => contract_id",
+            "/policies?number=1&contract_external_id={v} => contract_external_id",
             "/policies/{v}/contract-view => id",
             "/policies/contract-view?external_id={v} => external_id",
             "/policies/search?query=a&contract_external_id={v} => contract_external_id",
@@ -82,7 +82,7 @@ class UuidParameterRecordTest {
     @CsvSource(delimiterString = " => ", value = {
             "/insurance-contracts?external_id= => external_id",
             "/policies?external_id=%20%20 => external_id",
-            "/policies?number=1&contract_id= => contract_id"})
+            "/policies?number=1&contract_external_id= => contract_external_id"})
     void blankUuidParameter_isTheMissingParameter_withoutAskingServices(String path, String field) {
         MvcTestResult result = mvc.get().uri(URI.create(API + path)).exchange();
 

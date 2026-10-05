@@ -9,6 +9,7 @@ import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.core.read.ListAppender;
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
+import io.cucumber.java.ParameterType;
 import io.cucumber.java.ru.Тогда;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -24,6 +25,9 @@ import org.slf4j.LoggerFactory;
  * <p>Строку поиска, в которой может быть фамилия, сервис не повторяет ни в ответе, ни в журнале. Сценарии
  * пределов строят её из буквы «ж», поэтому три такие буквы подряд в теле ответа, в тексте записи, в её
  * контексте или в тексте исключения означают, что строка утекла.
+ *
+ * <p>Запись об ошибке данных 1С ищется по уровню и тексту: в тексте стоит код ошибки или id учреждения, полученный
+ * сценарием. Так проверяется, что проблемная запись видна в журнале и по ней можно собрать очередь исправлений в 1С.
  */
 public class ServiceLog {
 
@@ -55,6 +59,22 @@ public class ServiceLog {
                 .noneMatch(event -> event.getLevel() == Level.ERROR);
     }
 
+    /** Имя уровня — только из перечня уровней журнала: опечатка в уровне иначе проверяла бы не то, что написано. */
+    @ParameterType(name = "уровень", value = "ERROR|WARN|INFO|DEBUG|TRACE")
+    public Level level(String name) {
+        return Level.toLevel(name);
+    }
+
+    @Тогда("в журнале Дата-референса есть запись уровня {уровень} с полученным id")
+    public void entryWithObtainedId(Level level) {
+        entryMentioning(level, contracts.obtainedId());
+    }
+
+    @Тогда("в журнале Дата-референса есть запись уровня {уровень} с кодом {string}")
+    public void entryWithCode(Level level, String code) {
+        entryMentioning(level, code);
+    }
+
     @Тогда("строка query из запроса не попала ни в ответ, ни в журнал Дата-референса")
     public void searchStringNotRepeated() {
         assertThat(contracts.lastResponse().body().toString())
@@ -63,6 +83,12 @@ public class ServiceLog {
         assertThat(events.list)
                 .as("записи журнала со строкой поиска")
                 .noneMatch(ServiceLog::mentionsSearchString);
+    }
+
+    private void entryMentioning(Level level, String text) {
+        assertThat(events.list)
+                .as("записи уровня %s с «%s» в журнале", level, text)
+                .anyMatch(event -> event.getLevel() == level && event.getFormattedMessage().contains(text));
     }
 
     private static boolean mentionsSearchString(ILoggingEvent event) {

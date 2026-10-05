@@ -136,18 +136,18 @@ class PolicyApiTest {
     }
 
     @Test
-    void policyByNumberAndContract_isFound_andDuplicatesGive409() {
+    void policyByNumberAndContractGuid_isFound_andDuplicatesGive409() {
         Policy first = savePolicy("П-000003", "Дублев", "Номер", null, TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT));
 
-        MvcTestResult found = mvc.get().uri(BASE + "/policies?number={n}&contract_id={c}", "П-000003", contract.id())
+        MvcTestResult found = mvc.get().uri(BASE + "/policies?number={n}&contract_external_id={c}", "П-000003", CONTRACT_EXT)
                 .exchange();
         assertThat(found).hasStatusOk();
         assertThat(found).bodyJson().extractingPath("$.id").isEqualTo(first.id().toString());
 
         Policy duplicate = savePolicy("П-000003", "Дублев", "Номер", null, TODAY.minusMonths(1), null,
                 List.of(RVL_PROGRAM_EXT));
-        MvcTestResult conflict = mvc.get().uri(BASE + "/policies?number={n}&contract_id={c}", "П-000003", contract.id())
+        MvcTestResult conflict = mvc.get().uri(BASE + "/policies?number={n}&contract_external_id={c}", "П-000003", CONTRACT_EXT)
                 .exchange();
         assertThat(conflict).hasStatus(409);
         assertThat(conflict).bodyJson().extractingPath("$.error.code").isEqualTo("AMBIGUOUS_POLICY");
@@ -157,11 +157,12 @@ class PolicyApiTest {
     }
 
     @Test
-    void policyByNumber_unknownContract_returns404_andMissingKey_returns400() {
-        MvcTestResult unknown = mvc.get().uri(BASE + "/policies?number={n}&contract_id={c}", "П-1", UUID.randomUUID())
+    void policyByNumber_unknownContract_isPolicyNotFound_andMissingKey_returns400() {
+        MvcTestResult unknown = mvc.get()
+                .uri(BASE + "/policies?number={n}&contract_external_id={c}", "П-1", UUID.randomUUID())
                 .exchange();
         assertThat(unknown).hasStatus(404);
-        assertThat(unknown).bodyJson().extractingPath("$.error.code").isEqualTo("INSURANCE_CONTRACT_NOT_FOUND");
+        assertThat(unknown).bodyJson().extractingPath("$.error.code").isEqualTo("POLICY_NOT_FOUND");
 
         MvcTestResult noKey = mvc.get().uri(BASE + "/policies").exchange();
         assertThat(noKey).hasStatus(400);

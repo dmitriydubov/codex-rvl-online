@@ -1,10 +1,13 @@
 package ru.projectx.datareference.acceptance;
 
+import static ru.projectx.datareference.acceptance.StepTables.flag;
+import static ru.projectx.datareference.acceptance.StepTables.flagOr;
+import static ru.projectx.datareference.acceptance.StepTables.onlyKnown;
+import static ru.projectx.datareference.acceptance.StepTables.required;
+
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -14,8 +17,8 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Сообщения 1С:УСК из таблиц шагов «Дано»: ключ таблицы — поле контракта ТЗ-1, ТЗ-2, ТЗ-3
- * и ТЗ-6 по-русски, значение — как его прислала бы 1С.
+ * Сообщения 1С:УСК о полисах, договорах страхования, контрагентах и программах из таблиц шагов «Дано».
+ * Ключ таблицы — поле контракта по-русски, значение — как его прислала бы 1С.
  *
  * <p>Обязательные поля контракта, которых сценарий не называет, заполняются здесь
  * синтетикой: ФИО и дата рождения полиса (заглушками, см. {@link #policy}), тип продукта ДМС,
@@ -26,7 +29,7 @@ import tools.jackson.databind.node.ObjectNode;
  * вымышлены.
  *
  * <p>Строка таблицы, которой шаг не знает, и логическое значение не из «true»/«false» —
- * ошибка сценария, а не молча пропущенное или ложное поле.
+ * ошибка сценария, а не молча пропущенное или ложное поле ({@link StepTables}).
  */
 final class OneCMessages {
 
@@ -41,6 +44,13 @@ final class OneCMessages {
     private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
     private static final String PLACEHOLDER_FIRST_NAME = "Шаг";
     private static final String PLACEHOLDER_DATE_OF_BIRTH = "1985-06-15";
+    private static final String DELETE_MARK = "пометка удаления";
+    private static final String BEGIN = "начало";
+    private static final String AVAILABILITY = "availability";
+    private static final String LINE_PROGRAM = "условие обслуживания: программа";
+    private static final String LINE_END = "условие обслуживания: окончание";
+    private static final String LINE_AVAILABILITY = "условие обслуживания: доступность";
+    private static final String POLICY_AVAILABILITY = "доступность";
 
     /** Строка таблицы шага с явным {@code message-id} сообщения. */
     static final String MESSAGE_ID = "message-id";
@@ -58,7 +68,7 @@ final class OneCMessages {
     }
 
     /**
-     * ТЗ-3: контрагент без признака ЛПУ — страхователь. Строка в справочнике страхователей
+     * Контрагент без признака ЛПУ — страхователь (ТЗ-3). Строка в справочнике страхователей
      * создаётся, а сообщение уходит в пропуск с причиной: санаторием оно не стало.
      */
     static OneCMessage insurer(Map<String, String> table) {
@@ -72,20 +82,20 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.SKIPPED);
     }
 
-    /** ТЗ-3: ЛПУ с видом деятельности РВЛ — санаторий. */
+    /** ЛПУ с видом деятельности РВЛ — санаторий (ТЗ-3). Пометка удаления — если сценарий её назвал. */
     static OneCMessage sanatorium(Map<String, String> table) {
-        onlyKnown(table, "external_id", "наименование");
+        onlyKnown(table, "external_id", "наименование", DELETE_MARK);
         ObjectNode data = JSON.createObjectNode()
                 .put("guid", required(table, "external_id"))
                 .put("thisIsLPU", true)
-                .put("deleteMark", false)
+                .put("deleteMark", flagOr(table, DELETE_MARK, false))
                 .put("Наименование", required(table, "наименование"));
         data.putArray("typesActivities").addObject().put("guidTypeActivities", RVL_ACTIVITY);
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /**
-     * ТЗ-2: договор страхования продукта ДМС; страхователь — если сценарий его назвал. Строки
+     * Договор страхования продукта ДМС (ТЗ-2); страхователь — если сценарий его назвал. Строки
      * «message-id» и «перед конвертом» — свойства доставки, а не договора: первая задаёт идентификатор
      * сообщения явно, вторую читает шаг публикации в брокер.
      */
@@ -114,7 +124,7 @@ final class OneCMessages {
                 .orElse(null);
     }
 
-    /** ТЗ-6: программа РВЛ с одной строкой перечня {@code service[]}. */
+    /** Программа РВЛ с одной строкой перечня учреждений (ТЗ-6). */
     static OneCMessage program(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование", "услуга: санаторий", "услуга: вид обращения",
                 "услуга: начало", "услуга: окончание", "услуга: слой", "услуга: прямое прикрепление",
@@ -138,31 +148,47 @@ final class OneCMessages {
     }
 
     /**
-     * ТЗ-1: полис со сроком действия; программа полиса, отчество, пол, e-mail и пометка удаления —
-     * если сценарий их назвал. Фамилия, имя и дата рождения обязательны в контракте: не названные
-     * сценарием заполняются заглушками.
+     * Полис со сроком действия (ТЗ-1); программа полиса, строка условий обслуживания, отчество, пол, e-mail,
+     * доступность и пометка удаления — если сценарий их назвал. Фамилия, имя и дата рождения обязательны
+     * в контракте: не названные сценарием заполняются заглушками.
      */
     static OneCMessage policy(Map<String, String> table) {
-        onlyKnown(table, "external_id", "номер", "договор", "программа", "начало", "окончание",
-                "фамилия", "имя", "отчество", "дата рождения", "пол", "e-mail", "пометка удаления");
+        onlyKnown(table, "external_id", "номер", "договор", "программа", BEGIN, "окончание",
+                "фамилия", "имя", "отчество", "дата рождения", "пол", "e-mail", DELETE_MARK, POLICY_AVAILABILITY,
+                LINE_PROGRAM, LINE_END, LINE_AVAILABILITY);
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("idContract", required(table, "договор"))
                 .put("number", required(table, "номер"))
-                .put("deleteMark", table.containsKey("пометка удаления") && flag(table, "пометка удаления"));
+                .put("deleteMark", flagOr(table, DELETE_MARK, false));
         addInsured(data, table);
         data.putArray("header").addObject()
                 .put("rowNumber", 1)
-                .put("beginDate", required(table, "начало"))
+                .put("beginDate", required(table, BEGIN))
                 .put("endDate", required(table, "окончание"))
-                .put("availability", true);
+                .put(AVAILABILITY, flagOr(table, POLICY_AVAILABILITY, true));
         Optional.ofNullable(table.get("программа")).ifPresent(program -> addPolicyProgram(data, program, table));
+        Optional.ofNullable(table.get(LINE_PROGRAM)).ifPresent(program -> addServiceLine(data, program, table));
         return new OneCMessage(OneCStream.POLICIES, POLICIES_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /**
+     * Строка условий обслуживания по программе: первый слой без франшизы, с началом в день начала полиса. Окончание
+     * и доступность — если сценарий их назвал, иначе строка бессрочна и доступна.
+     */
+    private static void addServiceLine(ObjectNode policy, String program, Map<String, String> table) {
+        ObjectNode line = policy.putArray("services").addObject()
+                .put("idProgramm", program)
+                .put("layerNumber", 1)
+                .put("copayment", BigDecimal.ZERO)
+                .put("beginDate", required(table, BEGIN))
+                .put(AVAILABILITY, flagOr(table, LINE_AVAILABILITY, true));
+        Optional.ofNullable(table.get(LINE_END)).ifPresent(end -> line.put("endDate", end));
+    }
+
+    /**
      * Застрахованный полиса. Заглушки нарочно не совпадают со значениями сценариев: шаг,
-     * который забыл бы взять ФИО из таблицы, иначе выглядел бы как правильный. Почта в ТЗ-1 —
+     * который забыл бы взять ФИО из таблицы, иначе выглядел бы как правильный. Почта в сообщении полиса —
      * не поле, а дополнительное свойство полиса с именем из конфигурации контура.
      */
     private static void addInsured(ObjectNode policy, Map<String, String> table) {
@@ -189,30 +215,9 @@ final class OneCMessages {
     private static void addPolicyProgram(ObjectNode policy, String program, Map<String, String> table) {
         policy.putArray("programms").addObject()
                 .put("idProgramm", program)
-                .put("beginDate", required(table, "начало"))
+                .put("beginDate", required(table, BEGIN))
                 .put("endDate", required(table, "окончание"))
                 .put("limit", POLICY_PROGRAM_LIMIT)
-                .put("availability", true);
-    }
-
-    private static void onlyKnown(Map<String, String> table, String... keys) {
-        Set<String> unknown = new TreeSet<>(table.keySet());
-        unknown.removeAll(Set.of(keys));
-        if (!unknown.isEmpty()) {
-            throw new IllegalArgumentException("в таблице шага строки, которых шаг не знает: " + unknown);
-        }
-    }
-
-    private static boolean flag(Map<String, String> table, String key) {
-        String value = required(table, key);
-        if (!Set.of("true", "false").contains(value)) {
-            throw new IllegalArgumentException("строка «" + key + "» — не true и не false: " + value);
-        }
-        return Boolean.parseBoolean(value);
-    }
-
-    private static String required(Map<String, String> table, String key) {
-        return Optional.ofNullable(table.get(key))
-                .orElseThrow(() -> new IllegalArgumentException("в таблице шага нет строки «" + key + "»"));
+                .put(AVAILABILITY, true);
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
+import java.util.List;
 import java.util.Map;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
@@ -42,6 +43,26 @@ public class OneCSteps {
     @Дано("1С:УСК прислала программу РВЛ с одной услугой:")
     public void programSent(Map<String, String> program) {
         inbox.receive(OneCMessages.program(program));
+    }
+
+    @Дано("1С:УСК прислала вид обращения:")
+    public void appealTypeSent(Map<String, String> appealType) {
+        inbox.receive(OneCReferenceMessages.appealType(appealType));
+    }
+
+    @Дано("1С:УСК прислала код МКБ-10:")
+    public void mkb10Sent(Map<String, String> code) {
+        inbox.receive(OneCReferenceMessages.mkb10(code));
+    }
+
+    @Дано("1С:УСК прислала договор ЛПУ:")
+    public void lpuContractSent(Map<String, String> contract) {
+        inbox.receive(OneCReferenceMessages.lpuContract(contract));
+    }
+
+    @Дано("1С:УСК прислала программу РВЛ {string} с перечнем учреждений:")
+    public void programWithLpuListSent(String externalId, List<Map<String, String>> lines) {
+        inbox.receive(OneCReferenceMessages.programWithLpuList(externalId, lines));
     }
 
     @Дано("1С:УСК прислала полис:")

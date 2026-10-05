@@ -71,7 +71,7 @@ class RestReadTimeoutTest {
             "policies,            /internal/v1/policies/" + UNKNOWN_ID,
             "policies,            /internal/v1/policies?external_id=" + UNKNOWN_ID,
             "policies,            /internal/v1/policies/contract-view?external_id=" + UNKNOWN_ID,
-            "insurance_contracts, /internal/v1/policies?number=П-1&contract_id=" + UNKNOWN_ID,
+            "policies,            /internal/v1/policies?number=П-1&contract_external_id=" + UNKNOWN_ID,
             "insurance_contracts, /internal/v1/insurance-contracts?external_id=" + UNKNOWN_ID,
             "policies,            /internal/v1/policies/" + UNKNOWN_ID + "/contract-view",
             "insurance_contracts, /internal/v1/insurance-contracts/" + UNKNOWN_ID,

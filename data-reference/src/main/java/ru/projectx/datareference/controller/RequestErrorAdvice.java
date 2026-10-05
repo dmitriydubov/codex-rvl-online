@@ -26,9 +26,11 @@ import ru.projectx.datareference.exception.InvalidRequestException;
  * Такого пути нет: 404. У ручки нет такого метода: 405 с перечнем методов в заголовке {@code Allow}.
  * Ответ нужен в формате, которого сервис не отдаёт: 406.
  *
- * <p>Это ошибки вызывающего, а не сервиса, поэтому в журнал они не пишутся. Ответы 405 и 406 уходят с
- * явным типом {@code application/json}. Иначе Spring подбирал бы формат тела по заголовку {@code Accept}
- * запроса, а при {@code Accept: text/xml} не нашёл бы подходящего и отдал бы ответ без тела.
+ * <p>Это ошибки вызывающего, а не сервиса, поэтому в журнал они не пишутся. Ответы 404 на чужой путь, 405 и 406
+ * уходят с явным типом {@code application/json}. Иначе Spring подбирал бы формат тела по заголовку {@code Accept}
+ * запроса, а при {@code Accept: text/xml} не нашёл бы подходящего и отдал бы ответ без тела. Остальным отказам
+ * явный тип не нужен: у существующих ручек тип ответа задан, и запрос с {@code Accept} без JSON получает 406
+ * раньше, чем ручка вызвана.
  *
  * <p>В заголовке {@code Allow} к методу GET добавляется HEAD, и к любому набору добавляется OPTIONS:
  * сервис отвечает на них сам, и тот же набор он называет в ответе на OPTIONS.
@@ -43,6 +45,9 @@ public class RequestErrorAdvice {
     private static final String NOT_ACCEPTABLE = "NOT_ACCEPTABLE";
     private static final String MALFORMED_REQUEST = "нарушен формат запроса";
 
+    /** Причина отказа по пропущенному обязательному параметру; ею же отказывают ручки, которые сами видят пропуск. */
+    static final String REQUIRED_PARAMETER = "обязательный параметр";
+
     @ExceptionHandler(InvalidRequestException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse invalidRequest(InvalidRequestException invalid) {
@@ -52,7 +57,7 @@ public class RequestErrorAdvice {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse missingParameter(MissingServletRequestParameterException missing) {
-        return validationError(List.of(new ErrorResponse.Violation(missing.getParameterName(), "обязательный параметр")));
+        return validationError(List.of(new ErrorResponse.Violation(missing.getParameterName(), REQUIRED_PARAMETER)));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -77,9 +82,10 @@ public class RequestErrorAdvice {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse unknownPath(NoResourceFoundException noResource) {
-        return ErrorResponse.of(NOT_FOUND, "ресурс не найден: " + noResource.getResourcePath(), CurrentRequest.id());
+    public ResponseEntity<ErrorResponse> unknownPath(NoResourceFoundException noResource) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(NOT_FOUND, "ресурс не найден: " + noResource.getResourcePath(), CurrentRequest.id()));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

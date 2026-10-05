@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
@@ -35,11 +38,10 @@ class PolicyControllerTest {
     private static final String POLICIES = InternalApi.BASE_PATH + "/policies";
     private static final UUID POLICY_ID = UUID.fromString("9011c000-0000-4000-8000-000000000001");
     private static final UUID POLICY_EXTERNAL_ID = UUID.fromString("9011c000-0000-4000-8000-000000000002");
-    private static final UUID CONTRACT_ID = UUID.fromString("9011c000-0000-4000-8000-000000000003");
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("9011c000-0000-4000-8000-000000000004");
     private static final String POLICY_NUMBER = "П-0001";
     /** Отказ самого контроллера называет оба ключа; у пропущенного параметра Spring причина другая. */
-    private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_id";
+    private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_external_id";
     /** У полиса для Договоров ключ по GUID 1С один, поэтому отказ называет только его. */
     private static final String NO_EXTERNAL_ID_REASON = "нужен external_id";
     /** Причина отказа Spring по пустому обязательному параметру ({@link RequestErrorAdvice}). */
@@ -82,11 +84,11 @@ class PolicyControllerTest {
     }
 
     @Test
-    void policyByNumber_passesNumberAndContract() {
-        when(policies.byNumber(POLICY_NUMBER, CONTRACT_ID)).thenReturn(policy());
+    void policyByNumber_passesNumberAndContractGuid() {
+        when(policies.byNumber(POLICY_NUMBER, CONTRACT_EXTERNAL_ID)).thenReturn(policy());
 
         MvcTestResult result = mvc.get()
-                .uri(POLICIES + "?number={number}&contract_id={contract}", POLICY_NUMBER, CONTRACT_ID)
+                .uri(POLICIES + "?number={number}&contract_external_id={contract}", POLICY_NUMBER, CONTRACT_EXTERNAL_ID)
                 .exchange();
 
         assertThat(result).hasStatusOk();
@@ -104,23 +106,46 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
+    /** Номер без договора — половина ключа: отказ называет недостающий договор, а не ключ другого способа. */
     @Test
-    void numberWithoutContract_isNotALookupByNumber() {
+    void numberWithoutContract_isMissingContractExternalId() {
         MvcTestResult result = mvc.get().uri(POLICIES + "?number={number}", POLICY_NUMBER).exchange();
 
         assertThat(result).hasStatus(400);
-        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
-        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
+        verifyNoInteractions(policies, policySearch, contractViews);
+    }
+
+    /**
+     * Пустой номер — тоже недостающая часть ключа, как и пустой UUID: отказ по полю {@code number} без обращения
+     * к сервису чтения, а не «полиса нет» после поиска в базе.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"", "%20%20"})
+    void blankNumberWithContract_isMissingNumber_withoutAskingService(String number) {
+        MvcTestResult result = mvc.get()
+                .uri(URI.create(POLICIES + "?number=" + number + "&contract_external_id=" + CONTRACT_EXTERNAL_ID))
+                .exchange();
+
+        assertThat(result).hasStatus(400);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("VALIDATION_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().hasSize(1);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("number");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
     @Test
-    void contractWithoutNumber_isNotALookupByNumber() {
-        MvcTestResult result = mvc.get().uri(POLICIES + "?contract_id={contract}", CONTRACT_ID).exchange();
+    void contractWithoutNumber_isMissingNumber() {
+        MvcTestResult result = mvc.get()
+                .uri(POLICIES + "?contract_external_id={contract}", CONTRACT_EXTERNAL_ID)
+                .exchange();
 
         assertThat(result).hasStatus(400);
-        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
-        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(NO_KEY_REASON);
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().hasSize(1);
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("number");
+        assertThat(result).bodyJson().extractingPath("$.error.details[0].reason").isEqualTo(MISSING_VALUE_REASON);
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
