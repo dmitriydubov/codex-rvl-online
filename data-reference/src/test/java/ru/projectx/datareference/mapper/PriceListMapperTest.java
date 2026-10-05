@@ -151,6 +151,25 @@ class PriceListMapperTest {
         verify(repository, never()).saveAll(any());
     }
 
+    /** Проверка строки ещё до сборки передачи: те же правила, что при замещении, и ничего не пишется. */
+    @Test
+    void checkedRow_followsTheSameRulesAsReplacement_withoutTouchingPrices() {
+        ObjectNode withoutPrice = row(1, "830");
+        withoutPrice.remove("price");
+        ObjectNode withoutBeginDate = row(2, "830");
+        withoutBeginDate.remove("period");
+
+        mapper.checkRow(row(3, "830"));
+
+        assertThatThrownBy(() -> mapper.checkRow(withoutPrice))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("в строке прайса нет цены");
+        assertThatThrownBy(() -> mapper.checkRow(withoutBeginDate))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("в строке прайса нет даты начала действия");
+        verifyNoInteractions(serviceRepository, repository);
+    }
+
     @Test
     void transferWithoutServiceGuid_isContractViolation() {
         ObjectNode transfer = transfer(row(1, "830"));

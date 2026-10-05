@@ -30,6 +30,9 @@ public class OneCInbox {
                     now() + make_interval(secs => :order))
             """;
     private static final String STATUSES = "select status from inbound_message order by received_at";
+    private static final String TRANSFER_STATUSES = """
+            select status from inbound_message where payload -> 'data' ->> 'cid' = :cid order by received_at
+            """;
     private static final String MESSAGE_IDS = "select message_id from inbound_message order by received_at";
     private static final String STORED = "select exists(select 1 from inbound_message where message_id = :messageId)";
     private static final String ROW = """
@@ -92,7 +95,8 @@ public class OneCInbox {
         return row(received.getLast().messageId());
     }
 
-    private InboundRow row(UUID messageId) {
+    /** Строка сырья сообщения с этим {@code message-id}. */
+    public InboundRow row(UUID messageId) {
         return jdbc.sql(ROW)
                 .param("messageId", messageId)
                 .query((row, number) -> new InboundRow(row.getString("status"), row.getInt("attempt"),
@@ -161,6 +165,14 @@ public class OneCInbox {
     /** Статусы, которыми разбор обязан закончить присланные сообщения, в порядке приёма. */
     public List<String> expectedStatuses() {
         return List.copyOf(expectedStatuses);
+    }
+
+    /**
+     * Статусы частей передачи прайса в порядке приёма. Часть узнаётся по идентификатору передачи в теле: колонку
+     * передачи сервис заполняет не у каждой части.
+     */
+    public List<String> transferStatuses(UUID cid) {
+        return jdbc.sql(TRANSFER_STATUSES).param("cid", cid.toString()).query(String.class).list();
     }
 
     /** Статусы всех строк сырья в порядке приёма. */

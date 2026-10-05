@@ -3,6 +3,8 @@ package ru.projectx.datareference.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -137,6 +139,65 @@ class InboundOutcomeRecordingTest {
         assertThat(transitions()).containsExactly("FAILED");
     }
 
+    /** Поток, у которого отказ разделяют несколько сообщений, сам решает, кого он задевает; журнал — о причине. */
+    @Test
+    void permanentFailureInSharedScope_failsEveryMessageTheScopeNames_inOneRecording() {
+        InboundMessage message = existing();
+        InboundMessage sibling = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
+        RejectionScope scope = scopeFailing(sibling);
+
+        InboundStatus status = service(scope).recordPermanentFailure(MESSAGE_ID,
+                new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
+
+        assertThat(status).isEqualTo(InboundStatus.FAILED);
+        verify(scope).reject(message, "в конверте нет объекта data");
+        assertThat(sibling.outcome().lastError()).isEqualTo("задет: в конверте нет объекта data");
+        assertThat(transitions()).containsExactly("FAILED", "FAILED");
+    }
+
+    @Test
+    void exhaustedLadderInSharedScope_failsEveryMessageTheScopeNames() {
+        InboundMessage message = existing();
+        message.markRetrying("первая ошибка", NOW);
+        message.markRetrying("вторая ошибка", NOW);
+        InboundMessage sibling = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
+
+        InboundStatus status = service(scopeFailing(sibling)).recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+
+        assertThat(status).isEqualTo(InboundStatus.FAILED);
+        assertThat(message.outcome().lastError()).isEqualTo("повторы исчерпаны на попытке 3: " + ERROR);
+        assertThat(sibling.outcome().lastError()).isEqualTo("задет: повторы исчерпаны на попытке 3: " + ERROR);
+        assertThat(transitions()).containsExactly("FAILED", "FAILED");
+    }
+
+    /** Повтор не окончательный: соседей по отказу он не касается. */
+    @Test
+    void retryInSharedScope_touchesOnlyTheMessage() {
+        existing();
+        RejectionScope scope = mock(RejectionScope.class);
+        when(scope.stream()).thenReturn(OneCStream.MKB10);
+
+        assertThat(service(scope).recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        verify(scope, never()).reject(any(), any());
+        assertThat(transitions()).containsExactly("RETRY");
+    }
+
+    /** Отказ сообщения другого потока не задевает сообщения, о которых знает чужая область отказа. */
+    @Test
+    void permanentFailureOfOtherStream_isNotShared() {
+        InboundMessage message = existing();
+        RejectionScope scope = mock(RejectionScope.class);
+        when(scope.stream()).thenReturn(OneCStream.PRICE_LISTS);
+
+        service(scope).recordPermanentFailure(MESSAGE_ID,
+                new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
+
+        assertThat(message.outcome().lastError()).isEqualTo("в конверте нет объекта data");
+        verify(scope, never()).reject(any(), any());
+    }
+
     @Test
     void transferParts_areReadByTransferId() {
         UUID transfer = UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000cc");
@@ -183,9 +244,23 @@ class InboundOutcomeRecordingTest {
         return message;
     }
 
-    private InboundMessageService service() {
+    /** Область отказа потока MKB10: отклоняет сообщение и ещё одного соседа, ссылаясь на причину. */
+    private static RejectionScope scopeFailing(InboundMessage sibling) {
+        RejectionScope scope = mock(RejectionScope.class);
+        when(scope.stream()).thenReturn(OneCStream.MKB10);
+        when(scope.reject(any(), any())).thenAnswer(invocation -> {
+            InboundMessage message = invocation.getArgument(0);
+            String reason = invocation.getArgument(1);
+            message.markFailed(reason);
+            sibling.markFailed("задет: " + reason);
+            return List.of(message, sibling);
+        });
+        return scope;
+    }
+
+    private InboundMessageService service(RejectionScope... scopes) {
         return new InboundMessageService(
                 repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC),
-                new InboundTransitionMetrics(meters), new FinalRejectionJournal());
+                new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of(scopes));
     }
 }

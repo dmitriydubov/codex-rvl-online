@@ -32,7 +32,8 @@ public class DatabaseLockSteps {
             "договоры страхования", "insurance_contracts",
             "коды МКБ-10", "mkb10",
             "журнал входящих сообщений 1С:УСК", "inbox",
-            "сырьё сообщений 1С:УСК", "inbound_message");
+            "сырьё сообщений 1С:УСК", "inbound_message",
+            "строки прайсов", "price_list_items");
 
     private final DataSource dataSource;
     private @Nullable Connection lockingSession;

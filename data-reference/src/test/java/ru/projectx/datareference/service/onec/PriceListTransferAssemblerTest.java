@@ -159,6 +159,50 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.FAILED)).isEqualTo(2.0);
     }
 
+    /** Ошибка в самой части прерывает разбор до сборки: отклонят её и всю передачу уже после отката. */
+    @Test
+    void batchWithRowWithoutNumber_isContractViolation_beforeAssembling() {
+        InboundMessage finalMessage = buffered(finalData(1, 1), 1, 1);
+        InboundMessage batch = message(batchData("{\"price\":100.00}"));
+
+        assertThatThrownBy(() -> receive(batch))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля rowNumber");
+        verify(priceListMapper, never()).apply(any());
+        assertThat(finalMessage.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+    }
+
+    @Test
+    void batchOfAppliedTransfer_isContractViolation() {
+        InboundMessage applied = buffered(batchData(row(1, "100.00")), null, 1);
+        applied.markProcessed(NOW);
+        InboundMessage surplus = message(batchData(row(2, "200.00")));
+
+        assertThatThrownBy(() -> receive(surplus))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("лишний пакет: передача " + CID + " уже применена");
+        verify(priceListMapper, never()).apply(any());
+    }
+
+    /** Отказ передачи уже записан: опоздавшая часть отклоняется сразу, а прайс не трогается. */
+    @Test
+    void partOfRejectedTransfer_isRejectedRightAway() {
+        InboundMessage rejected = buffered(batchData(row(1, "100.00")), null, 1);
+        rejected.markFailed("в строке прайса нет цены");
+        InboundMessage lateFinal = message(finalData(1, 1));
+        String reason = "передача " + CID + " уже отклонена";
+
+        ImportResult result = receive(lateFinal);
+
+        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(lateFinal.outcome().status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(lateFinal.outcome().lastError()).isEqualTo(reason);
+        assertThat(rejected.outcome().lastError()).isEqualTo("в строке прайса нет цены");
+        verifySavedAfterBuffering(lateFinal);
+        verify(priceListMapper, never()).apply(any());
+        assertThat(transitions(InboundStatus.FAILED)).isEqualTo(1.0);
+    }
+
     /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
     @Test
     void batchWithErasedBody_isContractViolation() {
@@ -227,7 +271,7 @@ class PriceListTransferAssemblerTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         InboundMessageService inboundMessageService = new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
-                new InboundTransitionMetrics(meters), new FinalRejectionJournal());
+                new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
         return new PriceListTransferAssembler(inboundMessageService, priceListMapper, json, clock);
     }
 

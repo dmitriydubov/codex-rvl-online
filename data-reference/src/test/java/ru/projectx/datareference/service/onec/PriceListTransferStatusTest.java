@@ -76,6 +76,35 @@ class PriceListTransferStatusTest {
         assertThat(transfer).isInstanceOf(PriceListTransfer.Pending.class);
     }
 
+    /** Исход отклонённой передачи уже записан: части, пришедшие после него, не собираются заново, а отклоняются. */
+    @Test
+    void partsArrivingAfterRejection_areRejectedRightAway() {
+        InboundMessage rejectedBatch = batch(1);
+        rejectedBatch.markFailed("в строке прайса нет цены");
+        InboundMessage lateFinal = finalMessage(1, 1);
+        InboundMessage lateBatch = batch(1);
+
+        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(rejectedBatch, lateFinal, lateBatch));
+
+        assertThat(transfer).isEqualTo(new PriceListTransfer.Rejected(
+                "передача " + CID + " уже отклонена", List.of(lateFinal, lateBatch)));
+    }
+
+    @Test
+    void rejectedTransfer_failsEveryLatePartWithReason() {
+        InboundMessage lateFinal = finalMessage(1, 1);
+        InboundMessage lateBatch = batch(1);
+        PriceListTransfer.Rejected transfer = new PriceListTransfer.Rejected("уже отклонена", List.of(lateFinal, lateBatch));
+
+        List<InboundMessage> failed = transfer.fail();
+
+        assertThat(failed).containsExactly(lateFinal, lateBatch);
+        assertThat(failed).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
+            assertThat(message.outcome().lastError()).isEqualTo("уже отклонена");
+        });
+    }
+
     @Test
     void morePromisedBatchesThanArrived_failWholeTransfer() {
         InboundMessage finalMessage = finalMessage(1, 2);
@@ -128,6 +157,27 @@ class PriceListTransferStatusTest {
         assertThat(processed).containsExactly(finalMessage, batch);
         assertThat(processed).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+            assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
+        });
+    }
+
+    @Test
+    void outcomeOfApplying_isTheOutcomeOfEveryMessage() {
+        InboundMessage finalMessage = finalMessage(1, 1);
+        InboundMessage batch = batch(1);
+        InboundMessage skippedFinal = finalMessage(1, 1);
+        InboundMessage skippedBatch = batch(1);
+
+        List<InboundMessage> applied = new PriceListTransfer.Assembled(finalMessage, List.of(batch))
+                .markOutcome(ImportResult.applied(), PROCESSED_AT);
+        List<InboundMessage> skipped = new PriceListTransfer.Assembled(skippedFinal, List.of(skippedBatch))
+                .markOutcome(ImportResult.skipped("услуги нет"), PROCESSED_AT);
+
+        assertThat(applied).containsExactly(finalMessage, batch)
+                .allSatisfy(message -> assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED));
+        assertThat(skipped).containsExactly(skippedFinal, skippedBatch).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+            assertThat(message.outcome().lastError()).isEqualTo("услуги нет");
             assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
         });
     }

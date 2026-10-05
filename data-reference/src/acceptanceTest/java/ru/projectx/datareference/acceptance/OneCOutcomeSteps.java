@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.cucumber.java.ru.Тогда;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.JsonNode;
@@ -26,7 +27,8 @@ public class OneCOutcomeSteps {
             "пропущено", InboundStatus.SKIPPED,
             "отложено до повтора", InboundStatus.RETRY,
             "отклонено без повторов", InboundStatus.FAILED,
-            "ждёт разбора", InboundStatus.NEW);
+            "ждёт разбора", InboundStatus.NEW,
+            "ждёт сборки передачи", InboundStatus.BUFFERED);
 
     private final OneCInbox inbox;
 
@@ -45,6 +47,15 @@ public class OneCOutcomeSteps {
 
         assertThat(last.status()).as("статус последнего сообщения").isEqualTo(InboundStatus.FAILED.name());
         assertThat(last.lastError()).as("причина отказа последнего сообщения").isEqualTo(reason);
+    }
+
+    /** То же для сообщения с заданным сценарием {@code message-id}, например соседней части передачи прайса. */
+    @Тогда("сообщение 1С:УСК {string} отклонено без повторов с причиной {string}")
+    public void messageRejected(String messageId, String reason) {
+        InboundRow row = inbox.row(UUID.fromString(messageId));
+
+        assertThat(row.status()).as("статус сообщения %s", messageId).isEqualTo(InboundStatus.FAILED.name());
+        assertThat(row.lastError()).as("причина отказа сообщения %s", messageId).isEqualTo(reason);
     }
 
     /**
@@ -72,6 +83,16 @@ public class OneCOutcomeSteps {
         List<String> expected = Stream.of(outcomes.split(",")).map(String::strip).map(OneCOutcomeSteps::status).toList();
 
         assertThat(inbox.statuses()).as("статусы сырья в порядке приёма").containsExactlyElementsOf(expected);
+    }
+
+    /** То же для частей одной передачи прайса: часть узнаётся по идентификатору передачи. */
+    @Тогда("исходы сообщений передачи прайса {string} в порядке приёма — {string}")
+    public void transferOutcomesInOrder(String cid, String outcomes) {
+        List<String> expected = Stream.of(outcomes.split(",")).map(String::strip).map(OneCOutcomeSteps::status).toList();
+
+        assertThat(inbox.transferStatuses(UUID.fromString(cid)))
+                .as("статусы частей передачи %s в порядке приёма", cid)
+                .containsExactlyElementsOf(expected);
     }
 
     private static String status(String outcome) {

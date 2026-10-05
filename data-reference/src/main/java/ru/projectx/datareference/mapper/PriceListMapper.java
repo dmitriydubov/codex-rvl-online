@@ -68,6 +68,16 @@ public class PriceListMapper {
                 service -> replacePrices(service, transfer));
     }
 
+    /**
+     * Проверяет строку прайса по правилам замещения, ничего не записывая: так строку можно отклонить, когда пришёл
+     * её пакет, а не когда соберётся вся передача.
+     *
+     * @throws OneCFieldException если в строке нет цены или даты начала
+     */
+    public void checkRow(JsonNode row) {
+        rowOf(row);
+    }
+
     private ImportResult replacePrices(ContragentService service, ObjectNode transfer) {
         Instant now = clock.instant();
         int removed = repository.deleteByServiceId(service.id());

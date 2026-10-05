@@ -171,7 +171,7 @@ class InboundCommittedOutcomeTest {
     private InboundMessageService service() {
         return new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30), Duration.ofMinutes(5))),
-                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(meters), new FinalRejectionJournal());
+                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
     }
 
     private static Logger serviceLog() {
