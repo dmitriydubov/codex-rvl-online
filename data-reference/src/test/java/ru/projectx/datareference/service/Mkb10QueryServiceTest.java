@@ -35,6 +35,11 @@ class Mkb10QueryServiceTest {
     private static final Limit DEFAULT_LIMIT = Limit.of(20);
     private static final int MAX_QUERY_LENGTH = 100;
     private static final int MAX_CODES = 100;
+    /** Пределы, которые не совпадают ни с одним другим пределом в настройках. */
+    private static final int CONFIGURED_MAX_QUERY_LENGTH = 5;
+    private static final int CONFIGURED_MAX_CODES = 3;
+    /** Эмодзи U+1F600: один символ, но в строке Java занимает две единицы UTF-16 (суррогатную пару). */
+    private static final String OUTSIDE_BMP = Character.toString(0x1F600);
     private static final Mkb10Row Q06_0 = new Mkb10Row(UUID.fromString("6b1d0000-0000-4000-8000-000000000002"),
             UUID.fromString("6b1d0000-0000-4000-8000-000000000012"), "Q06.0", "Амиелия", 3, "Q06", false);
 
@@ -121,6 +126,65 @@ class Mkb10QueryServiceTest {
                     assertThat(invalid.getMessage()).isEqualTo("не длиннее 100 символов");
                 });
         verifyNoInteractions(mkb10);
+    }
+
+    /**
+     * Длина считается в символах, а не в единицах UTF-16. Здесь строка ровно в предел символов, но последний
+     * символ лежит вне основной плоскости Юникода и занимает две единицы, так что по {@code length()} строка
+     * на одну единицу длиннее предела. Она всё равно ищется.
+     */
+    @Test
+    void queryAtMaximumLength_withCharacterOutsideBmp_isSearched() {
+        String query = "ж".repeat(MAX_QUERY_LENGTH - 1) + OUTSIDE_BMP;
+        assertThat(query).as("единиц UTF-16 в строке").hasSize(MAX_QUERY_LENGTH + 1);
+        when(mkb10.findActiveByNamePattern(LikePatterns.substring(query), DEFAULT_LIMIT)).thenReturn(List.of(Q06_0));
+
+        assertThat(service.search(query, null).items()).containsExactly(item(Q06_0));
+    }
+
+    /** Длина проверяется первой: строка сверх предела отклоняется по полю query, даже когда неверен и limit. */
+    @Test
+    void queryLongerThanMaximum_withLimitOutOfBounds_isValidationErrorOnQuery() {
+        String query = "ж".repeat(MAX_QUERY_LENGTH + 1);
+
+        assertThatThrownBy(() -> service.search(query, 0))
+                .isInstanceOfSatisfying(InvalidRequestException.class,
+                        invalid -> assertThat(invalid.field()).isEqualTo("query"));
+        verifyNoInteractions(mkb10);
+    }
+
+    /**
+     * Предел длины строки — своя настройка МКБ-10. В умолчаниях он равен пределу строки поиска полисов
+     * и максимуму выдачи МКБ-10, поэтому здесь он другой: строка ровно в него ищется, на букву длиннее — нет.
+     */
+    @Test
+    void queryLength_isLimitedByMkb10Setting() {
+        Mkb10QueryService configured = new Mkb10QueryService(mkb10,
+                TestApiProperties.withMkb10InputLimits(CONFIGURED_MAX_QUERY_LENGTH, CONFIGURED_MAX_CODES));
+        String query = "ж".repeat(CONFIGURED_MAX_QUERY_LENGTH);
+        when(mkb10.findActiveByNamePattern(LikePatterns.substring(query), DEFAULT_LIMIT)).thenReturn(List.of(Q06_0));
+
+        assertThat(configured.search(query, null).items()).containsExactly(item(Q06_0));
+        assertThatThrownBy(() -> configured.search(query + "ж", null))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("query");
+                    assertThat(invalid.getMessage()).isEqualTo("не длиннее 5 символов");
+                });
+    }
+
+    /** То же для числа кодов: в умолчаниях оно равно максимуму выдачи МКБ-10, здесь — нет. */
+    @Test
+    void codesCount_isLimitedByMkb10Setting() {
+        Mkb10QueryService configured = new Mkb10QueryService(mkb10,
+                TestApiProperties.withMkb10InputLimits(CONFIGURED_MAX_QUERY_LENGTH, CONFIGURED_MAX_CODES));
+        when(mkb10.findByCodes(distinctCodes(CONFIGURED_MAX_CODES))).thenReturn(List.of(Q06_0));
+
+        assertThat(configured.byCodes(distinctCodes(CONFIGURED_MAX_CODES)).items()).containsExactly(item(Q06_0));
+        assertThatThrownBy(() -> configured.byCodes(distinctCodes(CONFIGURED_MAX_CODES + 1)))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("codes");
+                    assertThat(invalid.getMessage()).isEqualTo("не больше 3 кодов");
+                });
     }
 
     /** Повторы считаются: число кодов — по запросу как пришёл, а в базу уходят только разные коды. */

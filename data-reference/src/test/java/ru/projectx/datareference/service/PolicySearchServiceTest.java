@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Policy;
@@ -48,6 +49,10 @@ class PolicySearchServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 3, 14);
     private static final PolicyScope DEFAULT_SCOPE = new PolicyScope(CONTRACT, TODAY, 10);
     private static final int MAX_QUERY_LENGTH = 100;
+    /** Предел, который не совпадает ни с одним другим пределом в настройках. */
+    private static final int CONFIGURED_MAX_QUERY_LENGTH = 7;
+    /** Эмодзи U+1F600: один символ, но в строке Java занимает две единицы UTF-16 (суррогатную пару). */
+    private static final String OUTSIDE_BMP = Character.toString(0x1F600);
 
     @Mock
     private PolicyRepository policies;
@@ -62,9 +67,7 @@ class PolicySearchServiceTest {
 
     @BeforeEach
     void setUp() {
-        var api = TestApiProperties.defaults();
-        service = new PolicySearchService(policies, insuranceContracts,
-                api, new ReferenceCalendar(Clock.fixed(NOW, ZoneOffset.UTC), api));
+        service = serviceWith(TestApiProperties.defaults());
     }
 
     /** Обрезка, схлопывание пробелов, нижний регистр и ё → е — до того, как строка станет шаблоном. */
@@ -143,6 +146,55 @@ class PolicySearchServiceTest {
         verifyNoInteractions(policies, insuranceContracts);
     }
 
+    /**
+     * Длина считается в символах, а не в единицах UTF-16. Здесь строка ровно в предел символов, но последний
+     * символ лежит вне основной плоскости Юникода и занимает две единицы, так что по {@code length()} строка
+     * на одну единицу длиннее предела. Она всё равно ищется.
+     */
+    @Test
+    void queryAtMaximumLength_withCharacterOutsideBmp_isSearched() {
+        knownContract();
+        String query = "ж".repeat(MAX_QUERY_LENGTH - 1) + OUTSIDE_BMP;
+        assertThat(query).as("единиц UTF-16 в строке").hasSize(MAX_QUERY_LENGTH + 1);
+        when(policies.findRankedByNames(DEFAULT_SCOPE, List.of(LikePatterns.prefix(query))))
+                .thenReturn(List.of(policy("Петров")));
+
+        assertThat(service.search(CONTRACT, query, null).items())
+                .extracting(PolicySearchResponse.Item::lastName).containsExactly("Петров");
+    }
+
+    /** Длина проверяется первой: строка сверх предела отклоняется по полю query, даже когда неверен и limit. */
+    @Test
+    void queryLongerThanMaximum_withLimitOutOfBounds_isValidationErrorOnQuery() {
+        String query = "ж".repeat(MAX_QUERY_LENGTH + 1);
+
+        assertThatThrownBy(() -> service.search(CONTRACT, query, 0))
+                .isInstanceOfSatisfying(InvalidRequestException.class,
+                        invalid -> assertThat(invalid.field()).isEqualTo("query"));
+        verifyNoInteractions(policies, insuranceContracts);
+    }
+
+    /**
+     * Предел длины строки — своя настройка поиска полисов. В умолчаниях он равен пределу строки МКБ-10, поэтому
+     * здесь он другой: строка ровно в него ищется, на букву длиннее — нет.
+     */
+    @Test
+    void queryLength_isLimitedByPolicySearchSetting() {
+        PolicySearchService configured =
+                serviceWith(TestApiProperties.withPolicySearchMaxQueryLength(CONFIGURED_MAX_QUERY_LENGTH));
+        knownContract();
+        String query = "ж".repeat(CONFIGURED_MAX_QUERY_LENGTH);
+        when(policies.findRankedByNames(DEFAULT_SCOPE, List.of(LikePatterns.prefix(query))))
+                .thenReturn(List.of(policy("Петров")));
+
+        assertThat(configured.search(CONTRACT, query, null).items()).hasSize(1);
+        assertThatThrownBy(() -> configured.search(CONTRACT, query + "ж", null))
+                .isInstanceOfSatisfying(InvalidRequestException.class, invalid -> {
+                    assertThat(invalid.field()).isEqualTo("query");
+                    assertThat(invalid.getMessage()).isEqualTo("не длиннее 7 символов");
+                });
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {0, 51})
     void limitOutOfBounds_isValidationError_withoutQuery(int limit) {
@@ -161,6 +213,11 @@ class PolicySearchServiceTest {
                         notFound -> assertThat(notFound.code()).isEqualTo("INSURANCE_CONTRACT_NOT_FOUND"));
         verify(policies, never()).findRankedByNames(any(), anyList());
         verify(policies, never()).findRankedByNumber(any(), anyString(), anyString(), anyString());
+    }
+
+    private PolicySearchService serviceWith(ReferenceApiProperties api) {
+        return new PolicySearchService(policies, insuranceContracts,
+                api, new ReferenceCalendar(Clock.fixed(NOW, ZoneOffset.UTC), api));
     }
 
     private void knownContract() {
