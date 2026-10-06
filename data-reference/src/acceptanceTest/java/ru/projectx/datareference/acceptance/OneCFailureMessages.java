@@ -28,9 +28,18 @@ final class OneCFailureMessages {
     private static final String CONTACTS_QUEUE = "1c-usk_to_rvl-online_contact-information-changes";
 
     private static final JsonMapper JSON = JsonMapper.shared();
+
+    /**
+     * Самое длинное число, которое хранит {@code numeric}: 131072 цифры до запятой и 16383 после. Должно совпадать с
+     * пределом, с которым сервис читает сырьё ({@code StoredEnvelope.MAX_STORED_NUMBER_DIGITS}).
+     */
+    private static final int MAX_STORED_NUMBER_DIGITS = 131_072 + 16_383;
+
     /** Сырьё читается так же, как его читает разбор: числа — точно и такой длины, какую хранит {@code numeric}. */
     private static final JsonMapper EXACT_JSON = JsonMapper.builder(JsonFactory.builder()
-                    .streamReadConstraints(StreamReadConstraints.builder().maxNumberLength(131_072 + 16_383).build())
+                    .streamReadConstraints(StreamReadConstraints.builder()
+                            .maxNumberLength(MAX_STORED_NUMBER_DIGITS)
+                            .build())
                     .build())
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
             .build();
