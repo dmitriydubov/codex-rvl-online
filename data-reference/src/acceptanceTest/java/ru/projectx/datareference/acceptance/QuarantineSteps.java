@@ -91,7 +91,7 @@ public class QuarantineSteps {
 
     @Когда("Дата-референс выполняет проход стирания персональных данных")
     public void retentionPass() {
-        retention.forgetExpiredPayloads();
+        retention.forgetExpiredPersonalData();
     }
 
     private static UUID canonical(String messageId) {

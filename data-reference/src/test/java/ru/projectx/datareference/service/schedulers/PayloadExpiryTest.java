@@ -45,6 +45,9 @@ class PayloadExpiryTest {
     @Mock
     private AgedInboundMessages agedMessages;
 
+    @Mock
+    private ExpiredPolicyPersonalData expiredPolicies;
+
     private final RecordingTransactions transactions = new RecordingTransactions();
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
@@ -68,7 +71,7 @@ class PayloadExpiryTest {
                 .thenReturn(BATCH_SIZE, BATCH_SIZE, 3);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
         verify(agedMessages, times(3)).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
         verify(agedMessages).forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE);
@@ -81,11 +84,28 @@ class PayloadExpiryTest {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 2);
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
         verify(agedMessages, times(2)).forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE);
         assertThat(logged.list).singleElement().satisfies(event -> assertThat(event.getFormattedMessage())
                 .isEqualTo("стёрты тела 9 карантинных сообщений старше PT168H: срок хранения персональных данных"));
+    }
+
+    /** Полисы обезличиваются теми же пачками, а журнал называет их число и запас, но не данные. */
+    @Test
+    void policyRemainder_isErasedInBatches_andReportedOnceWithGrace() {
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
+        when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
+        when(expiredPolicies.erase(BATCH_SIZE)).thenReturn(BATCH_SIZE, 1);
+
+        retention().forgetExpiredPersonalData();
+
+        verify(expiredPolicies, times(2)).erase(BATCH_SIZE);
+        assertThat(logged.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.INFO);
+            assertThat(event.getFormattedMessage()).isEqualTo(
+                    "обезличены полисы: 8, после окончания срока или перевода в архив прошло больше PT720H");
+        });
     }
 
     /** Каждая пачка — в своей транзакции, и ни один запрос не идёт вне транзакции. */
@@ -99,10 +119,14 @@ class PayloadExpiryTest {
             transactions.erasedInsideCurrent();
             return 0;
         });
+        when(expiredPolicies.erase(BATCH_SIZE)).thenAnswer(invocation -> {
+            transactions.erasedInsideCurrent();
+            return 0;
+        });
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
-        assertThat(transactions.erasuresPerTransaction()).containsExactly(1, 1, 1);
+        assertThat(transactions.erasuresPerTransaction()).containsExactly(1, 1, 1, 1);
     }
 
     /** Остаток ровно в пачку: ещё один короткий запрос, который ничего не находит, — и проход окончен. */
@@ -111,7 +135,7 @@ class PayloadExpiryTest {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
         verify(agedMessages, times(2)).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
     }
@@ -122,7 +146,7 @@ class PayloadExpiryTest {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
@@ -137,16 +161,17 @@ class PayloadExpiryTest {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
-        retention().forgetExpiredPayloads();
+        retention().forgetExpiredPersonalData();
 
         verify(agedMessages).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
         verify(agedMessages).forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE);
-        assertThat(transactions.opened()).isEqualTo(2);
+        verify(expiredPolicies).erase(BATCH_SIZE);
+        assertThat(transactions.opened()).isEqualTo(3);
         assertThat(logged.list).isEmpty();
     }
 
     private PersonalDataRetention retention() {
-        return new PersonalDataRetention(agedMessages, transactions, ImportSettings.defaults()
+        return new PersonalDataRetention(agedMessages, expiredPolicies, transactions, ImportSettings.defaults()
                 .payloadTtl(PAYLOAD_TTL).quarantineTtl(QUARANTINE_TTL).retentionBatchSize(BATCH_SIZE).build());
     }
 

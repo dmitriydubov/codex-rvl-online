@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -141,6 +142,25 @@ public class OneCInbox {
         if (returned != 1) {
             throw new IllegalStateException("в сырье нет строки последнего сообщения");
         }
+    }
+
+    /**
+     * Сообщение, которое 1С:УСК присылает ещё раз с тем же содержимым, — новая выгрузка со своим {@code message-id}, а
+     * не дубль доставки. Первое такое сообщение остаётся как есть; у каждого следующего {@code message-id} выводится из
+     * прежнего и номера присылки, так что повторный прогон сценария кладёт те же строки.
+     */
+    public OneCMessage asNewDelivery(OneCMessage message) {
+        long sent = received.stream().filter(known -> known.messageId().equals(message.messageId())).count();
+        if (sent == 0) {
+            return message;
+        }
+        UUID resent = UUID.nameUUIDFromBytes((message.messageId() + "#" + sent).getBytes(StandardCharsets.UTF_8));
+        return new OneCMessage(message.stream(), message.queue(), message.data(), message.expected(), resent);
+    }
+
+    /** Все присланные сообщения потока в порядке присылки. */
+    public List<OneCMessage> receivedOf(OneCStream stream) {
+        return received.stream().filter(message -> message.stream() == stream).toList();
     }
 
     /** Сообщение, присланное последним шагом «1С:УСК прислала …». */

@@ -44,7 +44,7 @@ public class ScheduledPasses implements SchedulingConfigurer {
         registrar.addFixedDelayTask(new FixedDelayTask(
                 importScheduler::importPendingMessages, properties.pollInterval(), properties.initialDelay()));
         registrar.addFixedDelayTask(new FixedDelayTask(
-                retention::forgetExpiredPayloads, properties.retentionPollInterval(), properties.initialDelay()));
+                retention::forgetExpiredPersonalData, properties.retentionPollInterval(), properties.initialDelay()));
         registrar.addFixedDelayTask(new FixedDelayTask(
                 stuckTransferAlert::reportStuckTransfers, properties.stuckTransferPollInterval(),
                 properties.initialDelay()));

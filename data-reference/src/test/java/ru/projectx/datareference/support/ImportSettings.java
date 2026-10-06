@@ -22,6 +22,7 @@ public final class ImportSettings {
     private Duration quarantineTtl = Duration.ofDays(30);
     private Duration parentWaitTimeout = Duration.ofHours(24);
     private int parentWaitReportLimit = 20;
+    private final Duration policyPersonalDataGrace = Duration.ofDays(30);
 
     private ImportSettings() {
     }
@@ -93,6 +94,6 @@ public final class ImportSettings {
     public ImportProperties build() {
         return new ImportProperties(pollInterval, initialDelay, batchSize, stuckTransferThreshold,
                 stuckTransferPollInterval, stuckTransferReportLimit, payloadTtl, retentionPollInterval,
-                retentionBatchSize, quarantineTtl, parentWaitTimeout, parentWaitReportLimit);
+                retentionBatchSize, quarantineTtl, parentWaitTimeout, parentWaitReportLimit, policyPersonalDataGrace);
     }
 }

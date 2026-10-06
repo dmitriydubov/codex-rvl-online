@@ -27,6 +27,7 @@
       "end_date": "2030-12-31",
       "availability": true,
       "is_archive": false,
+      "personal_data_erased": false,
       "contract": {
         "id": "{insurance_contract_id}",
         "external_id": "77ff17b5-e659-4720-b57f-e8a19c00fcea",

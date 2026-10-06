@@ -18,6 +18,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
+import ru.projectx.datareference.service.schedulers.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
@@ -41,6 +42,9 @@ class InboundBacklogSnapshotTest {
     @Mock
     private QuarantineRepository quarantine;
 
+    @Mock
+    private ExpiredPolicyPersonalData expiredPolicies;
+
     @Test
     void snapshot_carriesEveryStatusRowCountsAndTheCurrentMoment() {
         Instant oldestNew = NOW.minus(Duration.ofMinutes(40));
@@ -52,17 +56,18 @@ class InboundBacklogSnapshotTest {
         when(repository.countTransfersBufferedBefore(NOW.minus(STUCK_THRESHOLD))).thenReturn(3L);
         when(repository.countPayloadsToForgetReceivedBefore(NOW.minus(PAYLOAD_TTL))).thenReturn(4L);
         when(quarantine.countBodiesReceivedBefore(NOW.minus(QUARANTINE_TTL))).thenReturn(5L);
+        when(expiredPolicies.countAt(NOW)).thenReturn(6L);
 
         InboundBacklog backlog = reads().read();
 
         assertThat(backlog).isEqualTo(new InboundBacklog(
                 List.of(new InboundBacklog.StatusCount(OneCStream.POLICIES, InboundStatus.NEW, 2, oldestNew),
                         new InboundBacklog.StatusCount(OneCStream.MKB10, InboundStatus.FAILED, 1, oldestFailed)),
-                3, new InboundBacklog.Overdue(4, 5), NOW));
+                3, new InboundBacklog.Overdue(4, 5, 6), NOW));
     }
 
     private InboundBacklogReads reads() {
-        return new InboundBacklogReads(repository, quarantine,
+        return new InboundBacklogReads(repository, quarantine, expiredPolicies,
                 ImportSettings.defaults().stuckTransferThreshold(STUCK_THRESHOLD).payloadTtl(PAYLOAD_TTL)
                         .quarantineTtl(QUARANTINE_TTL).build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));

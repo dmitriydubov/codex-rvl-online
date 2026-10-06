@@ -27,6 +27,8 @@ import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.support.ImportSettings;
+import ru.projectx.datareference.support.TestApiProperties;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -50,7 +52,8 @@ class PolicyMapperTest {
 
     private final PolicyRepository repository = mock(PolicyRepository.class);
     private final PolicyMapper mapper = new PolicyMapper(
-            repository, new PolicyContractProperties(EMAIL_PROPERTY), Clock.fixed(NOW, ZoneOffset.UTC));
+            repository, new PolicyContractProperties(EMAIL_PROPERTY), Clock.fixed(NOW, ZoneOffset.UTC),
+            new PolicyPersonalDataTerm(ImportSettings.defaults().build(), TestApiProperties.defaults()));
 
     @Test
     void streamIsPolicies() {
