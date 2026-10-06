@@ -53,6 +53,11 @@ public class OneCInbox {
     private static final String AGE_ALL = """
             update inbound_message set received_at = received_at - cast(:age as interval)
             """;
+    private static final String EXPIRED_PARENTS = """
+            select awaited_parent_id from inbound_message
+            where stream = :stream and status = 'FAILED' and parent_wait_since is not null
+            order by received_at
+            """;
     private static final String AGE_PARENT_WAITS = """
             update inbound_message set parent_wait_since = parent_wait_since - cast(:age as interval)
             where status = 'AWAITING_PARENT'
@@ -183,6 +188,13 @@ public class OneCInbox {
         if (jdbc.sql(AGE_PARENT_WAITS).param("age", age.toSeconds() + " seconds").update() == 0) {
             throw new IllegalStateException("в сырье нет сообщений, которые ждут родителя");
         }
+    }
+
+    /** Родители, которых не дождались отклонённые по сроку сообщения потока, без повторов, в порядке приёма. */
+    public List<UUID> expiredParentsInOrder(OneCStream stream) {
+        return jdbc.sql(EXPIRED_PARENTS).param("stream", stream.name()).query(UUID.class).list().stream()
+                .distinct()
+                .toList();
     }
 
     /** Конверт, присланный последним шагом «1С:УСК прислала …», в том виде, в каком его сохранил бы приём. */

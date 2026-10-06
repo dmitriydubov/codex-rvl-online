@@ -21,6 +21,11 @@ public sealed interface ImportOutcome {
         return false;
     }
 
+    /** Мог ли разбор изменить справочник: от этого зависит, сбрасывать ли кэши ответов потока. */
+    default boolean mayChangeCatalog() {
+        return true;
+    }
+
     /** Запись справочника создана или обновлена. */
     record Applied() implements ImportOutcome {
 
@@ -53,6 +58,12 @@ public sealed interface ImportOutcome {
         @Override
         public String summary() {
             return reason;
+        }
+
+        /** Сообщение ждёт родителя и в справочник ничего не записало. */
+        @Override
+        public boolean mayChangeCatalog() {
+            return false;
         }
     }
 

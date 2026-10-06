@@ -39,7 +39,6 @@ sealed interface PriceListTransfer {
         return assembling(cid, buffered);
     }
 
-    /** Исход передачи записан отказом или пропуском: её части, пришедшие позже, разделяют этот исход. */
     /**
      * Часть передачи, исход которой ещё не записан: она в буфере или вместе со всей собранной передачей ждёт услугу,
      * которой пока нет в справочнике.
@@ -49,6 +48,7 @@ sealed interface PriceListTransfer {
         return status == InboundStatus.BUFFERED || status == InboundStatus.AWAITING_PARENT;
     }
 
+    /** Исход передачи записан отказом или пропуском: её части, пришедшие позже, разделяют этот исход. */
     static boolean isClosed(List<InboundMessage> correlated) {
         return isRejected(correlated) || anyIn(correlated, InboundStatus.SKIPPED);
     }

@@ -197,20 +197,20 @@ public class InboundMessage {
     }
 
     /**
-     * Сообщение ссылается на запись, которой ещё нет, и ждёт её. Момент начала ожидания ставится один раз: сообщение,
-     * которое после пересмотра снова ждёт, например головную организацию вместо отделения, отсчитывает срок с
-     * первого ожидания.
+     * Сообщение ссылается на запись, которой ещё нет, и ждёт её. Сообщение, которое после пересмотра снова ждёт,
+     * например головную организацию вместо отделения, отсчитывает срок с первого ожидания. Сообщение, вручную
+     * возвращённое в разбор, начинает ожидание заново: иначе прежний срок отклонил бы его в том же проходе.
      *
      * @param record GUID записи справочника, которую меняет сообщение; пусто у передачи прайса
      */
     public void markAwaitingParent(AwaitedParent parent, @Nullable UUID record, Instant now) {
+        this.parentWaitSince = status == InboundStatus.NEW ? now : Objects.requireNonNullElse(parentWaitSince, now);
         this.status = InboundStatus.AWAITING_PARENT;
         this.lastError = parent.waitingReason();
         this.nextRetryAt = null;
         this.awaitedParentKind = parent.kind();
         this.awaitedParentId = parent.id();
         this.recordExternalId = record;
-        this.parentWaitSince = Objects.requireNonNullElse(parentWaitSince, now);
     }
 
     /**

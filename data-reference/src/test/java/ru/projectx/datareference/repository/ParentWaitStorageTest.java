@@ -2,23 +2,32 @@ package ru.projectx.datareference.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Limit;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.yaml.snakeyaml.Yaml;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
@@ -64,6 +73,12 @@ class ParentWaitStorageTest {
 
     @Autowired
     private TestJdbc testJdbc;
+
+    @Autowired
+    private JdbcClient jdbc;
+
+    @Autowired
+    private InsurerRepository insurers;
 
     @BeforeEach
     void clearTables() {
@@ -167,9 +182,73 @@ class ParentWaitStorageTest {
             foreign.remember(PARENT, "LPU_CONTRACT", NOW.plusSeconds(60));
         });
 
-        assertThat(foreign.count()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from foreign_reference").query(Long.class).single()).isEqualTo(1);
         assertThat(foreign.existsByExternalIdAndKind(PARENT, ParentKind.CONTRAGENT)).isTrue();
         assertThat(foreign.existsByExternalIdAndKind(PARENT, ParentKind.LPU_CONTRACT)).isFalse();
+    }
+
+    /**
+     * Сообщение, вручную возвращённое в разбор после отказа по сроку, ждёт родителя заново: прежний момент начала
+     * ожидания отклонил бы его в том же проходе.
+     */
+    @Test
+    void messageReturnedToParsing_startsWaitingAnew() {
+        UUID messageId = row("NEW", OneCStream.LPU_CONTRACTS, NOW.minusSeconds(86_400), WAITING_SINCE);
+        InboundMessage message = inbound.findById(messageId).orElseThrow();
+
+        message.markAwaitingParent(new AwaitedParent(ParentKind.CONTRAGENT, PARENT), RECORD, NOW);
+
+        assertThat(message.outcome().parentWait().orElseThrow().since()).isEqualTo(NOW);
+        assertThat(message.outcome().status()).isEqualTo(InboundStatus.AWAITING_PARENT);
+    }
+
+    /**
+     * Заполнение памяти при обновлении берёт только то, что известно наверняка: страхователей и санатории без вида
+     * деятельности РВЛ с телом в сырье, кроме ставших нашими и записанных не в канонической форме.
+     */
+    @Test
+    void fill_remembersInsurersAndSanatoriumsWithoutRvl_only() {
+        UUID insurer = UUID.randomUUID();
+        insurers.save(Insurer.create(insurer, new Insurer.Details("АО «Страховщик»", null, null, null, false), NOW));
+        UUID withoutRvl = UUID.randomUUID();
+        skippedContragent(withoutRvl.toString(), "контрагент без вида деятельности РВЛ");
+        skippedContragent(withoutRvl.toString(), "контрагент без вида деятельности РВЛ");
+        skippedContragent("1-2-3-4-5", "контрагент без вида деятельности РВЛ");
+        skippedContragent(UUID.randomUUID().toString(), "не задан projectx.onec.contract.rvl-activity-id");
+        UUID becameOurs = UUID.randomUUID();
+        skippedContragent(becameOurs.toString(), "контрагент без вида деятельности РВЛ");
+        lpus.save(sanatorium(becameOurs));
+
+        fillSql().forEach(testJdbc::update);
+        fillSql().forEach(testJdbc::update);
+
+        assertThat(jdbc.sql("select external_id from foreign_reference where kind = 'CONTRAGENT' order by external_id")
+                .query(UUID.class).list()).containsExactlyInAnyOrder(insurer, withoutRvl);
+    }
+
+    private void skippedContragent(String guid, String reason) {
+        testJdbc.update("""
+                insert into inbound_message (message_id, stream, source_queue, payload, status, attempt, received_at,
+                                             last_error)
+                values (?, 'CONTRAGENTS', 'очередь', cast(? as jsonb), 'SKIPPED', 0, ?, ?)
+                """, UUID.randomUUID(), "{\"data\":{\"guid\":\"%s\"}}".formatted(guid), Timestamp.from(NOW),
+                reason);
+    }
+
+    /** Операторы заполнения ровно тем текстом, что лежит в миграции. */
+    private static List<String> fillSql() {
+        try (InputStream changelog = new ClassPathResource("db/changelog/018-parent-wait.yaml").getInputStream()) {
+            Map<String, Object> root = new Yaml().load(changelog);
+            return ((List<Map<String, Object>>) root.get("databaseChangeLog")).stream()
+                    .map(entry -> (Map<String, Object>) entry.get("changeSet"))
+                    .filter(changeSet -> "018-foreign-reference-fill".equals(changeSet.get("id")))
+                    .flatMap(changeSet -> ((List<Map<String, Map<String, String>>>) changeSet.get("changes")).stream())
+                    .map(change -> change.get("sql").get("sql"))
+                    .toList();
+        }
+        catch (IOException unreadable) {
+            throw new IllegalStateException("миграция заполнения не читается", unreadable);
+        }
     }
 
     private void remember(UUID externalId, String kind) {

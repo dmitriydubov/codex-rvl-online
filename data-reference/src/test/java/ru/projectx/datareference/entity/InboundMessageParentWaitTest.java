@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Защищает переходы сообщения 1С, которое ждёт родителя: начало ожидания, повторное ожидание, отказ по сроку и выход
@@ -48,6 +49,21 @@ class InboundMessageParentWaitTest {
 
         assertThat(message.outcome().parentWait()).contains(new ParentWait(HEAD_OFFICE, WAITING_SINCE, RECORD));
         assertThat(message.outcome().lastError()).isEqualTo(HEAD_OFFICE.waitingReason());
+    }
+
+    /**
+     * Дежурный возвращает отклонённое по сроку сообщение в разбор обычным SQL, переводя строку в NEW; в сущности такого
+     * перехода нет, поэтому тест ставит статус так же, как его поставил бы SQL. Новое ожидание отсчитывает срок заново.
+     */
+    @Test
+    void waitingAfterManualReturnToParsing_startsTheWaitAnew() {
+        InboundMessage message = waiting();
+        message.markParentWaitExpired();
+        ReflectionTestUtils.setField(message, "status", InboundStatus.NEW);
+
+        message.markAwaitingParent(BRANCH, RECORD, LATER);
+
+        assertThat(message.outcome().parentWait()).contains(new ParentWait(BRANCH, LATER, RECORD));
     }
 
     @Test

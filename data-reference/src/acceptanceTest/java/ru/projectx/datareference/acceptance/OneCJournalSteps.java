@@ -7,6 +7,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import io.cucumber.java.ru.Тогда;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import ru.projectx.datareference.entity.OneCStream;
@@ -87,8 +89,13 @@ public class OneCJournalSteps {
                 .isTrue();
         assertThat(matcher.group(1)).as("поток в сводной записи").isEqualTo(STREAMS.get(stream).name());
         assertThat(Integer.parseInt(matcher.group(2))).as("число истёкших в сводной записи").isEqualTo(expired);
-        assertThat(GUID.matcher(matcher.group(3)).results().count()).as("GUID родителей в сводной записи")
-                .isEqualTo(listed);
+        List<String> expectedParents = inbox.expiredParentsInOrder(STREAMS.get(stream)).stream()
+                .map(UUID::toString)
+                .toList();
+        assertThat(GUID.matcher(matcher.group(3)).results().map(MatchResult::group).toList())
+                .as("GUID родителей в сводной записи: первые по порядку приёма, остальных нет")
+                .hasSize(listed)
+                .containsExactlyElementsOf(expectedParents.subList(0, Math.min(listed, expectedParents.size())));
     }
 
     @Тогда("в журнале Дата-референса есть ровно одна запись уровня ERROR об истёкшем ожидании услуги передачи прайса {string}")

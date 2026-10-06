@@ -73,6 +73,20 @@ class ReferenceImportDispatchTest {
         verify(events).publishEvent(new OneCMessageApplied(OneCStream.MKB10));
     }
 
+    /** Сообщение, которое ждёт родителя, в справочник ничего не записало, и кэши ответов сбрасывать незачем. */
+    @Test
+    void messageAwaitingItsParent_publishesNothing() {
+        when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
+        when(priceListHandler.stream()).thenReturn(OneCStream.PRICE_LISTS);
+        InboundMessage message = message(OneCStream.PRICE_LISTS, envelope(MKB10_DATA));
+        when(priceListHandler.handle(any(), any())).thenReturn(ImportOutcome.awaitingParent("ждёт родителя: услуга"));
+
+        ImportOutcome result = service().importMessage(message);
+
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent("ждёт родителя: услуга"));
+        verify(events, never()).publishEvent(any(Object.class));
+    }
+
     @Test
     void messageOfStreamWithOwnHandler_goesToThatHandler() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);

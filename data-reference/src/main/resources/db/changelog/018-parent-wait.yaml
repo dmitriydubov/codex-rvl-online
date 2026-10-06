@@ -126,3 +126,37 @@ databaseChangeLog:
       rollback:
         - dropTable:
             tableName: foreign_reference
+
+  - changeSet:
+      id: 018-foreign-reference-fill
+      author: rvl-online
+      comment: >
+        Заполняет память о не наших записях тем, что сервис уже знает наверняка: страхователями из их справочника и
+        санаториями без вида деятельности РВЛ, сообщения о которых ещё лежат в сырье с телом. Без этого после
+        обновления адреса страхователей и договоры таких санаториев ждали бы родителя и через срок ожидания уходили
+        бы в отказ. Договоры и услуги, пропущенные раньше как чужие, сюда не берутся: так же пропускались и записи,
+        пришедшие раньше своего родителя, и отличить одни от других по сырью нельзя. GUID из тела берётся только в
+        канонической записи. Повторный запуск ничего не портит. Отката нет: строки уходят вместе с таблицей.
+      changes:
+        - sql:
+            sql: >
+              insert into foreign_reference (external_id, kind, recorded_at)
+              select external_id, 'CONTRAGENT', now() from insurers
+              on conflict (external_id) do nothing
+        - sql:
+            sql: >
+              insert into foreign_reference (external_id, kind, recorded_at)
+              select distinct skipped.external_id, 'CONTRAGENT', now()
+                from (select cast(case when payload -> 'data' ->> 'guid'
+                                            ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                                       then payload -> 'data' ->> 'guid' end as uuid) as external_id
+                        from inbound_message
+                       where stream = 'CONTRAGENTS'
+                         and status = 'SKIPPED'
+                         and last_error = 'контрагент без вида деятельности РВЛ'
+                         and payload is not null) as skipped
+               where skipped.external_id is not null
+                 and not exists (select 1 from lpu where lpu.external_id = skipped.external_id)
+              on conflict (external_id) do nothing
+      rollback:
+        - empty: {}
