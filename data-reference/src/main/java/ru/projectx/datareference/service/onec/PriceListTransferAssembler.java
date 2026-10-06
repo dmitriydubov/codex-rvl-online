@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.node.ObjectNode;
@@ -61,7 +60,7 @@ public class PriceListTransferAssembler implements StreamHandler {
      * @throws OneCFieldException если часть нарушает контракт: передачу отклоняют после отката
      */
     @Override
-    public ImportResult handle(InboundMessage message, ObjectNode data) {
+    public ImportOutcome handle(InboundMessage message, ObjectNode data) {
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(data);
         serviceLock.lockServiceOf(markup.cid(), data);
         markup.applyTo(message);
@@ -71,9 +70,9 @@ public class PriceListTransferAssembler implements StreamHandler {
         return conclude(PriceListTransfer.of(markup.cid(), parts));
     }
 
-    private ImportResult conclude(PriceListTransfer transfer) {
+    private ImportOutcome conclude(PriceListTransfer transfer) {
         return switch (transfer) {
-            case PriceListTransfer.Pending pending -> ImportResult.skipped(pending.reason());
+            case PriceListTransfer.Pending pending -> ImportOutcome.skipped(pending.reason());
             case PriceListTransfer.Rejected rejected -> rejectLate(rejected);
             case PriceListTransfer.Closed closed -> skipLate(closed);
             case PriceListTransfer.Mismatched mismatched -> fail(mismatched);
@@ -82,30 +81,31 @@ public class PriceListTransferAssembler implements StreamHandler {
     }
 
     /** Прежний прайс по услуге не трогается: передача, не совпавшая со своими счётчиками, заведомо неполна. */
-    private ImportResult fail(PriceListTransfer.Mismatched transfer) {
+    private ImportOutcome fail(PriceListTransfer.Mismatched transfer) {
         log.error(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.rejected(transfer.reason());
+        return ImportOutcome.rejected(transfer.reason());
     }
 
     /** Отказ передачи уже записан и о нём уже сообщено; опоздавшая часть просто разделяет его. */
-    private ImportResult rejectLate(PriceListTransfer.Rejected transfer) {
+    private ImportOutcome rejectLate(PriceListTransfer.Rejected transfer) {
         log.warn(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.rejected(transfer.reason());
+        return ImportOutcome.rejected(transfer.reason());
     }
 
     /** Пропущенная передача уже не применится; поздняя часть разделяет её пропуск. */
-    private ImportResult skipLate(PriceListTransfer.Closed transfer) {
+    private ImportOutcome skipLate(PriceListTransfer.Closed transfer) {
         saveAll(transfer.skip(clock.instant()));
-        return ImportResult.skipped(transfer.reason());
+        return ImportOutcome.skipped(transfer.reason());
     }
 
-    /** Замещает прайс собранной передачей или пропускает её, если по услуге применена более новая; исход — всем частям. */
-    private ImportResult apply(PriceListTransfer.Assembled transfer) {
-        ImportResult result = replacement.replace(transfer);
-        saveAll(transfer.markOutcome(result, clock.instant()));
-        return result;
+    /**
+     * Замещает прайс собранной передачей, пропускает её, если по услуге применена более новая, или ставит ждать услугу,
+     * которой ещё нет; исход — всем частям.
+     */
+    private ImportOutcome apply(PriceListTransfer.Assembled transfer) {
+        return replacement.replace(transfer, clock.instant());
     }
 
     /** Обычный цикл, а не стрим: каждый шаг пишет в базу. */

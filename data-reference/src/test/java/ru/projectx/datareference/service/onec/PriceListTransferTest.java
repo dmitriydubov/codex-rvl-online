@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 import static ru.projectx.datareference.support.OneCMessages.sanatorium;
 
@@ -160,9 +161,9 @@ class PriceListTransferTest {
         assertThat(priceRepository.count()).isZero();
     }
 
-    /** Прайс по услуге, которой у нас нет, применять некуда. */
+    /** Прайс по услуге, которой ещё нет, применять некуда: собранная передача целиком ждёт услугу. */
     @Test
-    void priceForUnknownService_isSkipped() {
+    void priceForServiceNotYetReceived_waitsForIt() {
         serviceRepository.deleteAll();
 
         importBatch(rows(1, "4999.95"));
@@ -170,8 +171,9 @@ class PriceListTransferTest {
 
         assertThat(priceRepository.count()).isZero();
         assertThat(inboundMessageRepository.findByCorrelationId(CID))
-                .extracting(inbound -> inbound.outcome().status())
-                .containsOnly(InboundStatus.SKIPPED);
+                .extracting(inbound -> inbound.outcome().status(), inbound -> inbound.outcome().lastError())
+                .containsOnly(tuple(
+                        InboundStatus.AWAITING_PARENT, "ждёт родителя: услуга " + SERVICE_ID));
     }
 
     private UUID importBatch(String rows) {

@@ -20,7 +20,6 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.ProgramMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.LpuRepository;
@@ -94,9 +93,9 @@ class ProgramImportTest {
 
     @Test
     void nonRvlProgram_isSkipped() {
-        ImportResult result = importOne(OneCStream.PROGRAMS, program(false, row(SANATORIUM_ID, "r")));
+        ImportOutcome result = importOne(OneCStream.PROGRAMS, program(false, row(SANATORIUM_ID, "r")));
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
+        assertThat(result).isInstanceOf(ImportOutcome.Skipped.class);
         assertThat(programRepository.count()).isZero();
     }
 
@@ -185,7 +184,7 @@ class ProgramImportTest {
         return logged.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
-    private ImportResult importOne(OneCStream stream, String data) {
+    private ImportOutcome importOne(OneCStream stream, String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();

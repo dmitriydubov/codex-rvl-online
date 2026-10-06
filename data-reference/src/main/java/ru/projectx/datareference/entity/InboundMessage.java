@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Сеттеров нет. Состояние меняется только именованными переходами вроде {@link #markProcessed} и
  * {@link #markFailed}, и каждый записывает исход целиком. Для чтения сообщение отдаёт три снимка: сведения
- * о приёме, исход обработки и место в передаче из нескольких сообщений.
+ * о приёме, исход обработки вместе с ожиданием родителя и место в передаче из нескольких сообщений.
  */
 @Entity
 @Table(name = "inbound_message")
@@ -97,6 +98,24 @@ public class InboundMessage {
     @Column(name = "processed_at")
     private Instant processedAt;
 
+    /** Когда сообщение начало ждать родителя. У отказа по истечении ожидания остаётся: по нему стирается тело. */
+    @Nullable
+    @Column(name = "parent_wait_since")
+    private Instant parentWaitSince;
+
+    @Nullable
+    @Enumerated(EnumType.STRING)
+    @Column(name = "awaited_parent_kind")
+    private ParentKind awaitedParentKind;
+
+    @Nullable
+    @Column(name = "awaited_parent_id")
+    private UUID awaitedParentId;
+
+    @Nullable
+    @Column(name = "record_external_id")
+    private UUID recordExternalId;
+
     protected InboundMessage() {
         // JPA
     }
@@ -120,10 +139,14 @@ public class InboundMessage {
      * Сообщение — часть передачи, которая ещё не собралась. Разметка передачи сохраняется здесь же: по ней
      * сборщик находит остальные сообщения передачи, не разбирая тела заново.
      *
+     * <p>Часть, вручную возвращённая в разбор, забывает прежнее ожидание услуги: иначе собранная заново передача
+     * истекла бы в том же проходе.
+     *
      * @param batchCount сколько пакетов строк ожидается; есть только у финального сообщения, у пакетов пусто
      * @param rowCount   строк в этом пакете, а у финального сообщения — сколько их ожидается во всей передаче
      */
     public void markBuffered(UUID correlationId, @Nullable Integer batchCount, int rowCount) {
+        this.parentWaitSince = status == InboundStatus.NEW ? null : parentWaitSince;
         this.status = InboundStatus.BUFFERED;
         this.correlationId = correlationId;
         this.batchCount = batchCount;
@@ -137,6 +160,10 @@ public class InboundMessage {
         this.processedAt = processedAt;
         this.nextRetryAt = null;
         this.lastError = null;
+        this.parentWaitSince = null;
+        this.awaitedParentKind = null;
+        this.awaitedParentId = null;
+        this.recordExternalId = null;
     }
 
     /**
@@ -148,6 +175,10 @@ public class InboundMessage {
         this.lastError = reason;
         this.processedAt = processedAt;
         this.nextRetryAt = null;
+        this.parentWaitSince = null;
+        this.awaitedParentKind = null;
+        this.awaitedParentId = null;
+        this.recordExternalId = null;
     }
 
     /** Временная ошибка: попытка засчитана, следующая назначена через задержку из настроенного списка повторов. */
@@ -163,6 +194,42 @@ public class InboundMessage {
         this.status = InboundStatus.FAILED;
         this.lastError = error;
         this.nextRetryAt = null;
+        this.parentWaitSince = null;
+        this.awaitedParentKind = null;
+        this.awaitedParentId = null;
+        this.recordExternalId = null;
+    }
+
+    /**
+     * Сообщение ссылается на запись, которой ещё нет, и ждёт её. Сообщение, которое после пересмотра снова ждёт,
+     * например головную организацию вместо отделения, отсчитывает срок с первого ожидания. Сообщение, вручную
+     * возвращённое в разбор, начинает ожидание заново: иначе прежний срок отклонил бы его в том же проходе.
+     *
+     * @param record GUID записи справочника, которую меняет сообщение; пусто у передачи прайса
+     */
+    public void markAwaitingParent(AwaitedParent parent, @Nullable UUID record, Instant now) {
+        this.parentWaitSince = status == InboundStatus.NEW ? now : Objects.requireNonNullElse(parentWaitSince, now);
+        this.status = InboundStatus.AWAITING_PARENT;
+        this.lastError = parent.waitingReason();
+        this.nextRetryAt = null;
+        this.awaitedParentKind = parent.kind();
+        this.awaitedParentId = parent.id();
+        this.recordExternalId = record;
+    }
+
+    /**
+     * Родитель не пришёл за срок ожидания: окончательный отказ с причиной, которая его называет. Ожидание в строке
+     * остаётся: по нему такой отказ отличается от прочих, и тело стирается по сроку хранения.
+     *
+     * @throws IllegalStateException если сообщение ничего не ждёт
+     */
+    public void markParentWaitExpired() {
+        AwaitedParent parent = outcome().parentWait()
+                .orElseThrow(() -> new IllegalStateException("сообщение " + messageId + " не ждёт родителя"))
+                .parent();
+        this.status = InboundStatus.FAILED;
+        this.lastError = parent.expiredReason();
+        this.nextRetryAt = null;
     }
 
     /** Что пришло, по какому потоку, из какой очереди и когда. */
@@ -176,13 +243,20 @@ public class InboundMessage {
         return payload;
     }
 
-    /** Исход обработки на текущий момент. */
+    /**
+     * Исход обработки на текущий момент. Сообщение ждёт или ждало родителя, если задан момент начала ожидания: вид и
+     * GUID родителя записывает вместе с ним только один переход.
+     */
     public InboundOutcome outcome() {
-        return new InboundOutcome(status, attempt, nextRetryAt, lastError, processedAt);
+        ParentWait awaited = parentWaitSince == null ? null : new ParentWait(
+                new AwaitedParent(Objects.requireNonNull(awaitedParentKind), Objects.requireNonNull(awaitedParentId)),
+                parentWaitSince, recordExternalId);
+        return new InboundOutcome(status, attempt, nextRetryAt, lastError, processedAt, awaited);
     }
 
     /** Место сообщения в передаче из нескольких сообщений; у остальных сообщений все значения пустые. */
     public InboundTransferPart transferPart() {
         return new InboundTransferPart(correlationId, batchCount, rowCount);
     }
+
 }

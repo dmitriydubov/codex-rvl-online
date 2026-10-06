@@ -39,7 +39,7 @@ public final class OneCMessages {
     }
 
     /**
-     * Сообщение ТЗ-3, из которого получается санаторий. Нужно почти всем потокам
+     * Сообщение потока контрагентов, из которого получается санаторий. Нужно почти всем потокам
      * со связями: договоры, программы и адреса цепляются именно к нему.
      */
     public static String sanatorium(UUID externalId, String name) {
@@ -47,6 +47,13 @@ public final class OneCMessages {
                 {"guid":"%s","thisIsLPU":true,"Наименование":"%s","ИНН":"7701234567",\
                 "typesActivities":[{"guidTypeActivities":"%s"}]}"""
                 .formatted(externalId, name, RVL_ACTIVITY);
+    }
+
+    /** Контрагент-ЛПУ без вида деятельности «РВЛ»: сервис признаёт его не нашим. */
+    public static String sanatoriumWithoutRvl(UUID externalId, String name) {
+        return """
+                {"guid":"%s","thisIsLPU":true,"Наименование":"%s","ИНН":"7701234567","typesActivities":[]}"""
+                .formatted(externalId, name);
     }
 
     private OneCMessages() {

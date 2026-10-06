@@ -24,10 +24,13 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.config.InboundRetryProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
@@ -80,9 +83,9 @@ class PriceListTransferAssemblerTest {
     void batch_isBufferedWithItsRowCount_andWaitsForFinalMessage() {
         InboundMessage batch = message(batchData(row(1, "100.00"), row(2, "200.00")));
 
-        ImportResult result = receive(batch);
+        ImportOutcome result = receive(batch);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " ждёт финального сообщения"));
+        assertThat(result).isEqualTo(ImportOutcome.skipped("передача " + CID + " ждёт финального сообщения"));
         assertThat(batch.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
         assertThat(batch.transferPart().correlationId()).isEqualTo(CID);
         assertThat(batch.transferPart().batchCount()).isNull();
@@ -97,9 +100,9 @@ class PriceListTransferAssemblerTest {
     void finalMessage_isBufferedWithItsCounters() {
         InboundMessage finalMessage = message(finalData(2, 3));
 
-        ImportResult result = receive(finalMessage);
+        ImportOutcome result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " собрана на 0 из 2 сообщений"));
+        assertThat(result).isEqualTo(ImportOutcome.skipped("передача " + CID + " собрана на 0 из 2 сообщений"));
         assertThat(finalMessage.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
         assertThat(finalMessage.transferPart().correlationId()).isEqualTo(CID);
         assertThat(finalMessage.transferPart().batchCount()).isEqualTo(2);
@@ -114,9 +117,9 @@ class PriceListTransferAssemblerTest {
         InboundMessage finalMessage = message(finalData(2, 3));
         when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
 
-        ImportResult result = receive(finalMessage);
+        ImportOutcome result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.applied());
+        assertThat(result).isEqualTo(ImportOutcome.applied());
         verify(priceListMapper).apply(node("""
                 {"keyValue":"%s","recordSet":[%s,%s,%s]}"""
                 .formatted(SERVICE_ID, row(1, "100.00"), row(2, "200.00"), row(3, "300.00"))));
@@ -129,15 +132,53 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(3.0);
     }
 
+    /** Собранная передача по услуге, которой ещё нет, ждёт её вся, с одного момента и с причиной, которая её называет. */
+    @Test
+    void assembledTransferForServiceNotYetReceived_waitsForItWhole() {
+        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE_ID);
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.awaitingParent(service));
+
+        ImportOutcome result = receive(finalMessage);
+
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent(service.waitingReason()));
+        assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.AWAITING_PARENT);
+            assertThat(message.outcome().parentWait()).contains(new ParentWait(service, NOW, null));
+        });
+        assertThat(transitions(InboundStatus.AWAITING_PARENT)).isEqualTo(2.0);
+    }
+
+    /** Когда услуга пришла, пересмотр финального сообщения собирает передачу из тех же частей и применяет её. */
+    @Test
+    void waitingTransfer_isAssembledAgainFromItsParts_andApplied() {
+        AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE_ID);
+        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        finalMessage.markBuffered(CID, 1, 1);
+        batch.markAwaitingParent(service, null, NOW);
+        finalMessage.markAwaitingParent(service, null, NOW);
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
+
+        ImportOutcome result = receive(finalMessage);
+
+        assertThat(result).isEqualTo(ImportOutcome.applied());
+        assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+            assertThat(message.outcome().parentWait()).isEmpty();
+        });
+    }
+
     @Test
     void transferSkippedByPriceList_isSkippedWholeWithThatReason() {
         InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
         InboundMessage finalMessage = message(finalData(1, 1));
         when(priceListMapper.apply(any())).thenReturn(ImportResult.skipped("услуги нет"));
 
-        ImportResult result = receive(finalMessage);
+        ImportOutcome result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("услуги нет"));
+        assertThat(result).isEqualTo(ImportOutcome.skipped("услуги нет"));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
             assertThat(message.outcome().lastError()).isEqualTo("услуги нет");
@@ -154,9 +195,9 @@ class PriceListTransferAssemblerTest {
         InboundMessage finalMessage = message(finalData(1, 5));
         String reason = "счётчики передачи " + CID + " не сошлись: ожидалось 1 сообщений / 5 строк, получено 1 / 1";
 
-        ImportResult result = receive(finalMessage);
+        ImportOutcome result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.rejected(reason));
+        assertThat(result).isEqualTo(ImportOutcome.rejected(reason));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
             assertThat(message.outcome().lastError()).isEqualTo(reason);
@@ -199,9 +240,9 @@ class PriceListTransferAssemblerTest {
         InboundMessage lateFinal = message(finalData(1, 1));
         String reason = "передача " + CID + " уже отклонена";
 
-        ImportResult result = receive(lateFinal);
+        ImportOutcome result = receive(lateFinal);
 
-        assertThat(result).isEqualTo(ImportResult.rejected(reason));
+        assertThat(result).isEqualTo(ImportOutcome.rejected(reason));
         assertThat(lateFinal.outcome().status()).isEqualTo(InboundStatus.FAILED);
         assertThat(lateFinal.outcome().lastError()).isEqualTo(reason);
         assertThat(rejected.outcome().lastError()).isEqualTo("в строке прайса нет цены");
@@ -216,9 +257,9 @@ class PriceListTransferAssemblerTest {
         rejected.markFailed("в строке прайса нет цены");
         InboundMessage lateBatch = message(batchData("{\"price\":100.00}"));
 
-        ImportResult result = receive(lateBatch);
+        ImportOutcome result = receive(lateBatch);
 
-        assertThat(result).isEqualTo(ImportResult.rejected("передача " + CID + " уже отклонена"));
+        assertThat(result).isEqualTo(ImportOutcome.rejected("передача " + CID + " уже отклонена"));
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 
@@ -286,9 +327,9 @@ class PriceListTransferAssemblerTest {
         appliedFinalReceivedAt(appliedCid, NOW.plusSeconds(1));
         String reason = "по услуге " + SERVICE_ID + " уже применена более новая передача " + appliedCid;
 
-        ImportResult result = receive(lastBatch);
+        ImportOutcome result = receive(lastBatch);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportOutcome.skipped(reason));
         assertThat(List.of(olderFinal, lastBatch)).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
             assertThat(message.outcome().lastError()).isEqualTo(reason);
@@ -306,9 +347,9 @@ class PriceListTransferAssemblerTest {
         InboundMessage lateBatch = message(batchData("{\"price\":100.00}"));
         String reason = "передача " + CID + " уже пропущена";
 
-        ImportResult result = receive(lateBatch);
+        ImportOutcome result = receive(lateBatch);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportOutcome.skipped(reason));
         assertThat(lateBatch.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
         assertThat(lateBatch.outcome().lastError()).isEqualTo(reason);
         assertThat(lateBatch.outcome().processedAt()).isEqualTo(NOW);
@@ -367,7 +408,7 @@ class PriceListTransferAssemblerTest {
                 .hasMessageContaining("cid");
     }
 
-    private ImportResult receive(InboundMessage message) {
+    private ImportOutcome receive(InboundMessage message) {
         correlated.add(message);
         when(repository.findByCorrelationId(CID)).thenReturn(correlated);
         return assembler().handle(message, dataOf(message));
@@ -428,7 +469,7 @@ class PriceListTransferAssemblerTest {
         PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
         return new PriceListTransferAssembler(inboundMessageService, priceListMapper,
                 new PriceTransferServiceLock(repository, finalizations),
-                new PriceListReplacement(priceListMapper, order, json), clock);
+                new PriceListReplacement(priceListMapper, order, json, inboundMessageService), clock);
     }
 
     private static String batchData(String... rows) {

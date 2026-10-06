@@ -22,17 +22,23 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ContragentService;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Защищает замещение прейскуранта услуги собранной передачей. Цены принимаются только по услуге из
- * справочника, иначе передача уходит в пропуск с GUID услуги в причине и прежние цены не трогаются.
+ * справочника. Передача по услуге, признанной не нашей, уходит в пропуск с GUID услуги в причине, а по услуге,
+ * которой ещё нет, ждёт её; прежние цены в обоих случаях не трогаются.
  * По известной услуге старые строки снимаются целиком и записываются строки передачи в её порядке,
  * а пустая передача очищает прейскурант. Строки разбираются до снятия старых цен: битая строка
  * отклоняет передачу, не тронув прежний прейскурант. Данные вымышленные.
@@ -46,17 +52,32 @@ class PriceListMapperTest {
 
     private final PriceListItemRepository repository = mock(PriceListItemRepository.class);
     private final ContragentServiceRepository serviceRepository = mock(ContragentServiceRepository.class);
+    private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final ContragentService service = mock(ContragentService.class);
-    private final PriceListMapper mapper =
-            new PriceListMapper(repository, serviceRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final PriceListMapper mapper = new PriceListMapper(repository, new CatalogReferences(
+            mock(LpuRepository.class), mock(LpuContractRepository.class), serviceRepository,
+            new ForeignReferences(foreignRepository, clock)), clock);
 
     @Test
-    void transferForUnknownService_isSkippedNamingTheService_andOldPricesStay() {
+    void transferForForeignService_isSkippedNamingTheService_andOldPricesStay() {
         when(serviceRepository.findByExternalId(SERVICE)).thenReturn(Optional.empty());
+        when(foreignRepository.existsByExternalIdAndKind(SERVICE, ParentKind.CONTRAGENT_SERVICE)).thenReturn(true);
 
         ImportResult result = mapper.apply(transfer(row(1, "830")));
 
         assertThat(result).isEqualTo(ImportResult.skipped("прайс по услуге вне справочника: " + SERVICE));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void transferForServiceNotYetReceived_waitsForIt_andOldPricesStay() {
+        when(serviceRepository.findByExternalId(SERVICE)).thenReturn(Optional.empty());
+
+        ImportResult result = mapper.apply(transfer(row(1, "830")));
+
+        assertThat(result).isEqualTo(
+                ImportResult.awaitingParent(new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE)));
         verifyNoInteractions(repository);
     }
 

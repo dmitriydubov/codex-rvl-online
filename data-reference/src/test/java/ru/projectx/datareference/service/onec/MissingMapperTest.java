@@ -13,7 +13,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -31,7 +30,8 @@ class MissingMapperTest {
     void streamWithoutMapper_isSkippedWithReason() {
         InboundMessageService inboundMessageService = mock(InboundMessageService.class);
         ReferenceImportService importService = new ReferenceImportService(
-                List.of(), List.of(), inboundMessageService, JsonMapper.builder().build(),
+                List.of(), List.of(), inboundMessageService, mock(SupersededParentWaits.class),
+                JsonMapper.builder().build(),
                 mock(ApplicationEventPublisher.class));
 
         UUID messageId = UUID.randomUUID();
@@ -39,10 +39,10 @@ class MissingMapperTest {
                 new InboundReceipt(messageId, OneCStream.MKB10, "очередь", Instant.now()),
                 envelope("{\"id\":\"" + messageId + "\"}"));
 
-        ImportResult result = importService.importMessage(message);
+        ImportOutcome result = importService.importMessage(message);
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
-        assertThat(((ImportResult.Skipped) result).reason()).contains("маппера для потока MKB10 ещё нет");
-        verify(inboundMessageService).markSkipped(messageId, ((ImportResult.Skipped) result).reason());
+        assertThat(result).isInstanceOf(ImportOutcome.Skipped.class);
+        assertThat(((ImportOutcome.Skipped) result).reason()).contains("маппера для потока MKB10 ещё нет");
+        verify(inboundMessageService).markSkipped(messageId, ((ImportOutcome.Skipped) result).reason());
     }
 }

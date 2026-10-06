@@ -18,8 +18,8 @@ import ru.projectx.datareference.entity.OneCStream;
 
 /**
  * Метрики накопления в таблице сырых сообщений 1С: сколько сообщений каждого потока ждут разбора, ждут частей
- * передачи или ушли в отказ, как давно ждёт самое старое, сколько передач прайсов зависло и сколько тел с
- * персональными данными не стёрто в срок.
+ * передачи, ждут родителя или ушли в отказ, как давно ждёт самое старое, сколько передач прайсов зависло и сколько
+ * тел с персональными данными не стёрто в срок.
  *
  * <p>Значения берутся из снимка в памяти, а снимок обновляет задача по расписанию ({@link #refresh}). Запрашивать
  * базу при каждом скрейпе было бы хуже: скрейп ждал бы базу, а когда база недоступна — до её таймаутов, и
@@ -43,7 +43,8 @@ public class InboundBacklogMetrics implements MeterBinder {
 
     /** Статусы, по которым заведены ряды: всё, что ещё не разобрано, и отказ, который ждёт человека. */
     private static final List<InboundStatus> GAUGED_STATUSES =
-            List.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.BUFFERED, InboundStatus.FAILED);
+            List.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.BUFFERED, InboundStatus.AWAITING_PARENT,
+                    InboundStatus.FAILED);
 
     private static final Logger log = LoggerFactory.getLogger(InboundBacklogMetrics.class);
 
@@ -91,7 +92,7 @@ public class InboundBacklogMetrics implements MeterBinder {
         for (InboundStatus status : GAUGED_STATUSES) {
             Gauge.builder(MESSAGES, this, metrics -> metrics.backlog.messages(stream, status))
                     .description("Сырые сообщения 1С по потоку и статусу: ждут разбора (NEW, RETRY), ждут частей "
-                            + "передачи (BUFFERED), отказ (FAILED)")
+                            + "передачи (BUFFERED), ждут родителя (AWAITING_PARENT), отказ (FAILED)")
                     .tag("stream", stream.name())
                     .tag("status", status.name())
                     .register(registry);

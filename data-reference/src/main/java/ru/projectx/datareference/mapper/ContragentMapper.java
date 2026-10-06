@@ -11,6 +11,7 @@ import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
@@ -26,6 +27,9 @@ import tools.jackson.databind.node.ObjectNode;
  * сообщении пропал, запись не удаляется, а становится архивной, и её реквизиты всё равно обновляются.
  *
  * <p>Страхователь ({@code thisIsLPU = false}) сохраняется без фильтра в справочник страхователей.
+ *
+ * <p>Санаторий без вида «РВЛ», которого у нас нет, и страхователь запоминаются как не наши: договоры и контакты,
+ * которые на них ссылаются, пропускаются сразу, а не ждут санатория.
  *
  * <p>GUID вида деятельности «РВЛ» берётся из настройки {@code projectx.onec.contract.rvl-activity-id}
  * и читается при создании маппера, то есть при старте сервиса. Запись не в канонической форме 8-4-4-4-12
@@ -49,17 +53,20 @@ public class ContragentMapper implements StreamMapper {
 
     private final LpuRepository lpuRepository;
     private final InsurerRepository insurerRepository;
+    private final ForeignReferences foreign;
     private final @Nullable UUID rvlActivity;
     private final Clock clock;
 
     public ContragentMapper(
             LpuRepository lpuRepository,
             InsurerRepository insurerRepository,
+            ForeignReferences foreign,
             OneCContractProperties contract,
             Clock clock) {
 
         this.lpuRepository = lpuRepository;
         this.insurerRepository = insurerRepository;
+        this.foreign = foreign;
         this.rvlActivity = rvlActivityOf(contract);
         this.clock = clock;
     }
@@ -101,7 +108,7 @@ public class ContragentMapper implements StreamMapper {
         if (!hasActivity(data, rvl)) {
             return known
                     .map(lpu -> archiveAfterLosingRvl(lpu, details))
-                    .orElseGet(() -> ImportResult.skipped(WITHOUT_RVL));
+                    .orElseGet(() -> foreign.skipAsForeign(ParentKind.CONTRAGENT, externalId, WITHOUT_RVL));
         }
         Lpu lpu = known
                 .map(existing -> refreshed(existing, details))
@@ -139,7 +146,7 @@ public class ContragentMapper implements StreamMapper {
         insurer.applySnapshot(details, now);
         insurerRepository.save(insurer);
 
-        return ImportResult.skipped(NOT_A_SANATORIUM);
+        return foreign.skipAsForeign(ParentKind.CONTRAGENT, externalId, NOT_A_SANATORIUM);
     }
 
     private static boolean hasActivity(JsonNode data, UUID activityId) {

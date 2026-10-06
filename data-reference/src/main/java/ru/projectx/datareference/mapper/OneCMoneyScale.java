@@ -1,6 +1,7 @@
 package ru.projectx.datareference.mapper;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Optional;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
@@ -22,19 +23,27 @@ final class OneCMoneyScale {
     /**
      * Число поля по правилу знаков, без предела целой части. Не число JSON — пустой результат.
      *
-     * <p>Значение берётся из десятичной записи числа. Сообщения 1С разбираются с дробями в {@link BigDecimal}, и
-     * запись совпадает с присланной; число с порядком остаётся записанным с порядком и не разворачивается.
+     * <p>Сообщения 1С разбираются с дробями в {@link BigDecimal}, и значение берётся таким, каким его прочитал разбор, без
+     * повторного разбора текста: запись совпадает с присланной, а число с порядком остаётся записанным с порядком и не
+     * разворачивается.
      */
     static Optional<BigDecimal> read(JsonNode data, String field) {
         JsonNode value = data.path(field);
         return value.isNumber()
-                ? Optional.of(checked(new BigDecimal(value.asString()), field))
+                ? Optional.of(checked(value.decimalValue(), field))
                 : Optional.empty();
     }
 
-    /** @throws OneCFieldException если у значения больше двух значащих знаков после запятой */
+    /**
+     * Лишние знаки ищутся одним отбрасыванием всего, что дальше второго знака. Нули в конце не снимаются по одному: у
+     * числа из сотен тысяч цифр это заняло бы секунды. Число, у которого знаков после запятой и так не больше двух, не
+     * пересчитывается: число с огромным порядком иначе развернулось бы в цифры.
+     *
+     * @throws OneCFieldException если у значения больше двух значащих знаков после запятой
+     */
     private static BigDecimal checked(BigDecimal amount, String field) {
-        if (amount.stripTrailingZeros().scale() > MAX_FRACTION_DIGITS) {
+        int keptScale = Math.min(amount.scale(), MAX_FRACTION_DIGITS);
+        if (amount.compareTo(amount.setScale(keptScale, RoundingMode.DOWN)) != 0) {
             throw new OneCFieldException("поле %s содержит больше двух знаков после запятой".formatted(field));
         }
         return amount;

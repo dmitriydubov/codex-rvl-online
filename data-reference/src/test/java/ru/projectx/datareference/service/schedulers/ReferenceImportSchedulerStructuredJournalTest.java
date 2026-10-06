@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.schedulers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.mapper.ImportResult.applied;
+import static ru.projectx.datareference.service.onec.ImportOutcome.applied;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -52,6 +52,9 @@ class ReferenceImportSchedulerStructuredJournalTest {
 
     @Mock
     private ReferenceImportService importService;
+
+    @Mock
+    private OverdueParentWaits overdueParentWaits;
 
     @Mock
     private InboundMessageService inboundMessageService;
@@ -108,7 +111,8 @@ class ReferenceImportSchedulerStructuredJournalTest {
 
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
-                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), ImportSettings.defaults().build(), Clock.fixed(NOW, ZoneOffset.UTC));
+                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), overdueParentWaits,
+                ImportSettings.defaults().build(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static InboundMessage received() {

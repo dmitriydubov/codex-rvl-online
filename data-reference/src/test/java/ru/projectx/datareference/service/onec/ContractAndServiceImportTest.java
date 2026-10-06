@@ -3,6 +3,7 @@ package ru.projectx.datareference.service.onec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 import static ru.projectx.datareference.support.OneCMessages.sanatorium;
+import static ru.projectx.datareference.support.OneCMessages.sanatoriumWithoutRvl;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -13,9 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
@@ -95,10 +96,28 @@ class ContractAndServiceImportTest {
     }
 
     @Test
-    void contractOfStrangeContragent_isSkipped() {
-        ImportResult result = importOne(OneCStream.LPU_CONTRACTS, contract(STRANGER_ID, STRANGER_ID, null, false));
+    void contractOfContragentWithoutRvl_isSkipped() {
+        importOne(OneCStream.CONTRAGENTS, sanatoriumWithoutRvl(STRANGER_ID, "Санаторий «Чужой»"));
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
+        ImportOutcome result = importOne(OneCStream.LPU_CONTRACTS, contract(STRANGER_ID, STRANGER_ID, null, false));
+
+        assertThat(result).isInstanceOf(ImportOutcome.Skipped.class);
+        assertThat(contractRepository.count()).isZero();
+    }
+
+    /**
+     * Ребёнок приезжает раньше родителя: 1С присылает справочники многими очередями сразу и порядок не гарантирует.
+     * Договор контрагента, о котором сервис ещё ничего не знает, ждёт его, и строка сырья говорит, кого именно.
+     */
+    @Test
+    void contractOfContragentNotYetReceived_waitsForIt() {
+        UUID messageId = UUID.randomUUID();
+        ImportOutcome result = importOne(messageId, OneCStream.LPU_CONTRACTS,
+                contract(STRANGER_ID, STRANGER_ID, null, false));
+
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent("ждёт родителя: контрагент " + STRANGER_ID));
+        assertThat(inboundMessageRepository.findById(messageId).orElseThrow().outcome().status())
+                .isEqualTo(InboundStatus.AWAITING_PARENT);
         assertThat(contractRepository.count()).isZero();
     }
 
@@ -170,21 +189,22 @@ class ContractAndServiceImportTest {
     }
 
     /**
-     * Тот самый риск, о котором контракт предупреждает отдельно: ребёнок приезжает раньше
-     * родителя. Это пропуск с причиной, а не отказ — сообщение остаётся в базе целиком
-     * и переобрабатывается переводом строки обратно в NEW, когда договор приедет.
+     * Тот самый риск, о котором контракт предупреждает отдельно: ребёнок приезжает раньше родителя. Это ожидание, а
+     * не отказ и не пропуск: сообщение остаётся в базе целиком и применится, когда договор приедет.
      */
     @Test
-    void serviceArrivingBeforeItsContract_isSkippedWithReason() {
-        ImportResult result = importOne(OneCStream.CONTRAGENT_SERVICES, service(CONTRACT_ID));
+    void serviceArrivingBeforeItsContract_waitsForIt() {
+        ImportOutcome result = importOne(OneCStream.CONTRAGENT_SERVICES, service(CONTRACT_ID));
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
-        assertThat(((ImportResult.Skipped) result).reason()).contains("вне справочника");
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent("ждёт родителя: договор ЛПУ " + CONTRACT_ID));
         assertThat(serviceRepository.count()).isZero();
     }
 
-    private ImportResult importOne(OneCStream stream, String data) {
-        UUID messageId = UUID.randomUUID();
+    private ImportOutcome importOne(OneCStream stream, String data) {
+        return importOne(UUID.randomUUID(), stream, data);
+    }
+
+    private ImportOutcome importOne(UUID messageId, OneCStream stream, String data) {
         inboundMessageService.store(messageId, stream, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();
         return importService.importMessage(message);

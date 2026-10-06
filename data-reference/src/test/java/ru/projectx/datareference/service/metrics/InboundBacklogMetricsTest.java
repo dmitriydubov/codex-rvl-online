@@ -59,15 +59,15 @@ class InboundBacklogMetricsTest {
         metricsLog().detachAppender(logged);
     }
 
-    /** Ряды есть до первого чтения базы, по каждому потоку и каждому из четырёх статусов, и они нулевые. */
+    /** Ряды есть до первого чтения базы, по каждому потоку и каждому из пяти статусов, и они нулевые. */
     @Test
     void beforeFirstRefresh_everyStreamAndStatusIsZero() {
         assertThat(registry.find(InboundBacklogMetrics.MESSAGES).gauges())
-                .hasSize(OneCStream.values().length * 4)
+                .hasSize(OneCStream.values().length * 5)
                 .allSatisfy(gauge -> assertThat(gauge.value()).isZero());
         assertThat(registry.find(InboundBacklogMetrics.MESSAGES).gauges())
                 .extracting(gauge -> gauge.getId().getTag("status"))
-                .containsOnly("NEW", "RETRY", "BUFFERED", "FAILED");
+                .containsOnly("NEW", "RETRY", "BUFFERED", "AWAITING_PARENT", "FAILED");
         assertThat(registry.find(InboundBacklogMetrics.OLDEST_PENDING).timeGauges())
                 .hasSize(OneCStream.values().length)
                 .allSatisfy(gauge -> assertThat(gauge.value(TimeUnit.SECONDS)).isZero());

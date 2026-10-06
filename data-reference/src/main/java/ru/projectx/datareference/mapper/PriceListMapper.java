@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -45,17 +44,18 @@ public class PriceListMapper {
 
     public PriceListMapper(
             PriceListItemRepository repository,
-            ContragentServiceRepository serviceRepository,
+            CatalogReferences references,
             Clock clock) {
 
         this.repository = repository;
-        this.services = new CatalogReference<>(serviceRepository::findByExternalId, "прайс по услуге вне справочника: ");
+        this.services = references.services("прайс по услуге вне справочника: ");
         this.clock = clock;
     }
 
     /**
-     * Замещает прейскурант услуги целиком. Услуга вне справочника даёт пропуск с GUID услуги в причине,
-     * и прежние цены не трогаются. Строки разбираются до снятия прежних цен: битая строка их не задевает.
+     * Замещает прейскурант услуги целиком. Услуга, признанная не нашей, даёт пропуск с GUID услуги в причине, а
+     * услуга, которой ещё нет, — ожидание её; прежние цены в обоих случаях не трогаются. Строки разбираются до снятия
+     * прежних цен: битая строка их не задевает.
      *
      * @param transfer собранная передача: {@code keyValue} с GUID услуги и {@code recordSet} со строками
      *                 всех её сообщений по возрастанию номера строки

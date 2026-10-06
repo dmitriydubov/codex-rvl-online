@@ -3,7 +3,6 @@ package ru.projectx.datareference.service.onec;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.ImportResult;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -31,5 +30,5 @@ public interface StreamHandler {
      * @throws OneCFieldException если сообщение не соответствует контракту; это постоянная ошибка,
      *         повторять её бессмысленно
      */
-    ImportResult handle(InboundMessage message, ObjectNode data);
+    ImportOutcome handle(InboundMessage message, ObjectNode data);
 }

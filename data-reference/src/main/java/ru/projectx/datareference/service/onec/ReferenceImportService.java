@@ -13,7 +13,6 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCMessageApplied;
@@ -33,9 +32,10 @@ import tools.jackson.databind.node.ObjectNode;
  * фиксируются вместе. Если их разъединить, сообщение либо применится дважды, когда статус не записался, либо
  * потеряется, когда статус записался, а изменения откатились.
  *
- * <p>Разобранное сообщение, применённое или пропущенное, публикует событие {@link OneCMessageApplied}: по нему
+ * <p>Разобранное сообщение, которое могло изменить справочник, публикует событие {@link OneCMessageApplied}: по нему
  * после фиксации транзакции сбрасываются кэши ответов, которые зависят от потока сообщения. Отказ события не
- * публикует: транзакция откатывается, и справочник не меняется.
+ * публикует: транзакция откатывается, и справочник не меняется. Сообщение, которое ждёт родителя, тоже не публикует:
+ * в справочник оно ничего не записало.
  *
  * <p>Когда повторять и что делать с отказом, решает не этот класс. Исключение уходит к планировщику разбора,
  * потому что отказ записывается уже после отката этой транзакции.
@@ -51,6 +51,7 @@ public class ReferenceImportService {
     /**
      * @param mappers           мапперы потоков с обычным путём: каждый становится обработчиком своего потока
      * @param dedicatedHandlers обработчики потоков с особым путём
+     * @param supersededWaits   закрытие ожидающих сообщений, которые обогнало применённое сообщение той же записи
      * @param events            публикация события о разобранном сообщении
      * @throws IllegalStateException если у одного потока оказалось два обработчика
      */
@@ -58,11 +59,13 @@ public class ReferenceImportService {
             List<StreamMapper> mappers,
             List<StreamHandler> dedicatedHandlers,
             InboundMessageService inboundMessageService,
+            SupersededParentWaits supersededWaits,
             ObjectMapper json,
             ApplicationEventPublisher events) {
 
         this.handlers = Stream.concat(
-                        mappers.stream().map(mapper -> new MappedStreamHandler(mapper, inboundMessageService)),
+                        mappers.stream().map(mapper ->
+                                new MappedStreamHandler(mapper, inboundMessageService, supersededWaits)),
                         dedicatedHandlers.stream())
                 .collect(Collectors.toUnmodifiableMap(StreamHandler::stream, Function.identity()));
         this.inboundMessageService = inboundMessageService;
@@ -77,13 +80,15 @@ public class ReferenceImportService {
      *         её бессмысленно
      */
     @Transactional
-    public ImportResult importMessage(InboundMessage message) {
+    public ImportOutcome importMessage(InboundMessage message) {
         ObjectNode data = dataOf(message);
         OneCStream stream = message.receipt().stream();
-        ImportResult result = handlerFor(stream)
+        ImportOutcome result = handlerFor(stream)
                 .map(handler -> handler.handle(message, data))
                 .orElseGet(() -> skipWithoutHandler(message));
-        events.publishEvent(new OneCMessageApplied(stream));
+        if (result.mayChangeCatalog()) {
+            events.publishEvent(new OneCMessageApplied(stream));
+        }
         return result;
     }
 
@@ -96,11 +101,11 @@ public class ReferenceImportService {
      * которого ещё не дошли руки, ждёт своего маппера в разобранном виде, а не в виде ошибки. Когда маппер
      * появится, строку разбирают заново, вернув ей статус {@code NEW}, пока её тело не стёрто по сроку хранения.
      */
-    private ImportResult skipWithoutHandler(InboundMessage message) {
+    private ImportOutcome skipWithoutHandler(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
         String reason = "маппера для потока " + receipt.stream() + " ещё нет";
         inboundMessageService.markSkipped(receipt.messageId(), reason);
-        return ImportResult.skipped(reason);
+        return ImportOutcome.skipped(reason);
     }
 
     /**

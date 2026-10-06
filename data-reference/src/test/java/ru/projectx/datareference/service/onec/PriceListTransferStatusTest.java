@@ -6,10 +6,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.mapper.ImportResult;
 
 /**
@@ -228,15 +231,16 @@ class PriceListTransferStatusTest {
         InboundMessage batch = batch(1);
         InboundMessage skippedFinal = finalMessage(1, 1);
         InboundMessage skippedBatch = batch(1);
-        InboundMessage rejectedFinal = finalMessage(1, 1);
-        InboundMessage rejectedBatch = batch(1);
+        InboundMessage waitingFinal = finalMessage(1, 1);
+        InboundMessage waitingBatch = batch(1);
+        AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, CID);
 
         List<InboundMessage> applied = new PriceListTransfer.Assembled(finalMessage, List.of(batch))
                 .markOutcome(ImportResult.applied(), PROCESSED_AT);
         List<InboundMessage> skipped = new PriceListTransfer.Assembled(skippedFinal, List.of(skippedBatch))
                 .markOutcome(ImportResult.skipped("услуги нет"), PROCESSED_AT);
-        List<InboundMessage> rejected = new PriceListTransfer.Assembled(rejectedFinal, List.of(rejectedBatch))
-                .markOutcome(ImportResult.rejected("цены отклонены"), PROCESSED_AT);
+        List<InboundMessage> waiting = new PriceListTransfer.Assembled(waitingFinal, List.of(waitingBatch))
+                .markOutcome(ImportResult.awaitingParent(service), PROCESSED_AT);
 
         assertThat(applied).containsExactly(finalMessage, batch)
                 .allSatisfy(message -> assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED));
@@ -245,10 +249,23 @@ class PriceListTransferStatusTest {
             assertThat(message.outcome().lastError()).isEqualTo("услуги нет");
             assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
         });
-        assertThat(rejected).containsExactly(rejectedFinal, rejectedBatch).allSatisfy(message -> {
-            assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
-            assertThat(message.outcome().lastError()).isEqualTo("цены отклонены");
+        assertThat(waiting).containsExactly(waitingFinal, waitingBatch).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.AWAITING_PARENT);
+            assertThat(message.outcome().lastError()).isEqualTo(service.waitingReason());
+            assertThat(message.outcome().parentWait()).contains(new ParentWait(service, PROCESSED_AT, null));
         });
+    }
+
+    /** Собранная передача, которая ждёт услугу, при пересмотре собирается снова из тех же частей. */
+    @Test
+    void transferWaitingForItsService_isAssembledAgainFromTheSameParts() {
+        InboundMessage finalMessage = finalMessage(1, 1);
+        InboundMessage batch = batch(1);
+        new PriceListTransfer.Assembled(finalMessage, List.of(batch)).markOutcome(
+                ImportResult.awaitingParent(new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, CID)), PROCESSED_AT);
+
+        assertThat(PriceListTransfer.of(CID, List.of(finalMessage, batch)))
+                .isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of(batch)));
     }
 
     @Test

@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Защищает предел целой части денег и процентов: значение, которое не поместится в колонку, отклоняется при разборе с
+ * Защищает предел целой части денег: значение, которое не поместится в колонку, отклоняется при разборе с
  * именем поля, а не отказом базы, в котором поля не видно.
  *
  * <p>Сообщения разбираются той же настройкой JSON, что и у сервиса: от неё зависит, как читается число с экспонентой.
@@ -24,7 +24,6 @@ class OneCDecimalColumnTest {
 
     private static final ObjectMapper JSON = OneCJson.mapper();
     private static final String TOO_LARGE_PRICE = "поле price больше допустимого";
-    private static final String TOO_LARGE_COPAYMENT = "поле copayment больше допустимого";
 
     @ParameterizedTest
     @ValueSource(strings = {"9999999999999.99", "-9999999999999.99", "9999999999999", "0", "0.01", "1E+12", "0E+20"})
@@ -38,20 +37,6 @@ class OneCDecimalColumnTest {
         assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", sent), "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage(TOO_LARGE_PRICE);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"999.99", "-999.99", "999", "0.5", "0E+3"})
-    void percentWithinThreeIntegerDigits_isReadAsSent(String sent) {
-        assertThat(OneCDecimalColumn.PERCENT.read(node("copayment", sent), "copayment")).contains(new BigDecimal(sent));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"1000.00", "-1000.00", "1E+3", "1e999999999"})
-    void percentBeyondThreeIntegerDigits_isRejectedNamingFieldButNotValue(String sent) {
-        assertThatThrownBy(() -> OneCDecimalColumn.PERCENT.read(node("copayment", sent), "copayment"))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage(TOO_LARGE_COPAYMENT);
     }
 
     /** Знаки после запятой проверяются первыми: у значения с обоими нарушениями причина — знаки. */
@@ -85,6 +70,21 @@ class OneCDecimalColumnTest {
     }
 
     /**
+     * Самое длинное число, которое база может вернуть из сырья: 131072 цифры до запятой и 16383 нуля после. Нули дроби
+     * не снимаются по одному, а значение не разбирается заново из текста, поэтому отказ занимает доли секунды, а не
+     * десятки секунд.
+     */
+    @Test
+    void longestStoredNumber_isRejectedQuickly() {
+        ObjectNode data = JSON.createObjectNode()
+                .put("price", new BigDecimal("1" + "0".repeat(131_071) + "." + "0".repeat(16_383)));
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertThatThrownBy(
+                () -> OneCDecimalColumn.AMOUNT.read(data, "price"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage(TOO_LARGE_PRICE));
+    }
+
+    /**
      * Диапазон сооплаты строже колонки процента, поэтому и огромное значение отклоняется им, а не пределом колонки:
      * причина одна для всех значений больше 100 или меньше 0.
      */
@@ -110,7 +110,7 @@ class OneCDecimalColumnTest {
     @Test
     void absentOrTextValue_isEmpty() {
         assertThat(OneCDecimalColumn.AMOUNT.read(node("price", "\"1e999999999\""), "price")).isEmpty();
-        assertThat(OneCDecimalColumn.PERCENT.read(node("other", "1"), "copayment")).isEmpty();
+        assertThat(OneCDecimalColumn.AMOUNT.read(node("other", "1"), "price")).isEmpty();
     }
 
     private static ObjectNode node(String field, String number) {

@@ -7,7 +7,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.mapper.ImportResult.applied;
+import static ru.projectx.datareference.service.onec.ImportOutcome.applied;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -58,6 +58,9 @@ class ReferenceImportStreamOrderTest {
 
     @Mock
     private ReferenceImportService importService;
+
+    @Mock
+    private OverdueParentWaits overdueParentWaits;
 
     @Mock
     private InboundMessageService inboundMessageService;
@@ -184,7 +187,7 @@ class ReferenceImportStreamOrderTest {
 
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
-                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())),
+                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), overdueParentWaits,
                 ImportSettings.defaults().batchSize(BATCH_SIZE).build(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

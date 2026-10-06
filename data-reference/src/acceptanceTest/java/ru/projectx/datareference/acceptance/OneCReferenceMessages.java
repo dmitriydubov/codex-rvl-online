@@ -32,6 +32,7 @@ final class OneCReferenceMessages {
     private static final String BEGIN = "начало";
     private static final String END = "окончание";
     private static final String SANATORIUM = "санаторий";
+    private static final String BRANCH = "отделение";
     private static final String DELETE_MARK = "deleteMark";
     private static final String PROGRAM_NAME = "Стенд: программа РВЛ";
     private static final String MAIN_CONTRACT = "главный договор";
@@ -93,7 +94,8 @@ final class OneCReferenceMessages {
      * дополнительных свойств, а не поле сообщения.
      */
     static OneCMessage lpuContract(Map<String, String> table) {
-        onlyKnown(table, EXTERNAL_ID, "номер", SANATORIUM, BEGIN, END, MAIN_CONTRACT, MAIN_CONTRACT_PRICES, SOB_EXPORT);
+        onlyKnown(table, EXTERNAL_ID, "номер", SANATORIUM, BRANCH, BEGIN, END, MAIN_CONTRACT, MAIN_CONTRACT_PRICES,
+                SOB_EXPORT, OneCMessages.MESSAGE_ID);
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, EXTERNAL_ID))
                 .put("number", required(table, "номер"))
@@ -103,12 +105,14 @@ final class OneCReferenceMessages {
                 .put("endDate", required(table, END))
                 .put(DELETE_MARK, false);
         Optional.ofNullable(table.get(MAIN_CONTRACT)).ifPresent(main -> data.put("mainContractId", main));
+        Optional.ofNullable(table.get(BRANCH)).ifPresent(branch -> data.put("contragentBranchId", branch));
         if (table.containsKey(SOB_EXPORT)) {
             data.putArray("extProperties").addObject()
                     .put("propertyName", SOB_EXPORT_PROPERTY)
                     .putObject("value").put("value", flag(table, SOB_EXPORT));
         }
-        return new OneCMessage(OneCStream.LPU_CONTRACTS, LPU_CONTRACTS_QUEUE, data, InboundStatus.PROCESSED);
+        return new OneCMessage(OneCStream.LPU_CONTRACTS, LPU_CONTRACTS_QUEUE, data, InboundStatus.PROCESSED,
+                OneCMessages.fixedMessageId(table));
     }
 
     /**

@@ -39,3 +39,5 @@ databaseChangeLog:
       file: db/changelog/016-retention-index-all-statuses.yaml
   - include:
       file: db/changelog/017-price-list-finalization.yaml
+  - include:
+      file: db/changelog/018-parent-wait.yaml

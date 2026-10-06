@@ -89,11 +89,11 @@ class InboundTransitionMetricsTest {
     @Test
     void creation_registersZeroSeriesForEveryStreamAndTargetStatus() {
         assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
-                .hasSize(OneCStream.values().length * 5)
+                .hasSize(OneCStream.values().length * 6)
                 .allSatisfy(counter -> assertThat(counter.count()).isZero());
         assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
                 .extracting(counter -> counter.getId().getTag("status"))
-                .containsOnly("PROCESSED", "SKIPPED", "BUFFERED", "RETRY", "FAILED");
+                .containsOnly("PROCESSED", "SKIPPED", "BUFFERED", "AWAITING_PARENT", "RETRY", "FAILED");
     }
 
     /** NEW ставит приём, а не разбор: такой «переход» не считается и нового ряда не заводит. */

@@ -9,12 +9,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.InboundRetryProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -35,8 +37,12 @@ public class InboundMessageService {
 
     private static final Logger log = LoggerFactory.getLogger(InboundMessageService.class);
 
-    /** Статусы сообщений, которые ещё ждут разбора; у остальных исход разбора зафиксирован. */
-    private static final Set<InboundStatus> AWAITING_PARSE = EnumSet.of(InboundStatus.NEW, InboundStatus.RETRY);
+    /**
+     * Статусы сообщений, которые ещё ждут разбора; у остальных исход разбора зафиксирован. Сообщение, которое ждёт
+     * родителя, разбирают снова, когда родитель пришёл, и его отказ записывается так же, как у нового.
+     */
+    private static final Set<InboundStatus> AWAITING_PARSE =
+            EnumSet.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.AWAITING_PARENT);
 
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
@@ -96,6 +102,18 @@ public class InboundMessageService {
     public void markSkipped(UUID messageId, String reason) {
         InboundMessage message = require(messageId);
         message.markSkipped(reason, clock.instant());
+        transitions.record(message);
+    }
+
+    /**
+     * Отмечает, что сообщение ждёт записи, на которую ссылается. Работает в транзакции вызывающего, как пропуск.
+     *
+     * @param record GUID записи справочника, которую меняет сообщение; пусто, если у потока её нет
+     */
+    @Transactional
+    public void markAwaitingParent(UUID messageId, AwaitedParent parent, @Nullable UUID record) {
+        InboundMessage message = require(messageId);
+        message.markAwaitingParent(parent, record, clock.instant());
         transitions.record(message);
     }
 

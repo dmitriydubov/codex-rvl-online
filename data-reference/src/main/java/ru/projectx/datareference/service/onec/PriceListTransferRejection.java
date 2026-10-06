@@ -6,7 +6,6 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
@@ -85,7 +84,7 @@ public class PriceListTransferRejection implements RejectionScope {
     private static List<InboundMessage> bufferedOthers(InboundMessage message, List<InboundMessage> parts) {
         UUID messageId = message.receipt().messageId();
         return parts.stream()
-                .filter(other -> other.outcome().status() == InboundStatus.BUFFERED)
+                .filter(PriceListTransfer::isCollected)
                 .filter(other -> !other.receipt().messageId().equals(messageId))
                 .toList();
     }
