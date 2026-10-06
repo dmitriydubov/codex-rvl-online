@@ -286,10 +286,11 @@ class ParentWaitStorageTest {
         UUID messageId = UUID.randomUUID();
         testJdbc.update("""
                 insert into inbound_message (message_id, stream, source_queue, payload, status, attempt, received_at,
-                                             last_error, parent_wait_since)
-                values (?, ?, 'очередь', cast('{"data":{}}' as jsonb), ?, 0, ?, 'причина', ?)
+                                             last_error, parent_wait_since, awaited_parent_kind, awaited_parent_id)
+                values (?, ?, 'очередь', cast('{"data":{}}' as jsonb), ?, 0, ?, 'причина', ?, ?, ?)
                 """, messageId, stream.name(), status, Timestamp.from(receivedAt),
-                waitingSince == null ? null : Timestamp.from(waitingSince));
+                waitingSince == null ? null : Timestamp.from(waitingSince),
+                waitingSince == null ? null : ParentKind.CONTRAGENT.name(), waitingSince == null ? null : PARENT);
         return messageId;
     }
 
