@@ -1,19 +1,18 @@
 package ru.projectx.datareference.config;
 
+import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Чтение JSON приложением.
  *
- * <p>Бин объявлен явно, а не взят у автоконфигурации: она приезжает вместе со стартером
- * JSON, а у сервиса пока нет ни его, ни веб-слоя — только сам Jackson, на котором
- * разбираются сообщения 1С.
+ * <p>Маппер один — тот, что собирает автоконфигурация Spring Boot: на нём и ответы REST, и разбор сообщений 1С.
+ * Здесь к нему добавляются правила чтения сообщений 1С. Отдельный бин маппера тут не помог бы: основной маппер Boot
+ * помечен как главный, и сервисы всё равно получили бы его.
  *
- * <p>Мост Hibernate к колонкам {@code jsonb} ({@link Jackson3JsonFormatMapper}) этот бин
+ * <p>Мост Hibernate к колонкам {@code jsonb} ({@link Jackson3JsonFormatMapper}) этот маппер
  * не использует и использовать не может: его создаёт Hibernate по имени класса,
  * до и вне контекста Spring.
  */
@@ -27,11 +26,16 @@ public class JacksonConfig {
      *
      * <p>Задано явно, хотя в Jackson 3 это и так умолчание: правило контракта должно быть
      * видно в коде, а не зависеть от версии библиотеки.
+     *
+     * <p>Дробь читается в {@link java.math.BigDecimal}, а не в {@code double}: так сумма доходит
+     * до проверок ровно такой, какой её прислала 1С. Двоичная дробь теряет последние знаки у
+     * числа длиннее 15 значащих цифр, и третий знак после запятой у суммы с тринадцатью цифрами
+     * до запятой пропал бы незамеченным. Целые числа остаются целыми.
      */
     @Bean
-    public ObjectMapper objectMapper() {
-        return JsonMapper.builder()
+    public JsonMapperBuilderCustomizer oneCMessageReading() {
+        return builder -> builder
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .build();
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     }
 }
