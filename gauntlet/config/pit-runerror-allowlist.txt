@@ -43,3 +43,13 @@ ru.projectx.datareference.config.OneCContractProperties#filled                  
 # (final-message return), batch_hasNoExpectedBatches_andCountsItsOwnRows (batch return) — each asserts
 # isEqualTo(new PriceListTransferMarkup(...)), which fails on a null actual. Verified by the coordinator 2026-10-05.
 ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                   NullReturnValsMutator              # finalMessage_carries.../batch_hasNoExpectedBatches...: isEqualTo(new PriceListTransferMarkup(...)) on null
+
+# ImportPropertiesTest: parentWaitAgainstPayloadTtl_decidesTheStartup (parameterized: 30d/30d, 31d/30d, 2d/1d must fail
+# the start, 29d/30d and PT719H59M59S/30d must start; compareTo(payloadTtl) < 0).
+ru.projectx.datareference.config.ImportProperties#isParentWaitShorterThanPayloadTtl  ConditionalsBoundaryMutator         # [30d,30d,false]: <= 0 starts, getFailure() fails
+ru.projectx.datareference.config.ImportProperties#isParentWaitShorterThanPayloadTtl  RemoveConditionalMutator_ORDER_ELSE # [29d,30d,true]: always false, hasNotFailed() fails
+ru.projectx.datareference.config.ImportProperties#isParentWaitShorterThanPayloadTtl  BooleanTrueReturnValsMutator        # [31d,30d,false]: always true, getFailure() fails
+
+# ExpiredParentWaitTest: messageThatWaitedForNothing_isRefused (orElseThrow supplier returning null throws
+# NullPointerException instead of IllegalStateException).
+ru.projectx.datareference.service.onec.ExpiredParentWait#lambda$of$*                 NullReturnValsMutator              # isExactlyInstanceOf(IllegalStateException) fails on NPE
