@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -49,6 +51,27 @@ class PriceListTransferMarkupTest {
                 {"cid":"%s","countMessages":0,"countRows":0}""".formatted(CID)));
 
         assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 0, 0));
+    }
+
+    /** Счётчик за пределом целого — нарушение контракта с именем поля, без значения. */
+    @ParameterizedTest
+    @CsvSource({"countMessages, 1e10, 1", "countMessages, -10000000000, 1", "countRows, 1, 2147483648"})
+    void counterBeyondIntBound_isContractViolationNamingField(String field, String countMessages, String countRows) {
+        ObjectNode data = node("""
+                {"cid":"%s","countMessages":%s,"countRows":%s}""".formatted(CID, countMessages, countRows));
+
+        assertThatThrownBy(() -> PriceListTransferMarkup.of(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле " + field + " больше допустимого");
+    }
+
+    /** Счётчик, пришедший не числом JSON, а строкой с целым, читается как прежде — тем же целым. */
+    @Test
+    void counterWrittenAsText_isReadAsBefore() {
+        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+                {"cid":"%s","countMessages":"2","countRows":"3"}""".formatted(CID)));
+
+        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
     }
 
     @Test

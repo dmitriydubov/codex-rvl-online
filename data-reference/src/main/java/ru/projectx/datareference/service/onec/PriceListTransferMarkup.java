@@ -30,14 +30,29 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
      * <p>Финальное сообщение узнаётся по наличию счётчиков, а не по их значению: ноль пакетов — легальный случай,
      * он означает, что прайс по услуге очищается.
      *
-     * @throws OneCFieldException если в сообщении нет идентификатора передачи
+     * @throws OneCFieldException если в сообщении нет идентификатора передачи или счётчик не помещается в {@code int}
      */
     static PriceListTransferMarkup of(ObjectNode data) {
-        UUID cid = OneCValues.requiredUuid(data, CID);
+        UUID cid = cidOf(data);
         if (data.has(COUNT_MESSAGES)) {
-            return new PriceListTransferMarkup(cid, data.path(COUNT_MESSAGES).asInt(), data.path(COUNT_ROWS).asInt());
+            return new PriceListTransferMarkup(cid, counter(data, COUNT_MESSAGES), counter(data, COUNT_ROWS));
         }
         return new PriceListTransferMarkup(cid, null, data.path(RECORD_SET).size());
+    }
+
+    /**
+     * Идентификатор передачи, которой принадлежит сообщение. По нему передачу находят и тогда, когда остальная разметка
+     * сообщения не читается.
+     *
+     * @throws OneCFieldException если в сообщении нет идентификатора передачи
+     */
+    static UUID cidOf(ObjectNode data) {
+        return OneCValues.requiredUuid(data, CID);
+    }
+
+    /** Число за пределами {@code int} отклоняется с именем поля; прочее значение счётчика читается как прежде. */
+    private static int counter(ObjectNode data, String field) {
+        return OneCValues.integer(data, field).orElseGet(() -> data.path(field).asInt());
     }
 
     /** Откладывает сообщение в буфер с этой разметкой. */

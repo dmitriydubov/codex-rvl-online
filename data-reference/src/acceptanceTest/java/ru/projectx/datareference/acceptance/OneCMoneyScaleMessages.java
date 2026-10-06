@@ -41,7 +41,9 @@ final class OneCMoneyScaleMessages {
             "premium", OneCMoneyScaleMessages::policyProgram,
             "premiumD", OneCMoneyScaleMessages::policyProgram,
             "limit", OneCMoneyScaleMessages::policyProgram,
-            "copayment", OneCMoneyScaleMessages::policyServiceLine);
+            "copayment", OneCMoneyScaleMessages::policyServiceLine,
+            "layerNumber", OneCMoneyScaleMessages::policyServiceLine,
+            "rowNumber", OneCMoneyScaleMessages::policyHeader);
     private static final Map<String, BigDecimal> TWO_DIGITS = Map.of(
             "amount", new BigDecimal("12345.67"), "copayment", new BigDecimal("12.34"));
     private static final Map<String, BigDecimal> THREE_DIGITS = Map.of(
@@ -135,6 +137,10 @@ final class OneCMoneyScaleMessages {
 
     private static ObjectNode policyServiceLine(ObjectNode data) {
         return (ObjectNode) data.withArray("services").get(0);
+    }
+
+    private static ObjectNode policyHeader(ObjectNode data) {
+        return (ObjectNode) data.withArray("header").get(0);
     }
 
     private static String priceField(String field) {

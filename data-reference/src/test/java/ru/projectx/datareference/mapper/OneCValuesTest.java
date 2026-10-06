@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -322,6 +323,37 @@ class OneCValuesTest {
     @Test
     void integer_isRead() {
         assertThat(OneCValues.integer(node("{\"rowNumber\":7}"), "rowNumber")).contains(7);
+    }
+
+    /** Крайние значения целого читаются как есть. */
+    @ParameterizedTest
+    @ValueSource(strings = {"2147483647", "-2147483648", "0"})
+    void integerAtIntBound_isRead(String sent) {
+        assertThat(OneCValues.integer(node("{\"layerNumber\":%s}".formatted(sent)), "layerNumber"))
+                .contains(Integer.parseInt(sent));
+    }
+
+    /**
+     * Целое за пределом поля отклоняется с именем поля, но без значения: иначе разбор падал бы непредвиденной ошибкой,
+     * по которой не видно, какое поле виновато. Так же — число из тысячи с лишним цифр, каким база возвращает сырьё.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"2147483648", "-2147483649", "10000000000", "-100000000000000000000", "1e10"})
+    void integerBeyondIntBound_isRejectedNamingFieldButNotValue(String sent) {
+        ObjectNode data = node("{\"layerNumber\":%s}".formatted(sent));
+
+        assertThatThrownBy(() -> OneCValues.integer(data, "layerNumber"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layerNumber больше допустимого");
+    }
+
+    @Test
+    void integerOfThousandDigits_isRejectedNamingField() {
+        ObjectNode data = JSON.createObjectNode().put("rowNumber", new BigInteger("1" + "0".repeat(1000)));
+
+        assertThatThrownBy(() -> OneCValues.integer(data, "rowNumber"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле rowNumber больше допустимого");
     }
 
     /** Число, записанное строкой, числом не считается: контракт передаёт числа числами. */

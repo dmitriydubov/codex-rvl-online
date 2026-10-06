@@ -28,13 +28,13 @@ class OneCDecimalColumnTest {
     @ParameterizedTest
     @ValueSource(strings = {"9999999999999.99", "-9999999999999.99", "9999999999999", "0", "0.01", "1E+12", "0E+20"})
     void amountWithinThirteenIntegerDigits_isReadAsSent(String sent) {
-        assertThat(OneCDecimalColumn.AMOUNT.read(node("price", sent), "price")).contains(new BigDecimal(sent));
+        assertThat(OneCDecimalColumn.amount(node("price", sent), "price")).contains(new BigDecimal(sent));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"10000000000000.00", "-10000000000000.00", "10000000000000", "1E+13", "1e999999999"})
     void amountBeyondThirteenIntegerDigits_isRejectedNamingFieldButNotValue(String sent) {
-        assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", sent), "price"))
+        assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", sent), "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage(TOO_LARGE_PRICE);
     }
@@ -42,7 +42,7 @@ class OneCDecimalColumnTest {
     /** Знаки после запятой проверяются первыми: у значения с обоими нарушениями причина — знаки. */
     @Test
     void valueBreakingBothRules_isReportedByScale() {
-        assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", "10000000000000.001"), "price"))
+        assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "10000000000000.001"), "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле price содержит больше двух знаков после запятой");
     }
@@ -53,7 +53,7 @@ class OneCDecimalColumnTest {
      */
     @Test
     void exponentAtIntLimit_isRejected() {
-        assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", "1e2147483647"), "price"))
+        assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "1e2147483647"), "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage(TOO_LARGE_PRICE);
     }
@@ -66,7 +66,7 @@ class OneCDecimalColumnTest {
     void hugeExponent_isRejectedWithoutExpandingDigits() {
         ObjectNode data = node("price", "1e999999999");
         assertTimeoutPreemptively(Duration.ofSeconds(5), () -> assertThatThrownBy(
-                () -> OneCDecimalColumn.AMOUNT.read(data, "price")).isInstanceOf(OneCFieldException.class));
+                () -> OneCDecimalColumn.amount(data, "price")).isInstanceOf(OneCFieldException.class));
     }
 
     /**
@@ -79,7 +79,7 @@ class OneCDecimalColumnTest {
         ObjectNode data = JSON.createObjectNode()
                 .put("price", new BigDecimal("1" + "0".repeat(131_071) + "." + "0".repeat(16_383)));
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertThatThrownBy(
-                () -> OneCDecimalColumn.AMOUNT.read(data, "price"))
+                () -> OneCDecimalColumn.amount(data, "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage(TOO_LARGE_PRICE));
     }
@@ -102,15 +102,15 @@ class OneCDecimalColumnTest {
      */
     @Test
     void longPlainNumberFromStoredPayload_isRejected() {
-        assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", "1" + "0".repeat(500)), "price"))
+        assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "1" + "0".repeat(500)), "price"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage(TOO_LARGE_PRICE);
     }
 
     @Test
     void absentOrTextValue_isEmpty() {
-        assertThat(OneCDecimalColumn.AMOUNT.read(node("price", "\"1e999999999\""), "price")).isEmpty();
-        assertThat(OneCDecimalColumn.AMOUNT.read(node("other", "1"), "price")).isEmpty();
+        assertThat(OneCDecimalColumn.amount(node("price", "\"1e999999999\""), "price")).isEmpty();
+        assertThat(OneCDecimalColumn.amount(node("other", "1"), "price")).isEmpty();
     }
 
     private static ObjectNode node(String field, String number) {
