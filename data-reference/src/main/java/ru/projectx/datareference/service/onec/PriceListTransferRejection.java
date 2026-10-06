@@ -61,10 +61,10 @@ public class PriceListTransferRejection implements RejectionScope {
      * одновременно, даже если отклоняемая часть называет другую услугу.
      */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
-        serviceLock.lockTransferService(part.markup().cid(), part.data());
-        List<InboundMessage> parts = repository.findByCorrelationId(part.markup().cid());
+        serviceLock.lockTransferService(part.cid(), part.data());
+        List<InboundMessage> parts = repository.findByCorrelationId(part.cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
-        part.markup().applyTo(message);
+        part.markup().ifPresent(markup -> markup.applyTo(message));
         message.markFailed(reasons.own());
         List<InboundMessage> others = bufferedOthers(message, parts);
         others.forEach(other -> other.markFailed(reasons.others()));
@@ -72,7 +72,7 @@ public class PriceListTransferRejection implements RejectionScope {
     }
 
     private Reasons reasonsFor(InboundMessage message, TransferPart part, List<InboundMessage> parts, String reason) {
-        UUID cid = part.markup().cid();
+        UUID cid = part.cid();
         if (hasOwnDefect(message, part, parts)) {
             return new Reasons(reason, "передача %s отклонена: ошибка в сообщении %s: %s"
                     .formatted(cid, message.receipt().messageId(), reason));
@@ -89,11 +89,21 @@ public class PriceListTransferRejection implements RejectionScope {
                 .toList();
     }
 
-    /** Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. */
+    /**
+     * Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. Нечитаемая
+     * разметка — тоже ошибка самой части.
+     */
     private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
+        return part.markup()
+                .map(markup -> failsOwnChecks(message, part, markup, parts))
+                .orElse(true);
+    }
+
+    private boolean failsOwnChecks(
+            InboundMessage message, TransferPart part, PriceListTransferMarkup markup, List<InboundMessage> parts) {
         try {
-            serviceCheck.serviceOf(part.markup().cid(), part.data());
-            partCheck.check(message.receipt().messageId(), part.markup(), part.data(), parts);
+            serviceCheck.serviceOf(part.cid(), part.data());
+            partCheck.check(message.receipt().messageId(), markup, part.data(), parts);
             return false;
         }
         catch (OneCFieldException defect) {
@@ -102,19 +112,33 @@ public class PriceListTransferRejection implements RejectionScope {
     }
 
     /**
-     * Разметка части, если её можно прочитать. Нечитаемое тело или идентификатор — тоже окончательный отказ, но
-     * отнести его к передаче нельзя, и такая часть отклоняется одна.
+     * Часть передачи, если в её теле читается идентификатор передачи. Нечитаемое тело или идентификатор — тоже
+     * окончательный отказ, но отнести его к передаче нельзя, и такая часть отклоняется одна.
      */
     private Optional<TransferPart> partOf(InboundMessage message) {
         try {
-            return envelope.dataOf(message).map(data -> new TransferPart(PriceListTransferMarkup.of(data), data));
+            return envelope.dataOf(message)
+                    .map(data -> new TransferPart(PriceListTransferMarkup.cidOf(data), data));
         }
         catch (OneCFieldException notTransferPart) {
             return Optional.empty();
         }
     }
 
-    private record TransferPart(PriceListTransferMarkup markup, ObjectNode data) {
+    private record TransferPart(UUID cid, ObjectNode data) {
+
+        /**
+         * Разметка части, если она читается. Нечитаемый счётчик — ошибка самой части: передача находится по
+         * идентификатору, а разметка в часть не записывается.
+         */
+        Optional<PriceListTransferMarkup> markup() {
+            try {
+                return Optional.of(PriceListTransferMarkup.of(data));
+            }
+            catch (OneCFieldException unreadableCounter) {
+                return Optional.empty();
+            }
+        }
     }
 
     /** Причина у отклонённой части и у остальных частей её передачи. */

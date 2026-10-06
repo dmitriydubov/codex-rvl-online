@@ -32,7 +32,9 @@ public class OneCJournalSteps {
             "контактная информация", OneCStream.LPU_CONTACTS,
             "договоры страхования", OneCStream.INSURANCE_CONTRACTS,
             "полисы", OneCStream.POLICIES,
-            "прейскуранты", OneCStream.PRICE_LISTS);
+            "прейскуранты", OneCStream.PRICE_LISTS,
+            "МКБ-10", OneCStream.MKB10,
+            "виды обращений", OneCStream.APPEAL_TYPES);
 
     /** Сводная запись об истёкших ожиданиях потока: поток, число отклонённых и перечень GUID родителей. */
     private static final Pattern EXPIRED_WAITS = Pattern.compile(

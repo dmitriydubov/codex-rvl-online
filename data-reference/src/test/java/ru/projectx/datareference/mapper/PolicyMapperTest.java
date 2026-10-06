@@ -131,6 +131,26 @@ class PolicyMapperTest {
         assertThat(saved().details().availability()).isFalse();
     }
 
+    /** Единственная строка шапки с номером за пределом целого: полис отклоняется с именем поля, без значения. */
+    @Test
+    void onlyHeaderRowNumberBeyondInt_isRejectedNamingField() {
+        ObjectNode data = policy();
+        headerRowNumbered(data.putArray("header"), 2147483648L, true);
+
+        assertRejectedForHeaderRowNumber(data);
+    }
+
+    /** Недействующая строка с номером за пределом целого тоже отклоняет полис: неверное значение не пропускается. */
+    @Test
+    void inactiveHeaderRowNumberBeyondInt_isRejectedNamingField() {
+        ObjectNode data = policy();
+        ArrayNode header = data.putArray("header");
+        headerRow(header, 1, true, "2024-01-01T00:00:00+03:00", "2024-12-31T00:00:00+03:00");
+        headerRowNumbered(header, -2147483649L, false);
+
+        assertRejectedForHeaderRowNumber(data);
+    }
+
     @Test
     void policyWithoutHeaderRows_isContractViolation() {
         ObjectNode data = policy();
@@ -388,6 +408,21 @@ class PolicyMapperTest {
         serviceRow(data.putArray("services"));
         property(data.putArray("extProperties"), EMAIL_PROPERTY, "petr@example.org");
         return data;
+    }
+
+    private void assertRejectedForHeaderRowNumber(ObjectNode data) {
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле rowNumber больше допустимого");
+        verify(repository, never()).save(any());
+    }
+
+    private static void headerRowNumbered(ArrayNode header, long number, boolean available) {
+        header.addObject()
+                .put("rowNumber", number)
+                .put("availability", available)
+                .put("beginDate", "2025-01-01T00:00:00+03:00")
+                .put("endDate", "2025-12-31T00:00:00+03:00");
     }
 
     private static void headerRow(ArrayNode header, int number, boolean available, String begin, String end) {

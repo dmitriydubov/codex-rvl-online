@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -23,6 +24,7 @@ final class OneCPriceTransferMessages {
     private static final String ROW_NUMBER = "rowNumber";
     private static final String TABLE_ROW_NUMBER = "номер строки";
     private static final String CID = "cid";
+    private static final Set<String> COUNTERS = Set.of("countMessages", "countRows");
     private static final String KEY_VALUE = "keyValue";
     /** Так сценарий называет часть, в которой поля GUID услуги нет вовсе. */
     private static final String NO_SERVICE = "нет";
@@ -49,6 +51,15 @@ final class OneCPriceTransferMessages {
                 .put("countMessages", batches)
                 .put("countRows", rows);
         return new OneCMessage(OneCStream.PRICE_LISTS, FINAL_QUEUE, data, InboundStatus.PROCESSED, messageId);
+    }
+
+    /** Финальное сообщение, у которого счётчик {@code field} — число {@code value}, а второй счётчик равен 1. */
+    static OneCMessage finalMessageWithCounter(UUID messageId, UUID cid, String service, String field, BigDecimal value) {
+        if (!COUNTERS.contains(field)) {
+            throw new IllegalArgumentException("шаг не знает счётчика финального сообщения: " + field);
+        }
+        ObjectNode data = transferData(cid, service).put("countMessages", 1).put("countRows", 1).put(field, value);
+        return new OneCMessage(OneCStream.PRICE_LISTS, FINAL_QUEUE, data, InboundStatus.FAILED, messageId);
     }
 
     /** Пакет со строками таблицы; номер строки в таблице — число. */

@@ -109,6 +109,26 @@ class PriceListTransferRejectionTest {
                 + ": " + reason);
     }
 
+    /**
+     * Счётчик финального сообщения за пределом целого — ошибка этого сообщения: передача находится по её
+     * идентификатору, пакеты в буфере отклоняются со ссылкой на него.
+     */
+    @Test
+    void finalMessageWithCounterBeyondInt_keepsItsOwnReason_andBufferedBatchPointsToIt() {
+        InboundMessage batch = buffered(null);
+        InboundMessage trigger = received("{\"cid\":\"%s\",\"keyValue\":\"%s\",\"countMessages\":1e10,\"countRows\":1}"
+                .formatted(CID, SERVICE_ID));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(batch));
+        String reason = "поле countMessages больше допустимого";
+
+        assertThat(rejection.reject(trigger, reason)).containsExactly(trigger, batch);
+
+        assertFailed(trigger, reason);
+        assertFailed(batch, "передача " + CID + " отклонена: ошибка в сообщении " + trigger.receipt().messageId()
+                + ": " + reason);
+        verify(finalizations).lockByService(SERVICE_ID);
+    }
+
     @Test
     void decidesRejectionsOfPriceListStream() {
         assertThat(rejection.stream()).isEqualTo(OneCStream.PRICE_LISTS);

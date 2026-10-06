@@ -93,14 +93,16 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
      *
      * <p>Второе правило описывает не ошибку, а нормальное состояние. У прекращённого полиса
      * действующих строк нет, а срок его действия всё равно нужно знать. Первая попавшаяся строка
-     * показала бы человеку чужой период.
+     * показала бы человеку чужой период. Номер читается у каждой строки, даже единственной: неверный номер
+     * отклоняет полис.
      */
     private static JsonNode actualHeaderRow(ObjectNode data) {
-        List<JsonNode> rows = rowsOf(data, HEADER).toList();
+        List<NumberedRow> rows = rowsOf(data, HEADER).map(NumberedRow::of).toList();
         return rows.stream()
-                .filter(row -> OneCValues.flag(row, AVAILABILITY))
-                .max(Comparator.comparingInt(PolicyMapper::rowNumber))
-                .or(() -> rows.stream().max(Comparator.comparingInt(PolicyMapper::rowNumber)))
+                .filter(row -> OneCValues.flag(row.row(), AVAILABILITY))
+                .max(Comparator.comparingInt(NumberedRow::number))
+                .or(() -> rows.stream().max(Comparator.comparingInt(NumberedRow::number)))
+                .map(NumberedRow::row)
                 .orElseThrow(() -> new OneCFieldException(
                         "в сообщении нет ни одной строки header — срок действия полиса брать неоткуда"));
     }
@@ -147,7 +149,11 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
         return StreamSupport.stream(data.path(field).spliterator(), false);
     }
 
-    private static int rowNumber(JsonNode row) {
-        return OneCValues.integer(row, ROW_NUMBER).orElse(0);
+    /** Строка шапки и её номер; строка без номера считается нулевой. */
+    private record NumberedRow(int number, JsonNode row) {
+
+        static NumberedRow of(JsonNode row) {
+            return new NumberedRow(OneCValues.integer(row, ROW_NUMBER).orElse(0), row);
+        }
     }
 }

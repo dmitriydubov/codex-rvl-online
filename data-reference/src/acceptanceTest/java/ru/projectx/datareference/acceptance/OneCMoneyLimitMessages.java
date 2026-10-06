@@ -8,7 +8,7 @@ import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Числа, которые не помещаются в колонку денег или процента, так, как их называет спецификация. Сами числа стоят здесь,
+ * Числа, которые не помещаются в колонку денег или процента или в целое, так, как их называет спецификация. Сами числа стоят здесь,
  * а не в «Примерах»: мутация цифры порядка оставила бы значение за пределом, и сценарий её бы не заметил. Словари
  * закрытые: незнакомое слово или поле роняет шаг.
  *
@@ -43,14 +43,28 @@ final class OneCMoneyLimitMessages {
             "экспонента с наибольшим порядком, который примет база", new BigDecimal("1e131071"),
             "отрицательный порядок сразу за прежним пределом длины", new BigDecimal("1e-1000"));
 
+    /** Целочисленные поля: номера, уровни иерархии и счётчики передачи прайса. */
+    private static final Set<String> INTEGER_FIELDS = Set.of(
+            "layerNumber", "rowNumber", "hierarchyLevels", "hierarchyLevel", "countMessages", "countRows");
+    private static final Map<String, BigDecimal> INTEGER_RECORDS = Map.of(
+            "экспонента за пределом целого", new BigDecimal("1e10"),
+            "отрицательное с экспонентой за пределом целого", new BigDecimal("-1e20"),
+            "экспонента сразу за прежним пределом длины", new BigDecimal("1e1000"));
+
     private OneCMoneyLimitMessages() {
     }
 
-    /** Число поля в записи, которую называет спецификация; у процента и у денег записи свои. */
+    /** Число поля в записи, которую называет спецификация; у процента, у целого и у денег записи свои. */
     static BigDecimal recorded(String field, String record) {
-        Map<String, BigDecimal> records = PERCENT_FIELDS.contains(field) ? PERCENT_RECORDS : AMOUNT_RECORDS;
-        return Optional.ofNullable(records.get(record))
+        return Optional.ofNullable(recordsOf(field).get(record))
                 .orElseThrow(() -> new IllegalArgumentException("шаг не знает записи числа: " + record));
+    }
+
+    private static Map<String, BigDecimal> recordsOf(String field) {
+        if (INTEGER_FIELDS.contains(field)) {
+            return INTEGER_RECORDS;
+        }
+        return PERCENT_FIELDS.contains(field) ? PERCENT_RECORDS : AMOUNT_RECORDS;
     }
 
     /** Та же программа под новым наименованием; поле строки услуги — число в заданной записи. Разбор её отклоняет. */
