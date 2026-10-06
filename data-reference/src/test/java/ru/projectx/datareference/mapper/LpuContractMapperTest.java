@@ -3,6 +3,7 @@ package ru.projectx.datareference.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,10 +20,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.OneCContractProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,9 +35,11 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Защищает разбор договоров санаториев. Договор принимается, только если он принадлежит санаторию из
- * справочника, причём договор отделения достаётся отделению, а не головной организации. Пока имя
- * признака договора на восстановительное лечение не задано, этот фильтр не применяется. Известный договор
- * получает реквизиты последнего сообщения и может перейти к другому санаторию. Данные вымышленные.
+ * справочника, причём договор отделения достаётся отделению, а не головной организации. Отделение, которого ещё нет,
+ * договор ждёт; головная организация решает, только когда отделения нет или оно признано не нашим. Договор не
+ * нашего контрагента пропускается и запоминается как не наш, чтобы его услуги не ждали его. Пока имя признака
+ * договора на восстановительное лечение не задано, этот фильтр не применяется. Известный договор получает реквизиты
+ * последнего сообщения и может перейти к другому санаторию. Данные вымышленные.
  */
 class LpuContractMapperTest {
 
@@ -50,6 +56,7 @@ class LpuContractMapperTest {
 
     private final LpuContractRepository repository = mock(LpuContractRepository.class);
     private final LpuRepository lpuRepository = mock(LpuRepository.class);
+    private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final Lpu headOffice = mock(Lpu.class);
     private final Lpu branch = mock(Lpu.class);
 
@@ -122,13 +129,36 @@ class LpuContractMapperTest {
     }
 
     @Test
-    void contractOfUnknownBranch_belongsToHeadOffice() {
+    void contractOfForeignBranch_belongsToHeadOffice() {
         when(lpuRepository.findByExternalId(HEAD_OFFICE)).thenReturn(Optional.of(headOffice));
-        when(lpuRepository.findByExternalId(BRANCH)).thenReturn(Optional.empty());
+        foreign(BRANCH);
 
-        mapper(null).apply(contract(HEAD_OFFICE, BRANCH));
+        ImportResult result = mapper(null).apply(contract(HEAD_OFFICE, BRANCH));
 
+        assertThat(result).isInstanceOf(ImportResult.Applied.class);
         assertThat(saved().lpu()).isSameAs(headOffice);
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
+    }
+
+    @Test
+    void contractOfBranchNotYetReceived_waitsForTheBranch_evenWhenTheHeadOfficeIsKnown() {
+        when(lpuRepository.findByExternalId(HEAD_OFFICE)).thenReturn(Optional.of(headOffice));
+
+        ImportResult result = mapper(null).apply(contract(HEAD_OFFICE, BRANCH));
+
+        assertThat(result).isEqualTo(awaiting(BRANCH));
+        verify(repository, never()).save(any());
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
+    }
+
+    @Test
+    void contractOfForeignBranch_waitsForTheHeadOffice_notYetReceived() {
+        foreign(BRANCH);
+
+        ImportResult result = mapper(null).apply(contract(HEAD_OFFICE, BRANCH));
+
+        assertThat(result).isEqualTo(awaiting(HEAD_OFFICE));
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -152,14 +182,24 @@ class LpuContractMapperTest {
     }
 
     @Test
-    void contractOfStrangeContragent_isSkippedNamingBothReferences_andNotSaved() {
-        when(lpuRepository.findByExternalId(any())).thenReturn(Optional.empty());
+    void contractWithoutBranch_waitsForTheHeadOffice_notYetReceived() {
+        ImportResult result = mapper(null).apply(contract(HEAD_OFFICE, HEAD_OFFICE));
+
+        assertThat(result).isEqualTo(awaiting(HEAD_OFFICE));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void contractOfForeignContragents_isSkippedNamingBothReferences_andRememberedAsForeign() {
+        foreign(HEAD_OFFICE);
+        foreign(BRANCH);
 
         ImportResult result = mapper(null).apply(contract(HEAD_OFFICE, BRANCH));
 
         assertThat(result).isEqualTo(ImportResult.skipped(
                 "договор не нашего контрагента: ownerId=" + HEAD_OFFICE + ", contragentBranchId=" + BRANCH));
         verify(repository, never()).save(any());
+        verify(foreignRepository).remember(CONTRACT, "LPU_CONTRACT", NOW);
     }
 
     @Test
@@ -173,6 +213,11 @@ class LpuContractMapperTest {
         assertThat(result).isEqualTo(
                 ImportResult.skipped("договор не нашего контрагента: ownerId=null, contragentBranchId=null"));
         verifyNoInteractions(lpuRepository, repository);
+    }
+
+    @Test
+    void recordOfTheMessage_isTheContract() {
+        assertThat(mapper(null).recordOf(contract(HEAD_OFFICE, BRANCH))).contains(CONTRACT);
     }
 
     @Test
@@ -196,6 +241,7 @@ class LpuContractMapperTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped("договор без признака " + RVL_PROPERTY));
         verifyNoInteractions(lpuRepository, repository);
+        verify(foreignRepository).remember(CONTRACT, "LPU_CONTRACT", NOW);
     }
 
     @Test
@@ -290,7 +336,17 @@ class LpuContractMapperTest {
 
     private LpuContractMapper mapper(String rvlProperty) {
         var properties = new OneCContractProperties(null, rvlProperty, null, "Адрес", List.of());
-        return new LpuContractMapper(repository, lpuRepository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        return new LpuContractMapper(
+                repository, lpuRepository, new ForeignReferences(foreignRepository, clock), properties, clock);
+    }
+
+    private void foreign(UUID contragent) {
+        when(foreignRepository.existsByExternalIdAndKind(contragent, ParentKind.CONTRAGENT)).thenReturn(true);
+    }
+
+    private static ImportResult awaiting(UUID contragent) {
+        return ImportResult.awaitingParent(new AwaitedParent(ParentKind.CONTRAGENT, contragent));
     }
 
     private void knownSanatoriums() {

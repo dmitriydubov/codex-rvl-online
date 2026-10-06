@@ -12,18 +12,22 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Обычный путь сообщения 1С: маппер потока разбирает его, а исход записывается в ту же строку сырья.
  *
- * <p>Применённое сообщение отмечается обработанным, пропущенное — пропущенным с причиной от маппера. Отклонённое
- * уходит общим путём окончательного отказа: разбор откатывается, а отказ записывают после отката. Так обрабатываются
- * все потоки, у которых одно сообщение применяется само по себе.
+ * <p>Применённое сообщение отмечается обработанным и закрывает более старые сообщения той же записи, которые ещё ждут
+ * родителя. Пропущенное отмечается пропущенным с причиной от маппера. Сообщение, которое ссылается на ещё не
+ * пришедшую запись, ждёт её. Так обрабатываются все потоки, у которых одно сообщение применяется само по себе.
  */
 class MappedStreamHandler implements StreamHandler {
 
     private final StreamMapper mapper;
     private final InboundMessageService inboundMessageService;
+    private final SupersededParentWaits supersededWaits;
 
-    MappedStreamHandler(StreamMapper mapper, InboundMessageService inboundMessageService) {
+    MappedStreamHandler(
+            StreamMapper mapper, InboundMessageService inboundMessageService, SupersededParentWaits supersededWaits) {
+
         this.mapper = mapper;
         this.inboundMessageService = inboundMessageService;
+        this.supersededWaits = supersededWaits;
     }
 
     @Override
@@ -31,16 +35,26 @@ class MappedStreamHandler implements StreamHandler {
         return mapper.stream();
     }
 
-    /** @throws OneCFieldException если сообщение нарушает контракт или маппер его отклонил */
+    /** @throws OneCFieldException если сообщение нарушает контракт */
     @Override
-    public ImportResult handle(InboundMessage message, ObjectNode data) {
-        ImportResult result = mapper.apply(data);
+    public ImportOutcome handle(InboundMessage message, ObjectNode data) {
         UUID messageId = message.receipt().messageId();
-        switch (result) {
-            case ImportResult.Applied ignored -> inboundMessageService.markProcessed(messageId);
-            case ImportResult.Skipped skipped -> inboundMessageService.markSkipped(messageId, skipped.reason());
-            case ImportResult.Rejected rejected -> throw new OneCFieldException(rejected.reason());
-        }
-        return result;
+        return switch (mapper.apply(data)) {
+            case ImportResult.Applied ignored -> applied(message, data);
+            case ImportResult.Skipped skipped -> {
+                inboundMessageService.markSkipped(messageId, skipped.reason());
+                yield ImportOutcome.skipped(skipped.reason());
+            }
+            case ImportResult.AwaitingParent awaiting -> {
+                inboundMessageService.markAwaitingParent(messageId, awaiting.parent(), mapper.recordOf(data).orElse(null));
+                yield ImportOutcome.awaitingParent(awaiting.parent().waitingReason());
+            }
+        };
+    }
+
+    private ImportOutcome applied(InboundMessage message, ObjectNode data) {
+        inboundMessageService.markProcessed(message.receipt().messageId());
+        mapper.recordOf(data).ifPresent(record -> supersededWaits.closeOlderThan(message.receipt(), record));
+        return ImportOutcome.applied();
     }
 }

@@ -80,7 +80,7 @@ class InboundCommittedOutcomeTest {
         InboundStatus left = service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST);
 
         assertThat(left).isEqualTo(InboundStatus.PROCESSED);
-        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW));
+        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW, null));
         assertThat(counted(InboundStatus.PROCESSED)).isEqualTo(1);
         assertThat(countedTransitions()).isEqualTo(1);
     }

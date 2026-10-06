@@ -3,6 +3,7 @@ package ru.projectx.datareference.service.onec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 import static ru.projectx.datareference.support.OneCMessages.sanatorium;
+import static ru.projectx.datareference.support.OneCMessages.sanatoriumWithoutRvl;
 
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -117,16 +117,30 @@ class LpuContactImportTest {
     }
 
     @Test
-    void contactsOfUnknownContragent_areSkipped() {
+    void contactsOfContragentWithoutRvl_areSkipped() {
         UUID stranger = UUID.fromString("5b1e7c40-0000-4000-8000-0000000000ff");
+        importOne(OneCStream.CONTRAGENTS, sanatoriumWithoutRvl(stranger, "Санаторий «Чужой»"));
 
-        ImportResult result = importOne(OneCStream.LPU_CONTACTS, """
-                {"filter":[{"fieldName":"object","value":{"value":"%s"}}],"recordSet":[]}""".formatted(stranger));
+        ImportOutcome result = importOne(OneCStream.LPU_CONTACTS, contactsOf(stranger));
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
+        assertThat(result).isEqualTo(ImportOutcome.skipped("контакты не нашего контрагента: " + stranger));
     }
 
-    private ImportResult importOne(OneCStream stream, String data) {
+    @Test
+    void contactsOfContragentNotYetReceived_waitForIt() {
+        UUID notYet = UUID.fromString("5b1e7c40-0000-4000-8000-0000000000ee");
+
+        ImportOutcome result = importOne(OneCStream.LPU_CONTACTS, contactsOf(notYet));
+
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent("ждёт родителя: контрагент " + notYet));
+    }
+
+    private static String contactsOf(UUID contragent) {
+        return """
+                {"filter":[{"fieldName":"object","value":{"value":"%s"}}],"recordSet":[]}""".formatted(contragent);
+    }
+
+    private ImportOutcome importOne(OneCStream stream, String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();

@@ -33,7 +33,7 @@ class InboundMessageTransitionsTest {
         assertThat(message.receipt())
                 .isEqualTo(new InboundReceipt(MESSAGE_ID, OneCStream.PRICE_LISTS, QUEUE, RECEIVED_AT));
         assertThat(message.payload()).isEqualTo(PAYLOAD);
-        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.NEW, 0, null, null, null));
+        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.NEW, 0, null, null, null, null));
         assertThat(message.transferPart()).isEqualTo(new InboundTransferPart(null, null, null));
     }
 
@@ -45,7 +45,7 @@ class InboundMessageTransitionsTest {
         message.markRetrying(ERROR, LATER_RETRY_AT);
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, LATER_RETRY_AT, ERROR, null));
+                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, LATER_RETRY_AT, ERROR, null, null));
     }
 
     @Test
@@ -55,7 +55,7 @@ class InboundMessageTransitionsTest {
         message.markProcessed(PROCESSED_AT);
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 1, null, null, PROCESSED_AT));
+                .isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 1, null, null, PROCESSED_AT, null));
     }
 
     @Test
@@ -65,7 +65,7 @@ class InboundMessageTransitionsTest {
         message.markSkipped("услуги нет", PROCESSED_AT);
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 1, null, "услуги нет", PROCESSED_AT));
+                .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 1, null, "услуги нет", PROCESSED_AT, null));
     }
 
     @Test
@@ -75,7 +75,7 @@ class InboundMessageTransitionsTest {
         message.markFailed("лестница исчерпана");
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 1, null, "лестница исчерпана", null));
+                .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 1, null, "лестница исчерпана", null, null));
     }
 
     @Test
@@ -84,7 +84,7 @@ class InboundMessageTransitionsTest {
 
         message.markBuffered(CID, null, 2);
 
-        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.BUFFERED, 1, null, ERROR, null));
+        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.BUFFERED, 1, null, ERROR, null, null));
         assertThat(message.transferPart()).isEqualTo(new InboundTransferPart(CID, null, 2));
     }
 

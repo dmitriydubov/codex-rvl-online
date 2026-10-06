@@ -16,7 +16,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -167,9 +166,9 @@ class PolicyImportTest {
     void lastMessageWins_replacingSnapshotAndTableParts() {
         importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
 
-        ImportResult result = importOne(policy(header("2020-01-01", "2020-12-31", true, 1), "", ""));
+        ImportOutcome result = importOne(policy(header("2020-01-01", "2020-12-31", true, 1), "", ""));
 
-        assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        assertThat(result).isInstanceOf(ImportOutcome.Applied.class);
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
         assertThat(stored.beginDate()).isEqualTo(LocalDate.of(2020, 1, 1));
         assertThat(stored.programs()).isEmpty();
@@ -200,7 +199,7 @@ class PolicyImportTest {
                 .hasMessageNotContaining("17.05.1980");
     }
 
-    private ImportResult importOne(String data) {
+    private ImportOutcome importOne(String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.POLICIES, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();

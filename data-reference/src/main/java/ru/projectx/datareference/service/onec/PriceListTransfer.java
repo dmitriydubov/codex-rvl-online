@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.mapper.ImportResult;
@@ -13,20 +14,21 @@ import ru.projectx.datareference.mapper.ImportResult;
  * Передача прайс-листа по одной услуге: во что сложились её отложенные сообщения и какой исход у них общий.
  *
  * <p>Пакеты строк и финальное сообщение со счётчиками связаны общим идентификатором передачи. Передача ещё ждёт
- * своих сообщений, уже отклонена или пропущена, пришла целиком с несошедшимися счётчиками или собрана. Здесь только решение и
- * смена статусов, без базы: сохраняет сообщения и применяет прайс сборщик передачи.
+ * своих сообщений, уже отклонена или пропущена, пришла целиком с несошедшимися счётчиками или собрана. Собранная
+ * передача может ждать услугу, которой ещё нет в справочнике, и при пересмотре собирается заново из тех же частей.
+ * Здесь только решение и смена статусов, без базы: сохраняет сообщения и применяет прайс сборщик передачи.
  */
 sealed interface PriceListTransfer {
 
     /**
      * Состояние передачи по всем её сообщениям. Финальное узнаётся по ожидаемому числу пакетов; в сборку идут
-     * только сообщения в буфере.
+     * только собранные сообщения ({@link #isCollected}).
      *
      * @param correlated все сообщения передачи {@code cid}, в любом порядке и в любом статусе
      */
     static PriceListTransfer of(UUID cid, List<InboundMessage> correlated) {
         List<InboundMessage> buffered = correlated.stream()
-                .filter(message -> message.outcome().status() == InboundStatus.BUFFERED)
+                .filter(PriceListTransfer::isCollected)
                 .toList();
         if (isRejected(correlated)) {
             return new Rejected("передача %s уже отклонена".formatted(cid), buffered);
@@ -38,6 +40,15 @@ sealed interface PriceListTransfer {
     }
 
     /** Исход передачи записан отказом или пропуском: её части, пришедшие позже, разделяют этот исход. */
+    /**
+     * Часть передачи, исход которой ещё не записан: она в буфере или вместе со всей собранной передачей ждёт услугу,
+     * которой пока нет в справочнике.
+     */
+    static boolean isCollected(InboundMessage part) {
+        InboundStatus status = part.outcome().status();
+        return status == InboundStatus.BUFFERED || status == InboundStatus.AWAITING_PARENT;
+    }
+
     static boolean isClosed(List<InboundMessage> correlated) {
         return isRejected(correlated) || anyIn(correlated, InboundStatus.SKIPPED);
     }
@@ -156,7 +167,8 @@ sealed interface PriceListTransfer {
     record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements PriceListTransfer {
 
         /**
-         * Отмечает все сообщения передачи исходом применения прайса: применены, пропущены или отклонены с его причиной.
+         * Отмечает все сообщения передачи исходом применения прайса: применены, пропущены с его причиной или ждут
+         * услугу, которой ещё нет.
          *
          * @return сообщения с новым статусом, которые осталось сохранить
          */
@@ -164,8 +176,17 @@ sealed interface PriceListTransfer {
             return switch (result) {
                 case ImportResult.Applied ignored -> markProcessed(at);
                 case ImportResult.Skipped skipped -> markSkipped(skipped.reason(), at);
-                case ImportResult.Rejected rejected -> failAll(wholeTransfer(finalMessage, batches), rejected.reason());
+                case ImportResult.AwaitingParent awaiting -> markAwaitingParent(awaiting.parent(), at);
             };
+        }
+
+        /** Все сообщения передачи ждут услугу с одного момента: срок ожидания у передачи общий. */
+        List<InboundMessage> markAwaitingParent(AwaitedParent service, Instant at) {
+            List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
+            for (InboundMessage message : messages) {
+                message.markAwaitingParent(service, null, at);
+            }
+            return messages;
         }
 
         /**

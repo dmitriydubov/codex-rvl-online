@@ -3,6 +3,7 @@ package ru.projectx.datareference.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,20 +18,23 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Защищает разбор услуг санаториев. Услуга принимается только по договору, который уже есть в
- * справочнике; иначе сообщение уходит в пропуск, а причина называет GUID договора, чтобы такое
- * сообщение можно было найти и обработать заново. Известная услуга получает реквизиты последнего
- * сообщения вместе с договором.
+ * справочнике. Услуга договора, признанного не нашим, пропускается с причиной, которая называет GUID договора,
+ * и сама запоминается как не наша: иначе её прайс ждал бы её до отказа по сроку. Услуга договора, которого ещё
+ * нет, ждёт его. Известная услуга получает реквизиты последнего сообщения вместе с договором.
  */
 class ContragentServiceMapperTest {
 
@@ -43,9 +47,11 @@ class ContragentServiceMapperTest {
 
     private final ContragentServiceRepository repository = mock(ContragentServiceRepository.class);
     private final LpuContractRepository contractRepository = mock(LpuContractRepository.class);
+    private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final LpuContract contract = mock(LpuContract.class);
-    private final ContragentServiceMapper mapper =
-            new ContragentServiceMapper(repository, contractRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+    private final ContragentServiceMapper mapper = new ContragentServiceMapper(
+            repository, contractRepository, new ForeignReferences(foreignRepository, clock), clock);
 
     @Test
     void streamIsContragentServices() {
@@ -53,13 +59,32 @@ class ContragentServiceMapperTest {
     }
 
     @Test
-    void serviceUnderUnknownContract_isSkippedNamingTheContract_andNotSaved() {
+    void serviceUnderForeignContract_isSkippedNamingTheContract_andRememberedAsForeign() {
         when(contractRepository.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
+        when(foreignRepository.existsByExternalIdAndKind(CONTRACT, ParentKind.LPU_CONTRACT)).thenReturn(true);
 
         ImportResult result = mapper.apply(service());
 
         assertThat(result).isEqualTo(ImportResult.skipped("услуга по договору вне справочника: " + CONTRACT));
+        verify(foreignRepository).remember(SERVICE, "CONTRAGENT_SERVICE", NOW);
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void serviceUnderUnknownContract_waitsForTheContract_andIsNotRememberedAsForeign() {
+        when(contractRepository.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
+
+        ImportResult result = mapper.apply(service());
+
+        assertThat(result).isEqualTo(
+                ImportResult.awaitingParent(new AwaitedParent(ParentKind.LPU_CONTRACT, CONTRACT)));
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void recordOfTheMessage_isTheService() {
+        assertThat(mapper.recordOf(service())).contains(SERVICE);
     }
 
     @Test
@@ -70,6 +95,7 @@ class ContragentServiceMapperTest {
         ImportResult result = mapper.apply(service());
 
         assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
         ContragentService saved = saved();
         assertThat(saved.externalId()).isEqualTo(SERVICE);
         assertThat(saved.contract()).isSameAs(contract);
@@ -129,14 +155,16 @@ class ContragentServiceMapperTest {
     }
 
     @Test
-    void serviceWithoutGuidUnderUnknownContract_isSkipped_becauseTheContractIsCheckedFirst() {
+    void serviceWithoutGuidUnderForeignContract_isSkipped_becauseTheContractIsCheckedFirst() {
         when(contractRepository.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
+        when(foreignRepository.existsByExternalIdAndKind(CONTRACT, ParentKind.LPU_CONTRACT)).thenReturn(true);
         ObjectNode data = service();
         data.remove("id");
 
         ImportResult result = mapper.apply(data);
 
         assertThat(result).isEqualTo(ImportResult.skipped("услуга по договору вне справочника: " + CONTRACT));
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
         verify(repository, never()).save(any());
     }
 

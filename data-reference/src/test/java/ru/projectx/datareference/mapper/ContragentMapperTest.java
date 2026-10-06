@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,7 @@ import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,7 +35,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Защищает разбор потока контрагентов: санаторий принимается только с видом деятельности «РВЛ»,
  * санаторий, потерявший этот вид, становится архивным, а страхователь сохраняется в свой справочник.
- * Отдельно защищено чтение настройки GUID вида деятельности «РВЛ»: запись не в канонической форме
+ * Санаторий без «РВЛ» и страхователь запоминаются как не наши: иначе их договоры и контакты ждали бы их до отказа
+ * по сроку, а не пропускались сразу. Отдельно защищено чтение настройки GUID вида деятельности «РВЛ»: запись не в канонической форме
  * останавливает старт сервиса, потому что стандартное чтение UUID превратило бы её в чужой GUID,
  * и все санатории молча ушли бы в пропуск.
  */
@@ -47,6 +50,7 @@ class ContragentMapperTest {
 
     private final LpuRepository lpuRepository = mock(LpuRepository.class);
     private final InsurerRepository insurerRepository = mock(InsurerRepository.class);
+    private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @ParameterizedTest
@@ -85,6 +89,7 @@ class ContragentMapperTest {
         assertThat(result).isInstanceOfSatisfying(ImportResult.Skipped.class,
                 skipped -> assertThat(skipped.reason()).contains("rvl-activity-id"));
         verify(lpuRepository, never()).save(any());
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
     }
 
     @Test
@@ -94,6 +99,7 @@ class ContragentMapperTest {
         ImportResult result = mapper(RVL).apply(sanatorium(OTHER_ACTIVITY, RVL));
 
         assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
         Lpu saved = savedLpu();
         assertThat(saved.name()).isEqualTo("Санаторий «Сосны»");
         assertThat(saved.inn()).isEqualTo("7700000000");
@@ -101,14 +107,14 @@ class ContragentMapperTest {
     }
 
     @Test
-    void newSanatoriumWithoutRvl_isSkipped_andNotSaved() {
+    void newSanatoriumWithoutRvl_isSkipped_notSaved_andRememberedAsForeign() {
         when(lpuRepository.findByExternalId(CONTRAGENT)).thenReturn(Optional.empty());
 
         ImportResult result = mapper(RVL).apply(sanatorium(OTHER_ACTIVITY));
 
-        assertThat(result).isInstanceOfSatisfying(ImportResult.Skipped.class,
-                skipped -> assertThat(skipped.reason()).contains("РВЛ"));
+        assertThat(result).isEqualTo(ImportResult.skipped("контрагент без вида деятельности РВЛ"));
         verify(lpuRepository, never()).save(any());
+        verify(foreignRepository).remember(CONTRAGENT, "CONTRAGENT", NOW);
     }
 
     @Test
@@ -132,6 +138,7 @@ class ContragentMapperTest {
         ImportResult result = mapper(RVL).apply(sanatorium(OTHER_ACTIVITY));
 
         assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        verify(foreignRepository, never()).remember(any(), anyString(), any());
         assertThat(savedLpu()).isSameAs(known);
         assertThat(known.name()).isEqualTo("Санаторий «Сосны»");
         assertThat(known.isArchive()).isTrue();
@@ -145,6 +152,7 @@ class ContragentMapperTest {
 
         assertThat(result).isInstanceOfSatisfying(ImportResult.Skipped.class,
                 skipped -> assertThat(skipped.reason()).contains("страхователей"));
+        verify(foreignRepository).remember(CONTRAGENT, "CONTRAGENT", NOW);
         ArgumentCaptor<Insurer> saved = ArgumentCaptor.forClass(Insurer.class);
         verify(insurerRepository).save(saved.capture());
         assertThat(saved.getValue().name()).isEqualTo("АО «Страховщик»");
@@ -239,7 +247,8 @@ class ContragentMapperTest {
 
     private ContragentMapper mapper(String rvlActivity) {
         var contract = new OneCContractProperties(rvlActivity, null, null, "Адрес", List.of());
-        return new ContragentMapper(lpuRepository, insurerRepository, contract, clock);
+        return new ContragentMapper(
+                lpuRepository, insurerRepository, new ForeignReferences(foreignRepository, clock), contract, clock);
     }
 
     private Lpu savedLpu() {

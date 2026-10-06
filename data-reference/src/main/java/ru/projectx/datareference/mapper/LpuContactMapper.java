@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
@@ -19,7 +20,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Разбирает адрес и регион санатория из потока контактной информации 1С:УСК. Тем же потоком
  * идут телефоны и почта всех контрагентов 1С, поэтому фильтров два: сообщение должно относиться
- * к санаторию из справочника, а из его строк нужны только действительные адреса.
+ * к санаторию из справочника, а из его строк нужны только действительные адреса. Контакты контрагента,
+ * признанного не нашим, пропускаются, а контакты контрагента, который ещё не пришёл, ждут его.
  *
  * <p>Адрес замещается целиком. Если подходящих строк в сообщении нет, адрес и регион очищаются:
  * прежние значения показывали бы в каталоге адрес, которого в 1С уже нет, и узнать об этом было бы
@@ -39,9 +41,11 @@ public class LpuContactMapper implements StreamMapper {
     private final OneCContractProperties contract;
     private final Clock clock;
 
-    public LpuContactMapper(LpuRepository repository, OneCContractProperties contract, Clock clock) {
+    public LpuContactMapper(LpuRepository repository, ForeignReferences foreign, OneCContractProperties contract,
+                            Clock clock) {
         this.repository = repository;
-        this.sanatoriums = new CatalogReference<>(repository::findByExternalId, "контакты не нашего контрагента: ");
+        this.sanatoriums = new CatalogReference<>(repository::findByExternalId, ParentKind.CONTRAGENT, foreign,
+                "контакты не нашего контрагента: ");
         this.contract = contract;
         this.clock = clock;
     }
@@ -54,6 +58,12 @@ public class LpuContactMapper implements StreamMapper {
     @Override
     public ImportResult apply(ObjectNode data) {
         return sanatoriums.applyIfKnown(contragentOf(data), sanatorium -> replaceAddress(sanatorium, data));
+    }
+
+    /** Запись, которую меняет сообщение, — сам контрагент: адрес лежит в его строке справочника. */
+    @Override
+    public Optional<UUID> recordOf(ObjectNode data) {
+        return Optional.of(contragentOf(data));
     }
 
     private ImportResult replaceAddress(Lpu sanatorium, ObjectNode data) {

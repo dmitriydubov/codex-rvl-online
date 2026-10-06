@@ -55,15 +55,18 @@ class ReferenceImportDispatchTest {
     @Mock
     private ApplicationEventPublisher events;
 
+    @Mock
+    private SupersededParentWaits supersededWaits;
+
     @Test
     void messageOfMappedStream_goesToItsMapper_withDataOfEnvelope() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
         when(priceListHandler.stream()).thenReturn(OneCStream.PRICE_LISTS);
         when(mkb10Mapper.apply(any())).thenReturn(ImportResult.applied());
 
-        ImportResult result = service().importMessage(message(OneCStream.MKB10, envelope(MKB10_DATA)));
+        ImportOutcome result = service().importMessage(message(OneCStream.MKB10, envelope(MKB10_DATA)));
 
-        assertThat(result).isEqualTo(ImportResult.applied());
+        assertThat(result).isEqualTo(ImportOutcome.applied());
         verify(mkb10Mapper).apply(json.readValue(MKB10_DATA, ObjectNode.class));
         verify(inboundMessageService).markProcessed(MESSAGE_ID);
         verify(priceListHandler, never()).handle(any(), any());
@@ -75,11 +78,11 @@ class ReferenceImportDispatchTest {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
         when(priceListHandler.stream()).thenReturn(OneCStream.PRICE_LISTS);
         InboundMessage message = message(OneCStream.PRICE_LISTS, envelope("{\"cid\":\"c1\"}"));
-        when(priceListHandler.handle(any(), any())).thenReturn(ImportResult.skipped("ждёт финального"));
+        when(priceListHandler.handle(any(), any())).thenReturn(ImportOutcome.skipped("ждёт финального"));
 
-        ImportResult result = service().importMessage(message);
+        ImportOutcome result = service().importMessage(message);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("ждёт финального"));
+        assertThat(result).isEqualTo(ImportOutcome.skipped("ждёт финального"));
         verify(priceListHandler).handle(message, json.readValue("{\"cid\":\"c1\"}", ObjectNode.class));
         verify(mkb10Mapper, never()).apply(any());
         verify(events).publishEvent(new OneCMessageApplied(OneCStream.PRICE_LISTS));
@@ -141,7 +144,7 @@ class ReferenceImportDispatchTest {
      */
     @Test
     void bodyThatIsNotJson_isContractViolation_withoutQuotingTheBody() {
-        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, json, events);
+        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events);
 
         assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, "{не json")))
                 .isInstanceOf(OneCFieldException.class)
@@ -152,7 +155,7 @@ class ReferenceImportDispatchTest {
     }
 
     private void assertEnvelopeRejected(String payload, String reason) {
-        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, json, events);
+        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events);
 
         assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, payload)))
                 .isInstanceOf(OneCFieldException.class)
@@ -160,7 +163,7 @@ class ReferenceImportDispatchTest {
     }
 
     private ReferenceImportService service() {
-        return new ReferenceImportService(List.of(mkb10Mapper), List.of(priceListHandler), inboundMessageService, json, events);
+        return new ReferenceImportService(List.of(mkb10Mapper), List.of(priceListHandler), inboundMessageService, supersededWaits, json, events);
     }
 
     private static InboundMessage message(OneCStream stream, String payload) {

@@ -53,6 +53,10 @@ public class OneCInbox {
     private static final String AGE_ALL = """
             update inbound_message set received_at = received_at - cast(:age as interval)
             """;
+    private static final String AGE_PARENT_WAITS = """
+            update inbound_message set parent_wait_since = parent_wait_since - cast(:age as interval)
+            where status = 'AWAITING_PARENT'
+            """;
 
     private final JdbcClient jdbc;
     private final List<String> expectedStatuses = new ArrayList<>();
@@ -168,6 +172,16 @@ public class OneCInbox {
     public void ageAll(Duration age) {
         if (jdbc.sql(AGE_ALL).param("age", age.toSeconds() + " seconds").update() == 0) {
             throw new IllegalStateException("в сырье нет сообщений");
+        }
+    }
+
+    /**
+     * Отодвигает момент начала ожидания у всех сообщений, которые ждут родителя, в прошлое на {@code age}: ждать
+     * срок ожидания сценарий не может. Момент приёма не меняется.
+     */
+    public void ageParentWaits(Duration age) {
+        if (jdbc.sql(AGE_PARENT_WAITS).param("age", age.toSeconds() + " seconds").update() == 0) {
+            throw new IllegalStateException("в сырье нет сообщений, которые ждут родителя");
         }
     }
 

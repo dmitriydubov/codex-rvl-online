@@ -77,7 +77,7 @@ class InboundOutcomeRecordingTest {
 
         service().markProcessed(MESSAGE_ID);
 
-        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW));
+        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW, null));
         assertThat(transitions()).containsExactly("PROCESSED");
     }
 
@@ -88,7 +88,7 @@ class InboundOutcomeRecordingTest {
         service().markSkipped(MESSAGE_ID, "программа не РВЛ");
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 0, null, "программа не РВЛ", NOW));
+                .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 0, null, "программа не РВЛ", NOW, null));
         assertThat(transitions()).containsExactly("SKIPPED");
     }
 
@@ -99,7 +99,7 @@ class InboundOutcomeRecordingTest {
         service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, NOW.plus(BACKOFF.get(0)), ERROR, null));
+                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, NOW.plus(BACKOFF.get(0)), ERROR, null, null));
         assertThat(transitions()).containsExactly("RETRY");
     }
 
@@ -111,7 +111,7 @@ class InboundOutcomeRecordingTest {
         service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, NOW.plus(BACKOFF.get(1)), ERROR, null));
+                .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, NOW.plus(BACKOFF.get(1)), ERROR, null, null));
     }
 
     @Test
@@ -123,7 +123,7 @@ class InboundOutcomeRecordingTest {
         service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
 
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(
-                InboundStatus.FAILED, 2, null, "повторы исчерпаны на попытке 3: " + ERROR, null));
+                InboundStatus.FAILED, 2, null, "повторы исчерпаны на попытке 3: " + ERROR, null, null));
         assertThat(transitions()).containsExactly("FAILED");
     }
 
@@ -135,7 +135,7 @@ class InboundOutcomeRecordingTest {
                 new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         assertThat(message.outcome())
-                .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 0, null, "в конверте нет объекта data", null));
+                .isEqualTo(new InboundOutcome(InboundStatus.FAILED, 0, null, "в конверте нет объекта data", null, null));
         assertThat(transitions()).containsExactly("FAILED");
     }
 

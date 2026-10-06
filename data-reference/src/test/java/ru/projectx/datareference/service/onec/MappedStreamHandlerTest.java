@@ -1,22 +1,24 @@
 package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -28,18 +30,25 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Если исход не записать, строка останется новой и будет разобрана снова при следующем проходе. Если
  * записать не тот, справочник и статус сырья разойдутся: применённое сообщение будет выглядеть пропущенным
- * или наоборот.
+ * или наоборот. Сообщение, которое ссылается на ещё не пришедшую запись, ждёт её вместе с записью, которую меняет,
+ * а применённое сообщение закрывает более старые ожидающие сообщения той же записи: иначе они затёрли бы его.
  */
 @ExtendWith(MockitoExtension.class)
 class MappedStreamHandlerTest {
 
     private static final UUID MESSAGE_ID = UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000aa");
+    private static final UUID RECORD = UUID.fromString("5f14a8d2-c3e7-4b90-a1d6-9e2b7c4f0a83");
+    private static final AwaitedParent PARENT =
+            new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
 
     @Mock
     private StreamMapper mapper;
 
     @Mock
     private InboundMessageService inboundMessageService;
+
+    @Mock
+    private SupersededParentWaits supersededWaits;
 
     private final ObjectNode data = JsonMapper.builder().build().createObjectNode().put("code", "A00");
 
@@ -54,40 +63,64 @@ class MappedStreamHandlerTest {
     void appliedMessage_isMarkedProcessed() {
         when(mapper.apply(data)).thenReturn(ImportResult.applied());
 
-        ImportResult result = handler().handle(message(), data);
+        ImportOutcome result = handler().handle(message(), data);
 
-        assertThat(result).isEqualTo(ImportResult.applied());
+        assertThat(result).isEqualTo(ImportOutcome.applied());
         verify(inboundMessageService).markProcessed(MESSAGE_ID);
         verifyNoMoreInteractions(inboundMessageService);
+        verifyNoInteractions(supersededWaits);
+    }
+
+    @Test
+    void appliedMessageOfARecord_closesOlderWaitingMessagesOfThatRecord() {
+        when(mapper.apply(data)).thenReturn(ImportResult.applied());
+        when(mapper.recordOf(data)).thenReturn(Optional.of(RECORD));
+        InboundMessage message = message();
+
+        handler().handle(message, data);
+
+        verify(inboundMessageService).markProcessed(MESSAGE_ID);
+        verify(supersededWaits).closeOlderThan(message.receipt(), RECORD);
     }
 
     @Test
     void skippedMessage_isMarkedSkippedWithItsReason() {
         when(mapper.apply(data)).thenReturn(ImportResult.skipped("не санаторий"));
 
-        ImportResult result = handler().handle(message(), data);
+        ImportOutcome result = handler().handle(message(), data);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("не санаторий"));
+        assertThat(result).isEqualTo(ImportOutcome.skipped("не санаторий"));
         verify(inboundMessageService).markSkipped(MESSAGE_ID, "не санаторий");
         verifyNoMoreInteractions(inboundMessageService);
+        verifyNoInteractions(supersededWaits);
     }
 
-    /**
-     * Отклонённое маппером сообщение уходит по общему пути окончательного отказа: разбор откатывается, а отказ
-     * записывают после отката с записью в журнал и причиной от маппера.
-     */
     @Test
-    void rejectedMessage_isContractViolationWithItsReason() {
-        when(mapper.apply(data)).thenReturn(ImportResult.rejected("запись отклонена"));
+    void messageWithoutItsParent_waitsForItWithTheRecordItChanges() {
+        when(mapper.apply(data)).thenReturn(ImportResult.awaitingParent(PARENT));
+        when(mapper.recordOf(data)).thenReturn(Optional.of(RECORD));
 
-        assertThatThrownBy(() -> handler().handle(message(), data))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage("запись отклонена");
-        verifyNoInteractions(inboundMessageService);
+        ImportOutcome result = handler().handle(message(), data);
+
+        assertThat(result).isEqualTo(
+                ImportOutcome.awaitingParent("ждёт родителя: контрагент 6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
+        verify(inboundMessageService).markAwaitingParent(MESSAGE_ID, PARENT, RECORD);
+        verifyNoMoreInteractions(inboundMessageService);
+        verifyNoInteractions(supersededWaits);
+    }
+
+    @Test
+    void messageWithoutItsParent_ofAStreamWithoutRecords_waitsWithoutRecord() {
+        when(mapper.apply(data)).thenReturn(ImportResult.awaitingParent(PARENT));
+        when(mapper.recordOf(any())).thenReturn(Optional.empty());
+
+        handler().handle(message(), data);
+
+        verify(inboundMessageService).markAwaitingParent(MESSAGE_ID, PARENT, null);
     }
 
     private MappedStreamHandler handler() {
-        return new MappedStreamHandler(mapper, inboundMessageService);
+        return new MappedStreamHandler(mapper, inboundMessageService, supersededWaits);
     }
 
     private static InboundMessage message() {

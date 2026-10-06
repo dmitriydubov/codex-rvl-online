@@ -49,6 +49,13 @@ public final class OneCMessages {
                 .formatted(externalId, name, RVL_ACTIVITY);
     }
 
+    /** Контрагент-ЛПУ без вида деятельности «РВЛ»: сервис признаёт его не нашим. */
+    public static String sanatoriumWithoutRvl(UUID externalId, String name) {
+        return """
+                {"guid":"%s","thisIsLPU":true,"Наименование":"%s","ИНН":"7701234567","typesActivities":[]}"""
+                .formatted(externalId, name);
+    }
+
     private OneCMessages() {
     }
 }

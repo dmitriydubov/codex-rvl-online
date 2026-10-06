@@ -1,0 +1,128 @@
+# Сообщение справочника, пришедшее раньше своего родителя, ждёт его, а сервис помнит родителей, признанных не нашими.
+databaseChangeLog:
+
+  - changeSet:
+      id: 018-parent-wait-columns
+      author: rvl-online
+      comment: >
+        Договор санатория, его адрес, услуга и прайс услуги могут прийти раньше записи, на которую ссылаются: 1С:УСК
+        выгружает справочники многими очередями сразу и порядок не гарантирует. Такое сообщение ждёт родителя, и в
+        строке сырья лежит, кого оно ждёт (вид и GUID родителя), с какого момента и какую запись справочника меняет.
+        Вид и GUID родителя нужны выборке разбора: сообщение берётся заново, только когда родитель появился. Момент
+        начала ожидания отсчитывает срок. Запись справочника нужна, чтобы более новое применённое сообщение той же
+        записи закрыло ожидающее старое. Колонки пусты у всех сообщений, которые ничего не ждали.
+      changes:
+        - addColumn:
+            tableName: inbound_message
+            columns:
+              - column: { name: parent_wait_since, type: timestamptz }
+              - column: { name: awaited_parent_kind, type: text }
+              - column: { name: awaited_parent_id, type: uuid }
+              - column: { name: record_external_id, type: uuid }
+      rollback:
+        - dropColumn:
+            tableName: inbound_message
+            columns:
+              - column: { name: parent_wait_since }
+              - column: { name: awaited_parent_kind }
+              - column: { name: awaited_parent_id }
+              - column: { name: record_external_id }
+
+  - changeSet:
+      id: 018-parent-wait-indexes
+      author: rvl-online
+      comment: >
+        Два частичных индекса по ожидающим родителя сообщениям. Первый — под выборку разбора и проверку срока: каждый
+        проход перебирает ожидающие строки в порядке приёма. Второй — под закрытие устаревших: применённое сообщение
+        ищет более ранние ожидающие сообщения той же записи своего потока. Разобранные строки в индексы не входят.
+        Сырым sql: у createIndex в Liquibase нет условия частичного индекса (docs.liquibase.com, change-types/create-index).
+      changes:
+        - sql:
+            sql: >
+              create index idx_inbound_message_awaiting_parent on inbound_message (received_at)
+              where status = 'AWAITING_PARENT'
+        - sql:
+            sql: >
+              create index idx_inbound_message_awaiting_record on inbound_message (stream, record_external_id)
+              where status = 'AWAITING_PARENT'
+      rollback:
+        - sql:
+            sql: drop index idx_inbound_message_awaiting_record
+        - sql:
+            sql: drop index idx_inbound_message_awaiting_parent
+
+  - changeSet:
+      id: 018-unfinished-index-awaiting-parent
+      author: rvl-online
+      comment: >
+        Метрики очереди разбора считают и сообщения, которые ждут родителя. Частичный индекс под этот подсчёт
+        пересоздаётся с тем же именем и с новым статусом в условии, записанном так же, как в запросе подсчёта.
+      changes:
+        - sql:
+            sql: drop index idx_inbound_message_unfinished
+        - sql:
+            sql: >
+              create index idx_inbound_message_unfinished on inbound_message (stream, status, received_at)
+              where status in ('NEW', 'RETRY', 'BUFFERED', 'AWAITING_PARENT', 'FAILED')
+      rollback:
+        - sql:
+            sql: drop index idx_inbound_message_unfinished
+        - sql:
+            sql: >
+              create index idx_inbound_message_unfinished on inbound_message (stream, status, received_at)
+              where status in ('NEW', 'RETRY', 'BUFFERED', 'FAILED')
+
+  - changeSet:
+      id: 018-retention-index-expired-parent-wait
+      author: rvl-online
+      comment: >
+        По сроку хранения стирается и тело сообщения, отклонённого потому, что родитель за срок ожидания так и не
+        пришёл: применить его уже нечем, а по имени потока нельзя поручиться, что персональных данных в теле нет.
+        Такое сообщение отличает непустой момент начала ожидания: у отказа по другой причине он пуст. Индекс под
+        стирание пересоздаётся с тем же именем, условие записано так же, как в запросах стирания и подсчёта.
+      changes:
+        - sql:
+            sql: drop index idx_inbound_message_retention
+        - sql:
+            sql: >
+              create index idx_inbound_message_retention on inbound_message (received_at)
+              where payload is not null
+                and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED'
+                     or (status = 'FAILED' and parent_wait_since is not null))
+      rollback:
+        - sql:
+            sql: drop index idx_inbound_message_retention
+        - sql:
+            sql: >
+              create index idx_inbound_message_retention on inbound_message (received_at)
+              where payload is not null
+                and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+
+  - changeSet:
+      id: 018-foreign-reference
+      author: rvl-online
+      comment: >
+        Контрагенты, договоры санаториев и услуги 1С:УСК, которые сервис признал не нашими: санаторий без вида
+        деятельности РВЛ, страхователь, договор чужого контрагента, услуга такого договора. В справочниках их нет, и
+        без этой таблицы сообщение, которое на них ссылается, нельзя отличить от сообщения, родитель которого ещё не
+        пришёл. Хранится только вид записи, её GUID в 1С и момент, когда сервис её запомнил; персональных данных нет.
+        Ключ — GUID: у объектов 1С он уникален и между видами записей.
+      changes:
+        - createTable:
+            tableName: foreign_reference
+            columns:
+              - column:
+                  name: external_id
+                  type: uuid
+                  constraints: { primaryKey: true, primaryKeyName: pk_foreign_reference, nullable: false }
+              - column:
+                  name: kind
+                  type: text
+                  constraints: { nullable: false }
+              - column:
+                  name: recorded_at
+                  type: timestamptz
+                  constraints: { nullable: false }
+      rollback:
+        - dropTable:
+            tableName: foreign_reference

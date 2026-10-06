@@ -1,16 +1,18 @@
 package ru.projectx.datareference.mapper;
 
 import java.util.Objects;
+import ru.projectx.datareference.entity.AwaitedParent;
 
 /**
- * Чем закончился разбор одного сообщения: запись обновлена, сообщение не наше или сообщение отклонено.
+ * Чем закончилось применение сообщения к справочнику: запись обновлена, сообщение не наше или сообщение ждёт
+ * записи, на которую ссылается.
  *
  * <p>«Не наше» — штатный и частый исход, а не ошибка: один поток 1С несёт данные всех контрагентов 1С:УСК, а нам
- * нужны только санатории с видом деятельности РВЛ. Поэтому у пропуска и отказа обязательна причина: без неё «данных
- * нет» и «фильтр задан неверно» выглядят в базе одинаково.
+ * нужны только санатории с видом деятельности РВЛ. Поэтому у пропуска обязательна причина: без неё «данных нет» и
+ * «фильтр задан неверно» выглядят в базе одинаково. Нарушение контракта — не исход, а исключение.
  *
- * <p>Запечатанный тип, а не флаг со строкой: причина есть только у пропуска и отказа, и исчерпывающий {@code switch}
- * не даст забыть ни один исход.
+ * <p>Запечатанный тип, а не флаг со строкой: у каждого исхода свои данные, и исчерпывающий {@code switch} не даст
+ * забыть ни один исход.
  */
 public sealed interface ImportResult {
 
@@ -32,14 +34,13 @@ public sealed interface ImportResult {
     }
 
     /**
-     * Сообщение отклонено окончательно — с причиной. Как записать отказ, решает обработчик потока: передача прайса,
-     * не сошедшаяся со счётчиками, отклоняет все свои части в той же транзакции, а одиночное сообщение уходит общим
-     * путём окончательного отказа после отката разбора.
+     * Сообщение ссылается на запись справочника, которой ещё нет и о которой сервис ничего не знает. Применить его
+     * можно будет, когда запись придёт.
      */
-    record Rejected(String reason) implements ImportResult {
+    record AwaitingParent(AwaitedParent parent) implements ImportResult {
 
-        public Rejected {
-            Objects.requireNonNull(reason, "reason");
+        public AwaitingParent {
+            Objects.requireNonNull(parent, "parent");
         }
     }
 
@@ -51,7 +52,7 @@ public sealed interface ImportResult {
         return new Skipped(reason);
     }
 
-    static ImportResult rejected(String reason) {
-        return new Rejected(reason);
+    static ImportResult awaitingParent(AwaitedParent parent) {
+        return new AwaitingParent(parent);
     }
 }
