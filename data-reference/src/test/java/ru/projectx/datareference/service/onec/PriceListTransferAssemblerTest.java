@@ -156,7 +156,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportResult.rejected(reason));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
             assertThat(message.outcome().lastError()).isEqualTo(reason);
@@ -201,7 +201,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(lateFinal);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportResult.rejected(reason));
         assertThat(lateFinal.outcome().status()).isEqualTo(InboundStatus.FAILED);
         assertThat(lateFinal.outcome().lastError()).isEqualTo(reason);
         assertThat(rejected.outcome().lastError()).isEqualTo("в строке прайса нет цены");
@@ -218,7 +218,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(lateBatch);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " уже отклонена"));
+        assertThat(result).isEqualTo(ImportResult.rejected("передача " + CID + " уже отклонена"));
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 

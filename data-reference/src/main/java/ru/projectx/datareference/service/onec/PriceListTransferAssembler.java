@@ -85,14 +85,14 @@ public class PriceListTransferAssembler implements StreamHandler {
     private ImportResult fail(PriceListTransfer.Mismatched transfer) {
         log.error(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.skipped(transfer.reason());
+        return ImportResult.rejected(transfer.reason());
     }
 
     /** Отказ передачи уже записан и о нём уже сообщено; опоздавшая часть просто разделяет его. */
     private ImportResult rejectLate(PriceListTransfer.Rejected transfer) {
         log.warn(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.skipped(transfer.reason());
+        return ImportResult.rejected(transfer.reason());
     }
 
     /** Пропущенная передача уже не применится; поздняя часть разделяет её пропуск. */

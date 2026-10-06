@@ -3,6 +3,7 @@ package ru.projectx.datareference.service.onec;
 import java.util.UUID;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -11,8 +12,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Обычный путь сообщения 1С: маппер потока разбирает его, а исход записывается в ту же строку сырья.
  *
- * <p>Применённое сообщение отмечается обработанным, пропущенное — пропущенным с причиной от маппера. Так
- * обрабатываются все потоки, у которых одно сообщение применяется само по себе.
+ * <p>Применённое сообщение отмечается обработанным, пропущенное — пропущенным с причиной от маппера. Отклонённое
+ * уходит общим путём окончательного отказа: разбор откатывается, а отказ записывают после отката. Так обрабатываются
+ * все потоки, у которых одно сообщение применяется само по себе.
  */
 class MappedStreamHandler implements StreamHandler {
 
@@ -29,6 +31,7 @@ class MappedStreamHandler implements StreamHandler {
         return mapper.stream();
     }
 
+    /** @throws OneCFieldException если сообщение нарушает контракт или маппер его отклонил */
     @Override
     public ImportResult handle(InboundMessage message, ObjectNode data) {
         ImportResult result = mapper.apply(data);
@@ -36,6 +39,7 @@ class MappedStreamHandler implements StreamHandler {
         switch (result) {
             case ImportResult.Applied ignored -> inboundMessageService.markProcessed(messageId);
             case ImportResult.Skipped skipped -> inboundMessageService.markSkipped(messageId, skipped.reason());
+            case ImportResult.Rejected rejected -> throw new OneCFieldException(rejected.reason());
         }
         return result;
     }

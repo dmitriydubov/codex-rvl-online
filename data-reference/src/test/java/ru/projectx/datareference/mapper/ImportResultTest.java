@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 
 /**
- * Защищает исход разбора сообщения 1С: применено или пропущено с причиной.
+ * Защищает исход разбора сообщения 1С: применено, пропущено с причиной или отклонено с причиной.
  *
  * <p>По исходу строке сырья проставляется статус, а планировщик пишет его в журнал. Пропуск без причины
  * запрещён: без неё «справочник пуст, потому что данных нет» и «справочник пуст, потому что фильтр задан
@@ -34,6 +34,21 @@ class ImportResultTest {
                 .hasMessage("reason");
     }
 
+    @Test
+    void rejected_keepsItsReason() {
+        ImportResult result = ImportResult.rejected("счётчики не сошлись");
+
+        assertThat(result).isInstanceOf(ImportResult.Rejected.class);
+        assertThat(((ImportResult.Rejected) result).reason()).isEqualTo("счётчики не сошлись");
+    }
+
+    @Test
+    void rejectedWithoutReason_isRejected() {
+        assertThatThrownBy(() -> ImportResult.rejected(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("reason");
+    }
+
     /** Исходы сравниваются по смыслу: это и проверяют тесты разбора, сравнивая исход с ожидаемым. */
     @Test
     void outcomes_areEqualByMeaning() {
@@ -41,5 +56,7 @@ class ImportResultTest {
         assertThat(ImportResult.skipped("причина")).isEqualTo(ImportResult.skipped("причина"));
         assertThat(ImportResult.skipped("причина")).isNotEqualTo(ImportResult.skipped("другая"));
         assertThat(ImportResult.applied()).isNotEqualTo(ImportResult.skipped("причина"));
+        assertThat(ImportResult.rejected("причина")).isEqualTo(ImportResult.rejected("причина"));
+        assertThat(ImportResult.rejected("причина")).isNotEqualTo(ImportResult.skipped("причина"));
     }
 }
