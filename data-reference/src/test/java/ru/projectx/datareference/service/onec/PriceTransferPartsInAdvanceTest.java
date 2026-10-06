@@ -63,6 +63,23 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(parsed.dataOf(batch)).contains(dataOf(batch));
     }
 
+    /**
+     * Повторная доставка части, которая уже лежит в буфере: её прежняя строка заменяется пришедшей, а не считается
+     * вторым пакетом. Иначе счётчики передачи не сошлись бы и заранее не разобралось бы ничего.
+     */
+    @Test
+    void redeliveredPartAlreadyBuffered_countsOnce() {
+        InboundMessage finalMessage = buffered(finalData(1, 1), 1, 1);
+        InboundMessage batch = message(batchData(1));
+        InboundMessage storedBatch = storedCopy(batch);
+        storedBatch.markBuffered(CID, null, 1);
+        when(reader.parts(CID)).thenReturn(List.of(finalMessage, storedBatch));
+
+        ParsedTransferParts parsed = parse(batch, dataOf(batch));
+
+        assertThat(parsed.dataOf(finalMessage)).contains(dataOf(finalMessage));
+    }
+
     /** Передача ещё не собрана: разбирать заранее нечего, тела частей не читаются. */
     @Test
     void transferStillWaitingForParts_parsesNothing() {

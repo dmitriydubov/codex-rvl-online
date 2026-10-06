@@ -64,7 +64,7 @@ public class PriceListTransferRejection implements RejectionScope {
         serviceLock.lockTransferService(part.cid(), part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
-        part.markup().ifPresent(markup -> markup.applyTo(message));
+        part.markupOrTransferOnly().applyTo(message);
         message.markFailed(reasons.own());
         List<InboundMessage> others = bufferedOthers(message, parts);
         others.forEach(other -> other.markFailed(reasons.others()));
@@ -138,6 +138,14 @@ public class PriceListTransferRejection implements RejectionScope {
             catch (OneCFieldException unreadableCounter) {
                 return Optional.empty();
             }
+        }
+
+        /**
+         * Разметка, с которой часть записывается отклонённой. Если счётчики не читаются, часть всё равно записывается
+         * в свою передачу, но без счётчиков: так части, пришедшие позже, видят отказ передачи и разделяют его.
+         */
+        PriceListTransferMarkup markupOrTransferOnly() {
+            return markup().orElseGet(() -> new PriceListTransferMarkup(cid, null, 0));
         }
     }
 

@@ -10,12 +10,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
-/** Защищает чтение частей передачи заранее: читаются все сообщения передачи, в любом статусе. */
+/** Защищает чтение частей передачи заранее: читаются все сообщения передачи, в любом статусе, своей транзакцией. */
 @ExtendWith(MockitoExtension.class)
 class PriceTransferPartsReaderTest {
 
@@ -31,5 +33,18 @@ class PriceTransferPartsReaderTest {
         when(inbound.findByCorrelationId(CID)).thenReturn(List.of(part));
 
         assertThat(new PriceTransferPartsReader(inbound).parts(CID)).containsExactly(part);
+    }
+
+    /**
+     * Части читаются своей транзакцией только для чтения, которая завершается до их разбора: присоединись чтение к
+     * транзакции разбора, долгий разбор шёл бы внутри неё и упирался в предел её простоя.
+     */
+    @Test
+    void partsAreReadInTheirOwnReadOnlyTransaction() throws NoSuchMethodException {
+        Transactional transaction = PriceTransferPartsReader.class.getMethod("parts", UUID.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+        assertThat(transaction.readOnly()).isTrue();
     }
 }

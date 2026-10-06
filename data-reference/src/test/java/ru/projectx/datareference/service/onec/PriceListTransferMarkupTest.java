@@ -65,6 +65,15 @@ class PriceListTransferMarkupTest {
                 .hasMessage("поле " + field + " больше допустимого");
     }
 
+    /** Счётчик, пришедший не числом JSON, а строкой с целым, читается как прежде — тем же целым. */
+    @Test
+    void counterWrittenAsText_isReadAsBefore() {
+        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+                {"cid":"%s","countMessages":"2","countRows":"3"}""".formatted(CID)));
+
+        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
+    }
+
     @Test
     void messageWithoutTransferId_isContractViolation() {
         assertThatThrownBy(() -> PriceListTransferMarkup.of(node("{\"recordSet\":[]}")))

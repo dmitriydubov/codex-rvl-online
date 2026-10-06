@@ -129,6 +129,25 @@ class PriceListTransferRejectionTest {
         verify(finalizations).lockByService(SERVICE_ID);
     }
 
+    /**
+     * Финальное сообщение с нечитаемым счётчиком, пришедшее первым, записывается отклонённым в свою передачу, но без
+     * счётчиков: пакеты, пришедшие позже, видят отказ передачи и разделяют его.
+     */
+    @Test
+    void firstFinalMessageWithCounterBeyondInt_isRecordedInItsTransferWithoutCounters() {
+        InboundMessage trigger = received("{\"cid\":\"%s\",\"keyValue\":\"%s\",\"countMessages\":1,\"countRows\":1e10}"
+                .formatted(CID, SERVICE_ID));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of());
+
+        assertThat(rejection.reject(trigger, "поле countRows больше допустимого")).containsExactly(trigger);
+
+        assertFailed(trigger, "поле countRows больше допустимого");
+        assertThat(trigger.transferPart().correlationId()).isEqualTo(CID);
+        assertThat(trigger.transferPart().batchCount()).isNull();
+        assertThat(PriceListTransfer.of(CID, List.of(trigger)))
+                .isEqualTo(new PriceListTransfer.Rejected("передача " + CID + " уже отклонена", List.of()));
+    }
+
     @Test
     void decidesRejectionsOfPriceListStream() {
         assertThat(rejection.stream()).isEqualTo(OneCStream.PRICE_LISTS);
