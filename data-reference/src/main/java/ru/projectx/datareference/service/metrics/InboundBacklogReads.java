@@ -8,7 +8,7 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
-import ru.projectx.datareference.service.ExpiredPolicyPersonalData;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
 /**
  * Читает из базы снимок очереди разбора ({@link InboundBacklog}): пять запросов, каждый считает, а не выбирает

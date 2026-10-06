@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.retention;
 
 import java.time.Clock;
 import java.time.Instant;

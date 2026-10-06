@@ -24,7 +24,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
-import ru.projectx.datareference.service.ExpiredPolicyPersonalData;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**

@@ -18,7 +18,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
-import ru.projectx.datareference.service.ExpiredPolicyPersonalData;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**

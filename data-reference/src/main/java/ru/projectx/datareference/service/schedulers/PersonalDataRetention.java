@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.service.ExpiredPolicyPersonalData;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
 /**
  * Срок хранения персональных данных: тел сообщений 1С:УСК в таблице сырья и в карантине и ФИО, даты рождения и почты
