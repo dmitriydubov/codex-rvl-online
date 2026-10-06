@@ -30,8 +30,18 @@ class OneCMoneyScaleTest {
         assertThat(OneCValues.amount(node("price", sent), "price")).contains(new BigDecimal(sent));
     }
 
+    /**
+     * В 1С цена хранится с четырьмя знаками после запятой, и копейки приходят с хвостом из нулей. Знаки считаются по
+     * значению: такая цена принимается и остаётся равной присланной.
+     */
     @ParameterizedTest
-    @ValueSource(strings = {"4100.551", "0.001", "0.0001", "4100.5501", "1.23456E2"})
+    @ValueSource(strings = {"1234.5000", "1234.5600", "100.0000"})
+    void amountWithFourDigitsEndingInZeros_isReadAsSent(String sent) {
+        assertThat(OneCValues.amount(node("price", sent), "price")).contains(new BigDecimal(sent));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"4100.551", "0.001", "0.0001", "4100.5501", "1.23456E2", "1234.5670"})
     void amountWithThirdFractionDigit_isContractViolationNamingFieldButNotValue(String sent) {
         assertThatThrownBy(() -> OneCValues.amount(node("price", sent), "price"))
                 .isInstanceOf(OneCFieldException.class)
