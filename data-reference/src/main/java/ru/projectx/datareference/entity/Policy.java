@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Полис застрахованного — поток ТЗ-1. Отдельной сущности «застрахованное лицо»
+ * Полис застрахованного — из потока полисов 1С. Отдельной сущности «застрахованное лицо»
  * в контракте нет: полис и есть застрахованный в рамках договора страхования.
  *
  * <p><b>Здесь и только здесь лежат персональные данные сервиса</b>: ФИО, дата рождения,
@@ -23,8 +23,8 @@ import org.jspecify.annotations.Nullable;
  * сообщения, которым полис приехал, есть срок хранения в таблице сырья.
  *
  * <p>Родственники — это <b>отдельные полисы</b>, а не члены семьи внутри одного:
- * связи «чей это родственник» в контракте нет вообще, и поля в маппинге ТЗ-1 тоже нет.
- * Паспортных данных этот поток не приносит — ТЗ-1 прямо пишет, что структура их потока
+ * связи «чей это родственник» в контракте нет вообще, и поля в описании потока тоже нет.
+ * Паспортных данных этот поток не приносит — описание потока прямо говорит, что структура их потока
  * не определена, поэтому таблицы для них здесь нет.
  *
  * <p>Обе табличные части <b>замещаются целиком</b>: сообщение всегда несёт полный состав
@@ -37,7 +37,7 @@ public class Policy extends OneCEntity {
 
     /**
      * Договор страхования, по которому выдан полис. Логическая ссылка GUID'ом,
-     * без внешнего ключа: поток договоров страхования (ТЗ-2) на контуре не создан,
+     * без внешнего ключа: поток договоров страхования из 1С на контуре не создан,
      * и требовать существования строки, которой неоткуда взяться, нельзя.
      */
     @Column(name = "external_contract_id", nullable = false)
@@ -77,6 +77,10 @@ public class Policy extends OneCEntity {
     @Column(nullable = false)
     private boolean availability;
 
+    /*
+     * Коллекции не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
+     * полей сущности, а Hibernate при загрузке подменяет коллекцию своей реализацией.
+     */
     @OneToMany(mappedBy = "policy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PolicyProgram> programs = new ArrayList<>();
 
@@ -87,13 +91,19 @@ public class Policy extends OneCEntity {
         // JPA
     }
 
-    private Policy(UUID externalId, Snapshot snapshot, Instant now) {
+    private Policy(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(snapshot, now);
     }
 
+    /**
+     * Новый полис из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static Policy create(UUID externalId, Snapshot snapshot, Instant now) {
-        return new Policy(externalId, snapshot, now);
+        Policy policy = new Policy(externalId, now);
+        policy.applySnapshot(snapshot, now);
+        return policy;
     }
 
     public void applySnapshot(Snapshot snapshot, Instant now) {
@@ -129,7 +139,7 @@ public class Policy extends OneCEntity {
     }
 
     /**
-     * Разобранное сообщение ТЗ-1 целиком: поля полиса и обе табличные части.
+     * Разобранное сообщение 1С о полисе целиком: поля полиса и обе табличные части.
      *
      * <p>Одной записью, а не тремя аргументами, потому что применяются они только
      * вместе — замещение табличных частей без обновления полиса оставило бы запись,
@@ -146,7 +156,10 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /** Поля самого полиса. Разбор — в маппере, инварианты — здесь. */
+    /**
+     * Поля самого полиса в том виде, как их прислала 1С. Тот же набор отдаёт {@link #details()}; там пометка
+     * удаления — это признак архивности записи.
+     */
     public record Details(
             UUID externalContractId,
             String number,
@@ -160,54 +173,21 @@ public class Policy extends OneCEntity {
             @Nullable LocalDate endDate,
             boolean availability,
             boolean deleteMark) {
+
+        /** Без ФИО, даты рождения, пола, почты и номера полиса: запись может случайно попасть в журнал. */
+        @Override
+        public String toString() {
+            return "Details[externalContractId=" + externalContractId + "]";
+        }
     }
 
-    public UUID externalContractId() {
-        return externalContractId;
-    }
-
-    public String number() {
-        return number;
-    }
-
-    public String lastName() {
-        return lastName;
-    }
-
-    public String firstName() {
-        return firstName;
-    }
-
-    @Nullable
-    public String middleName() {
-        return middleName;
-    }
-
-    public LocalDate dateOfBirth() {
-        return dateOfBirth;
-    }
-
-    @Nullable
-    public String gender() {
-        return gender;
-    }
-
-    @Nullable
-    public String email() {
-        return email;
-    }
-
-    public LocalDate beginDate() {
-        return beginDate;
-    }
-
-    @Nullable
-    public LocalDate endDate() {
-        return endDate;
-    }
-
-    public boolean availability() {
-        return availability;
+    /**
+     * Поля полиса, как их применило последнее сообщение. Пометка удаления в ответе — это признак
+     * архивности записи: иначе, чем через сообщение, он у полиса не меняется.
+     */
+    public Details details() {
+        return new Details(externalContractId, number, lastName, firstName, middleName, dateOfBirth, gender, email,
+                beginDate, endDate, availability, isArchive());
     }
 
     public List<PolicyProgram> programs() {

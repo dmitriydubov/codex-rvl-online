@@ -6,8 +6,8 @@ import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.Policy;
 
 /**
- * Подсказка для поля «найти сотрудника» (R-04): ФИО и номер, чтобы выбрать из короткого
- * списка. Дата рождения и e-mail сюда не входят намеренно — e-mail только в R-05,
+ * Подсказка для поля «найти сотрудника» (поиск полисов по ФИО и номеру): ФИО и номер, чтобы выбрать из короткого
+ * списка. Дата рождения и e-mail сюда не входят намеренно — e-mail только в ответе «полис целиком»,
  * а различение тёзок по дате рождения аналитик оставил открытым.
  */
 public record PolicySearchResponse(List<Item> items) {
@@ -25,8 +25,9 @@ public record PolicySearchResponse(List<Item> items) {
             @Nullable String middleName) {
 
         static Item of(Policy policy) {
-            return new Item(policy.id(), policy.externalId(), policy.number(),
-                    policy.lastName(), policy.firstName(), policy.middleName());
+            Policy.Details details = policy.details();
+            return new Item(policy.id(), policy.externalId(), details.number(),
+                    details.lastName(), details.firstName(), details.middleName());
         }
     }
 }

@@ -13,7 +13,7 @@ import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 
 /**
- * Полис целиком для сервиса Заявок (R-05): реквизиты, застрахованный, договор, программы РВЛ
+ * Полис целиком для сервиса Заявок (ответ «полис целиком»): реквизиты, застрахованный, договор, программы РВЛ
  * с условиями обслуживания. Вместе с поиском полисов это единственные ответы сервиса
  * с персональными данными (ПДн). ПДн не пишутся в журнал ни в тексте сообщения, ни в тексте
  * исключения, а сервису Договоров полис отдаётся отдельным ответом без них.
@@ -54,11 +54,12 @@ public record PolicyResponse(
                 .filter(row -> rvlPrograms.containsKey(row.externalProgramId()))
                 .map(row -> ProgramLine.of(row, rvlPrograms.get(row.externalProgramId()), policy.serviceLines()))
                 .toList();
+        Policy.Details details = policy.details();
         return new PolicyResponse(
-                policy.id(), policy.externalId(), policy.number(),
-                policy.lastName(), policy.firstName(), policy.middleName(),
-                policy.dateOfBirth(), policy.gender(), policy.email(),
-                policy.beginDate(), policy.endDate(), policy.availability(), policy.isArchive(),
+                policy.id(), policy.externalId(), details.number(),
+                details.lastName(), details.firstName(), details.middleName(),
+                details.dateOfBirth(), details.gender(), details.email(),
+                details.beginDate(), details.endDate(), details.availability(), policy.isArchive(),
                 contract == null ? null : ContractRef.of(contract), programs);
     }
 
