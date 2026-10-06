@@ -34,6 +34,7 @@ final class OneCMoneyLimitMessages {
             "экспонента с наибольшим порядком, который примет база", new BigDecimal("1e131071"),
             "отрицательный порядок сразу за прежним пределом длины", new BigDecimal("1e-1000"));
     private static final Map<String, BigDecimal> PERCENT_RECORDS = Map.of(
+            "на одну сотую за пределом", new BigDecimal("1000.00"),
             "экспонента с огромным порядком", new BigDecimal("1e500"),
             "экспонента сразу за пределом", new BigDecimal("1E+3"),
             "отрицательное на одну сотую за пределом", new BigDecimal("-1000.00"),

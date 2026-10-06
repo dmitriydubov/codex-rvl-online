@@ -216,26 +216,73 @@ class PolicyMapperTest {
         assertThat(line.availability()).isTrue();
     }
 
-    /** Процент франшизы хранится в колонке процента: три цифры до запятой. */
-    @Test
-    void copaymentAtPercentColumnLimit_isStored() {
+    /** Процент сооплаты — от 0 до 100 включительно: обе границы принимаются как есть. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "100.00", "100"})
+    void copaymentAtRangeBound_isStored(String sent) {
         when(repository.findByExternalId(POLICY)).thenReturn(Optional.empty());
         ObjectNode data = policy();
-        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("999.99"));
+        serviceLine(data).put("copayment", new BigDecimal(sent));
 
         mapper.apply(data);
 
-        assertThat(saved().serviceLines().getFirst().copayment()).isEqualByComparingTo("999.99");
+        assertThat(saved().serviceLines().getFirst().copayment()).isEqualByComparingTo(sent);
     }
 
-    @Test
-    void copaymentBeyondPercentColumn_isContractViolationNamingField() {
+    /** Диапазон строже колонки процента, поэтому и значение за пределом колонки отклоняется диапазоном. */
+    @ParameterizedTest
+    @ValueSource(strings = {"-0.01", "100.01", "999.99", "1000.00", "-1000.00", "1E+3", "1e500", "1e999999999"})
+    void copaymentOutOfRange_isContractViolationNamingFieldButNotValue(String sent) {
         ObjectNode data = policy();
-        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("1000.00"));
+        serviceLine(data).put("copayment", new BigDecimal(sent));
 
         assertThatThrownBy(() -> mapper.apply(data))
                 .isInstanceOf(OneCFieldException.class)
-                .hasMessage("поле copayment больше допустимого");
+                .hasMessage("поле copayment вне диапазона от 0 до 100");
+        verify(repository, never()).save(any());
+    }
+
+    /** Знаки после запятой проверяются раньше диапазона. */
+    @Test
+    void copaymentBreakingScaleAndRange_isReportedByScale() {
+        ObjectNode data = policy();
+        serviceLine(data).put("copayment", new BigDecimal("100.001"));
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment содержит больше двух знаков после запятой");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void copaymentAbsentOrNull_isMissingRequiredField() {
+        ObjectNode absent = policy();
+        serviceLine(absent).remove("copayment");
+        ObjectNode nullValue = policy();
+        serviceLine(nullValue).putNull("copayment");
+
+        assertThatThrownBy(() -> mapper.apply(absent))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля copayment");
+        assertThatThrownBy(() -> mapper.apply(nullValue))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля copayment");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void copaymentOfOtherJsonType_isNotANumber() {
+        ObjectNode text = policy();
+        serviceLine(text).put("copayment", "0");
+        ObjectNode flag = policy();
+        serviceLine(flag).put("copayment", true);
+
+        assertThatThrownBy(() -> mapper.apply(text))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment не является числом");
+        assertThatThrownBy(() -> mapper.apply(flag))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment не является числом");
         verify(repository, never()).save(any());
     }
 
@@ -374,6 +421,10 @@ class PolicyMapperTest {
                 .put("beginDate", "2026-07-17T00:00:00+03:00")
                 .put("endDate", "2027-05-17T00:00:00+03:00")
                 .put("availability", true);
+    }
+
+    private static ObjectNode serviceLine(ObjectNode data) {
+        return (ObjectNode) data.path("services").get(0);
     }
 
     private static void property(ArrayNode properties, String name, String value) {
