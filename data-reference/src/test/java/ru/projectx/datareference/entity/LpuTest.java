@@ -68,6 +68,15 @@ class LpuTest {
     }
 
     @Test
+    void applySnapshot_withoutDeleteMark_returnsSanatoriumFromArchive() {
+        Lpu lpu = Lpu.create(EXTERNAL_ID, new Lpu.Details("Берёзка", null, null, null, null, null, true), CREATED);
+
+        lpu.applySnapshot(NEW_DETAILS, UPDATED);
+
+        assertThat(lpu.isArchive()).isFalse();
+    }
+
+    @Test
     void applyContacts_replacesAddressAndRegionAndKeepsRequisites() {
         Lpu lpu = Lpu.create(EXTERNAL_ID, DETAILS, CREATED);
         lpu.applyContacts("Москва, ул. Лесная, 1", "Москва", CREATED);

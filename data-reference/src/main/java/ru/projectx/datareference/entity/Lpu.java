@@ -57,11 +57,7 @@ public class Lpu extends OneCEntity {
         super(externalId, now);
     }
 
-    /**
-     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
-     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
-     * вызов раньше, чем инициализировались его собственные поля.
-     */
+    /** Новая запись из первого сообщения 1С. */
     public static Lpu create(UUID externalId, Details details, Instant now) {
         Lpu lpu = new Lpu(externalId, now);
         lpu.applySnapshot(details, now);

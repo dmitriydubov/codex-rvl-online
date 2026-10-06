@@ -84,7 +84,10 @@ public class PriceListItem {
         return new PriceListItem(service, row, now);
     }
 
-    /** Разобранная строка прейскуранта ({@code recordSet[]} собранной передачи). */
+    /**
+     * Разобранная строка прейскуранта. Прейскурант по услуге приходит несколькими сообщениями со строками
+     * и одним итоговым, а применяется, только когда все они собраны.
+     */
     public record Row(
             @Nullable String serviceName,
             @Nullable String serviceCode,
