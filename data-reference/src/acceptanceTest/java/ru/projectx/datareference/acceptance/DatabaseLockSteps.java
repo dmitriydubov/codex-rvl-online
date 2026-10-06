@@ -33,7 +33,8 @@ public class DatabaseLockSteps {
             "коды МКБ-10", "mkb10",
             "журнал входящих сообщений 1С:УСК", "inbox",
             "сырьё сообщений 1С:УСК", "inbound_message",
-            "строки прайсов", "price_list_items");
+            "строки прайсов", "price_list_items",
+            "применённые передачи прайсов по услугам", "price_list_finalization");
 
     private final DataSource dataSource;
     private @Nullable Connection lockingSession;

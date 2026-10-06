@@ -8,9 +8,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
@@ -105,7 +106,7 @@ class InboundMessageServiceTest {
     void temporaryFailure_schedulesRetryByFirstStepOfLadder() {
         UUID messageId = store();
 
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.RETRY);
@@ -119,13 +120,13 @@ class InboundMessageServiceTest {
     void repeatedTemporaryFailures_walkDownTheLadder() {
         UUID messageId = store();
 
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
 
         assertThat(repository.findById(messageId).orElseThrow().outcome().nextRetryAt())
                 .isEqualTo(NOW.plus(Duration.ofMinutes(5)));
 
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().attempt()).isEqualTo(3);
@@ -141,7 +142,7 @@ class InboundMessageServiceTest {
         UUID messageId = store();
 
         for (int failure = 0; failure < 4; failure++) {
-            inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+            inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
         }
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
@@ -155,7 +156,7 @@ class InboundMessageServiceTest {
     void permanentFailure_endsWithoutRetrying() {
         UUID messageId = store();
 
-        inboundMessageService.recordPermanentFailure(messageId,
+        inboundMessageService.recordPermanentFailure(messageId, unchanged(messageId),
                 new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
@@ -172,7 +173,7 @@ class InboundMessageServiceTest {
     @Test
     void successAfterRetry_clearsFailureTrace() {
         UUID messageId = store();
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, unchanged(messageId), TIMEOUT);
 
         inboundMessageService.markProcessed(messageId);
 
@@ -189,14 +190,20 @@ class InboundMessageServiceTest {
     @Test
     void temporaryFailureAfterProcessed_keepsStoredOutcome() {
         UUID messageId = store();
+        InboundOutcome beforeAttempt = unchanged(messageId);
         inboundMessageService.markProcessed(messageId);
 
-        inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+        inboundMessageService.recordTemporaryFailure(messageId, beforeAttempt, TIMEOUT);
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
         assertThat(stored.outcome().attempt()).isZero();
         assertThat(stored.outcome().nextRetryAt()).isNull();
+    }
+
+    /** Исход строки сейчас: попытка откатилась, и строка такая же, как до неё. */
+    private InboundOutcome unchanged(UUID messageId) {
+        return repository.findById(messageId).orElseThrow().outcome();
     }
 
     private UUID store() {

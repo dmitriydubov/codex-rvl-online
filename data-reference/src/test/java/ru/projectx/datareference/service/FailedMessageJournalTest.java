@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ru.projectx.datareference.config.InboundRetryProperties;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
@@ -69,7 +70,7 @@ class FailedMessageJournalTest {
     void permanentFailure_isReportedAsErrorWithAttemptTypeAndSqlState() {
         existing();
 
-        service().recordPermanentFailure(MESSAGE_ID,
+        service().recordPermanentFailure(MESSAGE_ID, unchanged(),
                 new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
 
         assertThat(logged.list).singleElement().satisfies(event -> {
@@ -85,7 +86,7 @@ class FailedMessageJournalTest {
     void permanentFailureAfterTemporaryOne_namesTheAttemptThatFailed() {
         existing().markRetrying(LOCK_TIMEOUT.reason(), NOW);
 
-        service().recordPermanentFailure(MESSAGE_ID, new ParseFailure.Permanent(
+        service().recordPermanentFailure(MESSAGE_ID, unchanged(), new ParseFailure.Permanent(
                 "база данных отклонила запись: DataIntegrityViolationException, SQLSTATE 22003",
                 "DataIntegrityViolationException", "22003"));
 
@@ -98,7 +99,7 @@ class FailedMessageJournalTest {
     void exhaustedRetries_areReportedAsError() {
         existing().markRetrying(LOCK_TIMEOUT.reason(), NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
@@ -112,7 +113,7 @@ class FailedMessageJournalTest {
     void temporaryFailureWithRetriesLeft_isNotAnError() {
         existing();
 
-        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(logged.list).noneMatch(event -> event.getLevel() == Level.ERROR);
     }
@@ -126,7 +127,7 @@ class FailedMessageJournalTest {
         existing();
         TransactionSynchronizationManager.initSynchronization();
         try {
-            service().recordPermanentFailure(MESSAGE_ID,
+            service().recordPermanentFailure(MESSAGE_ID, unchanged(),
                     new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
 
             assertThat(logged.list).isEmpty();
@@ -144,7 +145,7 @@ class FailedMessageJournalTest {
         existing();
         TransactionSynchronizationManager.initSynchronization();
         try {
-            service().recordPermanentFailure(MESSAGE_ID,
+            service().recordPermanentFailure(MESSAGE_ID, unchanged(),
                     new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
 
             TransactionSynchronizationManager.getSynchronizations()
@@ -154,6 +155,11 @@ class FailedMessageJournalTest {
         finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    /** Исход строки сейчас: попытка откатилась, и строка такая же, как до неё. */
+    private InboundOutcome unchanged() {
+        return repository.findById(MESSAGE_ID).orElseThrow().outcome();
     }
 
     private InboundMessage existing() {
