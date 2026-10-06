@@ -19,7 +19,7 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-8: адрес и регион приходят отдельным потоком — тем же, которым едут телефоны
+ * Контактная информация (ТЗ-8): адрес и регион приходят отдельным потоком — тем же, которым едут телефоны
  * и почта всех контрагентов 1С:УСК.
  */
 @IntegrationTest

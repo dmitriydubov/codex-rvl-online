@@ -30,7 +30,10 @@ final class PriceListTransferRows {
         this.envelope = new StoredEnvelope(json);
     }
 
-    /** @throws OneCFieldException если тело части стёрто или у строки нет целого номера */
+    /**
+     * @throws OneCFieldException если тело части стёрто или не читается как JSON, в её конверте нет объекта
+     *                            {@code data} или у строки нет целого номера
+     */
     ObjectNode of(PriceListTransfer.Assembled transfer) {
         ObjectNode assembled = json.createObjectNode();
         assembled.set(KEY_VALUE, dataOf(transfer.finalMessage()).path(KEY_VALUE));

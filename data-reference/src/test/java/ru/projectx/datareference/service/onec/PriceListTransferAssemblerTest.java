@@ -344,6 +344,20 @@ class PriceListTransferAssemblerTest {
                 .hasMessage("тело сообщения передачи стёрто, собрать её нечем");
     }
 
+    /** Конверт части без объекта data — нарушение контракта с тем же текстом, что при разборе одного сообщения. */
+    @Test
+    void batchWithoutDataObject_isContractViolation() {
+        InboundMessage batch = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW), "{\"metadata\":{}}");
+        batch.markBuffered(CID, null, 1);
+        correlated.add(batch);
+        InboundMessage finalMessage = message(finalData(1, 1));
+
+        assertThatThrownBy(() -> receive(finalMessage))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("в конверте сообщения нет объекта data");
+    }
+
     @Test
     void messageWithoutTransferId_isContractViolation() {
         InboundMessage message = message("{\"keyValue\":\"%s\",\"recordSet\":[]}".formatted(SERVICE_ID));
