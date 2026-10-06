@@ -123,6 +123,14 @@ class OneCRequiredValuesTest {
                 .hasMessage("поле share вне диапазона от 0 до 100");
     }
 
+    /** Обязательная сумма читается по пределу денежной колонки, как и необязательная. */
+    @Test
+    void amountBeyondMoneyColumn_isRejected() {
+        assertThatThrownBy(() -> OneCRequiredValues.amount(node("{\"share\":1E+13}"), "share"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле share больше допустимого");
+    }
+
     @Test
     void percent_keepsTheTypeRule() {
         assertThatThrownBy(() -> OneCRequiredValues.percent(node("{\"share\":\"10\"}"), "share"))

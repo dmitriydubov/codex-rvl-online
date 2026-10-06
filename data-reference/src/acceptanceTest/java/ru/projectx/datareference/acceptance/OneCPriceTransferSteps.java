@@ -1,7 +1,6 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ru.Дано;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -11,8 +10,6 @@ import java.util.UUID;
  * идентификатором передачи. Сырьё ложится так, как его сохранил бы приём из очереди.
  */
 public class OneCPriceTransferSteps {
-
-    private static final BigDecimal ONE_HUNDREDTH = new BigDecimal("0.01");
 
     private final OneCInbox inbox;
 
@@ -35,12 +32,6 @@ public class OneCPriceTransferSteps {
     public void defectiveBatchSent(String messageId, String cid, String service, String defect) {
         inbox.receive(OneCPriceTransferMessages.defectiveBatch(
                 UUID.fromString(messageId), UUID.fromString(cid), service, defect));
-    }
-
-    @Дано("1С:УСК прислала пакет {string} передачи прайса {string} по услуге {string} из одной строки с ценой на одну сотую больше {bigdecimal}")
-    public void overpricedBatchSent(String messageId, String cid, String service, BigDecimal limit) {
-        inbox.receive(OneCPriceTransferMessages.pricedBatch(
-                UUID.fromString(messageId), UUID.fromString(cid), service, limit.add(ONE_HUNDREDTH)));
     }
 
     @Дано("1С:УСК прислала пакет {string} прайса по услуге {string} без идентификатора передачи:")

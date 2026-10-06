@@ -1,7 +1,9 @@
 package ru.projectx.datareference.acceptance;
 
+import java.math.BigDecimal;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -24,6 +26,8 @@ final class OneCFailureMessages {
     private static final String CONTACTS_QUEUE = "1c-usk_to_rvl-online_contact-information-changes";
 
     private static final JsonMapper JSON = JsonMapper.shared();
+    private static final JsonMapper EXACT_JSON =
+            JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
 
     private OneCFailureMessages() {
     }
@@ -65,11 +69,25 @@ final class OneCFailureMessages {
         return new OneCMessage(OneCStream.LPU_CONTACTS, CONTACTS_QUEUE, data, InboundStatus.FAILED);
     }
 
-    /** Строковое значение поля сообщения, как его прислала 1С:УСК, на любой глубине {@code data}. */
-    static String valueOf(OneCMessage message, String field) {
-        return message.data().findValues(field).stream()
+    /**
+     * Значение поля в сырье так, как его отдала база. Число {@code jsonb} хранит по величине, а не по записи:
+     * {@code 1E+13} возвращается как {@code 10000000000000}. Дроби читаются в {@link BigDecimal}, без двоичной дроби.
+     */
+    static JsonNode storedNodeOf(String payload, String field) {
+        return nodeOf(EXACT_JSON.readTree(payload), field);
+    }
+
+    /** Присланное и сохранённое значения совпадают: число — по величине, остальное — по тексту. */
+    static boolean sameValue(JsonNode sent, JsonNode stored) {
+        return sent.isNumber() && stored.isNumber()
+                ? sent.decimalValue().compareTo(stored.decimalValue()) == 0
+                : sent.asString().equals(stored.asString());
+    }
+
+    /** Значение поля сообщения на любой глубине {@code data}. */
+    static JsonNode nodeOf(JsonNode data, String field) {
+        return data.findValues(field).stream()
                 .findFirst()
-                .map(JsonNode::asString)
                 .orElseThrow(() -> new IllegalArgumentException("в сообщении нет поля " + field));
     }
 }
