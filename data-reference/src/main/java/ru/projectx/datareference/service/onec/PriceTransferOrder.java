@@ -46,7 +46,7 @@ public class PriceTransferOrder {
      * Блокирует строку услуги, названной в части передачи, до того как читаются остальные части: тогда закрытие
      * зависших передач той же услуги не меняет их у сборки за спиной. Часть без читаемого GUID услуги не блокирует.
      */
-    public void lockServiceOf(ObjectNode part) {
+    void lockServiceOf(ObjectNode part) {
         OneCValues.text(part, KEY_VALUE).flatMap(OneCGuid::parse).ifPresent(finalizations::lockByService);
     }
 
@@ -66,6 +66,7 @@ public class PriceTransferOrder {
         return result;
     }
 
+    /** Пишет в базу мимо сущности, загруженной блокировкой: после этого её в транзакции не читают. */
     private void remember(UUID service, UUID finalMessageId) {
         finalizations.recordApplied(service, finalMessageId);
     }

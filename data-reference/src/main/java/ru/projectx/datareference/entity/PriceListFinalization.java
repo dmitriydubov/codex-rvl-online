@@ -39,10 +39,6 @@ public class PriceListFinalization {
         return new PriceListFinalization(serviceExternalId, finalMessageId);
     }
 
-    public UUID serviceExternalId() {
-        return serviceExternalId;
-    }
-
     public UUID finalMessageId() {
         return finalMessageId;
     }

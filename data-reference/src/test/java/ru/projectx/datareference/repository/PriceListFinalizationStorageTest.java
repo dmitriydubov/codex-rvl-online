@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -197,9 +198,14 @@ class PriceListFinalizationStorageTest {
         assertThat(finalizations.count()).isZero();
     }
 
+    /** Строки таблицы по услугам сценариев; лишних строк в таблице нет. */
     private Map<UUID, UUID> finalizationsByService() {
-        return finalizations.findAll().stream().collect(Collectors.toMap(
-                PriceListFinalization::serviceExternalId, PriceListFinalization::finalMessageId));
+        Map<UUID, UUID> rows = Stream.of(SERVICE, OTHER_SERVICE)
+                .flatMap(service -> finalizations.findById(service).stream()
+                        .map(finalization -> Map.entry(service, finalization.finalMessageId())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        assertThat(finalizations.count()).as("строк в таблице").isEqualTo(rows.size());
+        return rows;
     }
 
     private void record(UUID service, UUID finalMessageId) {

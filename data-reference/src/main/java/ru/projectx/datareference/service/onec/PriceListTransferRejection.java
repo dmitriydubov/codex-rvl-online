@@ -31,11 +31,15 @@ public class PriceListTransferRejection implements RejectionScope {
     private static final String DATA = "data";
 
     private final InboundMessageRepository repository;
+    private final PriceTransferOrder order;
     private final PriceListPartCheck partCheck;
     private final ObjectMapper json;
 
-    public PriceListTransferRejection(InboundMessageRepository repository, PriceListMapper priceList, ObjectMapper json) {
+    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferOrder order,
+            PriceListMapper priceList, ObjectMapper json) {
+
         this.repository = repository;
+        this.order = order;
         this.partCheck = new PriceListPartCheck(priceList);
         this.json = json;
     }
@@ -55,7 +59,9 @@ public class PriceListTransferRejection implements RejectionScope {
                 });
     }
 
+    /** Строка услуги блокируется до чтения частей, как при разборе: закрытие зависших не пишет их одновременно. */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
+        order.lockServiceOf(part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.markup().cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
         part.markup().applyTo(message);
