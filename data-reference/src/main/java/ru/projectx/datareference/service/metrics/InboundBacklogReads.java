@@ -8,14 +8,15 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
 /**
- * Читает из базы снимок очереди разбора ({@link InboundBacklog}): четыре запроса, каждый считает, а не выбирает
- * строки, и тела сообщений не читает. Пороги — те же, что у задач, которые с этим накоплением работают: срок
- * хранения тел и порог тревоги о зависших передачах из {@link ImportProperties}. Давность превращается в момент по
+ * Читает из базы снимок очереди разбора ({@link InboundBacklog}): пять запросов, каждый считает, а не выбирает
+ * строки, и ни тела сообщений, ни персональные данные полисов не читает. Пороги — те же, что у задач, которые с этим
+ * накоплением работают: сроки хранения и порог тревоги о зависших передачах из {@link ImportProperties}. Давность превращается в момент по
  * часам сервиса один раз на снимок: «старше порога» значит принято раньше, чем «момент снимка минус порог».
  *
- * <p>Все четыре запроса идут в одной транзакции только для чтения: снимок согласован, и база знает, что писать в
+ * <p>Все пять запросов идут в одной транзакции только для чтения: снимок согласован, и база знает, что писать в
  * этой транзакции не будут.
  */
 @Component
@@ -23,14 +24,16 @@ public class InboundBacklogReads {
 
     private final InboundMessageRepository inboundMessages;
     private final QuarantineRepository quarantine;
+    private final ExpiredPolicyPersonalData expiredPolicies;
     private final ImportProperties properties;
     private final Clock clock;
 
     public InboundBacklogReads(InboundMessageRepository inboundMessages, QuarantineRepository quarantine,
-            ImportProperties properties, Clock clock) {
+            ExpiredPolicyPersonalData expiredPolicies, ImportProperties properties, Clock clock) {
 
         this.inboundMessages = inboundMessages;
         this.quarantine = quarantine;
+        this.expiredPolicies = expiredPolicies;
         this.properties = properties;
         this.clock = clock;
     }
@@ -44,7 +47,8 @@ public class InboundBacklogReads {
                 inboundMessages.countTransfersBufferedBefore(now.minus(properties.stuckTransferThreshold())),
                 new InboundBacklog.Overdue(
                         inboundMessages.countPayloadsToForgetReceivedBefore(now.minus(properties.payloadTtl())),
-                        quarantine.countBodiesReceivedBefore(now.minus(properties.quarantineTtl()))),
+                        quarantine.countBodiesReceivedBefore(now.minus(properties.quarantineTtl())),
+                        expiredPolicies.countAt(now)),
                 now);
     }
 

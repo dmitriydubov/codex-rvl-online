@@ -59,9 +59,10 @@ class PolicyImportTest {
         databaseCleaner.clear();
     }
 
+    /** Полис действует на часах теста: у кончившегося давно полиса ФИО и почта стираются уже при разборе. */
     @Test
     void policyMessage_becomesPolicyRow() {
-        importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
+        importOne(policy(header("2026-01-01", "2026-12-31", true, 1), programs(), services()));
 
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
         assertThat(stored.details().number()).isEqualTo("П-001");
@@ -111,7 +112,7 @@ class PolicyImportTest {
     /** Почта лежит в наборе дополнительных свойств, а не отдельным полем. */
     @Test
     void email_isTakenFromExtProperties() {
-        importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
+        importOne(policy(header("2026-01-01", "2026-12-31", true, 1), programs(), services()));
 
         assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().details().email())
                 .isEqualTo("ivanov@example.org");

@@ -18,8 +18,8 @@ import ru.projectx.datareference.entity.OneCStream;
 
 /**
  * Метрики накопления в таблице сырых сообщений 1С: сколько сообщений каждого потока ждут разбора, ждут частей
- * передачи, ждут родителя или ушли в отказ, как давно ждёт самое старое, сколько передач прайсов зависло и сколько
- * тел с персональными данными не стёрто в срок.
+ * передачи, ждут родителя или ушли в отказ, как давно ждёт самое старое, сколько передач прайсов зависло, сколько
+ * тел с персональными данными не стёрто в срок и у скольких полисов персональные данные пережили свой срок.
  *
  * <p>Значения берутся из снимка в памяти, а снимок обновляет задача по расписанию ({@link #refresh}). Запрашивать
  * базу при каждом скрейпе было бы хуже: скрейп ждал бы базу, а когда база недоступна — до её таймаутов, и
@@ -39,6 +39,7 @@ public class InboundBacklogMetrics implements MeterBinder {
     static final String STUCK_TRANSFERS = "onec.price.transfers.stuck";
     static final String OVERDUE_PAYLOADS = "onec.retention.overdue.payloads";
     static final String OVERDUE_QUARANTINE_BODIES = "onec.retention.overdue.quarantine.bodies";
+    static final String OVERDUE_POLICIES = "policies.retention.overdue.personal.data";
     static final String STALENESS = "onec.inbound.backlog.staleness";
 
     /** Статусы, по которым заведены ряды: всё, что ещё не разобрано, и отказ, который ждёт человека. */
@@ -83,6 +84,9 @@ public class InboundBacklogMetrics implements MeterBinder {
                 current -> current.overdue().payloads());
         gauge(registry, OVERDUE_QUARANTINE_BODIES, "Тела карантинных сообщений старше срока хранения, ещё не стёртые",
                 current -> current.overdue().quarantineBodies());
+        gauge(registry, OVERDUE_POLICIES,
+                "Полисы, у которых срок хранения ФИО, даты рождения и почты истёк, а они ещё не стёрты",
+                current -> current.overdue().policies());
         TimeGauge.builder(STALENESS, this, TimeUnit.SECONDS, metrics -> metrics.secondsSince(metrics.backlog.takenAt()))
                 .description("Сколько секунд назад обновлены метрики очереди разбора 1С")
                 .register(registry);

@@ -206,6 +206,27 @@ class ImportPropertiesTest {
                 });
     }
 
+    @Test
+    void policyPersonalDataGrace_defaultsToThirtyDays() {
+        context.run(started -> assertThat(started.getBean(ImportProperties.class).policyPersonalDataGrace())
+                .isEqualTo(Duration.ofDays(30)));
+    }
+
+    @Test
+    void policyPersonalDataGrace_isBoundFromItsProperty() {
+        context.withPropertyValues("projectx.import.policy-personal-data-grace=1d")
+                .run(started -> assertThat(started.getBean(ImportProperties.class).policyPersonalDataGrace())
+                        .isEqualTo(Duration.ofDays(1)));
+    }
+
+    @Test
+    void policyPersonalDataGraceBelowOneDay_failsStartup() {
+        context.withPropertyValues("projectx.import.policy-personal-data-grace=PT23H59M59S")
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining("policyPersonalDataGrace"));
+    }
+
     @EnableConfigurationProperties(ImportProperties.class)
     static class ImportPropertiesBinding {
     }

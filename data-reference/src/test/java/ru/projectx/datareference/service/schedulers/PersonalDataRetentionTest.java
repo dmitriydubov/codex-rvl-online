@@ -60,7 +60,7 @@ class PersonalDataRetentionTest {
     void freshPolicyPayload_isKept() {
         UUID messageId = storePolicy(Duration.ZERO);
 
-        retention.forgetExpiredPayloads();
+        retention.forgetExpiredPersonalData();
 
         assertThat(inboundMessageRepository.findById(messageId).orElseThrow().payload()).isNotNull();
     }
@@ -70,7 +70,7 @@ class PersonalDataRetentionTest {
     void expiredPolicyPayload_isErasedButRowSurvives() {
         UUID messageId = storePolicy(Duration.ofDays(31));
 
-        retention.forgetExpiredPayloads();
+        retention.forgetExpiredPersonalData();
 
         InboundMessage stored = inboundMessageRepository.findById(messageId).orElseThrow();
         assertThat(stored.payload()).isNull();
@@ -86,7 +86,7 @@ class PersonalDataRetentionTest {
     void expiredReferencePayload_isKept() {
         UUID messageId = storeRaw(OneCStream.MKB10, Duration.ofDays(400));
 
-        retention.forgetExpiredPayloads();
+        retention.forgetExpiredPersonalData();
 
         assertThat(inboundMessageRepository.findById(messageId).orElseThrow().payload()).isNotNull();
     }
@@ -98,7 +98,7 @@ class PersonalDataRetentionTest {
     @Test
     void messageWithErasedPayload_failsWithClearReason() {
         UUID messageId = storePolicy(Duration.ofDays(31));
-        retention.forgetExpiredPayloads();
+        retention.forgetExpiredPersonalData();
         InboundMessage erased = inboundMessageRepository.findById(messageId).orElseThrow();
 
         assertThatThrownBy(() -> importService.importMessage(erased))

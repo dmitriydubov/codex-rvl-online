@@ -27,6 +27,10 @@ import ru.projectx.datareference.entity.Program;
  * <p>Лимит и процент сооплаты — как есть: расчёт стоимости и сооплаты остаётся в ЛК HR.
  * Паспорта нет: {@code policy_passports} ни одним потоком не наполняется.
  *
+ * @param lastName {@code null} у полиса, персональные данные которого стёрты по сроку хранения; так же имя,
+ *                 отчество, дата рождения и почта
+ * @param personalDataErased персональные данные стёрты по сроку хранения: полис кончился или переведён в архив, и
+ *                 запас после этого прошёл. Отличает «стёрто» от «не было в 1С»
  * @param contract {@code null}, если договора страхования нет в справочнике: связь логическая
  * @param endDate {@code null} — открытая дата источника
  */
@@ -34,16 +38,17 @@ public record PolicyResponse(
         UUID id,
         UUID externalId,
         String number,
-        String lastName,
-        String firstName,
+        @Nullable String lastName,
+        @Nullable String firstName,
         @Nullable String middleName,
-        LocalDate dateOfBirth,
+        @Nullable LocalDate dateOfBirth,
         @Nullable String gender,
         @Nullable String email,
         LocalDate beginDate,
         @Nullable LocalDate endDate,
         boolean availability,
         boolean isArchive,
+        boolean personalDataErased,
         @Nullable ContractRef contract,
         List<ProgramLine> programs) {
 
@@ -60,7 +65,7 @@ public record PolicyResponse(
                 details.lastName(), details.firstName(), details.middleName(),
                 details.dateOfBirth(), details.gender(), details.email(),
                 details.beginDate(), details.endDate(), details.availability(), policy.isArchive(),
-                contract == null ? null : ContractRef.of(contract), programs);
+                policy.personalDataErased(), contract == null ? null : ContractRef.of(contract), programs);
     }
 
     /** Договор страхования, к которому относится полис. */

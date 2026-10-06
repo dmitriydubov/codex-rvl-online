@@ -57,7 +57,7 @@ class ScheduledPassesTest {
         assertThat(task.getIntervalDuration()).isEqualTo(RETENTION_PAUSE);
         assertThat(task.getInitialDelayDuration()).isEqualTo(INITIAL_DELAY);
         task.getRunnable().run();
-        verify(retention).forgetExpiredPayloads();
+        verify(retention).forgetExpiredPersonalData();
         verifyNoInteractions(importScheduler, stuckTransferAlert);
     }
 

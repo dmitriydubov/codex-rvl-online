@@ -45,7 +45,7 @@ class ScheduledPassesWiringTest {
             try {
                 assertThat(started.getBean(ScheduledTaskHolder.class).getScheduledTasks()).hasSize(3);
                 verify(importScheduler, timeout(WAIT_MILLIS)).importPendingMessages();
-                verify(retention, timeout(WAIT_MILLIS).atLeast(2)).forgetExpiredPayloads();
+                verify(retention, timeout(WAIT_MILLIS).atLeast(2)).forgetExpiredPersonalData();
                 verify(stuckTransferAlert, timeout(WAIT_MILLIS).atLeast(2)).reportStuckTransfers();
             }
             finally {

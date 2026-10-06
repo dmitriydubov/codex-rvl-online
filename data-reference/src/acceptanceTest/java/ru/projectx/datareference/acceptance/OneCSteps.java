@@ -77,7 +77,7 @@ public class OneCSteps {
 
     @Дано("1С:УСК прислала полис:")
     public void policySent(Map<String, String> policy) {
-        inbox.receive(OneCMessages.policy(policy));
+        inbox.receive(inbox.asNewDelivery(OneCMessages.policy(policy)));
     }
 
     /**

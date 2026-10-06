@@ -17,10 +17,10 @@ import org.jspecify.annotations.Nullable;
  * Полис застрахованного — из потока полисов 1С. Отдельной сущности «застрахованное лицо»
  * в контракте нет: полис и есть застрахованный в рамках договора страхования.
  *
- * <p><b>Здесь и только здесь лежат персональные данные сервиса</b>: ФИО, дата рождения,
- * почта. Из этого следуют два правила, которые действуют вокруг этого класса, а не
- * внутри него: ПДн не попадают в лог — ни значением, ни в тексте исключения, — и у тела
- * сообщения, которым полис приехал, есть срок хранения в таблице сырья.
+ * <p><b>Здесь лежат персональные данные (ПДн) застрахованного</b>: ФИО, дата рождения, почта. Они не попадают
+ * в журнал ни значением, ни в тексте исключения. Хранятся они, пока полис действует, и ещё запас после окончания
+ * срока или перевода в архив; потом стираются ({@link #erasePersonalDataBeyond}), а строка полиса с реквизитами
+ * остаётся: на неё ссылается сервис Договоров. Новое сообщение 1С приносит ПДн снова.
  *
  * <p>Родственники — это <b>отдельные полисы</b>, а не члены семьи внутри одного:
  * связи «чей это родственник» в контракте нет вообще, и поля в описании потока тоже нет.
@@ -46,17 +46,20 @@ public class Policy extends OneCEntity {
     @Column(nullable = false)
     private String number;
 
-    @Column(name = "last_name", nullable = false)
+    @Nullable
+    @Column(name = "last_name")
     private String lastName;
 
-    @Column(name = "first_name", nullable = false)
+    @Nullable
+    @Column(name = "first_name")
     private String firstName;
 
     @Nullable
     @Column(name = "middle_name")
     private String middleName;
 
-    @Column(name = "date_of_birth", nullable = false)
+    @Nullable
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
     @Nullable
@@ -76,6 +79,16 @@ public class Policy extends OneCEntity {
 
     @Column(nullable = false)
     private boolean availability;
+
+    /** Когда сообщение 1С перевело полис в архив; пусто, пока полис не в архиве. Повторная присылка его не сдвигает. */
+    @Nullable
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    /** Когда стёрты ПДн; пусто, пока они хранятся. */
+    @Nullable
+    @Column(name = "personal_data_erased_at")
+    private Instant personalDataErasedAt;
 
     /*
      * Коллекции не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
@@ -119,8 +132,47 @@ public class Policy extends OneCEntity {
         this.beginDate = details.beginDate();
         this.endDate = details.endDate();
         this.availability = details.availability();
+        this.archivedAt = archivedSince(details.deleteMark(), now);
+        this.personalDataErasedAt = null;
         replaceTableParts(snapshot, now);
         applyCommon(details.deleteMark(), now);
+    }
+
+    /**
+     * Стирает ФИО, дату рождения и почту, если полис пережил границу хранения: срок действия кончился раньше её дня
+     * или полис переведён в архив не позже её момента. Реквизиты, пол и время обновления остаются: стирание — не
+     * сообщение 1С.
+     */
+    public void erasePersonalDataBeyond(PersonalDataCutoff cutoff, Instant now) {
+        if (endedBefore(cutoff.endedBefore()) || archivedBy(cutoff.archivedBy())) {
+            this.lastName = null;
+            this.firstName = null;
+            this.middleName = null;
+            this.dateOfBirth = null;
+            this.email = null;
+            this.personalDataErasedAt = now;
+        }
+    }
+
+    /** Стёрты ли ПДн полиса по сроку хранения. */
+    public boolean personalDataErased() {
+        return personalDataErasedAt != null;
+    }
+
+    /** Момент перевода в архив остаётся прежним, пока полис в архиве: повторная присылка — не новый перевод. */
+    private @Nullable Instant archivedSince(boolean deleteMark, Instant now) {
+        if (!deleteMark) {
+            return null;
+        }
+        return archivedAt == null ? now : archivedAt;
+    }
+
+    private boolean endedBefore(LocalDate day) {
+        return endDate != null && endDate.isBefore(day);
+    }
+
+    private boolean archivedBy(Instant moment) {
+        return archivedAt != null && !archivedAt.isAfter(moment);
     }
 
     /**
@@ -158,15 +210,15 @@ public class Policy extends OneCEntity {
 
     /**
      * Поля самого полиса в том виде, как их прислала 1С. Тот же набор отдаёт {@link #details()}; там пометка
-     * удаления — это признак архивности записи.
+     * удаления — это признак архивности записи, а ФИО и дата рождения пусты, если ПДн стёрты по сроку хранения.
      */
     public record Details(
             UUID externalContractId,
             String number,
-            String lastName,
-            String firstName,
+            @Nullable String lastName,
+            @Nullable String firstName,
             @Nullable String middleName,
-            LocalDate dateOfBirth,
+            @Nullable LocalDate dateOfBirth,
             @Nullable String gender,
             @Nullable String email,
             LocalDate beginDate,

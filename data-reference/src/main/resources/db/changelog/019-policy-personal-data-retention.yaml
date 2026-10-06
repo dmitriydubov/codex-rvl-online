@@ -1,0 +1,108 @@
+# Персональные данные застрахованного в полисе хранятся, пока полис действует, и ещё запас после окончания срока
+# или перевода в архив; потом ФИО, дата рождения и почта стираются, а строка полиса остаётся.
+databaseChangeLog:
+
+  - changeSet:
+      id: 019-policy-personal-data-columns
+      author: rvl-online
+      comment: >
+        Фамилия, имя и дата рождения становятся необязательными: у полиса со стёртыми персональными данными их нет.
+        Момент стирания говорит, что поля пусты по сроку хранения, а не по ошибке. Момент перевода в архив нужен для
+        отсчёта запаса: время обновления строки для этого не годится, его сдвигает каждая повторная присылка полиса.
+        Снятие NOT NULL и новые пустые колонки меняют только каталог, таблица не переписывается.
+        Откат возможен, только пока ни у одного полиса данные не стёрты: пустые фамилию, имя и дату рождения
+        вернуть нельзя, и восстановление NOT NULL откажет.
+      changes:
+        - dropNotNullConstraint:
+            tableName: policies
+            columnName: last_name
+            columnDataType: text
+        - dropNotNullConstraint:
+            tableName: policies
+            columnName: first_name
+            columnDataType: text
+        - dropNotNullConstraint:
+            tableName: policies
+            columnName: date_of_birth
+            columnDataType: date
+        - addColumn:
+            tableName: policies
+            columns:
+              - column: { name: archived_at, type: timestamptz }
+              - column: { name: personal_data_erased_at, type: timestamptz }
+      rollback:
+        - dropColumn:
+            tableName: policies
+            columns:
+              - column: { name: archived_at }
+              - column: { name: personal_data_erased_at }
+        - addNotNullConstraint:
+            tableName: policies
+            columnName: last_name
+            columnDataType: text
+        - addNotNullConstraint:
+            tableName: policies
+            columnName: first_name
+            columnDataType: text
+        - addNotNullConstraint:
+            tableName: policies
+            columnName: date_of_birth
+            columnDataType: date
+
+  - changeSet:
+      id: 019-policy-archived-at-fill
+      author: rvl-online
+      comment: >
+        У полисов, которые уже лежат в архиве, момент перевода в архив неизвестен. Ближайшее, что о нём известно, —
+        время последнего применённого сообщения: запас отсчитывается от него. Повторный запуск ничего не портит.
+      changes:
+        - sql:
+            sql: update policies set archived_at = updated_at where is_archive and archived_at is null
+      rollback:
+        - empty: {}
+
+  - changeSet:
+      id: 019-policy-personal-data-check
+      author: rvl-online
+      comment: >
+        Фамилия, имя и дата рождения обязательны, пока персональные данные не стёрты, и момент перевода в архив есть
+        ровно у архивного полиса: проверка в базе сохраняет прежнюю гарантию для всех остальных строк. Сырым sql: у
+        проверочного ограничения нет своего изменения в Liquibase (liquibase-core).
+      changes:
+        - sql:
+            sql: >
+              alter table policies add constraint ck_policies_personal_data
+              check (personal_data_erased_at is not null
+                     or (last_name is not null and first_name is not null and date_of_birth is not null))
+        - sql:
+            sql: >
+              alter table policies add constraint ck_policies_archived_at
+              check ((archived_at is not null) = is_archive)
+      rollback:
+        - sql:
+            sql: alter table policies drop constraint ck_policies_archived_at
+        - sql:
+            sql: alter table policies drop constraint ck_policies_personal_data
+
+  - changeSet:
+      id: 019-policy-retention-indexes
+      author: rvl-online
+      comment: >
+        Проход стирания и метрика ищут полисы с ещё не стёртыми персональными данными, у которых кончился срок или
+        запас после перевода в архив. Таких строк мало, а полисов много, поэтому индексы частичные: по дню окончания
+        и по моменту перевода в архив, только по строкам, где данные ещё хранятся. Условие записано так же, как в
+        запросах. Сырым sql: у createIndex в Liquibase нет условия частичного индекса.
+      changes:
+        - sql:
+            sql: >
+              create index idx_policies_retention_end_date on policies (end_date)
+              where personal_data_erased_at is null
+        - sql:
+            sql: >
+              create index idx_policies_retention_archived_at on policies (archived_at)
+              where personal_data_erased_at is null
+      rollback:
+        - sql:
+            sql: drop index idx_policies_retention_archived_at
+        - sql:
+            sql: drop index idx_policies_retention_end_date
