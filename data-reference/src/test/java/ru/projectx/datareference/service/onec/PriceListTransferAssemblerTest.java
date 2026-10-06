@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +28,11 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import ru.projectx.datareference.service.FinalRejectionJournal;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
@@ -58,6 +61,9 @@ class PriceListTransferAssemblerTest {
 
     @Mock
     private PriceListMapper priceListMapper;
+
+    @Mock
+    private PriceListFinalizationRepository finalizations;
 
     private final List<InboundMessage> correlated = new ArrayList<>();
 
@@ -215,6 +221,87 @@ class PriceListTransferAssemblerTest {
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 
+    /**
+     * Строка услуги блокируется раньше, чем читаются части передачи: проверка зависших передач не меняет их у сборки
+     * за спиной.
+     */
+    @Test
+    void serviceRowIsLocked_beforeTransferPartsAreRead() {
+        receive(message(batchData(row(1, "100.00"))));
+
+        InOrder steps = inOrder(finalizations, repository);
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+        steps.verify(repository).findByCorrelationId(CID);
+    }
+
+    /** Применённая передача становится последней по услуге: следующие сравниваются с её финальным сообщением. */
+    @Test
+    void appliedTransfer_becomesTheLastOfItsService() {
+        buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
+
+        receive(finalMessage);
+
+        verify(finalizations).recordApplied(SERVICE_ID, finalMessage.receipt().messageId());
+    }
+
+    /**
+     * Передача, финал которой принят раньше финала уже применённой, собралась позже неё: прайс не трогается, а вся
+     * передача пропускается с причиной, называющей услугу и применённую передачу.
+     */
+    @Test
+    void transferFinalizedBeforeTheAppliedOne_isSkippedWhole_andPricesStay() {
+        InboundMessage olderFinal = buffered(finalData(1, 1), 1, 1);
+        InboundMessage lastBatch = message(batchData(row(1, "100.00")));
+        UUID appliedCid = UUID.fromString("8e4b0f70-0000-4000-8000-0000000000c2");
+        appliedFinalReceivedAt(appliedCid, NOW.plusSeconds(1));
+        String reason = "по услуге " + SERVICE_ID + " уже применена более новая передача " + appliedCid;
+
+        ImportResult result = receive(lastBatch);
+
+        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(List.of(olderFinal, lastBatch)).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+            assertThat(message.outcome().lastError()).isEqualTo(reason);
+            assertThat(message.outcome().processedAt()).isEqualTo(NOW);
+        });
+        verify(priceListMapper, never()).apply(any());
+        verify(finalizations, never()).recordApplied(any(), any());
+    }
+
+    /** Исход пропущенной передачи записан: опоздавшая часть пропускается сразу, даже испорченная, прайс не трогается. */
+    @Test
+    void partOfSkippedTransfer_isSkippedRightAway() {
+        InboundMessage skipped = buffered(finalData(1, 1), 1, 1);
+        skipped.markSkipped("прайс по услуге вне справочника", NOW);
+        InboundMessage lateBatch = message(batchData("{\"price\":100.00}"));
+        String reason = "передача " + CID + " уже пропущена";
+
+        ImportResult result = receive(lateBatch);
+
+        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(lateBatch.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+        assertThat(lateBatch.outcome().lastError()).isEqualTo(reason);
+        assertThat(lateBatch.outcome().processedAt()).isEqualTo(NOW);
+        assertThat(skipped.outcome().lastError()).isEqualTo("прайс по услуге вне справочника");
+        verifySavedAfterBuffering(lateBatch);
+        verify(priceListMapper, never()).apply(any());
+        assertThat(transitions(InboundStatus.SKIPPED)).isEqualTo(1.0);
+    }
+
+    /** Финальное сообщение у передачи ровно одно: второе — ошибка этой части ещё до сборки. */
+    @Test
+    void secondFinalMessage_isContractViolation_beforeAssembling() {
+        buffered(finalData(1, 1), 1, 1);
+        InboundMessage secondFinal = message(finalData(1, 1));
+
+        assertThatThrownBy(() -> receive(secondFinal))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("второе финальное сообщение передачи " + CID);
+        verify(priceListMapper, never()).apply(any());
+    }
+
     /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
     @Test
     void batchWithErasedBody_isContractViolation() {
@@ -261,6 +348,16 @@ class PriceListTransferAssemblerTest {
                 .tag("stream", OneCStream.PRICE_LISTS.name()).tag("status", status.name()).counter().count();
     }
 
+    private void appliedFinalReceivedAt(UUID appliedCid, Instant receivedAt) {
+        InboundMessage appliedFinal = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", receivedAt), "{}");
+        appliedFinal.markBuffered(appliedCid, 1, 1);
+        UUID appliedFinalId = appliedFinal.receipt().messageId();
+        when(finalizations.lockByService(SERVICE_ID))
+                .thenReturn(Optional.of(PriceListFinalization.of(SERVICE_ID, appliedFinalId)));
+        when(repository.findById(appliedFinalId)).thenReturn(Optional.of(appliedFinal));
+    }
+
     private InboundMessage buffered(String data, Integer batchCount, int rowCount) {
         InboundMessage message = message(data);
         message.markBuffered(CID, batchCount, rowCount);
@@ -286,7 +383,9 @@ class PriceListTransferAssemblerTest {
         InboundMessageService inboundMessageService = new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
-        return new PriceListTransferAssembler(inboundMessageService, priceListMapper, json, clock);
+        PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
+        return new PriceListTransferAssembler(inboundMessageService, priceListMapper, order,
+                new PriceListReplacement(priceListMapper, order, json), clock);
     }
 
     private static String batchData(String... rows) {

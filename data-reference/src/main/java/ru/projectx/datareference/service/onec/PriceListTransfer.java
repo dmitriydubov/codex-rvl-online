@@ -12,7 +12,7 @@ import ru.projectx.datareference.entity.InboundStatus;
  * Передача прайс-листа по одной услуге: во что сложились её отложенные сообщения и какой исход у них общий.
  *
  * <p>Пакеты строк и финальное сообщение со счётчиками связаны общим идентификатором передачи. Передача ещё ждёт
- * своих сообщений, уже отклонена, пришла целиком с несошедшимися счётчиками или собрана. Здесь только решение и
+ * своих сообщений, уже отклонена или пропущена, пришла целиком с несошедшимися счётчиками или собрана. Здесь только решение и
  * смена статусов, без базы: сохраняет сообщения и применяет прайс сборщик передачи.
  */
 sealed interface PriceListTransfer {
@@ -30,7 +30,15 @@ sealed interface PriceListTransfer {
         if (isRejected(correlated)) {
             return new Rejected("передача %s уже отклонена".formatted(cid), buffered);
         }
+        if (anyIn(correlated, InboundStatus.SKIPPED)) {
+            return new Closed("передача %s уже пропущена".formatted(cid), buffered);
+        }
         return assembling(cid, buffered);
+    }
+
+    /** Исход передачи записан отказом или пропуском: её части, пришедшие позже, разделяют этот исход. */
+    static boolean isClosed(List<InboundMessage> correlated) {
+        return isRejected(correlated) || anyIn(correlated, InboundStatus.SKIPPED);
     }
 
     /**
@@ -106,6 +114,18 @@ sealed interface PriceListTransfer {
         List<InboundMessage> fail() {
             for (InboundMessage message : lateParts) {
                 message.markFailed(reason);
+            }
+            return lateParts;
+        }
+    }
+
+    /** Передача уже пропущена; её части, пришедшие позже, пропускаются сразу и прайс не трогают. */
+    record Closed(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
+
+        /** @return части с новым статусом, которые осталось сохранить */
+        List<InboundMessage> skip(Instant processedAt) {
+            for (InboundMessage message : lateParts) {
+                message.markSkipped(reason, processedAt);
             }
             return lateParts;
         }

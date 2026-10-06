@@ -57,7 +57,7 @@ public class PriceListMapper {
 
     /**
      * Замещает прейскурант услуги целиком. Услуга вне справочника даёт пропуск с GUID услуги в причине,
-     * и прежние цены не трогаются.
+     * и прежние цены не трогаются. Строки разбираются до снятия прежних цен: битая строка их не задевает.
      *
      * @param transfer собранная передача: {@code keyValue} с GUID услуги и {@code recordSet} со строками
      *                 всех её сообщений по возрастанию номера строки
@@ -80,10 +80,10 @@ public class PriceListMapper {
 
     private ImportResult replacePrices(ContragentService service, ObjectNode transfer) {
         Instant now = clock.instant();
-        int removed = repository.deleteByServiceId(service.id());
         List<PriceListItem> items = rowsOf(transfer).stream()
                 .map(row -> PriceListItem.of(service, row, now))
                 .toList();
+        int removed = repository.deleteByServiceId(service.id());
         repository.saveAll(items);
 
         log.debug("прайс услуги {}: снято строк {}, записано {}", service.externalId(), removed, items.size());

@@ -10,7 +10,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.service.InboundMessageService;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -18,8 +17,9 @@ import tools.jackson.databind.node.ObjectNode;
  * счётчиками, связанными общим идентификатором передачи.
  *
  * <p>Каждая часть откладывается в буфер, и после каждой проверяется, не собралась ли передача: порядок двух очередей
- * не гарантирован. Прайс замещается только передачей целиком, и исход записывается сразу всем её частям. Часть с
- * собственной ошибкой ({@link PriceListPartCheck}) прерывает разбор: её и остальные части передачи отклоняет
+ * не гарантирован. Прайс замещается только передачей целиком, и исход записывается сразу всем её частям. Цены
+ * меняет передача, финальное сообщение которой принято не раньше финала уже применённой ({@link PriceTransferOrder}).
+ * Часть с собственной ошибкой ({@link PriceListPartCheck}) прерывает разбор: её и остальные части передачи отклоняет
  * {@link PriceListTransferRejection} после отката.
  */
 @Component
@@ -28,21 +28,22 @@ public class PriceListTransferAssembler implements StreamHandler {
     private static final Logger log = LoggerFactory.getLogger(PriceListTransferAssembler.class);
 
     private final InboundMessageService inboundMessageService;
-    private final PriceListMapper priceListMapper;
+    private final PriceTransferOrder order;
+    private final PriceListReplacement replacement;
     private final PriceListPartCheck partCheck;
-    private final PriceListTransferRows rows;
     private final Clock clock;
 
     public PriceListTransferAssembler(
             InboundMessageService inboundMessageService,
             PriceListMapper priceListMapper,
-            ObjectMapper json,
+            PriceTransferOrder order,
+            PriceListReplacement replacement,
             Clock clock) {
 
         this.inboundMessageService = inboundMessageService;
-        this.priceListMapper = priceListMapper;
+        this.order = order;
+        this.replacement = replacement;
         this.partCheck = new PriceListPartCheck(priceListMapper);
-        this.rows = new PriceListTransferRows(json);
         this.clock = clock;
     }
 
@@ -52,17 +53,19 @@ public class PriceListTransferAssembler implements StreamHandler {
     }
 
     /**
-     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась.
+     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась. Строка услуги
+     * блокируется первой: проверка зависших передач решает за ту же услугу только до или после этого разбора.
      *
      * @throws OneCFieldException если часть нарушает контракт: передачу отклоняют после отката
      */
     @Override
     public ImportResult handle(InboundMessage message, ObjectNode data) {
+        order.lockServiceOf(data);
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(data);
         markup.applyTo(message);
         inboundMessageService.saveTransferPart(message);
         List<InboundMessage> parts = inboundMessageService.transferParts(markup.cid());
-        partCheck.check(markup, data, parts);
+        partCheck.check(message.receipt().messageId(), markup, data, parts);
         return conclude(PriceListTransfer.of(markup.cid(), parts));
     }
 
@@ -70,6 +73,7 @@ public class PriceListTransferAssembler implements StreamHandler {
         return switch (transfer) {
             case PriceListTransfer.Pending pending -> ImportResult.skipped(pending.reason());
             case PriceListTransfer.Rejected rejected -> rejectLate(rejected);
+            case PriceListTransfer.Closed closed -> skipLate(closed);
             case PriceListTransfer.Mismatched mismatched -> fail(mismatched);
             case PriceListTransfer.Assembled assembled -> apply(assembled);
         };
@@ -89,8 +93,15 @@ public class PriceListTransferAssembler implements StreamHandler {
         return ImportResult.skipped(transfer.reason());
     }
 
+    /** Пропущенная передача уже не применится; поздняя часть разделяет её пропуск. */
+    private ImportResult skipLate(PriceListTransfer.Closed transfer) {
+        saveAll(transfer.skip(clock.instant()));
+        return ImportResult.skipped(transfer.reason());
+    }
+
+    /** Замещает прайс собранной передачей или пропускает её, если по услуге применена более новая; исход — всем частям. */
     private ImportResult apply(PriceListTransfer.Assembled transfer) {
-        ImportResult result = priceListMapper.apply(rows.of(transfer));
+        ImportResult result = replacement.replace(transfer);
         saveAll(transfer.markOutcome(result, clock.instant()));
         return result;
     }

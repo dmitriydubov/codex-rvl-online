@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Тогда;
 import java.util.Map;
+import java.util.UUID;
 import ru.projectx.datareference.entity.InboundStatus;
 
 /**
@@ -27,9 +28,16 @@ public class OneCSkipSteps {
     /** «Пропущено» значит статус {@code SKIPPED}; причина сравнивается дословно. */
     @Тогда("последнее сообщение 1С:УСК пропущено с причиной {string}")
     public void lastMessageSkipped(String reason) {
-        InboundRow last = inbox.last();
+        assertSkipped(inbox.last(), "последнего сообщения", reason);
+    }
 
-        assertThat(last.status()).as("статус последнего сообщения").isEqualTo(InboundStatus.SKIPPED.name());
-        assertThat(last.lastError()).as("причина пропуска последнего сообщения").isEqualTo(reason);
+    @Тогда("сообщение 1С:УСК {string} пропущено с причиной {string}")
+    public void messageSkipped(String messageId, String reason) {
+        assertSkipped(inbox.row(UUID.fromString(messageId)), "сообщения " + messageId, reason);
+    }
+
+    private static void assertSkipped(InboundRow row, String whose, String reason) {
+        assertThat(row.status()).as("статус %s", whose).isEqualTo(InboundStatus.SKIPPED.name());
+        assertThat(row.lastError()).as("причина пропуска %s", whose).isEqualTo(reason);
     }
 }
