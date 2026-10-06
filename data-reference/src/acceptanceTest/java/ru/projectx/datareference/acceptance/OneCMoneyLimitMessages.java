@@ -11,6 +11,10 @@ import tools.jackson.databind.node.ObjectNode;
  * Числа, которые не помещаются в колонку денег или процента, так, как их называет спецификация. Сами числа стоят здесь,
  * а не в «Примерах»: мутация цифры порядка оставила бы значение за пределом, и сценарий её бы не заметил. Словари
  * закрытые: незнакомое слово или поле роняет шаг.
+ *
+ * <p>Огромный порядок — {@code 1e500}, а не больше: сырьё сообщения хранится в {@code jsonb}, а его число — это
+ * {@code numeric} PostgreSQL, у которого до запятой не больше 131072 цифр. Число с порядком больше база не примет в
+ * сырьё, и сообщение уйдёт в карантин при приёме, до разбора.
  */
 final class OneCMoneyLimitMessages {
 
@@ -19,12 +23,12 @@ final class OneCMoneyLimitMessages {
     /** Поля процента: у них колонка {@code numeric(5,2)}, у остальных денежных полей — {@code numeric(15,2)}. */
     private static final Set<String> PERCENT_FIELDS = Set.of("copayment", "percentCopayment");
     private static final Map<String, BigDecimal> AMOUNT_RECORDS = Map.of(
-            "экспонента с огромным порядком", new BigDecimal("1e999999999"),
+            "экспонента с огромным порядком", new BigDecimal("1e500"),
             "экспонента сразу за пределом", new BigDecimal("1E+13"),
             "отрицательное на одну сотую за пределом", new BigDecimal("-10000000000000.00"),
             "лишняя цифра слева и третий знак справа", new BigDecimal("10000000000000.001"));
     private static final Map<String, BigDecimal> PERCENT_RECORDS = Map.of(
-            "экспонента с огромным порядком", new BigDecimal("1e999999999"),
+            "экспонента с огромным порядком", new BigDecimal("1e500"),
             "экспонента сразу за пределом", new BigDecimal("1E+3"),
             "отрицательное на одну сотую за пределом", new BigDecimal("-1000.00"),
             "лишняя цифра слева и третий знак справа", new BigDecimal("1000.001"));

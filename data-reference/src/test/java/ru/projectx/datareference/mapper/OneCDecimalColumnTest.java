@@ -96,6 +96,17 @@ class OneCDecimalColumnTest {
                 .hasMessage("поле percentCopayment вне диапазона от 0 до 100");
     }
 
+    /**
+     * Так до разбора доходит {@code 1e500}: сырьё хранится в {@code jsonb}, и база отдаёт число цифрами, без порядка.
+     * Пятьсот одна цифра — в пределах длины числа, которую читает разбор JSON.
+     */
+    @Test
+    void longPlainNumberFromStoredPayload_isRejected() {
+        assertThatThrownBy(() -> OneCDecimalColumn.AMOUNT.read(node("price", "1" + "0".repeat(500)), "price"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage(TOO_LARGE_PRICE);
+    }
+
     @Test
     void absentOrTextValue_isEmpty() {
         assertThat(OneCDecimalColumn.AMOUNT.read(node("price", "\"1e999999999\""), "price")).isEmpty();
