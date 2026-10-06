@@ -4,15 +4,12 @@ import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
 import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
-import java.util.Optional;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
-import ru.projectx.datareference.repository.LpuContractRepository;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -31,31 +28,20 @@ public class ContragentServiceMapper
         extends OwnedCatalogStreamMapper<ContragentService, LpuContract, ContragentService.Details> {
 
     private final CatalogReference<LpuContract> contracts;
-    private final ForeignReferences foreign;
 
     public ContragentServiceMapper(
             ContragentServiceRepository repository,
-            LpuContractRepository contractRepository,
-            ForeignReferences foreign,
+            CatalogReferences references,
             Clock clock) {
 
         super(OneCStream.CONTRAGENT_SERVICES, repository::findByExternalId, ContragentService::create,
-                ContragentService::applySnapshot, repository::save, clock);
-        this.contracts = new CatalogReference<>(contractRepository::findByExternalId, ParentKind.LPU_CONTRACT, foreign,
-                "услуга по договору вне справочника: ");
-        this.foreign = foreign;
+                ContragentService::applySnapshot, repository::save, clock, ParentKind.CONTRAGENT_SERVICE, references);
+        this.contracts = references.contracts("услуга по договору вне справочника: ");
     }
 
     @Override
-    public ImportResult apply(ObjectNode data) {
-        ImportResult result = contracts.applyIfKnown(
-                OneCValues.requiredUuid(data, "ownerId"), contract -> applyUnder(contract, data));
-        return foreign.rememberIfSkipped(result, ParentKind.CONTRAGENT_SERVICE, data);
-    }
-
-    @Override
-    public Optional<UUID> recordOf(ObjectNode data) {
-        return OneCValues.uuid(data, "id");
+    protected ImportResult decide(ObjectNode data) {
+        return contracts.applyIfKnown(OneCValues.requiredUuid(data, "ownerId"), contract -> applyUnder(contract, data));
     }
 
     private ImportResult applyUnder(LpuContract contract, ObjectNode data) {

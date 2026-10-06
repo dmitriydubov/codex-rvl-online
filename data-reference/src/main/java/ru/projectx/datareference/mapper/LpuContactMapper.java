@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
@@ -41,11 +40,10 @@ public class LpuContactMapper implements StreamMapper {
     private final OneCContractProperties contract;
     private final Clock clock;
 
-    public LpuContactMapper(LpuRepository repository, ForeignReferences foreign, OneCContractProperties contract,
+    public LpuContactMapper(LpuRepository repository, CatalogReferences references, OneCContractProperties contract,
                             Clock clock) {
         this.repository = repository;
-        this.sanatoriums = new CatalogReference<>(repository::findByExternalId, ParentKind.CONTRAGENT, foreign,
-                "контакты не нашего контрагента: ");
+        this.sanatoriums = references.sanatoriums("контакты не нашего контрагента: ");
         this.contract = contract;
         this.clock = clock;
     }

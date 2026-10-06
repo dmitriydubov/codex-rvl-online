@@ -14,10 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -46,13 +44,11 @@ public class PriceListMapper {
 
     public PriceListMapper(
             PriceListItemRepository repository,
-            ContragentServiceRepository serviceRepository,
-            ForeignReferences foreign,
+            CatalogReferences references,
             Clock clock) {
 
         this.repository = repository;
-        this.services = new CatalogReference<>(serviceRepository::findByExternalId, ParentKind.CONTRAGENT_SERVICE,
-                foreign, "прайс по услуге вне справочника: ");
+        this.services = references.services("прайс по услуге вне справочника: ");
         this.clock = clock;
     }
 

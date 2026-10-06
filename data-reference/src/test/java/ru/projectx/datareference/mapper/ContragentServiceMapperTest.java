@@ -27,6 +27,7 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -50,8 +51,9 @@ class ContragentServiceMapperTest {
     private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final LpuContract contract = mock(LpuContract.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-    private final ContragentServiceMapper mapper = new ContragentServiceMapper(
-            repository, contractRepository, new ForeignReferences(foreignRepository, clock), clock);
+    private final ContragentServiceMapper mapper = new ContragentServiceMapper(repository,
+            new CatalogReferences(mock(LpuRepository.class), contractRepository, repository,
+                    new ForeignReferences(foreignRepository, clock)), clock);
 
     @Test
     void streamIsContragentServices() {

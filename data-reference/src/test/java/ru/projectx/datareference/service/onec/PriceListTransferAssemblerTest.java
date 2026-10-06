@@ -24,10 +24,13 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.config.InboundRetryProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
@@ -127,6 +130,44 @@ class PriceListTransferAssemblerTest {
         verifySavedAfterBuffering(finalMessage, first, second);
         assertThat(transitions(InboundStatus.BUFFERED)).isEqualTo(1.0);
         assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(3.0);
+    }
+
+    /** Собранная передача по услуге, которой ещё нет, ждёт её вся, с одного момента и с причиной, которая её называет. */
+    @Test
+    void assembledTransferForServiceNotYetReceived_waitsForItWhole() {
+        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE_ID);
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.awaitingParent(service));
+
+        ImportOutcome result = receive(finalMessage);
+
+        assertThat(result).isEqualTo(ImportOutcome.awaitingParent(service.waitingReason()));
+        assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.AWAITING_PARENT);
+            assertThat(message.outcome().parentWait()).contains(new ParentWait(service, NOW, null));
+        });
+        assertThat(transitions(InboundStatus.AWAITING_PARENT)).isEqualTo(2.0);
+    }
+
+    /** Когда услуга пришла, пересмотр финального сообщения собирает передачу из тех же частей и применяет её. */
+    @Test
+    void waitingTransfer_isAssembledAgainFromItsParts_andApplied() {
+        AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE_ID);
+        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        finalMessage.markBuffered(CID, 1, 1);
+        batch.markAwaitingParent(service, null, NOW);
+        finalMessage.markAwaitingParent(service, null, NOW);
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
+
+        ImportOutcome result = receive(finalMessage);
+
+        assertThat(result).isEqualTo(ImportOutcome.applied());
+        assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+            assertThat(message.outcome().parentWait()).isEmpty();
+        });
     }
 
     @Test

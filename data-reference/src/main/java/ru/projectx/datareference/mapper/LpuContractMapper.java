@@ -17,7 +17,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -61,35 +60,22 @@ public class LpuContractMapper extends OwnedCatalogStreamMapper<LpuContract, Lpu
     private static final String SOB_EXPORT_PROPERTY = "Выгружать прейскуранты в систему бронирования";
 
     private final CatalogReference<Lpu> sanatoriums;
-    private final ForeignReferences foreign;
     private final OneCContractProperties contract;
 
     public LpuContractMapper(
             LpuContractRepository repository,
-            LpuRepository lpuRepository,
-            ForeignReferences foreign,
+            CatalogReferences references,
             OneCContractProperties contract,
             Clock clock) {
 
         super(OneCStream.LPU_CONTRACTS, repository::findByExternalId, LpuContract::create,
-                LpuContract::applySnapshot, repository::save, clock);
-        this.sanatoriums = new CatalogReference<>(lpuRepository::findByExternalId, ParentKind.CONTRAGENT, foreign,
-                "договор не нашего контрагента: ");
-        this.foreign = foreign;
+                LpuContract::applySnapshot, repository::save, clock, ParentKind.LPU_CONTRACT, references);
+        this.sanatoriums = references.sanatoriums("договор не нашего контрагента: ");
         this.contract = contract;
     }
 
     @Override
-    public ImportResult apply(ObjectNode data) {
-        return foreign.rememberIfSkipped(decide(data), ParentKind.LPU_CONTRACT, data);
-    }
-
-    @Override
-    public Optional<UUID> recordOf(ObjectNode data) {
-        return OneCValues.uuid(data, "id");
-    }
-
-    private ImportResult decide(ObjectNode data) {
+    protected ImportResult decide(ObjectNode data) {
         return unmetRvlProperty(data)
                 .map(property -> ImportResult.skipped("договор без признака " + property))
                 .orElseGet(() -> applyToSanatorium(data));

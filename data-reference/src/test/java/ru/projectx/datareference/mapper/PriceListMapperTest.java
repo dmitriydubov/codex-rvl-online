@@ -29,6 +29,8 @@ import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -53,8 +55,9 @@ class PriceListMapperTest {
     private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final ContragentService service = mock(ContragentService.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-    private final PriceListMapper mapper = new PriceListMapper(
-            repository, serviceRepository, new ForeignReferences(foreignRepository, clock), clock);
+    private final PriceListMapper mapper = new PriceListMapper(repository, new CatalogReferences(
+            mock(LpuRepository.class), mock(LpuContractRepository.class), serviceRepository,
+            new ForeignReferences(foreignRepository, clock)), clock);
 
     @Test
     void transferForForeignService_isSkippedNamingTheService_andOldPricesStay() {

@@ -22,11 +22,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.config.InboundRetryProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -53,6 +56,8 @@ class InboundOutcomeRecordingTest {
             "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
             "CannotAcquireLockException", "55P03");
     private static final String ERROR = LOCK_TIMEOUT.reason();
+    private static final AwaitedParent PARENT =
+            new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
 
     @Mock
     private InboundMessageRepository repository;
@@ -90,6 +95,42 @@ class InboundOutcomeRecordingTest {
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 0, null, "программа не РВЛ", NOW, null));
         assertThat(transitions()).containsExactly("SKIPPED");
+    }
+
+    @Test
+    void awaitingParent_remembersTheParentTheRecordAndTheCurrentMoment() {
+        InboundMessage message = existing();
+        UUID record = UUID.fromString("5f14a8d2-c3e7-4b90-a1d6-9e2b7c4f0a83");
+
+        service().markAwaitingParent(MESSAGE_ID, PARENT, record);
+
+        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.AWAITING_PARENT, 0, null,
+                PARENT.waitingReason(), null, new ParentWait(PARENT, NOW, record)));
+        assertThat(transitions()).containsExactly("AWAITING_PARENT");
+    }
+
+    /**
+     * Отказ при пересмотре сообщения, которое ждало родителя, записывается как отказ нового: временный уходит на
+     * повтор, а не считается уже зафиксированным исходом.
+     */
+    @Test
+    void temporaryFailureOfAWaitingMessage_schedulesARetry() {
+        InboundMessage message = existing();
+        message.markAwaitingParent(PARENT, null, RECEIVED_AT);
+
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        assertThat(message.outcome().nextRetryAt()).isEqualTo(NOW.plus(BACKOFF.get(0)));
+    }
+
+    @Test
+    void permanentFailureOfAWaitingMessage_failsIt() {
+        InboundMessage message = existing();
+        message.markAwaitingParent(PARENT, null, RECEIVED_AT);
+
+        assertThat(service().recordPermanentFailure(MESSAGE_ID,
+                new ParseFailure.Permanent("в договоре нет даты начала", "OneCFieldException", "нет")))
+                .isEqualTo(InboundStatus.FAILED);
+        assertThat(message.outcome().lastError()).isEqualTo("в договоре нет даты начала");
     }
 
     @Test

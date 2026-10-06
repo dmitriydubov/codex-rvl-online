@@ -23,7 +23,9 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -49,7 +51,8 @@ class LpuContactMapperTest {
     private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
     private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final LpuContactMapper mapper = new LpuContactMapper(repository,
-            new ForeignReferences(foreignRepository, clock),
+            new CatalogReferences(repository, mock(LpuContractRepository.class), mock(ContragentServiceRepository.class),
+                    new ForeignReferences(foreignRepository, clock)),
             new OneCContractProperties(null, null, null, "Адрес", List.of(ACTUAL, REGISTERED)), clock);
     private final Lpu sanatorium = Lpu.create(SANATORIUM,
             new Lpu.Details("Санаторий «Тестовый»", null, null, null, null, null, false), EARLIER);

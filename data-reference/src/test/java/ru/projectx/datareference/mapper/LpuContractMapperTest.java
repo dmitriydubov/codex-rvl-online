@@ -26,6 +26,7 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
@@ -337,8 +338,8 @@ class LpuContractMapperTest {
     private LpuContractMapper mapper(String rvlProperty) {
         var properties = new OneCContractProperties(null, rvlProperty, null, "Адрес", List.of());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        return new LpuContractMapper(
-                repository, lpuRepository, new ForeignReferences(foreignRepository, clock), properties, clock);
+        return new LpuContractMapper(repository, new CatalogReferences(lpuRepository, repository,
+                mock(ContragentServiceRepository.class), new ForeignReferences(foreignRepository, clock)), properties, clock);
     }
 
     private void foreign(UUID contragent) {
