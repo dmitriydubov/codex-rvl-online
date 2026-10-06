@@ -72,9 +72,10 @@ final class OneCFailureMessages {
     /**
      * Значение поля в сырье так, как его отдала база. Число {@code jsonb} хранит по величине, а не по записи:
      * {@code 1E+13} возвращается как {@code 10000000000000}. Дроби читаются в {@link BigDecimal}, без двоичной дроби.
+     * Поле ищется в {@code data}, как и в присланном сообщении, а не в метаданных конверта.
      */
     static JsonNode storedNodeOf(String payload, String field) {
-        return nodeOf(EXACT_JSON.readTree(payload), field);
+        return nodeOf(EXACT_JSON.readTree(payload).path("data"), field);
     }
 
     /** Присланное и сохранённое значения совпадают: число — по величине, остальное — по тексту. */
