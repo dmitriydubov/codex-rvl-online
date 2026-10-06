@@ -94,7 +94,7 @@ class InboundBacklogMetricsTest {
         assertThat(messages(OneCStream.PRICE_LISTS, InboundStatus.BUFFERED)).isEqualTo(4.0);
         assertThat(messages(OneCStream.POLICIES, InboundStatus.NEW)).isZero();
         assertThat(gauge(InboundBacklogMetrics.STUCK_TRANSFERS).value()).isEqualTo(2.0);
-        assertThat(gauge(InboundBacklogMetrics.OVERDUE_POLICY_PAYLOADS).value()).isEqualTo(11.0);
+        assertThat(gauge(InboundBacklogMetrics.OVERDUE_PAYLOADS).value()).isEqualTo(11.0);
         assertThat(gauge(InboundBacklogMetrics.OVERDUE_QUARANTINE_BODIES).value()).isEqualTo(5.0);
     }
 
