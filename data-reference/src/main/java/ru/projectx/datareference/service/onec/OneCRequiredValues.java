@@ -58,7 +58,7 @@ public final class OneCRequiredValues {
     public static BigDecimal percent(JsonNode data, String field) {
         BigDecimal value = amount(data, field);
         if (value.signum() < 0 || value.compareTo(FULL_PERCENT) > 0) {
-            throw new OneCFieldException("поле %s вне диапазона от 0 до 100".formatted(field));
+            throw new OneCFieldException("поле %s вне диапазона от 0 до %s".formatted(field, FULL_PERCENT));
         }
         return value;
     }
