@@ -66,17 +66,17 @@ class PolicyMapperTest {
         assertThat(result).isInstanceOf(ImportResult.Applied.class);
         Policy saved = saved();
         assertThat(saved.externalId()).isEqualTo(POLICY);
-        assertThat(saved.externalContractId()).isEqualTo(CONTRACT);
-        assertThat(saved.number()).isEqualTo("26 KM R/000001/1");
-        assertThat(saved.lastName()).isEqualTo("Тестов");
-        assertThat(saved.firstName()).isEqualTo("Пётр");
-        assertThat(saved.middleName()).isEqualTo("Иванович");
-        assertThat(saved.dateOfBirth()).isEqualTo(LocalDate.of(1980, 1, 2));
-        assertThat(saved.gender()).isEqualTo("Мужской");
-        assertThat(saved.email()).isEqualTo("petr@example.org");
-        assertThat(saved.beginDate()).isEqualTo(LocalDate.of(2026, 7, 17));
-        assertThat(saved.endDate()).isEqualTo(LocalDate.of(2027, 5, 17));
-        assertThat(saved.availability()).isTrue();
+        assertThat(saved.details().externalContractId()).isEqualTo(CONTRACT);
+        assertThat(saved.details().number()).isEqualTo("26 KM R/000001/1");
+        assertThat(saved.details().lastName()).isEqualTo("Тестов");
+        assertThat(saved.details().firstName()).isEqualTo("Пётр");
+        assertThat(saved.details().middleName()).isEqualTo("Иванович");
+        assertThat(saved.details().dateOfBirth()).isEqualTo(LocalDate.of(1980, 1, 2));
+        assertThat(saved.details().gender()).isEqualTo("Мужской");
+        assertThat(saved.details().email()).isEqualTo("petr@example.org");
+        assertThat(saved.details().beginDate()).isEqualTo(LocalDate.of(2026, 7, 17));
+        assertThat(saved.details().endDate()).isEqualTo(LocalDate.of(2027, 5, 17));
+        assertThat(saved.details().availability()).isTrue();
         assertThat(saved.isArchive()).isFalse();
         assertThat(saved.createdAt()).isEqualTo(NOW);
     }
@@ -92,7 +92,7 @@ class PolicyMapperTest {
 
         assertThat(result).isInstanceOf(ImportResult.Applied.class);
         assertThat(saved()).isSameAs(known);
-        assertThat(known.lastName()).isEqualTo("Тестов");
+        assertThat(known.details().lastName()).isEqualTo("Тестов");
         assertThat(known.programs()).hasSize(1);
         assertThat(known.serviceLines()).hasSize(1);
         assertThat(known.isArchive()).isTrue();
@@ -111,9 +111,9 @@ class PolicyMapperTest {
 
         mapper.apply(data);
 
-        assertThat(saved().beginDate()).isEqualTo(LocalDate.of(2025, 1, 1));
-        assertThat(saved().endDate()).isEqualTo(LocalDate.of(2025, 12, 31));
-        assertThat(saved().availability()).isTrue();
+        assertThat(saved().details().beginDate()).isEqualTo(LocalDate.of(2025, 1, 1));
+        assertThat(saved().details().endDate()).isEqualTo(LocalDate.of(2025, 12, 31));
+        assertThat(saved().details().availability()).isTrue();
     }
 
     @Test
@@ -126,9 +126,9 @@ class PolicyMapperTest {
 
         mapper.apply(data);
 
-        assertThat(saved().beginDate()).isEqualTo(LocalDate.of(2025, 1, 1));
-        assertThat(saved().endDate()).isNull();
-        assertThat(saved().availability()).isFalse();
+        assertThat(saved().details().beginDate()).isEqualTo(LocalDate.of(2025, 1, 1));
+        assertThat(saved().details().endDate()).isNull();
+        assertThat(saved().details().availability()).isFalse();
     }
 
     @Test
@@ -152,7 +152,7 @@ class PolicyMapperTest {
 
         mapper.apply(data);
 
-        assertThat(saved().email()).isEqualTo("petr@example.org");
+        assertThat(saved().details().email()).isEqualTo("petr@example.org");
     }
 
     @Test
@@ -163,7 +163,7 @@ class PolicyMapperTest {
 
         mapper.apply(data);
 
-        assertThat(saved().email()).isNull();
+        assertThat(saved().details().email()).isNull();
     }
 
     @Test
@@ -214,6 +214,29 @@ class PolicyMapperTest {
         assertThat(line.beginDate()).isEqualTo(LocalDate.of(2026, 7, 17));
         assertThat(line.endDate()).isEqualTo(LocalDate.of(2027, 5, 17));
         assertThat(line.availability()).isTrue();
+    }
+
+    /** Процент франшизы хранится в колонке процента: три цифры до запятой. */
+    @Test
+    void copaymentAtPercentColumnLimit_isStored() {
+        when(repository.findByExternalId(POLICY)).thenReturn(Optional.empty());
+        ObjectNode data = policy();
+        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("999.99"));
+
+        mapper.apply(data);
+
+        assertThat(saved().serviceLines().getFirst().copayment()).isEqualByComparingTo("999.99");
+    }
+
+    @Test
+    void copaymentBeyondPercentColumn_isContractViolationNamingField() {
+        ObjectNode data = policy();
+        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("1000.00"));
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment больше допустимого");
+        verify(repository, never()).save(any());
     }
 
     @Test

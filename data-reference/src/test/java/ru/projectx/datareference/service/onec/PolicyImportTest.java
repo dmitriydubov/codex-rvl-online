@@ -23,7 +23,7 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Полис застрахованного (ТЗ-1). Фильтров у потока нет, зато есть два места, где контракт
+ * Полис застрахованного из потока полисов 1С. Фильтров у потока нет, зато есть два места, где контракт
  * расходится с наивным чтением маппинга: срок действия берётся из строки шапки,
  * а почта лежит в наборе дополнительных свойств.
  *
@@ -64,10 +64,10 @@ class PolicyImportTest {
         importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
 
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
-        assertThat(stored.number()).isEqualTo("П-001");
-        assertThat(stored.lastName()).isEqualTo("Иванов");
-        assertThat(stored.dateOfBirth()).isEqualTo(LocalDate.of(1980, 5, 17));
-        assertThat(stored.externalContractId()).isEqualTo(CONTRACT_ID);
+        assertThat(stored.details().number()).isEqualTo("П-001");
+        assertThat(stored.details().lastName()).isEqualTo("Иванов");
+        assertThat(stored.details().dateOfBirth()).isEqualTo(LocalDate.of(1980, 5, 17));
+        assertThat(stored.details().externalContractId()).isEqualTo(CONTRACT_ID);
     }
 
     /**
@@ -81,8 +81,8 @@ class PolicyImportTest {
                 programs(), services()));
 
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
-        assertThat(stored.beginDate()).isEqualTo(LocalDate.of(2024, 1, 1));
-        assertThat(stored.endDate()).isEqualTo(LocalDate.of(2024, 12, 31));
+        assertThat(stored.details().beginDate()).isEqualTo(LocalDate.of(2024, 1, 1));
+        assertThat(stored.details().endDate()).isEqualTo(LocalDate.of(2024, 12, 31));
     }
 
     /**
@@ -96,8 +96,8 @@ class PolicyImportTest {
                 programs(), services()));
 
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
-        assertThat(stored.beginDate()).isEqualTo(LocalDate.of(2024, 1, 1));
-        assertThat(stored.availability()).isFalse();
+        assertThat(stored.details().beginDate()).isEqualTo(LocalDate.of(2024, 1, 1));
+        assertThat(stored.details().availability()).isFalse();
     }
 
     /** Открытая дата источника — это «пока не заменят», а не тысяча лет. */
@@ -105,7 +105,7 @@ class PolicyImportTest {
     void openEndDate_becomesEmpty() {
         importOne(policy(header("2024-01-01", "3000-01-01", true, 1), programs(), services()));
 
-        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().endDate()).isNull();
+        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().details().endDate()).isNull();
     }
 
     /** Почта лежит в наборе дополнительных свойств, а не отдельным полем. */
@@ -113,7 +113,7 @@ class PolicyImportTest {
     void email_isTakenFromExtProperties() {
         importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
 
-        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().email())
+        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().details().email())
                 .isEqualTo("ivanov@example.org");
     }
 
@@ -125,7 +125,7 @@ class PolicyImportTest {
                 "dateOfBirth":"1980-05-17","header":[%s],"programms":[],"services":[]}"""
                 .formatted(POLICY_ID, CONTRACT_ID, header("2024-01-01", "2024-12-31", true, 1)));
 
-        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().email()).isNull();
+        assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().details().email()).isNull();
     }
 
     @Test
@@ -170,7 +170,7 @@ class PolicyImportTest {
 
         assertThat(result).isInstanceOf(ImportOutcome.Applied.class);
         Policy stored = policyRepository.findByExternalId(POLICY_ID).orElseThrow();
-        assertThat(stored.beginDate()).isEqualTo(LocalDate.of(2020, 1, 1));
+        assertThat(stored.details().beginDate()).isEqualTo(LocalDate.of(2020, 1, 1));
         assertThat(stored.programs()).isEmpty();
     }
 

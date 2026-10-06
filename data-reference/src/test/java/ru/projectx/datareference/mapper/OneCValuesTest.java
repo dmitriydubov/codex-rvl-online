@@ -174,6 +174,16 @@ class OneCValuesTest {
                 .contains(new BigDecimal("4999.95"));
     }
 
+    /** Сумма должна поместиться в денежную колонку: тринадцать цифр до запятой. */
+    @Test
+    void amount_isLimitedByMoneyColumn() {
+        assertThat(OneCValues.amount(node("{\"price\":9999999999999.99}"), "price"))
+                .contains(new BigDecimal("9999999999999.99"));
+        assertThatThrownBy(() -> OneCValues.amount(node("{\"price\":10000000000000.00}"), "price"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле price больше допустимого");
+    }
+
     @Test
     void requiredGuid_isRead() {
         ObjectNode data = node("{\"id\":\"f3876c53-c7d8-4620-b364-9538164ba5d4\"}");

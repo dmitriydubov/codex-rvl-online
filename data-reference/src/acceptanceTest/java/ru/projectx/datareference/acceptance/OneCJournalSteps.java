@@ -12,6 +12,7 @@ import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import ru.projectx.datareference.entity.OneCStream;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Шаги о журнале Дата-референса при отказе разбора сообщения 1С:УСК.
@@ -49,12 +50,16 @@ public class OneCJournalSteps {
 
     @Тогда("значение поля {string} последнего сообщения есть в его сырье, но не попало ни в причину отказа, ни в журнал Дата-референса")
     public void fieldValueKeptOnlyInRaw(String field) {
-        String value = OneCFailureMessages.valueOf(inbox.lastMessage(), field);
+        JsonNode sent = OneCFailureMessages.nodeOf(inbox.lastMessage().data(), field);
         InboundRow last = inbox.last();
+        JsonNode stored = OneCFailureMessages.storedNodeOf(last.payload(), field);
 
-        assertThat(last.payload()).as("тело последнего сообщения").contains(value);
-        assertThat(last.lastError()).as("причина отказа последнего сообщения").isNotNull().doesNotContain(value);
-        assertThat(journal.mentioning(value)).as("записи журнала со значением поля %s", field).isEmpty();
+        assertThat(OneCFailureMessages.sameValue(sent, stored))
+                .as("в теле последнего сообщения поле %s со значением как присланное", field).isTrue();
+        for (String value : List.of(sent.asString(), stored.asString())) {
+            assertThat(last.lastError()).as("причина отказа последнего сообщения").isNotNull().doesNotContain(value);
+            assertThat(journal.mentioning(value)).as("записи журнала со значением поля %s", field).isEmpty();
+        }
     }
 
     @Тогда("в журнале Дата-референса есть запись уровня ERROR об окончательном отказе последнего сообщения: поток {string}, попытка {int}, тип {string}, SQLSTATE {string}")
