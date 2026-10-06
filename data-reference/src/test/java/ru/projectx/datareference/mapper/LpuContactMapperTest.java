@@ -18,9 +18,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.config.OneCContractProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -29,7 +34,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Защищает разбор адреса санатория из потока контактной информации. Контакты принимаются только для
  * санатория из справочника, из строк берутся действительные адреса в порядке предпочтения видов из
- * настроек, а сообщение без подходящего адреса очищает прежний адрес и регион. Данные вымышленные.
+ * настроек, а сообщение без подходящего адреса очищает прежний адрес и регион. Контакты контрагента, признанного не
+ * нашим, пропускаются, а контрагента, который ещё не пришёл, ждут его. Данные вымышленные.
  */
 class LpuContactMapperTest {
 
@@ -42,9 +48,12 @@ class LpuContactMapperTest {
     private static final Instant EARLIER = NOW.minusSeconds(3600);
 
     private final LpuRepository repository = mock(LpuRepository.class);
+    private final ForeignReferenceRepository foreignRepository = mock(ForeignReferenceRepository.class);
+    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final LpuContactMapper mapper = new LpuContactMapper(repository,
-            new OneCContractProperties(null, null, null, "Адрес", List.of(ACTUAL, REGISTERED)),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            new CatalogReferences(repository, mock(LpuContractRepository.class), mock(ContragentServiceRepository.class),
+                    new ForeignReferences(foreignRepository, clock)),
+            new OneCContractProperties(null, null, null, "Адрес", List.of(ACTUAL, REGISTERED)), clock);
     private final Lpu sanatorium = Lpu.create(SANATORIUM,
             new Lpu.Details("Санаторий «Тестовый»", null, null, null, null, null, false), EARLIER);
 
@@ -152,8 +161,9 @@ class LpuContactMapperTest {
     }
 
     @Test
-    void contactsOfUnknownContragent_areSkippedNamingIt_andNothingIsSaved() {
+    void contactsOfForeignContragent_areSkippedNamingIt_andNothingIsSaved() {
         UUID stranger = UUID.fromString("1255bbed-0000-4000-8000-0000000000ff");
+        when(foreignRepository.existsByExternalIdAndKind(stranger, ParentKind.CONTRAGENT)).thenReturn(true);
         ObjectNode data = contacts(address(1, ACTUAL, "Чужой адрес", "Чужой регион"));
         data.set("filter", filter("object", stranger));
 
@@ -161,6 +171,23 @@ class LpuContactMapperTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped("контакты не нашего контрагента: " + stranger));
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void contactsOfContragentNotYetReceived_waitForIt_andNothingIsSaved() {
+        UUID notYet = UUID.fromString("1255bbed-0000-4000-8000-0000000000ee");
+        ObjectNode data = contacts(address(1, ACTUAL, "Будущий адрес", "Будущий регион"));
+        data.set("filter", filter("object", notYet));
+
+        ImportResult result = mapper.apply(data);
+
+        assertThat(result).isEqualTo(ImportResult.awaitingParent(new AwaitedParent(ParentKind.CONTRAGENT, notYet)));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void recordOfTheMessage_isTheContragent() {
+        assertThat(mapper.recordOf(contacts())).contains(SANATORIUM);
     }
 
     @Test

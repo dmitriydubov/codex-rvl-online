@@ -17,7 +17,7 @@ import ru.projectx.datareference.entity.OneCStream;
 
 /**
  * Счётчик переходов статусов сырых сообщений 1С при разборе: сколько сообщений каждого потока разобрано, пропущено,
- * отложено в буфер передачи, назначено на повтор и ушло в отказ.
+ * отложено в буфер передачи, поставлено ждать родителя, назначено на повтор и ушло в отказ.
  *
  * <p>Переход считается только после фиксации транзакции, в которой он записан. Статус ставится внутри транзакции
  * разбора, и она ещё может откатиться — например, если база отказала на самом коммите. Тогда сообщение остаётся в
@@ -38,7 +38,7 @@ public class InboundTransitionMetrics {
 
     /** Статусы, в которые сообщение переводит разбор. {@code NEW} ставит приём, его считают счётчики приёма. */
     private static final List<InboundStatus> TARGET_STATUSES = List.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED,
-            InboundStatus.BUFFERED, InboundStatus.RETRY, InboundStatus.FAILED);
+            InboundStatus.BUFFERED, InboundStatus.AWAITING_PARENT, InboundStatus.RETRY, InboundStatus.FAILED);
 
     private final Map<SeriesKey, Counter> counters;
 

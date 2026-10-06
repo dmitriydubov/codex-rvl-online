@@ -7,6 +7,8 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Разбор потока 1С, записи которого принадлежат другой записи справочника: договор принадлежит
@@ -17,11 +19,19 @@ import ru.projectx.datareference.entity.OneCStream;
  * реквизиты, а создание или обновление записи вместе с владельцем берёт отсюда: наследник сохраняет
  * запись только через {@link #upsertUnder}, чтобы владелец и реквизиты всегда приходили вместе.
  *
+ * <p>Владельца может ещё не быть: тогда сообщение ждёт его. Сообщение, пропущенное наследником, запоминает свою запись
+ * как не нашу: так её собственные дети пропускаются сразу, а не ждут её. Запись сообщения — поле {@code id}.
+ *
  * @param <E> запись справочника
  * @param <P> запись-владелец
  * @param <D> разобранные реквизиты записи
  */
 abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, OwnedCatalogStreamMapper.Owned<P, D>> {
+
+    private static final String RECORD_ID = "id";
+
+    private final ParentKind kind;
+    private final CatalogReferences references;
 
     /**
      * @param stream поток 1С, сообщения которого разбирает наследник
@@ -30,14 +40,32 @@ abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, 
      * @param refresh новые реквизиты и владелец известной записи, обычно {@code applySnapshot} сущности
      * @param store сохранение записи, обычно {@code save} репозитория
      * @param clock часы, по которым ставится момент создания и изменения записи
+     * @param kind вид записей потока, каким его называют их дети
+     * @param references ссылки на родительские записи и память о не наших
      */
     OwnedCatalogStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, Creation<E, P, D> creation,
-                             Refresh<E, P, D> refresh, Consumer<E> store, Clock clock) {
+                             Refresh<E, P, D> refresh, Consumer<E> store, Clock clock, ParentKind kind,
+                             CatalogReferences references) {
         super(stream, finder,
                 (externalId, owned, now) -> creation.create(externalId, owned.owner(), owned.details(), now),
                 (entry, owned, now) -> refresh.apply(entry, owned.owner(), owned.details(), now),
                 store, clock);
+        this.kind = kind;
+        this.references = references;
     }
+
+    @Override
+    public final ImportResult apply(ObjectNode data) {
+        return references.rememberIfSkipped(decide(data), kind, data);
+    }
+
+    @Override
+    public final Optional<UUID> recordOf(ObjectNode data) {
+        return OneCValues.uuid(data, RECORD_ID);
+    }
+
+    /** Применяет сообщение, пропускает его или ставит ждать владельца. */
+    protected abstract ImportResult decide(ObjectNode data);
 
     /** Создаёт или обновляет запись с GUID 1С {@code externalId}, привязанную к владельцу {@code owner}. */
     protected final ImportResult upsertUnder(P owner, UUID externalId, D details) {

@@ -5,14 +5,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.mapper.ImportResult.applied;
-import static ru.projectx.datareference.mapper.ImportResult.rejected;
-import static ru.projectx.datareference.mapper.ImportResult.skipped;
+import static ru.projectx.datareference.service.onec.ImportOutcome.applied;
+import static ru.projectx.datareference.service.onec.ImportOutcome.awaitingParent;
+import static ru.projectx.datareference.service.onec.ImportOutcome.rejected;
+import static ru.projectx.datareference.service.onec.ImportOutcome.skipped;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -78,6 +81,9 @@ class ReferenceImportPassTest {
 
     @Mock
     private ReferenceImportService importService;
+
+    @Mock
+    private OverdueParentWaits overdueParentWaits;
 
     @Mock
     private InboundMessageService inboundMessageService;
@@ -290,6 +296,40 @@ class ReferenceImportPassTest {
         });
     }
 
+    /** Ожидание родителя — не отказ: запись INFO с причиной, которая называет родителя. */
+    @Test
+    void messageAwaitingItsParent_isReportedInJournalWithReason() {
+        InboundMessage message = received();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        when(importService.importMessage(message)).thenReturn(awaitingParent("ждёт родителя: контрагент X"));
+
+        scheduler().importPendingMessages();
+
+        assertThat(logged.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.INFO);
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("сообщение " + message.receipt().messageId()
+                            + " потока MKB10 ждёт родителя: контрагент X");
+        });
+    }
+
+    /**
+     * Сообщения, не дождавшиеся родителя, отклоняются после разбора пачки: сообщение, родитель которого пришёл в этом
+     * проходе, разбор возьмёт на следующем, и срок его не отклонит.
+     */
+    @Test
+    void overdueWaits_areRejectedAfterThePass() {
+        InboundMessage message = received();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        when(importService.importMessage(message)).thenReturn(applied());
+
+        scheduler().importPendingMessages();
+
+        InOrder order = inOrder(importService, overdueParentWaits);
+        order.verify(importService).importMessage(message);
+        order.verify(overdueParentWaits).rejectAndReport();
+    }
+
     /** Один отказ не останавливает пачку: следующее сообщение разбирается как обычно. */
     @Test
     void failedMessage_doesNotStopThePass() {
@@ -306,7 +346,8 @@ class ReferenceImportPassTest {
 
     private ReferenceImportScheduler scheduler() {
         return new ReferenceImportScheduler(repository, importService, inboundMessageService,
-                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), ImportSettings.defaults().batchSize(BATCH_SIZE).build(), Clock.fixed(NOW, ZoneOffset.UTC));
+                new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator())), overdueParentWaits,
+                ImportSettings.defaults().batchSize(BATCH_SIZE).build(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static InboundMessage received() {

@@ -30,11 +30,18 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
      * потоков разбираются как обычно. Окончательный отказ и части передачи прайса, ждущие остальных частей, поток не
      * держат.
      *
+     * <p>Сообщение, которое ждёт родителя, поток не держит и попадает сюда, только когда родитель появился в
+     * справочнике или признан не нашим. Передачу прайса представляет её финальное сообщение: сборщик разбирает
+     * передачу целиком, и одной части на проход достаточно.
+     *
      * <p>{@code SKIPPED} и {@code FAILED} сюда не попадают: они терминальные. Переобработать такую строку можно,
      * переведя её обратно в {@code NEW} обычным SQL, но только помня о порядке: строка встанет в поток по своему
      * старому моменту приёма, и её данные затрут то, что пришло после неё. Переобрабатывать безопасно последнее
      * сообщение по объекту или все сообщения потока начиная с него. Переобработать можно, только пока тело не
-     * стёрто по сроку хранения: у пропущенных сообщений, полисов и договоров страхования оно живёт ограниченно.
+     * стёрто по сроку хранения: у пропущенных сообщений, полисов и договоров страхования, а также у сообщений,
+     * не дождавшихся родителя, оно живёт ограниченно. Сообщение, не дождавшееся родителя, после возврата снова ждёт
+     * его полный срок, если родителя всё ещё нет, поэтому возвращать его стоит, когда родитель уже пришёл.
+     * Сообщение, которое ждёт родителя, возвращать не нужно: разбор возьмёт его сам, когда родитель придёт.
      *
      * <p>Порядок задаёт момент приёма с точностью до микросекунды. Сообщения одного потока с одинаковым моментом
      * приёма друг друга не держат, и их порядок в пачке не определён. Такое возможно только у прайс-листов, которые
@@ -48,7 +55,25 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
             select message
               from InboundMessage message
              where (message.status = NEW
-                    or (message.status = RETRY and message.nextRetryAt <= :now))
+                    or (message.status = RETRY and message.nextRetryAt <= :now)
+                    or (message.status = AWAITING_PARENT
+                        and (message.stream <> PRICE_LISTS or message.batchCount is not null)
+                        and (exists (select lpu.id
+                                       from Lpu lpu
+                                      where message.awaitedParentKind = CONTRAGENT
+                                        and lpu.externalId = message.awaitedParentId)
+                             or exists (select contract.id
+                                          from LpuContract contract
+                                         where message.awaitedParentKind = LPU_CONTRACT
+                                           and contract.externalId = message.awaitedParentId)
+                             or exists (select service.id
+                                          from ContragentService service
+                                         where message.awaitedParentKind = CONTRAGENT_SERVICE
+                                           and service.externalId = message.awaitedParentId)
+                             or exists (select stranger.externalId
+                                          from ForeignReference stranger
+                                         where stranger.externalId = message.awaitedParentId
+                                           and stranger.kind = message.awaitedParentKind))))
                and not exists (select earlier.messageId
                                  from InboundMessage earlier
                                 where earlier.stream = message.stream
@@ -124,7 +149,8 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
 
     /**
      * Сколько сообщений каждого потока лежит в каждом незавершённом статусе — ждут разбора ({@code NEW},
-     * {@code RETRY}), ждут частей передачи ({@code BUFFERED}) или ушли в отказ ({@code FAILED}) — и когда принято
+     * {@code RETRY}), ждут частей передачи ({@code BUFFERED}) или родителя ({@code AWAITING_PARENT}), ушли в отказ
+     * ({@code FAILED}) — и когда принято
      * самое давнее из них. Строка на пару «поток, статус»; пар без сообщений в ответе нет. Нужен метрикам: запрос
      * считает, а не выбирает строки, и тела не читает.
      *
@@ -137,7 +163,7 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
                    count(message) as messages,
                    min(message.receivedAt) as oldestReceivedAt
               from InboundMessage message
-             where message.status in (NEW, RETRY, BUFFERED, FAILED)
+             where message.status in (NEW, RETRY, BUFFERED, AWAITING_PARENT, FAILED)
              group by message.stream, message.status
             """)
     List<StatusBacklog> countUnfinishedByStreamAndStatus();
@@ -163,16 +189,18 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
             select count(*)
               from inbound_message
              where payload is not null
-               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED'
+                    or (status = 'FAILED' and parent_wait_since is not null))
                and received_at < :receivedBefore
             """)
     long countPayloadsToForgetReceivedBefore(@Param("receivedBefore") Instant receivedBefore);
 
     /**
      * Стирает тела не больше {@code limit} строк, принятых раньше {@code receivedBefore}, начиная с самых старых, и
-     * возвращает, сколько стёрто. Стираются тела полисов и договоров страхования в любом статусе и тела пропущенных
-     * сообщений любого потока. У полиса вместе с телом стирается причина исхода: в ней мог остаться текст ошибки
-     * базы со значениями полей. Транзакцию открывает вызывающий, отдельную на каждую пачку.
+     * возвращает, сколько стёрто. Стираются тела полисов и договоров страхования в любом статусе, тела пропущенных
+     * сообщений любого потока и тела сообщений, отклонённых потому, что родитель не пришёл за срок ожидания. У полиса
+     * вместе с телом стирается причина исхода: в ней мог остаться текст ошибки базы со значениями полей. Транзакцию
+     * открывает вызывающий, отдельную на каждую пачку.
      *
      * <p>Отбор повторён и снаружи подзапроса: если строку пачки в это время изменили, например вернули
      * пропущенное сообщение в разбор, PostgreSQL перепроверит внешнее условие на её новой версии и тело не сотрёт.
@@ -185,11 +213,13 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
                set payload = null,
                    last_error = case when stream = 'POLICIES' then null else last_error end
              where payload is not null
-               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED'
+                    or (status = 'FAILED' and parent_wait_since is not null))
                and message_id in (select message_id
                                     from inbound_message
                                    where payload is not null
-                                     and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+                                     and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED'
+                                          or (status = 'FAILED' and parent_wait_since is not null))
                                      and received_at < :receivedBefore
                                    order by received_at
                                    limit :limit)

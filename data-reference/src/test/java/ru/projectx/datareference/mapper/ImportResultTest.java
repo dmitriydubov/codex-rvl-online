@@ -3,16 +3,23 @@ package ru.projectx.datareference.mapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import ru.projectx.datareference.entity.AwaitedParent;
+import ru.projectx.datareference.entity.ParentKind;
 
 /**
- * Защищает исход разбора сообщения 1С: применено, пропущено с причиной или отклонено с причиной.
+ * Защищает исход применения сообщения 1С к справочнику: применено, пропущено с причиной или ждёт записи, на которую
+ * ссылается.
  *
- * <p>По исходу строке сырья проставляется статус, а планировщик пишет его в журнал. Пропуск без причины
- * запрещён: без неё «справочник пуст, потому что данных нет» и «справочник пуст, потому что фильтр задан
- * неверно» выглядят в базе одинаково.
+ * <p>По исходу строке сырья проставляется статус. Пропуск без причины запрещён: без неё «справочник пуст, потому что
+ * данных нет» и «справочник пуст, потому что фильтр задан неверно» выглядят в базе одинаково. Ожидание без родителя
+ * запрещено: разбор не знал бы, когда брать сообщение снова.
  */
 class ImportResultTest {
+
+    private static final AwaitedParent CONTRAGENT =
+            new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
 
     @Test
     void applied_isTheApplyOutcome() {
@@ -35,18 +42,18 @@ class ImportResultTest {
     }
 
     @Test
-    void rejected_keepsItsReason() {
-        ImportResult result = ImportResult.rejected("счётчики не сошлись");
+    void awaitingParent_keepsTheAwaitedRecord() {
+        ImportResult result = ImportResult.awaitingParent(CONTRAGENT);
 
-        assertThat(result).isInstanceOf(ImportResult.Rejected.class);
-        assertThat(((ImportResult.Rejected) result).reason()).isEqualTo("счётчики не сошлись");
+        assertThat(result).isInstanceOf(ImportResult.AwaitingParent.class);
+        assertThat(((ImportResult.AwaitingParent) result).parent()).isEqualTo(CONTRAGENT);
     }
 
     @Test
-    void rejectedWithoutReason_isRejected() {
-        assertThatThrownBy(() -> ImportResult.rejected(null))
+    void awaitingWithoutParent_isRejected() {
+        assertThatThrownBy(() -> ImportResult.awaitingParent(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("reason");
+                .hasMessage("parent");
     }
 
     /** Исходы сравниваются по смыслу: это и проверяют тесты разбора, сравнивая исход с ожидаемым. */
@@ -56,7 +63,6 @@ class ImportResultTest {
         assertThat(ImportResult.skipped("причина")).isEqualTo(ImportResult.skipped("причина"));
         assertThat(ImportResult.skipped("причина")).isNotEqualTo(ImportResult.skipped("другая"));
         assertThat(ImportResult.applied()).isNotEqualTo(ImportResult.skipped("причина"));
-        assertThat(ImportResult.rejected("причина")).isEqualTo(ImportResult.rejected("причина"));
-        assertThat(ImportResult.rejected("причина")).isNotEqualTo(ImportResult.skipped("причина"));
+        assertThat(ImportResult.awaitingParent(CONTRAGENT)).isEqualTo(ImportResult.awaitingParent(CONTRAGENT));
     }
 }

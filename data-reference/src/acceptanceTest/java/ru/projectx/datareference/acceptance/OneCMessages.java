@@ -125,7 +125,7 @@ final class OneCMessages {
      * {@code message-id} из таблицы шага — только канонический GUID: иное значение — ошибка сценария, а не
      * сообщение с испорченным конвертом (тот путь закрепляют тесты приёма).
      */
-    private static @Nullable UUID fixedMessageId(Map<String, String> table) {
+    static @Nullable UUID fixedMessageId(Map<String, String> table) {
         return Optional.ofNullable(table.get(MESSAGE_ID))
                 .map(raw -> OneCGuid.parse(raw).orElseThrow(() -> new IllegalArgumentException(
                         "message-id в таблице шага — не канонический GUID: " + raw)))

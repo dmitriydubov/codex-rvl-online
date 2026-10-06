@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import ru.projectx.datareference.config.OneCContractProperties;
+import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 
@@ -67,7 +68,7 @@ class RvlActivitySettingStartupTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties(OneCContractProperties.class)
-    @Import(ContragentMapper.class)
+    @Import({ContragentMapper.class, ForeignReferences.class})
     static class MapperOnly {
 
         @Bean
@@ -78,6 +79,11 @@ class RvlActivitySettingStartupTest {
         @Bean
         InsurerRepository insurerRepository() {
             return mock(InsurerRepository.class);
+        }
+
+        @Bean
+        ForeignReferenceRepository foreignReferenceRepository() {
+            return mock(ForeignReferenceRepository.class);
         }
 
         @Bean

@@ -95,10 +95,10 @@ class InsuranceContractImportTest {
     /** Обмен присылает договоры всех продуктов страховщика, и договоры не по ДМС до таблицы не доходят. */
     @Test
     void contractOfAnotherProduct_isSkipped() {
-        ImportResult result = importOne(contract("Обязательное страхование", insurerParty()));
+        ImportOutcome result = importOne(contract("Обязательное страхование", insurerParty()));
 
         assertThat(result)
-                .isInstanceOfSatisfying(ImportResult.Skipped.class,
+                .isInstanceOfSatisfying(ImportOutcome.Skipped.class,
                         skipped -> assertThat(skipped.reason()).contains("не ДМС"));
         assertThat(repository.count()).isZero();
     }
@@ -160,7 +160,7 @@ class InsuranceContractImportTest {
                         skipped -> assertThat(skipped.reason()).contains("dms-product-type"));
     }
 
-    private ImportResult importOne(String data) {
+    private ImportOutcome importOne(String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.INSURANCE_CONTRACTS, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();

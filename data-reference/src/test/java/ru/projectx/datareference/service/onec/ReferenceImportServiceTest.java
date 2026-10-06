@@ -13,7 +13,6 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.Mkb10;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -96,9 +95,9 @@ class ReferenceImportServiceTest {
         importService.importMessage(message(store(OneCStream.MKB10, mkb10("A00", "Холера уточнённая"))));
         UUID staleId = store(OneCStream.MKB10, mkb10("A00", "Холера"));
 
-        ImportResult result = importService.importMessage(message(staleId));
+        ImportOutcome result = importService.importMessage(message(staleId));
 
-        assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        assertThat(result).isInstanceOf(ImportOutcome.Applied.class);
         assertThat(mkb10Repository.findByExternalId(CODE_ID).orElseThrow().name())
                 .isEqualTo("Холера");
     }

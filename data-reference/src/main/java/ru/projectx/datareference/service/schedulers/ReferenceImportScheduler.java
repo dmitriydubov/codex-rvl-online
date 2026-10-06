@@ -16,12 +16,12 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.ParseFailure;
 import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.service.onec.ImportOutcome;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
 /**
@@ -41,8 +41,11 @@ import ru.projectx.datareference.service.onec.ReferenceImportService;
  * ({@link InboundMessageRepository#findDueForImport}), а внутри прохода — сам проход: сообщение, ушедшее на повтор,
  * держит свой поток до конца прохода.
  *
- * <p>Исход каждого сообщения виден в журнале: применено, пропущено с причиной, отклонено при разборе, отложено до
- * повтора, отклонено окончательно или удержано, пока ждёт повтора более раннее сообщение потока. На время разбора в MDC лежат
+ * <p>Сообщение, которое ждёт родителя, поток не держит. В конце прохода сообщения, не дождавшиеся родителя за срок,
+ * отклоняются, и журнал получает о них сводку ({@link OverdueParentWaits}).
+ *
+ * <p>Исход каждого сообщения виден в журнале: применено, пропущено с причиной, ждёт родителя, отклонено при разборе,
+ * отложено до повтора, отклонено окончательно или удержано, пока ждёт повтора более раннее сообщение потока. На время разбора в MDC лежат
  * {@code message-id} и поток сообщения, под теми же именами, что при приёме из брокера. Тела сообщения и текста чужого исключения в журнале нет: через этот
  * путь идут полисы с персональными данными.
  */
@@ -55,6 +58,7 @@ public class ReferenceImportScheduler {
     private final ReferenceImportService importService;
     private final InboundMessageService inboundMessageService;
     private final ParseFailures failures;
+    private final OverdueParentWaits overdueParentWaits;
     private final ImportProperties properties;
     private final Clock clock;
 
@@ -63,6 +67,7 @@ public class ReferenceImportScheduler {
             ReferenceImportService importService,
             InboundMessageService inboundMessageService,
             ParseFailures failures,
+            OverdueParentWaits overdueParentWaits,
             ImportProperties properties,
             Clock clock) {
 
@@ -70,12 +75,15 @@ public class ReferenceImportScheduler {
         this.importService = importService;
         this.inboundMessageService = inboundMessageService;
         this.failures = failures;
+        this.overdueParentWaits = overdueParentWaits;
         this.properties = properties;
         this.clock = clock;
     }
 
     /**
-     * Один проход: взять пачку дозревших сообщений и разобрать каждое.
+     * Один проход: взять пачку дозревших сообщений, разобрать каждое, затем отклонить сообщения, не дождавшиеся
+     * родителя за срок. Отклонение идёт после разбора: сообщение, родитель которого пришёл в этом проходе, разбор
+     * возьмёт на следующем, и срок его не отклонит.
      *
      * <p>Обычный цикл, а не стрим: каждый шаг пишет в базу и ловит свои исключения, то есть состоит из
      * побочных эффектов.
@@ -86,6 +94,7 @@ public class ReferenceImportScheduler {
         for (InboundMessage message : due) {
             importInStreamOrder(message, heldStreams);
         }
+        overdueParentWaits.rejectAndReport();
     }
 
     /**
@@ -161,14 +170,11 @@ public class ReferenceImportScheduler {
      * Причина пропуска и отказа пишется в журнал целиком: её составляют правила потоков, и в ней бывают только
      * идентификаторы, счётчики и признаки справочников, а не данные застрахованных.
      */
-    private static void reportOutcome(InboundReceipt receipt, ImportResult result) {
-        switch (result) {
-            case ImportResult.Applied ignored ->
-                    log.info("сообщение {} потока {} применено", receipt.messageId(), receipt.stream());
-            case ImportResult.Skipped skipped -> log.info("сообщение {} потока {} пропущено: {}",
-                    receipt.messageId(), receipt.stream(), skipped.reason());
-            case ImportResult.Rejected rejected -> log.warn("сообщение {} потока {} отклонено: {}",
-                    receipt.messageId(), receipt.stream(), rejected.reason());
+    private static void reportOutcome(InboundReceipt receipt, ImportOutcome outcome) {
+        if (outcome.needsAttention()) {
+            log.warn("сообщение {} потока {} {}", receipt.messageId(), receipt.stream(), outcome.summary());
+            return;
         }
+        log.info("сообщение {} потока {} {}", receipt.messageId(), receipt.stream(), outcome.summary());
     }
 }

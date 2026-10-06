@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
@@ -70,9 +69,9 @@ class ContragentImportTest {
     /** Контрагент без РВЛ — это просто не наше юрлицо, а не ошибка. */
     @Test
     void contragentWithoutRvlActivity_isSkipped() {
-        ImportResult result = importOne(contragent(true, OTHER_ACTIVITY, "ООО «Ромашка»"));
+        ImportOutcome result = importOne(contragent(true, OTHER_ACTIVITY, "ООО «Ромашка»"));
 
-        assertThat(result).isInstanceOf(ImportResult.Skipped.class);
+        assertThat(result).isInstanceOf(ImportOutcome.Skipped.class);
         assertThat(lpuRepository.count()).isZero();
     }
 
@@ -108,10 +107,10 @@ class ContragentImportTest {
      */
     @Test
     void insurerIsStored_butMessageIsSkippedWithReason() {
-        ImportResult result = importOne(contragent(false, OTHER_ACTIVITY, "АО «Работодатель»"));
+        ImportOutcome result = importOne(contragent(false, OTHER_ACTIVITY, "АО «Работодатель»"));
 
         assertThat(result)
-                .isInstanceOfSatisfying(ImportResult.Skipped.class,
+                .isInstanceOfSatisfying(ImportOutcome.Skipped.class,
                         skipped -> assertThat(skipped.reason()).contains("страхователей"));
         assertThat(insurerRepository.findByExternalId(CONTRAGENT_ID)).isPresent();
     }
@@ -124,14 +123,14 @@ class ContragentImportTest {
     void lastMessageWins_thereIsNoVersionGuard() {
         importOne(contragent(true, RVL, "Санаторий «Заря»"));
 
-        ImportResult result = importOne(contragent(true, RVL, "Старое название"));
+        ImportOutcome result = importOne(contragent(true, RVL, "Старое название"));
 
-        assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        assertThat(result).isInstanceOf(ImportOutcome.Applied.class);
         assertThat(lpuRepository.findByExternalId(CONTRAGENT_ID).orElseThrow().name())
                 .isEqualTo("Старое название");
     }
 
-    private ImportResult importOne(String data) {
+    private ImportOutcome importOne(String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.CONTRAGENTS, QUEUE, envelope(data));
         InboundMessage message = inboundMessageRepository.findById(messageId).orElseThrow();

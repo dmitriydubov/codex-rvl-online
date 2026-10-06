@@ -44,7 +44,8 @@ final class OneCServiceMessages {
 
     /** Услуга договора ЛПУ (ТЗ-10); вид обращения и пометка удаления — если сценарий их назвал. */
     static OneCMessage service(Map<String, String> table) {
-        onlyKnown(table, "external_id", "договор", "наименование", "код", APPEAL_TYPE, DELETE_MARK);
+        onlyKnown(table, "external_id", "договор", "наименование", "код", APPEAL_TYPE, DELETE_MARK,
+                OneCMessages.MESSAGE_ID);
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("ownerId", required(table, "договор"))
@@ -52,7 +53,8 @@ final class OneCServiceMessages {
                 .put("code", required(table, "код"))
                 .put("deleteMark", flagOr(table, DELETE_MARK, false));
         Optional.ofNullable(table.get(APPEAL_TYPE)).ifPresent(appealType -> data.put("typeAppealId", appealType));
-        return new OneCMessage(OneCStream.CONTRAGENT_SERVICES, SERVICES_QUEUE, data, InboundStatus.PROCESSED);
+        return new OneCMessage(OneCStream.CONTRAGENT_SERVICES, SERVICES_QUEUE, data, InboundStatus.PROCESSED,
+                OneCMessages.fixedMessageId(table));
     }
 
     /** Полная передача прайса по услуге (ТЗ-9): один пакет со всеми строками таблицы и финальное сообщение. */

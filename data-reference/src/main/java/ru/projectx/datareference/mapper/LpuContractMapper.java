@@ -7,16 +7,16 @@ import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -28,11 +28,14 @@ import tools.jackson.databind.node.ObjectNode;
  *       договора, а его имя задаётся настройкой: в контракте 1С на месте имени пока заглушка. Пока имя
  *       не задано, этот фильтр не применяется, см. {@link OneCContractProperties#rvlContractProperty()}.</li>
  *   <li><b>Чей это договор.</b> Если в договоре указано отделение, отличное от головной организации,
- *       договор принадлежит отделению: отделение у нас отдельный санаторий. Поэтому сначала ищется
- *       санаторий отделения, а затем санаторий головной организации.</li>
- *   <li><b>Наш ли он.</b> Если ни одна из двух ссылок не ведёт к санаторию из справочника, договор
- *       заключён с чужим контрагентом и пропускается с причиной, в которой названы обе ссылки.</li>
+ *       договор принадлежит отделению: отделение у нас отдельный санаторий. Головная организация берётся,
+ *       только когда отделения нет или оно признано не нашим.</li>
+ *   <li><b>Наш ли он.</b> Если санаторий признан не нашим, договор заключён с чужим контрагентом и
+ *       пропускается с причиной, в которой названы обе ссылки. Если о санатории ещё ничего не известно,
+ *       договор ждёт его: 1С присылает справочники в произвольном порядке.</li>
  * </ol>
+ *
+ * <p>Пропущенный договор запоминается как не наш: услуги по нему тоже пропускаются, а не ждут.
  *
  * <p>Признак ценообразующего договора здесь не вычисляется. Сохраняются поля источника: ссылка на
  * основной договор и признак «использовать цены основного договора». Вывод делается при расчёте цены,
@@ -56,30 +59,26 @@ public class LpuContractMapper extends OwnedCatalogStreamMapper<LpuContract, Lpu
      */
     private static final String SOB_EXPORT_PROPERTY = "Выгружать прейскуранты в систему бронирования";
 
-    private final LpuRepository lpuRepository;
+    private final CatalogReference<Lpu> sanatoriums;
     private final OneCContractProperties contract;
 
     public LpuContractMapper(
             LpuContractRepository repository,
-            LpuRepository lpuRepository,
+            CatalogReferences references,
             OneCContractProperties contract,
             Clock clock) {
 
         super(OneCStream.LPU_CONTRACTS, repository::findByExternalId, LpuContract::create,
-                LpuContract::applySnapshot, repository::save, clock);
-        this.lpuRepository = lpuRepository;
+                LpuContract::applySnapshot, repository::save, clock, ParentKind.LPU_CONTRACT, references);
+        this.sanatoriums = references.sanatoriums("договор не нашего контрагента: ");
         this.contract = contract;
     }
 
     @Override
-    public ImportResult apply(ObjectNode data) {
-        Optional<String> unmetProperty = unmetRvlProperty(data);
-        if (unmetProperty.isPresent()) {
-            return ImportResult.skipped("договор без признака " + unmetProperty.get());
-        }
-        return sanatoriumOf(data)
-                .map(sanatorium -> applyUnder(sanatorium, data))
-                .orElseGet(() -> ImportResult.skipped(strangerReason(data)));
+    protected ImportResult decide(ObjectNode data) {
+        return unmetRvlProperty(data)
+                .map(property -> ImportResult.skipped("договор без признака " + property))
+                .orElseGet(() -> applyToSanatorium(data));
     }
 
     /**
@@ -91,23 +90,32 @@ public class LpuContractMapper extends OwnedCatalogStreamMapper<LpuContract, Lpu
     }
 
     /**
-     * Санаторий отделения важнее санатория головной организации. Если отделение не указано или совпадает
-     * с головной организацией, результат тот же, что и при поиске по одной головной организации.
+     * Санаторий отделения важнее санатория головной организации. Отделение, о котором ещё ничего не известно,
+     * договор ждёт, даже если головная организация уже есть. Если отделение не указано или признано не нашим, решает
+     * головная организация. Отделение, совпадающее с головной организацией, проходит тот же путь и приходит к тому же
+     * исходу.
      */
-    private Optional<Lpu> sanatoriumOf(JsonNode data) {
-        Optional<UUID> owner = OneCValues.uuid(data, OWNER_ID);
-        Optional<UUID> branch = OneCValues.uuid(data, BRANCH_ID);
-        return branch.flatMap(lpuRepository::findByExternalId)
-                .or(() -> owner.flatMap(lpuRepository::findByExternalId));
+    private ImportResult applyToSanatorium(ObjectNode data) {
+        return OneCValues.uuid(data, BRANCH_ID)
+                .map(branch -> sanatoriums.applyIfKnown(branch, sanatorium -> applyUnder(sanatorium, data),
+                        () -> applyToOwner(data)))
+                .orElseGet(() -> applyToOwner(data));
+    }
+
+    private ImportResult applyToOwner(ObjectNode data) {
+        Supplier<ImportResult> stranger = () -> stranger(data);
+        return OneCValues.uuid(data, OWNER_ID)
+                .map(owner -> sanatoriums.applyIfKnown(owner, sanatorium -> applyUnder(sanatorium, data), stranger))
+                .orElseGet(stranger);
     }
 
     private ImportResult applyUnder(Lpu sanatorium, ObjectNode data) {
         return upsertUnder(sanatorium, OneCValues.requiredUuid(data, "id"), detailsOf(data));
     }
 
-    private static String strangerReason(JsonNode data) {
-        return "договор не нашего контрагента: ownerId=" + uuidOrNull(data, OWNER_ID)
-                + ", contragentBranchId=" + uuidOrNull(data, BRANCH_ID);
+    private static ImportResult stranger(JsonNode data) {
+        return ImportResult.skipped("договор не нашего контрагента: ownerId=" + uuidOrNull(data, OWNER_ID)
+                + ", contragentBranchId=" + uuidOrNull(data, BRANCH_ID));
     }
 
     /** Дата начала читается первой: без неё договор нарушает контракт, что бы ни было в остальных полях. */

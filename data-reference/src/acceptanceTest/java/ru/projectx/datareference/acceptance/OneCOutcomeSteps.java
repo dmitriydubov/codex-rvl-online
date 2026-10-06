@@ -24,6 +24,7 @@ public class OneCOutcomeSteps {
     /** Исходы так, как их называет спецификация, и статусы строки сырья, которые за ними стоят. */
     private static final Map<String, InboundStatus> OUTCOMES = Map.of(
             "применено", InboundStatus.PROCESSED,
+            "ждёт родителя", InboundStatus.AWAITING_PARENT,
             "пропущено", InboundStatus.SKIPPED,
             "отложено до повтора", InboundStatus.RETRY,
             "отклонено без повторов", InboundStatus.FAILED,
