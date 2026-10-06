@@ -8,17 +8,18 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-8: адрес и регион приходят отдельным потоком — тем же, которым едут телефоны
+ * Контактная информация (ТЗ-8): адрес и регион приходят отдельным потоком — тем же, которым едут телефоны
  * и почта всех контрагентов 1С:УСК.
  */
 @IntegrationTest

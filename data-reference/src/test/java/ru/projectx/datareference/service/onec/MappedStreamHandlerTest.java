@@ -1,7 +1,9 @@
 package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +16,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -65,6 +70,20 @@ class MappedStreamHandlerTest {
         assertThat(result).isEqualTo(ImportResult.skipped("не санаторий"));
         verify(inboundMessageService).markSkipped(MESSAGE_ID, "не санаторий");
         verifyNoMoreInteractions(inboundMessageService);
+    }
+
+    /**
+     * Отклонённое маппером сообщение уходит по общему пути окончательного отказа: разбор откатывается, а отказ
+     * записывают после отката с записью в журнал и причиной от маппера.
+     */
+    @Test
+    void rejectedMessage_isContractViolationWithItsReason() {
+        when(mapper.apply(data)).thenReturn(ImportResult.rejected("запись отклонена"));
+
+        assertThatThrownBy(() -> handler().handle(message(), data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("запись отклонена");
+        verifyNoInteractions(inboundMessageService);
     }
 
     private MappedStreamHandler handler() {

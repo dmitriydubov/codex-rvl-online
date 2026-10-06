@@ -15,8 +15,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.service.onec.OneCRequiredValues;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

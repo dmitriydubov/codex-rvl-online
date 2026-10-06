@@ -13,10 +13,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCGuid;
-import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -40,14 +36,6 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class ContragentMapper implements StreamMapper {
 
-    /**
-     * Длина колонок {@code inn} и {@code kpp} в справочниках санаториев и страхователей. Контракт длину не
-     * называет, поэтому предел задают колонки: значение длиннее — испорченное, и сообщение отклоняется.
-     */
-    private static final int INN_LENGTH = 12;
-    private static final int KPP_LENGTH = 9;
-    private static final String INN = "ИНН";
-    private static final String KPP = "КПП";
     private static final String ACTIVITIES = "typesActivities";
     private static final String ACTIVITY_GUID = "guidTypeActivities";
     private static final String RVL_ACTIVITY_NOT_CANONICAL =
@@ -188,8 +176,8 @@ public class ContragentMapper implements StreamMapper {
             return new CommonFields(
                     OneCValues.requiredText(data, "Наименование"),
                     optionalText(data, "НаименованиеПолное"),
-                    OneCValues.limitedText(data, INN, INN_LENGTH).orElse(null),
-                    OneCValues.limitedText(data, KPP, KPP_LENGTH).orElse(null),
+                    ContragentRequisite.INN.read(data).orElse(null),
+                    ContragentRequisite.KPP.read(data).orElse(null),
                     OneCValues.flag(data, "deleteMark"));
         }
     }

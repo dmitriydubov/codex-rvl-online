@@ -7,18 +7,19 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-3: один поток, два справочника и фильтр, который отсекает почти всё.
+ * Контрагенты (ТЗ-3): один поток, два справочника и фильтр, который отсекает почти всё.
  *
  * <p>Поток несёт всех контрагентов-юрлиц 1С:УСК, а нужны нам единицы — санатории
  * с видом деятельности РВЛ. Поэтому здесь проверяется не столько маппинг полей,
@@ -76,7 +77,7 @@ class ContragentImportTest {
     }
 
     /**
-     * ТЗ-3, п. 3.3: у известного нам санатория пропал вид деятельности РВЛ. Запись
+     * У известного нам санатория пропал вид деятельности РВЛ. Запись
      * не удаляется — физического удаления нет нигде, — а помечается архивной.
      * Реквизиты при этом обновляются: сообщение принесло актуальные.
      */
@@ -116,7 +117,7 @@ class ContragentImportTest {
     }
 
     /**
-     * Версии у ТЗ-3 нет, и защиты от переприменения тоже: действует последнее полученное
+     * Версии у сообщений контрагентов нет, и защиты от переприменения тоже: действует последнее полученное
      * сообщение, даже если по содержанию оно старее.
      */
     @Test

@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.integration;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
-import ru.projectx.datareference.service.onec.OneCGuid;
+import ru.projectx.datareference.mapper.OneCGuid;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

@@ -12,8 +12,6 @@ import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

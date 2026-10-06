@@ -11,11 +11,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.InboundMessageService;
@@ -23,7 +24,7 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-1: полис застрахованного. Фильтров у потока нет, зато есть два места, где ТЗ
+ * Полис застрахованного (ТЗ-1). Фильтров у потока нет, зато есть два места, где контракт
  * расходится с наивным чтением маппинга: срок действия берётся из строки шапки,
  * а почта лежит в наборе дополнительных свойств.
  *
@@ -71,7 +72,7 @@ class PolicyImportTest {
     }
 
     /**
-     * ТЗ-1, п. 1.3: срок действия берётся из строки шапки с наибольшим номером среди
+     * Срок действия берётся из строки шапки с наибольшим номером среди
      * действующих — не из первой попавшейся и не из полей самого полиса.
      */
     @Test

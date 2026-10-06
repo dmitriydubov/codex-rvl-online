@@ -50,7 +50,7 @@ public class SupersededTransferClosure {
     @Transactional
     public boolean closeIfSuperseded(UUID cid) {
         return repository.findBufferedTransferService(cid)
-                .flatMap(OneCGuid::parse)
+                .flatMap(TransferServiceGuid::parse)
                 .flatMap(order::lockApplied)
                 .map(applied -> closeIfOlder(cid, applied))
                 .orElse(false);

@@ -45,9 +45,14 @@ public class OneCJournalSteps {
 
     @Тогда("в журнале Дата-референса есть запись уровня ERROR об окончательном отказе последнего сообщения: поток {string}, попытка {int}, тип {string}, SQLSTATE {string}")
     public void finalRejectionLogged(String stream, int attempt, String type, String sqlState) {
+        finalRejectionLogged(inbox.lastMessage().messageId().toString(), stream, attempt, type, sqlState);
+    }
+
+    @Тогда("в журнале Дата-референса есть запись уровня ERROR об окончательном отказе сообщения {string}: поток {string}, попытка {int}, тип {string}, SQLSTATE {string}")
+    public void finalRejectionLogged(String messageId, String stream, int attempt, String type, String sqlState) {
         assertThat(STREAMS).as("потоки, которые знает шаг").containsKey(stream);
         String expected = "сообщение %s потока %s отклонено окончательно на попытке %d: %s, SQLSTATE %s".formatted(
-                inbox.lastMessage().messageId(), STREAMS.get(stream), attempt, type, sqlState);
+                messageId, STREAMS.get(stream), attempt, type, sqlState);
 
         assertThat(journal.events())
                 .as("запись ERROR об окончательном отказе: %s", expected)
