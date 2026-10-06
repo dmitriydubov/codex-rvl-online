@@ -19,7 +19,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Каждая часть откладывается в буфер, и после каждой проверяется, не собралась ли передача: порядок двух очередей
  * не гарантирован. Прайс замещается только передачей целиком, и исход записывается сразу всем её частям. Цены
  * меняет передача, финальное сообщение которой принято не раньше финала уже применённой ({@link PriceTransferOrder}).
- * Часть с собственной ошибкой ({@link PriceTransferServiceLock}, {@link PriceListPartCheck}) прерывает разбор: её и
+ * Часть с собственной ошибкой ({@link PriceTransferServiceCheck}, {@link PriceListPartCheck}) прерывает разбор: её и
  * остальные части передачи отклоняет {@link PriceListTransferRejection} после отката.
  */
 @Component

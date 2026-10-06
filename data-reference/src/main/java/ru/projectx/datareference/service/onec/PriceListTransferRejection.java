@@ -32,6 +32,7 @@ public class PriceListTransferRejection implements RejectionScope {
 
     private final InboundMessageRepository repository;
     private final PriceTransferServiceLock serviceLock;
+    private final PriceTransferServiceCheck serviceCheck;
     private final PriceListPartCheck partCheck;
     private final ObjectMapper json;
 
@@ -40,6 +41,7 @@ public class PriceListTransferRejection implements RejectionScope {
 
         this.repository = repository;
         this.serviceLock = serviceLock;
+        this.serviceCheck = new PriceTransferServiceCheck(repository);
         this.partCheck = new PriceListPartCheck(priceList);
         this.json = json;
     }
@@ -95,7 +97,7 @@ public class PriceListTransferRejection implements RejectionScope {
     /** Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. */
     private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
         try {
-            serviceLock.serviceOf(part.markup().cid(), part.data());
+            serviceCheck.serviceOf(part.markup().cid(), part.data());
             partCheck.check(message.receipt().messageId(), part.markup(), part.data(), parts);
             return false;
         }

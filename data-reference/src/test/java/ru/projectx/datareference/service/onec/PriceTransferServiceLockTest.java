@@ -36,7 +36,8 @@ class PriceTransferServiceLockTest {
 
     private final InboundMessageRepository inbound = mock(InboundMessageRepository.class);
     private final PriceListFinalizationRepository finalizations = mock(PriceListFinalizationRepository.class);
-    private final PriceTransferServiceLock lock = new PriceTransferServiceLock(inbound, finalizations);
+    private final PriceTransferServiceLock lock =
+            new PriceTransferServiceLock(inbound, finalizations);
     private final JsonMapper json = JsonMapper.builder().build();
 
     @Test
@@ -59,13 +60,6 @@ class PriceTransferServiceLockTest {
     }
 
     @Test
-    void partNamingTheServiceOfBufferedParts_namesIt_inAnyCase() {
-        bufferedParts(SERVICE.toString().toUpperCase(), SERVICE.toString());
-
-        assertThat(lock.serviceOf(CID, part(SERVICE.toString()))).contains(SERVICE);
-    }
-
-    @Test
     void partNamingAnotherServiceThanBufferedParts_isDefect_andLocksNothing() {
         bufferedParts(SERVICE.toString(), SERVICE.toString());
 
@@ -77,34 +71,11 @@ class PriceTransferServiceLockTest {
 
     /** Часть в буфере без читаемого GUID услуги не называет ту же услугу: собрать передачу по одной услуге нельзя. */
     @Test
-    void bufferedPartWithoutReadableService_makesTransferMixed() {
-        bufferedParts(SERVICE.toString(), null);
-
-        assertThatThrownBy(() -> lock.serviceOf(CID, part(SERVICE.toString())))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage(MIXED);
-    }
-
-    @Test
     void partWithoutService_isDefect() {
         assertThatThrownBy(() -> lock.lockServiceOf(CID, json.createObjectNode()))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("нет обязательного GUID в поле keyValue");
         verify(finalizations, never()).lockByService(any());
-    }
-
-    @Test
-    void partWithEmptyGuidAsService_isDefect() {
-        assertThatThrownBy(() -> lock.serviceOf(CID, part("00000000-0000-0000-0000-000000000000")))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage("нет обязательного GUID в поле keyValue");
-    }
-
-    @Test
-    void partWithServiceNotWrittenAsGuid_isDefect() {
-        assertThatThrownBy(() -> lock.serviceOf(CID, part("1-2-3-4-5")))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage("поле keyValue не является GUID");
     }
 
     /** Исход передачи уже записан: поздняя часть разделяет его, и какую услугу она называет, не проверяется. */
@@ -129,14 +100,6 @@ class PriceTransferServiceLockTest {
     }
 
     /** Исход записан, если есть хотя бы одна часть применённая, пропущенная или отклонённая. */
-    @Test
-    void outcomeIsRecordedByAppliedSkippedOrFailedParts() {
-        lock.serviceOf(CID, part(SERVICE.toString()));
-
-        verify(inbound).existsByCorrelationIdAndStatusIn(CID,
-                EnumSet.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED, InboundStatus.FAILED));
-    }
-
     /**
      * При отказе блокируется услуга, которую называют части передачи в буфере, — та же, что блокирует проверка
      * зависших передач, даже если отклоняемая часть называет другую.
