@@ -118,7 +118,8 @@ class InboundOutcomeRecordingTest {
         InboundMessage message = existing();
         message.markAwaitingParent(PARENT, null, RECEIVED_AT);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT))
+                .isEqualTo(InboundStatus.RETRY);
         assertThat(message.outcome().nextRetryAt()).isEqualTo(NOW.plus(BACKOFF.get(0)));
     }
 
@@ -127,7 +128,7 @@ class InboundOutcomeRecordingTest {
         InboundMessage message = existing();
         message.markAwaitingParent(PARENT, null, RECEIVED_AT);
 
-        assertThat(service().recordPermanentFailure(MESSAGE_ID,
+        assertThat(service().recordPermanentFailure(MESSAGE_ID, unchanged(),
                 new ParseFailure.Permanent("в договоре нет даты начала", "OneCFieldException", "нет")))
                 .isEqualTo(InboundStatus.FAILED);
         assertThat(message.outcome().lastError()).isEqualTo("в договоре нет даты начала");
@@ -137,7 +138,7 @@ class InboundOutcomeRecordingTest {
     void firstTemporaryFailure_schedulesTheFirstStepOfTheLadder() {
         InboundMessage message = existing();
 
-        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, NOW.plus(BACKOFF.get(0)), ERROR, null, null));
@@ -149,7 +150,7 @@ class InboundOutcomeRecordingTest {
         InboundMessage message = existing();
         message.markRetrying("первая ошибка", NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.RETRY, 2, NOW.plus(BACKOFF.get(1)), ERROR, null, null));
@@ -161,7 +162,7 @@ class InboundOutcomeRecordingTest {
         message.markRetrying("первая ошибка", NOW);
         message.markRetrying("вторая ошибка", NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(
                 InboundStatus.FAILED, 2, null, "повторы исчерпаны на попытке 3: " + ERROR, null, null));
@@ -172,7 +173,7 @@ class InboundOutcomeRecordingTest {
     void permanentFailure_failsTheMessageAtOnce() {
         InboundMessage message = existing();
 
-        service().recordPermanentFailure(MESSAGE_ID,
+        service().recordPermanentFailure(MESSAGE_ID, unchanged(),
                 new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         assertThat(message.outcome())
@@ -188,7 +189,7 @@ class InboundOutcomeRecordingTest {
                 new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
         RejectionScope scope = scopeFailing(sibling);
 
-        InboundStatus status = service(scope).recordPermanentFailure(MESSAGE_ID,
+        InboundStatus status = service(scope).recordPermanentFailure(MESSAGE_ID, unchanged(),
                 new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         assertThat(status).isEqualTo(InboundStatus.FAILED);
@@ -205,7 +206,8 @@ class InboundOutcomeRecordingTest {
         InboundMessage sibling = InboundMessage.receive(
                 new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
 
-        InboundStatus status = service(scopeFailing(sibling)).recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT);
+        InboundStatus status =
+                service(scopeFailing(sibling)).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(status).isEqualTo(InboundStatus.FAILED);
         assertThat(message.outcome().lastError()).isEqualTo("повторы исчерпаны на попытке 3: " + ERROR);
@@ -220,7 +222,8 @@ class InboundOutcomeRecordingTest {
         RejectionScope scope = mock(RejectionScope.class);
         when(scope.stream()).thenReturn(OneCStream.MKB10);
 
-        assertThat(service(scope).recordTemporaryFailure(MESSAGE_ID, LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service(scope).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT))
+                .isEqualTo(InboundStatus.RETRY);
         verify(scope, never()).reject(any(), any());
         assertThat(transitions()).containsExactly("RETRY");
     }
@@ -232,7 +235,7 @@ class InboundOutcomeRecordingTest {
         RejectionScope scope = mock(RejectionScope.class);
         when(scope.stream()).thenReturn(OneCStream.PRICE_LISTS);
 
-        service(scope).recordPermanentFailure(MESSAGE_ID,
+        service(scope).recordPermanentFailure(MESSAGE_ID, unchanged(),
                 new ParseFailure.Permanent("в конверте нет объекта data", "OneCFieldException", "нет"));
 
         assertThat(message.outcome().lastError()).isEqualTo("в конверте нет объекта data");
@@ -276,6 +279,11 @@ class InboundOutcomeRecordingTest {
         return meters.find(InboundTransitionMetrics.TRANSITIONS).tag("stream", "MKB10").counters().stream()
                 .flatMap(counter -> Collections.nCopies((int) counter.count(), counter.getId().getTag("status")).stream())
                 .toList();
+    }
+
+    /** Исход строки сейчас: попытка откатилась, и строка такая же, как до неё. */
+    private InboundOutcome unchanged() {
+        return repository.findById(MESSAGE_ID).orElseThrow().outcome();
     }
 
     private InboundMessage existing() {

@@ -13,6 +13,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
@@ -137,15 +138,20 @@ public class ReferenceImportScheduler {
         }
     }
 
+    /**
+     * Исход сообщения запоминается до разбора: по нему сервис исходов отличит откаченную попытку от зафиксированной,
+     * о фиксации которой приложение не узнало.
+     */
     private Optional<InboundStatus> importAndClassify(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
+        InboundOutcome beforeAttempt = message.outcome();
         try {
             reportOutcome(receipt, importService.importMessage(message));
             return Optional.empty();
         }
         catch (RuntimeException failure) {
             // Граница прохода: любая ошибка разбора одного сообщения записывается его исходом, и проход идёт дальше.
-            return Optional.of(recordFailure(receipt, failures.classify(failure)));
+            return Optional.of(recordFailure(receipt, beforeAttempt, failures.classify(failure)));
         }
     }
 
@@ -154,15 +160,15 @@ public class ReferenceImportScheduler {
      *
      * @return статус, с которым сообщение осталось
      */
-    private InboundStatus recordFailure(InboundReceipt receipt, ParseFailure failure) {
+    private InboundStatus recordFailure(InboundReceipt receipt, InboundOutcome beforeAttempt, ParseFailure failure) {
         return switch (failure) {
             case ParseFailure.Temporary temporary -> {
                 log.warn("временная ошибка разбора сообщения {} потока {}: {}, SQLSTATE {}",
                         receipt.messageId(), receipt.stream(), temporary.type(), temporary.sqlState());
-                yield inboundMessageService.recordTemporaryFailure(receipt.messageId(), temporary);
+                yield inboundMessageService.recordTemporaryFailure(receipt.messageId(), beforeAttempt, temporary);
             }
             case ParseFailure.Permanent permanent ->
-                    inboundMessageService.recordPermanentFailure(receipt.messageId(), permanent);
+                    inboundMessageService.recordPermanentFailure(receipt.messageId(), beforeAttempt, permanent);
         };
     }
 
