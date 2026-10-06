@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionOperations;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
@@ -25,6 +26,9 @@ class InboundTransitionCommitTest {
 
     private static final ParseFailure.Temporary TIMEOUT = new ParseFailure.Temporary(
             "временный отказ базы данных: QueryTimeoutException, SQLSTATE 57014", "QueryTimeoutException", "57014");
+
+    /** Исход только что сохранённого сообщения: таким разбор его прочитал до неудавшейся попытки. */
+    private static final InboundOutcome NEW = new InboundOutcome(InboundStatus.NEW, 0, null, null, null, null);
 
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
 
@@ -75,7 +79,7 @@ class InboundTransitionCommitTest {
         double before = transitions(InboundStatus.RETRY);
 
         transactions.executeWithoutResult(status -> {
-            inboundMessageService.recordTemporaryFailure(messageId, TIMEOUT);
+            inboundMessageService.recordTemporaryFailure(messageId, NEW, TIMEOUT);
             status.setRollbackOnly();
         });
 

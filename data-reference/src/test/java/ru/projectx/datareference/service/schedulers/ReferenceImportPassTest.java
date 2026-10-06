@@ -41,10 +41,13 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.DatabaseOutages;
@@ -99,8 +102,10 @@ class ReferenceImportPassTest {
     /** Сервис исходов сообщает, с каким статусом осталось сообщение; здесь — обычные статусы отказов. */
     @BeforeEach
     void recordFailuresAsUsual() {
-        lenient().when(inboundMessageService.recordTemporaryFailure(any(), any())).thenReturn(InboundStatus.RETRY);
-        lenient().when(inboundMessageService.recordPermanentFailure(any(), any())).thenReturn(InboundStatus.FAILED);
+        lenient().when(inboundMessageService.recordTemporaryFailure(any(), any(), any()))
+                .thenReturn(InboundStatus.RETRY);
+        lenient().when(inboundMessageService.recordPermanentFailure(any(), any(), any()))
+                .thenReturn(InboundStatus.FAILED);
     }
 
     @AfterEach
@@ -212,7 +217,7 @@ class ReferenceImportPassTest {
         doAnswer(invocation -> {
             seen.putAll(MDC.getCopyOfContextMap());
             return InboundStatus.RETRY;
-        }).when(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()), any());
+        }).when(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()), any(), any());
 
         scheduler().importPendingMessages();
 
@@ -236,9 +241,9 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), message.outcome(),
                 new ParseFailure.Permanent("не задано поле code", "OneCFieldException", "нет"));
-        verify(inboundMessageService, never()).recordTemporaryFailure(any(), any());
+        verify(inboundMessageService, never()).recordTemporaryFailure(any(), any(), any());
         assertThat(logged.list).isEmpty();
     }
 
@@ -253,11 +258,11 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), message.outcome(),
                 new ParseFailure.Permanent(
                         "база данных отклонила запись: DataIntegrityViolationException, SQLSTATE 22003",
                         "DataIntegrityViolationException", "22003"));
-        verify(inboundMessageService, never()).recordTemporaryFailure(any(), any());
+        verify(inboundMessageService, never()).recordTemporaryFailure(any(), any(), any());
     }
 
     /** Ошибка в коде разбора повтором не лечится: сразу окончательный отказ, в причине только тип. */
@@ -269,9 +274,29 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(),
+        verify(inboundMessageService).recordPermanentFailure(message.receipt().messageId(), message.outcome(),
                 new ParseFailure.Permanent("непредвиденная ошибка разбора: IllegalStateException",
                         "IllegalStateException", "нет"));
+    }
+
+    /**
+     * Сервис исходов получает исход, каким сообщение было до попытки, а не после: разбор мог поменять сообщение, и по
+     * сравнению с ним сервис отличает откаченную попытку от зафиксированной.
+     */
+    @Test
+    void failedImport_reportsTheOutcomeReadBeforeTheAttempt() {
+        InboundMessage message = received();
+        InboundOutcome beforeAttempt = message.outcome();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        doAnswer(invocation -> {
+            message.markAwaitingParent(new AwaitedParent(ParentKind.CONTRAGENT, UUID.randomUUID()), null, NOW);
+            throw new CannotAcquireLockException("lock");
+        }).when(importService).importMessage(message);
+
+        scheduler().importPendingMessages();
+
+        verify(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()),
+                eq(beforeAttempt), any());
     }
 
     /** Временный отказ базы идёт на повтор: в причину и в журнал — тип и SQLSTATE, без текста отказа. */
@@ -285,10 +310,10 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordTemporaryFailure(message.receipt().messageId(), new ParseFailure.Temporary(
-                "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
-                "CannotAcquireLockException", "55P03"));
-        verify(inboundMessageService, never()).recordPermanentFailure(any(), any());
+        verify(inboundMessageService).recordTemporaryFailure(message.receipt().messageId(), message.outcome(),
+                new ParseFailure.Temporary("временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
+                        "CannotAcquireLockException", "55P03"));
+        verify(inboundMessageService, never()).recordPermanentFailure(any(), any(), any());
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage()).isEqualTo("временная ошибка разбора сообщения "

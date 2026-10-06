@@ -151,7 +151,7 @@ class ReferenceImportStreamOrderTest {
         InboundMessage next = received(OneCStream.MKB10);
         due(head, next);
         doThrow(new OneCFieldException("нет обязательного поля name")).when(importService).importMessage(head);
-        when(inboundMessageService.recordPermanentFailure(eq(head.receipt().messageId()), any()))
+        when(inboundMessageService.recordPermanentFailure(eq(head.receipt().messageId()), any(), any()))
                 .thenReturn(InboundStatus.FAILED);
         when(importService.importMessage(next)).thenReturn(applied());
 
@@ -182,7 +182,8 @@ class ReferenceImportStreamOrderTest {
 
     private void headFailsTemporarily(InboundMessage head, InboundStatus recorded) {
         doThrow(new CannotAcquireLockException("lock")).when(importService).importMessage(head);
-        when(inboundMessageService.recordTemporaryFailure(eq(head.receipt().messageId()), any())).thenReturn(recorded);
+        when(inboundMessageService.recordTemporaryFailure(eq(head.receipt().messageId()), any(), any()))
+                .thenReturn(recorded);
     }
 
     private ReferenceImportScheduler scheduler() {
