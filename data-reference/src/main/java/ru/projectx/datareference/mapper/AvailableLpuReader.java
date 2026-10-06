@@ -23,15 +23,16 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Читает из сообщения о страховой программе перечень учреждений, куда по ней можно поехать.
  *
- * <p>Строка перечня остаётся, только если её санаторий есть в справочнике и у неё указан тип
+ * <p>Строка перечня остаётся, только если её санаторий есть в справочнике и у неё ровно один тип
  * покрытия. Санаторий может отсутствовать, потому что не прошёл фильтр РВЛ или ещё не пришёл
- * из 1С. Тип покрытия может отсутствовать, потому что источник не проставил ни рисковую, ни
- * депозитную часть. Обе причины считаются порознь: первая лечится порядком загрузки и настройкой
+ * из 1С. Тип покрытия неизвестен, когда источник не проставил ни рисковую, ни депозитную часть
+ * или проставил обе. Причины считаются порознь: первая лечится порядком загрузки и настройкой
  * фильтра, вторая требует вопроса к 1С, и по общему счётчику выбрать между ними нельзя.
  *
- * <p>У строки, которая остаётся, обязательны номер слоя, признак прямого прикрепления и процент сооплаты: по ним
- * сервис Договоров выпускает договор. Нет хотя бы одного или тип не тот — отклоняется всё сообщение, чтобы программа
- * не сохранилась с условиями, которых источник не присылал. Строки, которые и так отбрасываются, их не проверяют.
+ * <p>У строки, которая остаётся, обязательны номер слоя не меньше нуля, признак прямого прикрепления и процент
+ * сооплаты от 0 до 100: по ним сервис Договоров выпускает договор. Нет хотя бы одного, тип не тот или значение за
+ * пределом — отклоняется всё сообщение, чтобы программа не сохранилась с условиями, которых источник не задавал.
+ * Строки, которые и так отбрасываются, их не проверяют.
  */
 @Component
 public class AvailableLpuReader {
@@ -49,6 +50,7 @@ public class AvailableLpuReader {
      * Перечень учреждений программы и счётчики отброшенных строк.
      *
      * @throws ru.projectx.datareference.exception.OneCFieldException если у остающейся строки нет обязательного условия
+     *         или оно за пределом
      */
     public AvailableLpu read(ObjectNode data) {
         List<JsonNode> received = StreamSupport.stream(data.path(SERVICE).spliterator(), false).toList();
@@ -91,22 +93,22 @@ public class AvailableLpuReader {
                 uuidOrNull(row, "idTreatment"),
                 dateOrNull(row, "beginDate"),
                 dateOrNull(row, "endDate"),
-                OneCRequiredValues.integer(row, "numberLayer"),
+                OneCRequiredValues.nonNegativeInteger(row, "numberLayer"),
                 OneCRequiredValues.flag(row, "directAttachment"),
-                OneCRequiredValues.amount(row, "percentCopayment"),
+                OneCRequiredValues.percent(row, "percentCopayment"),
                 coverage.get()));
     }
 
     /**
-     * Рисковая и депозитная части взаимоисключающие, но источник не обещает, что выставлен ровно
-     * один флаг. Строка без типа покрытия смысла не имеет: она отбрасывается и попадает в счётчик,
-     * а не сохраняется с придуманным значением.
+     * Тип покрытия есть, только когда выставлен ровно один из флагов рисковой и депозитной части. Строка без флагов
+     * или с обоими отбрасывается и попадает в счётчик, а не сохраняется с выбранным за источник типом.
      */
     private static Optional<ProgramLpu.CoverageType> coverageTypeOf(JsonNode row) {
-        if (OneCValues.flag(row, "r")) {
-            return Optional.of(ProgramLpu.CoverageType.R);
+        boolean risk = OneCValues.flag(row, "r");
+        if (risk == OneCValues.flag(row, "d")) {
+            return Optional.empty();
         }
-        return OneCValues.flag(row, "d") ? Optional.of(ProgramLpu.CoverageType.D) : Optional.empty();
+        return Optional.of(risk ? ProgramLpu.CoverageType.R : ProgramLpu.CoverageType.D);
     }
 
     /**

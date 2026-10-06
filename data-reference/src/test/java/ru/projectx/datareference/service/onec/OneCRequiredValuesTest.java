@@ -86,6 +86,50 @@ class OneCRequiredValuesTest {
         assertThat(OneCRequiredValues.amount(node("{\"share\":0}"), "share")).isZero();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "1", "2147483647"})
+    void zeroOrPositiveInteger_isReadAsNonNegative(String value) {
+        assertThat(OneCRequiredValues.nonNegativeInteger(node("{\"layer\":" + value + "}"), "layer"))
+                .isEqualTo(Integer.parseInt(value));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-1", "-2147483648"})
+    void negativeInteger_isRejectedWithoutValue(String value) {
+        assertThatThrownBy(() -> OneCRequiredValues.nonNegativeInteger(node("{\"layer\":" + value + "}"), "layer"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layer отрицательное");
+    }
+
+    @Test
+    void nonNegativeInteger_keepsTheTypeRule() {
+        assertThatThrownBy(() -> OneCRequiredValues.nonNegativeInteger(node("{\"layer\":\"1\"}"), "layer"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layer не является целым числом");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "0.00", "0.01", "55.5", "99.99", "100", "100.00"})
+    void percentFromZeroToHundred_isReadAsSent(String value) {
+        assertThat(OneCRequiredValues.percent(node("{\"share\":" + value + "}"), "share"))
+                .isEqualByComparingTo(value);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"-0.01", "-1", "100.01", "101", "1000"})
+    void percentOutsideZeroToHundred_isRejectedWithoutValue(String value) {
+        assertThatThrownBy(() -> OneCRequiredValues.percent(node("{\"share\":" + value + "}"), "share"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле share вне диапазона от 0 до 100");
+    }
+
+    @Test
+    void percent_keepsTheTypeRule() {
+        assertThatThrownBy(() -> OneCRequiredValues.percent(node("{\"share\":\"10\"}"), "share"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле share не является числом");
+    }
+
     private static ObjectNode node(String json) {
         return (ObjectNode) JSON.readTree(json);
     }
