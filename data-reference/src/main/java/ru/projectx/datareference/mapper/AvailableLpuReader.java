@@ -3,7 +3,6 @@ package ru.projectx.datareference.mapper;
 import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
 import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,6 +15,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.service.onec.OneCRequiredValues;
 import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -28,6 +28,10 @@ import tools.jackson.databind.node.ObjectNode;
  * из 1С. Тип покрытия может отсутствовать, потому что источник не проставил ни рисковую, ни
  * депозитную часть. Обе причины считаются порознь: первая лечится порядком загрузки и настройкой
  * фильтра, вторая требует вопроса к 1С, и по общему счётчику выбрать между ними нельзя.
+ *
+ * <p>У строки, которая остаётся, обязательны номер слоя, признак прямого прикрепления и процент сооплаты: по ним
+ * сервис Договоров выпускает договор. Нет хотя бы одного или тип не тот — отклоняется всё сообщение, чтобы программа
+ * не сохранилась с условиями, которых источник не присылал. Строки, которые и так отбрасываются, их не проверяют.
  */
 @Component
 public class AvailableLpuReader {
@@ -41,7 +45,11 @@ public class AvailableLpuReader {
         this.lpuRepository = lpuRepository;
     }
 
-    /** Перечень учреждений программы и счётчики отброшенных строк. */
+    /**
+     * Перечень учреждений программы и счётчики отброшенных строк.
+     *
+     * @throws ru.projectx.datareference.exception.OneCFieldException если у остающейся строки нет обязательного условия
+     */
     public AvailableLpu read(ObjectNode data) {
         List<JsonNode> received = StreamSupport.stream(data.path(SERVICE).spliterator(), false).toList();
         Map<UUID, Lpu> sanatoriums = sanatoriumsOf(received);
@@ -83,9 +91,9 @@ public class AvailableLpuReader {
                 uuidOrNull(row, "idTreatment"),
                 dateOrNull(row, "beginDate"),
                 dateOrNull(row, "endDate"),
-                OneCValues.integer(row, "numberLayer").orElse(0),
-                OneCValues.flag(row, "directAttachment"),
-                OneCValues.amount(row, "percentCopayment").orElse(BigDecimal.ZERO),
+                OneCRequiredValues.integer(row, "numberLayer"),
+                OneCRequiredValues.flag(row, "directAttachment"),
+                OneCRequiredValues.amount(row, "percentCopayment"),
                 coverage.get()));
     }
 
