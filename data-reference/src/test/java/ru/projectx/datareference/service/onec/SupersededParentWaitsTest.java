@@ -47,13 +47,25 @@ class SupersededParentWaitsTest {
         when(waits.findAwaitingOfRecordBefore(OneCStream.LPU_CONTRACTS, RECORD, RECEIVED_AT))
                 .thenReturn(List.of(oldest, older));
 
-        superseded.closeOlderThan(newer, RECORD);
+        superseded.closeOlderThan(newer, RECORD, "применено");
 
         String reason = "по записи " + RECORD + " уже применено более новое сообщение " + NEWER_ID;
         assertThat(List.of(oldest, older)).allSatisfy(message -> assertThat(message.outcome())
                 .isEqualTo(new InboundOutcome(InboundStatus.SKIPPED, 0, null, reason, NOW, null)));
         assertThat(registry.get(InboundTransitionMetrics.TRANSITIONS)
                 .tags("stream", "LPU_CONTRACTS", "status", "SKIPPED").counter().count()).isEqualTo(2);
+    }
+
+    @Test
+    void skippedNewerMessage_isNamedSkippedInTheReason() {
+        InboundReceipt newer = new InboundReceipt(NEWER_ID, OneCStream.LPU_CONTRACTS, QUEUE, RECEIVED_AT);
+        InboundMessage older = waiting(UUID.randomUUID());
+        when(waits.findAwaitingOfRecordBefore(OneCStream.LPU_CONTRACTS, RECORD, RECEIVED_AT)).thenReturn(List.of(older));
+
+        superseded.closeOlderThan(newer, RECORD, "пропущено");
+
+        assertThat(older.outcome().lastError())
+                .isEqualTo("по записи " + RECORD + " уже пропущено более новое сообщение " + NEWER_ID);
     }
 
     private static InboundMessage waiting(UUID messageId) {

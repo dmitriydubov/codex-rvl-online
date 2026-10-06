@@ -80,7 +80,7 @@ class MappedStreamHandlerTest {
         handler().handle(message, data);
 
         verify(inboundMessageService).markProcessed(MESSAGE_ID);
-        verify(supersededWaits).closeOlderThan(message.receipt(), RECORD);
+        verify(supersededWaits).closeOlderThan(message.receipt(), RECORD, "применено");
     }
 
     @Test
@@ -93,6 +93,19 @@ class MappedStreamHandlerTest {
         verify(inboundMessageService).markSkipped(MESSAGE_ID, "не санаторий");
         verifyNoMoreInteractions(inboundMessageService);
         verifyNoInteractions(supersededWaits);
+    }
+
+    /** Пропущенное более новое сообщение записи тоже решает за её старые ожидающие сообщения. */
+    @Test
+    void skippedMessageOfARecord_closesOlderWaitingMessagesOfThatRecord() {
+        when(mapper.apply(data)).thenReturn(ImportResult.skipped("договор не нашего контрагента"));
+        when(mapper.recordOf(data)).thenReturn(Optional.of(RECORD));
+        InboundMessage message = message();
+
+        handler().handle(message, data);
+
+        verify(inboundMessageService).markSkipped(MESSAGE_ID, "договор не нашего контрагента");
+        verify(supersededWaits).closeOlderThan(message.receipt(), RECORD, "пропущено");
     }
 
     @Test

@@ -9,7 +9,6 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.config.ParentWaitProperties;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
@@ -30,19 +29,16 @@ public class ParentWaitExpiry {
     private final ParentWaitRepository waits;
     private final InboundMessageRepository inbound;
     private final InboundTransitionMetrics transitions;
-    private final ParentWaitProperties waitProperties;
-    private final ImportProperties importProperties;
+    private final ImportProperties properties;
     private final Clock clock;
 
     public ParentWaitExpiry(ParentWaitRepository waits, InboundMessageRepository inbound,
-            InboundTransitionMetrics transitions, ParentWaitProperties waitProperties,
-            ImportProperties importProperties, Clock clock) {
+            InboundTransitionMetrics transitions, ImportProperties properties, Clock clock) {
 
         this.waits = waits;
         this.inbound = inbound;
         this.transitions = transitions;
-        this.waitProperties = waitProperties;
-        this.importProperties = importProperties;
+        this.properties = properties;
         this.clock = clock;
     }
 
@@ -57,8 +53,8 @@ public class ParentWaitExpiry {
      */
     @Transactional
     public List<ExpiredParentWait> expireOverdue() {
-        Instant deadline = clock.instant().minus(waitProperties.parentWaitTimeout());
-        List<InboundMessage> overdue = waits.findExpiredUnresolved(deadline, Limit.of(importProperties.batchSize()))
+        Instant deadline = clock.instant().minus(properties.parentWaitTimeout());
+        List<InboundMessage> overdue = waits.findExpiredUnresolved(deadline, Limit.of(properties.batchSize()))
                 .stream()
                 .flatMap(this::withTransferParts)
                 .distinct()

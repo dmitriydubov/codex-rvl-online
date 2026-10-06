@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Limit;
-import ru.projectx.datareference.config.ParentWaitProperties;
 import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
@@ -47,7 +46,7 @@ class ParentWaitExpiryTest {
     private final InboundMessageRepository inbound = mock(InboundMessageRepository.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final ParentWaitExpiry expiry = new ParentWaitExpiry(waits, inbound, new InboundTransitionMetrics(registry),
-            new ParentWaitProperties(TIMEOUT, 20), ImportSettings.defaults().batchSize(BATCH_SIZE).build(),
+            ImportSettings.defaults().batchSize(BATCH_SIZE).parentWaitTimeout(TIMEOUT).build(),
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test

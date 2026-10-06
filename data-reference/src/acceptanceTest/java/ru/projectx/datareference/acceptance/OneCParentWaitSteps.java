@@ -9,7 +9,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
-import ru.projectx.datareference.config.ParentWaitProperties;
+import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
@@ -28,9 +28,9 @@ public class OneCParentWaitSteps {
 
     private final OneCInbox inbox;
     private final ReferenceImportScheduler scheduler;
-    private final ParentWaitProperties properties;
+    private final ImportProperties properties;
 
-    public OneCParentWaitSteps(OneCInbox inbox, ReferenceImportScheduler scheduler, ParentWaitProperties properties) {
+    public OneCParentWaitSteps(OneCInbox inbox, ReferenceImportScheduler scheduler, ImportProperties properties) {
         this.inbox = inbox;
         this.scheduler = scheduler;
         this.properties = properties;

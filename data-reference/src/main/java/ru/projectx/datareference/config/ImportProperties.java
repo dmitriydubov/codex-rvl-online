@@ -1,5 +1,6 @@
 package ru.projectx.datareference.config;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
 import org.hibernate.validator.constraints.time.DurationMin;
@@ -9,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Настройки трёх задач по расписанию, которые работают с таблицей сырых сообщений: разбора сообщений,
- * стирания персональных данных и проверки зависших многочастных передач.
+ * стирания персональных данных и проверки зависших многочастных передач, а также ожидания родителя при разборе.
  *
  * <p>Интервалы задаются паузой между проходами: следующий проход начинается через заданное время после
  * окончания предыдущего, поэтому долгий проход не накладывается сам на себя. Нулевая или отрицательная
@@ -44,6 +45,14 @@ import org.springframework.validation.annotation.Validated;
  *                приёма. Тело не разобрано, и по имени очереди нельзя поручиться, что в нём нет персональных
  *                данных, поэтому срок один для всех очередей и по умолчанию равен сроку тела полиса. Меньше суток
  *                не допускается: карантин разбирает человек, и ему нужно успеть увидеть тело
+ * @param parentWaitTimeout сколько сообщение, пришедшее раньше своего родителя, ждёт его, считая от начала ожидания,
+ *                прежде чем будет отклонено. Сутки покрывают первичную выгрузку, которую 1С присылает многими очередями
+ *                сразу. Срок должен быть меньше срока хранения тела: тело ожидающего сообщения не стирается, и при
+ *                сроке ожидания длиннее тело с персональными данными жило бы дольше положенного, поэтому иное
+ *                соотношение не пускает сервис в работу
+ * @param parentWaitReportLimit сколько GUID родителей, первых по порядку приёма, называет запись журнала об истёкших
+ *                ожиданиях потока. При массовой выгрузке истекают тысячи сообщений, и строка со всеми GUID была бы
+ *                нечитаемой; число истёкших запись называет всегда
  */
 @Validated
 @ConfigurationProperties("projectx.import")
@@ -57,5 +66,14 @@ public record ImportProperties(
         @DefaultValue("30d") @DurationMin(days = 1) Duration payloadTtl,
         @DefaultValue("1h") @DurationMin(millis = 1) Duration retentionPollInterval,
         @DefaultValue("500") @Positive int retentionBatchSize,
-        @DefaultValue("30d") @DurationMin(days = 1) Duration quarantineTtl) {
+        @DefaultValue("30d") @DurationMin(days = 1) Duration quarantineTtl,
+        @DefaultValue("24h") @DurationMin(millis = 1) Duration parentWaitTimeout,
+        @DefaultValue("20") @Positive int parentWaitReportLimit) {
+
+    /** Срок ожидания родителя короче срока хранения тела, иначе тела ожидающих сообщений переживали бы свой срок. */
+    @AssertTrue(message = "срок ожидания родителя (parent-wait-timeout) должен быть меньше срока хранения тела "
+            + "(payload-ttl)")
+    public boolean isParentWaitShorterThanPayloadTtl() {
+        return parentWaitTimeout.compareTo(payloadTtl) < 0;
+    }
 }

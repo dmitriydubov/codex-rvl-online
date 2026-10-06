@@ -12,11 +12,15 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Обычный путь сообщения 1С: маппер потока разбирает его, а исход записывается в ту же строку сырья.
  *
- * <p>Применённое сообщение отмечается обработанным и закрывает более старые сообщения той же записи, которые ещё ждут
- * родителя. Пропущенное отмечается пропущенным с причиной от маппера. Сообщение, которое ссылается на ещё не
- * пришедшую запись, ждёт её. Так обрабатываются все потоки, у которых одно сообщение применяется само по себе.
+ * <p>Применённое сообщение отмечается обработанным, пропущенное — пропущенным с причиной от маппера. И то и другое
+ * закрывает более старые сообщения той же записи, которые ещё ждут родителя: последнее полученное решает за них.
+ * Сообщение, которое ссылается на ещё не пришедшую запись, ждёт её. Так обрабатываются все потоки, у которых одно
+ * сообщение применяется само по себе.
  */
 class MappedStreamHandler implements StreamHandler {
+
+    private static final String APPLIED = "применено";
+    private static final String SKIPPED = "пропущено";
 
     private final StreamMapper mapper;
     private final InboundMessageService inboundMessageService;
@@ -40,10 +44,13 @@ class MappedStreamHandler implements StreamHandler {
     public ImportOutcome handle(InboundMessage message, ObjectNode data) {
         UUID messageId = message.receipt().messageId();
         return switch (mapper.apply(data)) {
-            case ImportResult.Applied ignored -> applied(message, data);
+            case ImportResult.Applied ignored -> {
+                inboundMessageService.markProcessed(messageId);
+                yield closingOlderWaits(message, data, APPLIED, ImportOutcome.applied());
+            }
             case ImportResult.Skipped skipped -> {
                 inboundMessageService.markSkipped(messageId, skipped.reason());
-                yield ImportOutcome.skipped(skipped.reason());
+                yield closingOlderWaits(message, data, SKIPPED, ImportOutcome.skipped(skipped.reason()));
             }
             case ImportResult.AwaitingParent awaiting -> {
                 inboundMessageService.markAwaitingParent(messageId, awaiting.parent(), mapper.recordOf(data).orElse(null));
@@ -52,9 +59,11 @@ class MappedStreamHandler implements StreamHandler {
         };
     }
 
-    private ImportOutcome applied(InboundMessage message, ObjectNode data) {
-        inboundMessageService.markProcessed(message.receipt().messageId());
-        mapper.recordOf(data).ifPresent(record -> supersededWaits.closeOlderThan(message.receipt(), record));
-        return ImportOutcome.applied();
+    private ImportOutcome closingOlderWaits(
+            InboundMessage message, ObjectNode data, String newerOutcome, ImportOutcome outcome) {
+
+        mapper.recordOf(data)
+                .ifPresent(record -> supersededWaits.closeOlderThan(message.receipt(), record, newerOutcome));
+        return outcome;
     }
 }

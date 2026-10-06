@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.config.ParentWaitProperties;
+import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.metrics.ParentWaitMetrics;
 import ru.projectx.datareference.service.onec.ExpiredParentWait;
@@ -31,9 +31,9 @@ public class OverdueParentWaits {
 
     private final ParentWaitExpiry expiry;
     private final ParentWaitMetrics metrics;
-    private final ParentWaitProperties properties;
+    private final ImportProperties properties;
 
-    public OverdueParentWaits(ParentWaitExpiry expiry, ParentWaitMetrics metrics, ParentWaitProperties properties) {
+    public OverdueParentWaits(ParentWaitExpiry expiry, ParentWaitMetrics metrics, ImportProperties properties) {
         this.expiry = expiry;
         this.metrics = metrics;
         this.properties = properties;

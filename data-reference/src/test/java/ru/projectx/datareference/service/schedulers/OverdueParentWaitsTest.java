@@ -9,7 +9,6 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -17,13 +16,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import ru.projectx.datareference.config.ParentWaitProperties;
 import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.service.metrics.ParentWaitMetrics;
 import ru.projectx.datareference.service.onec.ExpiredParentWait;
 import ru.projectx.datareference.service.onec.ParentWaitExpiry;
+import ru.projectx.datareference.support.ImportSettings;
 
 /**
  * Защищает журнал и метрику истёкших ожиданий. При массовой выгрузке истекают тысячи сообщений, поэтому журнал
@@ -40,7 +39,7 @@ class OverdueParentWaitsTest {
     private final ParentWaitExpiry expiry = mock(ParentWaitExpiry.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final OverdueParentWaits overdue = new OverdueParentWaits(expiry, new ParentWaitMetrics(registry),
-            new ParentWaitProperties(Duration.ofHours(24), REPORT_LIMIT));
+            ImportSettings.defaults().parentWaitReportLimit(REPORT_LIMIT).build());
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
     @BeforeEach

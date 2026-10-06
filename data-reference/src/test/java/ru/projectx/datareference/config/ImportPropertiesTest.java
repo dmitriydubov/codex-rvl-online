@@ -91,9 +91,10 @@ class ImportPropertiesTest {
                         .rootCause().hasMessageContaining("payloadTtl"));
     }
 
+    /** Сутки — наименьший срок хранения; срок ожидания родителя тогда должен быть короче суток. */
     @Test
     void payloadTtlOfOneDay_isAccepted() {
-        context.withPropertyValues("projectx.import.payload-ttl=1d")
+        context.withPropertyValues("projectx.import.payload-ttl=1d", "projectx.import.parent-wait-timeout=12h")
                 .run(started -> assertThat(started.getBean(ImportProperties.class).payloadTtl())
                         .isEqualTo(Duration.ofDays(1)));
     }
@@ -152,6 +153,57 @@ class ImportPropertiesTest {
         context.withPropertyValues("projectx.import.initial-delay=soon")
                 .run(started -> assertThat(started).getFailure()
                         .cause().hasMessageContaining("projectx.import.initial-delay"));
+    }
+
+    @Test
+    void parentWait_defaultsToADayAndTwentyParents() {
+        context.run(started -> {
+            ImportProperties properties = started.getBean(ImportProperties.class);
+            assertThat(properties.parentWaitTimeout()).isEqualTo(Duration.ofHours(24));
+            assertThat(properties.parentWaitReportLimit()).isEqualTo(20);
+        });
+    }
+
+    @Test
+    void parentWait_isBoundFromItsProperties() {
+        context.withPropertyValues("projectx.import.parent-wait-timeout=36h",
+                        "projectx.import.parent-wait-report-limit=5")
+                .run(started -> {
+                    ImportProperties properties = started.getBean(ImportProperties.class);
+                    assertThat(properties.parentWaitTimeout()).isEqualTo(Duration.ofHours(36));
+                    assertThat(properties.parentWaitReportLimit()).isEqualTo(5);
+                });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"parent-wait-timeout=0s,parentWaitTimeout", "parent-wait-report-limit=0,parentWaitReportLimit"})
+    void zeroParentWaitSetting_failsStartup(String setting, String component) {
+        context.withPropertyValues("projectx.import." + setting)
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining(component));
+    }
+
+    /**
+     * Тело ожидающего сообщения не стирается, поэтому срок ожидания не дольше срока хранения тела не пускает сервис в
+     * работу, и ошибка называет оба свойства. Срок на волос короче срока хранения допустим.
+     */
+    @ParameterizedTest
+    @CsvSource({"30d,30d,false", "31d,30d,false", "2d,1d,false", "29d,30d,true", "PT719H59M59S,30d,true"})
+    void parentWaitAgainstPayloadTtl_decidesTheStartup(String timeout, String payloadTtl, boolean starts) {
+        context.withPropertyValues("projectx.import.parent-wait-timeout=" + timeout,
+                        "projectx.import.payload-ttl=" + payloadTtl)
+                .run(started -> {
+                    if (starts) {
+                        assertThat(started).hasNotFailed();
+                        return;
+                    }
+                    assertThat(started).getFailure()
+                            .hasRootCauseInstanceOf(BindValidationException.class)
+                            .rootCause()
+                            .hasMessageContaining("parent-wait-timeout")
+                            .hasMessageContaining("payload-ttl");
+                });
     }
 
     @EnableConfigurationProperties(ImportProperties.class)

@@ -5,7 +5,7 @@ import ru.projectx.datareference.config.ImportProperties;
 
 /**
  * Настройки задач по расписанию для unit-тестов: умолчания сервиса, из которых тест меняет только то, что
- * проверяет. Так тест не перечисляет девять значений по порядку и не ломается, когда настроек становится
+ * проверяет. Так тест не перечисляет все значения по порядку и не ломается, когда настроек становится
  * больше.
  */
 public final class ImportSettings {
@@ -20,6 +20,8 @@ public final class ImportSettings {
     private Duration retentionPollInterval = Duration.ofHours(1);
     private int retentionBatchSize = 500;
     private Duration quarantineTtl = Duration.ofDays(30);
+    private Duration parentWaitTimeout = Duration.ofHours(24);
+    private int parentWaitReportLimit = 20;
 
     private ImportSettings() {
     }
@@ -78,9 +80,19 @@ public final class ImportSettings {
         return this;
     }
 
+    public ImportSettings parentWaitTimeout(Duration value) {
+        parentWaitTimeout = value;
+        return this;
+    }
+
+    public ImportSettings parentWaitReportLimit(int value) {
+        parentWaitReportLimit = value;
+        return this;
+    }
+
     public ImportProperties build() {
         return new ImportProperties(pollInterval, initialDelay, batchSize, stuckTransferThreshold,
                 stuckTransferPollInterval, stuckTransferReportLimit, payloadTtl, retentionPollInterval,
-                retentionBatchSize, quarantineTtl);
+                retentionBatchSize, quarantineTtl, parentWaitTimeout, parentWaitReportLimit);
     }
 }

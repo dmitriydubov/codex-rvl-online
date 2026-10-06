@@ -10,11 +10,12 @@ import ru.projectx.datareference.repository.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 /**
- * Закрывает сообщения, которые ждут родителя, когда применилось более новое сообщение той же записи справочника.
+ * Закрывает сообщения, которые ждут родителя, когда более новое сообщение той же записи справочника применено или
+ * пропущено.
  *
  * <p>Версий у сообщений 1С нет, и в справочнике действует последнее полученное. Старое сообщение, применённое после
- * прихода родителя, затёрло бы более новые данные. Поэтому оно закрывается пропуском с причиной, которая называет
- * запись и более новое сообщение.
+ * прихода родителя, затёрло бы более новые данные или вернуло бы запись, которую 1С уже назвала чужой. Поэтому оно
+ * закрывается пропуском с причиной, которая называет запись и более новое сообщение.
  */
 @Component
 class SupersededParentWaits {
@@ -30,15 +31,18 @@ class SupersededParentWaits {
     }
 
     /**
-     * Пропускает сообщения потока применённого сообщения о записи {@code record}, принятые раньше него и ждущие
-     * родителя. Работает в транзакции вызывающего: пропуск фиксируется вместе с применением.
+     * Пропускает сообщения потока более нового сообщения о записи {@code record}, принятые раньше него и ждущие
+     * родителя. Работает в транзакции вызывающего: пропуск фиксируется вместе с исходом более нового сообщения.
      *
      * <p>Обычный цикл, а не стрим: каждый шаг меняет сообщение.
+     *
+     * @param newerOutcome что стало с более новым сообщением, как это звучит в причине: «применено» или «пропущено»
      */
     @Transactional
-    void closeOlderThan(InboundReceipt applied, UUID record) {
-        String reason = "по записи %s уже применено более новое сообщение %s".formatted(record, applied.messageId());
-        for (InboundMessage older : waits.findAwaitingOfRecordBefore(applied.stream(), record, applied.receivedAt())) {
+    void closeOlderThan(InboundReceipt newer, UUID record, String newerOutcome) {
+        String reason = "по записи %s уже %s более новое сообщение %s"
+                .formatted(record, newerOutcome, newer.messageId());
+        for (InboundMessage older : waits.findAwaitingOfRecordBefore(newer.stream(), record, newer.receivedAt())) {
             older.markSkipped(reason, clock.instant());
             transitions.record(older);
         }
