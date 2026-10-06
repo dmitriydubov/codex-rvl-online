@@ -68,7 +68,12 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    without the plan, the ТЗ or gauntlet - must understand what the thing is and why from the comment
    alone. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
    dash chains, «см. раздел … в CLAUDE.md», restated code, edit history («после PR #25»). Old Javadoc in
-   an untouched file is not a finding; old Javadoc in a touched file is.
+   an untouched file is not a finding; old Javadoc in a touched file is. The same applies to comments in
+   configuration files that go to the company network (`application.yml`, `Dockerfile`,
+   `docker-compose.yml`, Liquibase changeSets, `build.gradle`; owner's rule of 2026-10-06): one or two
+   sentences on why the value is what it is, no restated key or value, no document codes. A change that only
+   rewrites such comments must prove that values, keys and instructions did not change (YAML tree, `docker
+   compose config`, Dockerfile lines without comments) - flag a missing proof.
 
 ## Output (exactly this shape)
 ```
