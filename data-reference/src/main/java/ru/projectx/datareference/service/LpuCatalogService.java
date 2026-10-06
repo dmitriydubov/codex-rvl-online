@@ -8,7 +8,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
@@ -29,6 +31,8 @@ import ru.projectx.datareference.service.PriceContractResolver.Resolution;
  * одна кривая строка в 1С не должна класть каталог целиком для всех пользователей
  * договора (В-6). В точечных ручках (карточка, услуги) то же — отказ {@code 409} или
  * {@code 422}: там ответ по одному ЛПУ, и подменить его нечем.
+ *
+ * <p>Каталог кэшируется по сегодняшнему дню контура и договору.
  */
 @Service
 public class LpuCatalogService implements LpuCatalogReads {
@@ -59,6 +63,7 @@ public class LpuCatalogService implements LpuCatalogReads {
     }
 
     @Override
+    @Cacheable(cacheNames = ReferenceCaches.LPU_CATALOG, keyGenerator = ReferenceCaches.TODAY_KEY)
     @RestReadTransaction
     public LpuCatalogResponse catalog(UUID contractExternalId) {
         insuranceContracts.findByExternalIdAndArchiveFalse(contractExternalId)

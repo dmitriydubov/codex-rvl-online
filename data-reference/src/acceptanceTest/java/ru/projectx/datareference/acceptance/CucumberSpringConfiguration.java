@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.datareference.config.OneCQueueProperties;
@@ -36,8 +37,10 @@ import ru.projectx.datareference.config.OneCQueueProperties;
  * <p>Недоступность базы сценарии изображают переключателем источника соединений
  * ({@link SwitchableDataSource}): остановить саму базу нельзя, она одна на все сценарии.
  *
- * <p>Контекст и контейнеры общие на все сценарии, поэтому перед каждым сценарием база
- * очищается ({@link DatabaseCleanupHook}), а состояние сценария живёт в бинах
+ * <p>Время сервиса — часы стенда ({@link StandClock}): идут как системные, пока сценарий их не остановит.
+ *
+ * <p>Контекст и контейнеры общие на все сценарии, поэтому перед каждым сценарием база и кэши ответов
+ * очищаются ({@link DatabaseCleanupHook}), а состояние сценария живёт в бинах
  * {@code @ScenarioScope} ({@link ContractsService}, {@link OneCInbox}, {@link OneCBroker}).
  */
 @CucumberContextConfiguration
@@ -67,6 +70,16 @@ public class CucumberSpringConfiguration {
         @ServiceConnection
         RabbitMQContainer rabbitContainer() {
             return new RabbitMQContainer(RABBITMQ_IMAGE);
+        }
+
+        /**
+         * Часы сервиса, которыми управляют шаги сценария ({@link ClockSteps}). Приоритетный кандидат выигрывает
+         * инъекцию {@link java.time.Clock} по типу у часов из конфигурации сервиса.
+         */
+        @Bean
+        @Primary
+        StandClock standClock() {
+            return new StandClock();
         }
 
         /** Справки об очередях для шагов сценария; очередей сам не объявляет — бинов очередей в контексте нет. */

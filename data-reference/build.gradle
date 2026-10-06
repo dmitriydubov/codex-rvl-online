@@ -124,6 +124,10 @@ dependencies {
     // spring-boot-micrometer-metrics, который уже приходит с актуатором, — он включается, как только
     // на classpath появляется реестр Prometheus. Версия — из BOM Spring Boot.
     implementation 'io.micrometer:micrometer-registry-prometheus'
+    // Кэш ответов справочных ручек: стандартный кэш Spring, хранилище в памяти процесса — Caffeine
+    // (срок жизни, предел размера, статистика для метрик). Версии — из BOM Spring Boot.
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     // @Nullable в сигнатурах. Аннотации нужны и в рантайме — Spring 7 читает их сам.
     implementation 'org.jspecify:jspecify'
     // Jackson 3 — тот, что приносит Boot 4. Явно, а не транзитивно: на нём написан
