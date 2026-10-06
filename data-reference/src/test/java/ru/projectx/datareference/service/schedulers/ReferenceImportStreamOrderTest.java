@@ -182,7 +182,8 @@ class ReferenceImportStreamOrderTest {
 
     private void headFailsTemporarily(InboundMessage head, InboundStatus recorded) {
         doThrow(new CannotAcquireLockException("lock")).when(importService).importMessage(head);
-        when(inboundMessageService.recordTemporaryFailure(eq(head.receipt().messageId()), any(), any())).thenReturn(recorded);
+        when(inboundMessageService.recordTemporaryFailure(eq(head.receipt().messageId()), any(), any()))
+                .thenReturn(recorded);
     }
 
     private ReferenceImportScheduler scheduler() {

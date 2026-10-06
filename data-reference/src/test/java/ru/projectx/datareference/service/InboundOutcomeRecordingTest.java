@@ -118,7 +118,8 @@ class InboundOutcomeRecordingTest {
         InboundMessage message = existing();
         message.markAwaitingParent(PARENT, null, RECEIVED_AT);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT))
+                .isEqualTo(InboundStatus.RETRY);
         assertThat(message.outcome().nextRetryAt()).isEqualTo(NOW.plus(BACKOFF.get(0)));
     }
 
@@ -205,7 +206,8 @@ class InboundOutcomeRecordingTest {
         InboundMessage sibling = InboundMessage.receive(
                 new InboundReceipt(UUID.randomUUID(), OneCStream.MKB10, QUEUE, RECEIVED_AT), PAYLOAD);
 
-        InboundStatus status = service(scopeFailing(sibling)).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
+        InboundStatus status =
+                service(scopeFailing(sibling)).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT);
 
         assertThat(status).isEqualTo(InboundStatus.FAILED);
         assertThat(message.outcome().lastError()).isEqualTo("повторы исчерпаны на попытке 3: " + ERROR);
@@ -220,7 +222,8 @@ class InboundOutcomeRecordingTest {
         RejectionScope scope = mock(RejectionScope.class);
         when(scope.stream()).thenReturn(OneCStream.MKB10);
 
-        assertThat(service(scope).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service(scope).recordTemporaryFailure(MESSAGE_ID, unchanged(), LOCK_TIMEOUT))
+                .isEqualTo(InboundStatus.RETRY);
         verify(scope, never()).reject(any(), any());
         assertThat(transitions()).containsExactly("RETRY");
     }

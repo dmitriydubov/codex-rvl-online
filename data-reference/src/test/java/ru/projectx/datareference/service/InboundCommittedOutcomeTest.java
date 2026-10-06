@@ -113,7 +113,8 @@ class InboundCommittedOutcomeTest {
     void temporaryFailureAfterBuffered_keepsTheOutcome() {
         existing().markBuffered(UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000cc"), 2, 10);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, NEW, CONNECTION_LOST)).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, NEW, CONNECTION_LOST))
+                .isEqualTo(InboundStatus.BUFFERED);
     }
 
     @Test
@@ -190,7 +191,8 @@ class InboundCommittedOutcomeTest {
         InboundMessage message = existing();
         message.markRetrying("первая ошибка", NOW);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST))
+                .isEqualTo(InboundStatus.RETRY);
         assertThat(message.outcome().attempt()).isEqualTo(2);
         assertThat(logged.list).isEmpty();
     }
@@ -201,7 +203,8 @@ class InboundCommittedOutcomeTest {
         message.markRetrying("первая ошибка", NOW);
         message.markRetrying("вторая ошибка", NOW);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST)).isEqualTo(InboundStatus.FAILED);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST))
+                .isEqualTo(InboundStatus.FAILED);
     }
 
     @Test

@@ -103,6 +103,11 @@ public class InboundMessage {
     @Column(name = "parent_wait_since")
     private Instant parentWaitSince;
 
+    /**
+     * Эта колонка, GUID родителя и GUID записи справочника читаются только у сообщения, которое ждёт родителя, и
+     * переход в ожидание переписывает все три. Поэтому переходы, которые забывают ожидание вручную возвращённого
+     * сообщения, стирают только начало ожидания: прежние значения трёх колонок до следующего ожидания никто не читает.
+     */
     @Nullable
     @Enumerated(EnumType.STRING)
     @Column(name = "awaited_parent_kind")

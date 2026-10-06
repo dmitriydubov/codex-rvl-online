@@ -102,8 +102,10 @@ class ReferenceImportPassTest {
     /** Сервис исходов сообщает, с каким статусом осталось сообщение; здесь — обычные статусы отказов. */
     @BeforeEach
     void recordFailuresAsUsual() {
-        lenient().when(inboundMessageService.recordTemporaryFailure(any(), any(), any())).thenReturn(InboundStatus.RETRY);
-        lenient().when(inboundMessageService.recordPermanentFailure(any(), any(), any())).thenReturn(InboundStatus.FAILED);
+        lenient().when(inboundMessageService.recordTemporaryFailure(any(), any(), any()))
+                .thenReturn(InboundStatus.RETRY);
+        lenient().when(inboundMessageService.recordPermanentFailure(any(), any(), any()))
+                .thenReturn(InboundStatus.FAILED);
     }
 
     @AfterEach
@@ -293,7 +295,8 @@ class ReferenceImportPassTest {
 
         scheduler().importPendingMessages();
 
-        verify(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()), eq(beforeAttempt), any());
+        verify(inboundMessageService).recordTemporaryFailure(eq(message.receipt().messageId()),
+                eq(beforeAttempt), any());
     }
 
     /** Временный отказ базы идёт на повтор: в причину и в журнал — тип и SQLSTATE, без текста отказа. */
