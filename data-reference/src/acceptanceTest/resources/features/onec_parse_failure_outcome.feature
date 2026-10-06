@@ -25,8 +25,11 @@
 #   [PG]     PostgreSQL 16 (исходники REL_16_STABLE): src/backend/utils/errcodes.txt — 55P03 lock_not_available.
 #   [ПЕРЕНОС] отказ базы по содержимому сообщения (22003) раньше закреплял здесь процент сооплаты программы больше
 #            999.99. С проверкой сооплаты «от 0 до 100» (onec_program_value_ranges.feature) такое сообщение отклоняет
-#            сам разбор, до базы оно не доходит. Отказ базы 22003 — окончательный, с типом и SQLSTATE — остаётся
-#            закреплён в onec_price_transfer_failure.feature (цена прайса больше 9999999999999.99).
+#            сам разбор, до базы оно не доходит. Затем его закрепляла цена прайса больше 9999999999999.99
+#            (onec_price_transfer_failure.feature); с задачей «Понятная причина отказа при слишком большой сумме из 1С»
+#            (2026-10-06) все денежные значения и проценты больше допустимого колонкой отклоняет разбор с причиной
+#            «поле X больше допустимого» (onec_money_integer_limit_*.feature). Отказ базы по содержимому сообщения —
+#            окончательный, с типом и SQLSTATE — из сообщения 1С:УСК больше не достижим и остаётся тестам кода.
 #   [ORM]    по байткоду из сборки: hibernate-core 7.2.19 (PostgreSQLDialect) — 55P03 → LockTimeoutException, класс 22
 #            без своего правила → DataException; spring-orm 7.0.8 (HibernateExceptionTranslator,
 #            EntityManagerFactoryUtils) — LockTimeoutException → CannotAcquireLockException (временный отказ),

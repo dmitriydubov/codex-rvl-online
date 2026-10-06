@@ -14,8 +14,9 @@ import ru.projectx.datareference.entity.OneCStream;
  */
 public class OneCMoneyScaleSteps {
 
-    private static final Map<String, BigDecimal> STEPS =
-            Map.of("на одну тысячную больше", OneCMoneyScaleMessages.ONE_THOUSANDTH);
+    private static final Map<String, BigDecimal> STEPS = Map.of(
+            "на одну тысячную больше", OneCMoneyScaleMessages.ONE_THOUSANDTH,
+            "на одну сотую больше", OneCMoneyLimitMessages.ONE_HUNDREDTH);
 
     private final OneCInbox inbox;
 

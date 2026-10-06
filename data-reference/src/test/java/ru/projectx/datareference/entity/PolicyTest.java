@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -22,6 +23,39 @@ class PolicyTest {
     private static final UUID FIRST_PROGRAM = UUID.fromString("6a1f0c3e-1b2d-4e7a-9c1b-000000000001");
     private static final UUID SECOND_PROGRAM = UUID.fromString("6a1f0c3e-1b2d-4e7a-9c1b-000000000002");
     private static final UUID THIRD_PROGRAM = UUID.fromString("6a1f0c3e-1b2d-4e7a-9c1b-000000000003");
+
+    @Test
+    void create_takesPolicyDetailsFromMessage() {
+        Policy.Details details = details("П-0001", "Тестов", LocalDate.of(2026, 12, 31), false);
+
+        Policy policy = Policy.create(UUID.randomUUID(), new Policy.Snapshot(details, List.of(), List.of()), CREATED);
+
+        assertThat(policy.details()).isEqualTo(details);
+        assertThat(policy.isArchive()).isFalse();
+    }
+
+    @Test
+    void detailsText_leavesOutPersonalData_butNamesTheContract() {
+        Policy.Details details = details("П-0001", "Тестов", LocalDate.of(2026, 12, 31), false);
+
+        String text = details.toString();
+
+        assertThat(text).contains(details.externalContractId().toString())
+                .doesNotContain("Тестов", "Тестович", "1990-01-01", "test@example.org", "Мужской");
+    }
+
+    @Test
+    void applySnapshot_replacesDetails_archivesByDeleteMark_andMarksUpdateTime() {
+        Policy policy = Policy.create(UUID.randomUUID(), snapshot(List.of(), List.of()), CREATED);
+        Policy.Details updated = details("П-0002", "Изменённая", null, true);
+
+        policy.applySnapshot(new Policy.Snapshot(updated, List.of(), List.of()), UPDATED);
+
+        assertThat(policy.details()).isEqualTo(updated);
+        assertThat(policy.isArchive()).isTrue();
+        assertThat(policy.updatedAt()).isEqualTo(UPDATED);
+        assertThat(policy.createdAt()).isEqualTo(CREATED);
+    }
 
     @Test
     void applySnapshot_replacesProgramsInsteadOfAddingToOldOnes() {
@@ -72,6 +106,12 @@ class PolicyTest {
         var details = new Policy.Details(UUID.randomUUID(), "П-0001", "Тестов", "Тест", null,
                 LocalDate.of(1990, 1, 1), null, null, BEGIN, null, true, false);
         return new Policy.Snapshot(details, programs, lines);
+    }
+
+    private static Policy.Details details(String number, String lastName, @Nullable LocalDate endDate,
+            boolean deleteMark) {
+        return new Policy.Details(UUID.randomUUID(), number, lastName, "Тест", "Тестович",
+                LocalDate.of(1990, 1, 1), "Мужской", "test@example.org", BEGIN, endDate, !deleteMark, deleteMark);
     }
 
     private static PolicyProgram.Row program(UUID programId, boolean availability) {

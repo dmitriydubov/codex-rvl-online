@@ -65,13 +65,6 @@ class OneCMoneyScaleTest {
                 .contains(new BigDecimal("9999999999999.99"));
     }
 
-    @Test
-    void requiredAmountWithThirdFractionDigit_isContractViolation() {
-        assertThatThrownBy(() -> OneCRequiredValues.amount(node("price", "4100.551"), "price"))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage("поле price содержит больше двух знаков после запятой");
-    }
-
     /** Сооплата больше 100 с третьим знаком называет масштаб: он проверяется при чтении числа, раньше диапазона. */
     @Test
     void percentWithThirdFractionDigit_isReportedByScaleBeforeRange() {

@@ -34,6 +34,7 @@ final class OneCPriceTransferMessages {
     /** Дефекты строки так, как их называет спецификация; незнакомое слово роняет шаг. */
     private static final Map<String, Consumer<ObjectNode>> DEFECTS = Map.of(
             "нет цены", row -> row.remove("price"),
+            "цена больше допустимого", row -> row.put("price", new BigDecimal("10000000000000.00")),
             "нет номера строки", row -> row.remove(ROW_NUMBER),
             "номер строки — текст", row -> row.put(ROW_NUMBER, "вторая"),
             "номер строки — дробное число", row -> row.put(ROW_NUMBER, new BigDecimal("2.5")));
@@ -64,12 +65,6 @@ final class OneCPriceTransferMessages {
         }
         ObjectNode row = OneCServiceMessages.priceRow(2, SINGLE_ROW);
         DEFECTS.get(defect).accept(row);
-        return batchMessage(messageId, transferData(cid, service), JSON.createArrayNode().add(row), InboundStatus.FAILED);
-    }
-
-    /** Пакет из одной строки с номером 2 и заданной ценой. */
-    static OneCMessage pricedBatch(UUID messageId, UUID cid, String service, BigDecimal price) {
-        ObjectNode row = OneCServiceMessages.priceRow(2, SINGLE_ROW).put("price", price);
         return batchMessage(messageId, transferData(cid, service), JSON.createArrayNode().add(row), InboundStatus.FAILED);
     }
 
