@@ -84,6 +84,17 @@ class ProgramTest {
     }
 
     @Test
+    void replaceAvailableLpu_keepsEveryRowOfMessage_inMessageOrder() {
+        Program program = Program.create(EXTERNAL_ID, details("Программа РВЛ", false), CREATED);
+        Lpu first = lpu("Первый санаторий");
+        Lpu second = lpu("Второй санаторий");
+
+        program.replaceAvailableLpu(List.of(row(first), row(second)), CREATED);
+
+        assertThat(program.availableLpu()).extracting(ProgramLpu::lpu).containsExactly(first, second);
+    }
+
+    @Test
     void availableLpu_cannotBeChangedFromOutside() {
         Program program = Program.create(EXTERNAL_ID, details("Программа РВЛ", false), CREATED);
         program.replaceAvailableLpu(List.of(row(lpu("Санаторий"))), CREATED);
