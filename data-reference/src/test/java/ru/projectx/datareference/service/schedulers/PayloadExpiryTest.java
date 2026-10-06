@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
- * Проход срока хранения без базы: сколько пачек он стирает — в сырье полисов и в карантине, — каждую ли в
+ * Проход срока хранения без базы: сколько пачек он стирает — в сырье и в карантине, — каждую ли в
  * своей транзакции и о чём сообщает. Что запросы стирают только тела старше срока и оставляют сами строки,
  * проверяет на настоящей базе {@link PersonalDataRetentionTest}; здесь — решения самого прохода.
  *
@@ -64,21 +64,21 @@ class PayloadExpiryTest {
     /** Полные пачки — повод для следующей; неполная означает, что остаток исчерпан, и проход заканчивается. */
     @Test
     void remainderLargerThanBatch_isErasedInSeveralBatches() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE))
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE))
                 .thenReturn(BATCH_SIZE, BATCH_SIZE, 3);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages, times(3)).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages, times(3)).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
         verify(agedMessages).forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE);
         verifyNoMoreInteractions(agedMessages);
     }
 
-    /** Карантин стирается тем же правилом пачек и со своим сроком, независимо от остатка полисов. */
+    /** Карантин стирается тем же правилом пачек и со своим сроком, независимо от остатка в сырье. */
     @Test
     void quarantineRemainder_isErasedInItsOwnBatchesWithItsOwnTtl() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 2);
 
         retention().forgetExpiredPayloads();
@@ -91,7 +91,7 @@ class PayloadExpiryTest {
     /** Каждая пачка — в своей транзакции, и ни один запрос не идёт вне транзакции. */
     @Test
     void everyBatch_runsInItsOwnTransaction() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
             transactions.erasedInsideCurrent();
             return transactions.opened() < 2 ? BATCH_SIZE : 0;
         });
@@ -108,18 +108,18 @@ class PayloadExpiryTest {
     /** Остаток ровно в пачку: ещё один короткий запрос, который ничего не находит, — и проход окончен. */
     @Test
     void remainderOfExactlyOneBatch_endsOnEmptyBatch() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages, times(2)).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages, times(2)).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
     }
 
     /** В журнал — сколько тел стёрто за весь проход и какой срок, без единого значения из стёртых тел. */
     @Test
     void erasure_isReportedOnceWithTotalAndTtl() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
@@ -127,19 +127,19 @@ class PayloadExpiryTest {
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("стёрты тела 10 сообщений полисов старше PT720H: срок хранения персональных данных");
+                    .isEqualTo("стёрты тела 10 сообщений в сырье старше PT720H: срок хранения персональных данных");
         });
     }
 
-    /** Стирать нечего — по одному запросу на полисы и карантин, по одной транзакции и молчание в журнале. */
+    /** Стирать нечего — по одному запросу на сырьё и карантин, по одной транзакции и молчание в журнале. */
     @Test
     void nothingExpired_oneQueryEachAndNothingLogged() {
-        when(agedMessages.forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
+        when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
         when(agedMessages.forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE)).thenReturn(0);
 
         retention().forgetExpiredPayloads();
 
-        verify(agedMessages).forgetPolicyPayloads(PAYLOAD_TTL, BATCH_SIZE);
+        verify(agedMessages).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
         verify(agedMessages).forgetQuarantineBodies(QUARANTINE_TTL, BATCH_SIZE);
         assertThat(transactions.opened()).isEqualTo(2);
         assertThat(logged.list).isEmpty();

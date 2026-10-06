@@ -37,7 +37,7 @@ public class InboundBacklogMetrics implements MeterBinder {
     static final String MESSAGES = "onec.inbound.messages";
     static final String OLDEST_PENDING = "onec.inbound.pending.oldest.age";
     static final String STUCK_TRANSFERS = "onec.price.transfers.stuck";
-    static final String OVERDUE_POLICY_PAYLOADS = "onec.retention.overdue.policy.payloads";
+    static final String OVERDUE_PAYLOADS = "onec.retention.overdue.payloads";
     static final String OVERDUE_QUARANTINE_BODIES = "onec.retention.overdue.quarantine.bodies";
     static final String STALENESS = "onec.inbound.backlog.staleness";
 
@@ -78,8 +78,8 @@ public class InboundBacklogMetrics implements MeterBinder {
         }
         gauge(registry, STUCK_TRANSFERS, "Передачи прайсов, которые ждут своих частей дольше порога тревоги",
                 current -> current.stuckTransfers());
-        gauge(registry, OVERDUE_POLICY_PAYLOADS, "Тела сообщений полисов старше срока хранения, ещё не стёртые",
-                current -> current.overdue().policyPayloads());
+        gauge(registry, OVERDUE_PAYLOADS, "Тела сообщений с ПДн старше срока хранения, ещё не стёртые",
+                current -> current.overdue().payloads());
         gauge(registry, OVERDUE_QUARANTINE_BODIES, "Тела карантинных сообщений старше срока хранения, ещё не стёртые",
                 current -> current.overdue().quarantineBodies());
         TimeGauge.builder(STALENESS, this, TimeUnit.SECONDS, metrics -> metrics.secondsSince(metrics.backlog.takenAt()))

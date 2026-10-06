@@ -100,17 +100,25 @@ final class OneCMessages {
      * сообщения явно, вторую читает шаг публикации в брокер.
      */
     static OneCMessage insuranceContract(Map<String, String> table) {
+        return insuranceContract(DMS_PRODUCT, InboundStatus.PROCESSED, table);
+    }
+
+    /** Договор страхования другого продукта: разбор пропускает его, потому что сохраняются только договоры ДМС. */
+    static OneCMessage insuranceContractOfProduct(String productType, Map<String, String> table) {
+        return insuranceContract(productType, InboundStatus.SKIPPED, table);
+    }
+
+    private static OneCMessage insuranceContract(String productType, InboundStatus expected, Map<String, String> table) {
         onlyKnown(table, "external_id", "номер", "страхователь", "начало", "окончание", MESSAGE_ID, BEFORE_ENVELOPE);
         ObjectNode data = JSON.createObjectNode()
                 .put("contractId", required(table, "external_id"))
                 .put("number", required(table, "номер"))
-                .put("productType", DMS_PRODUCT)
+                .put("productType", productType)
                 .put("dateBeginISO", required(table, "начало"))
                 .put("dateEndISO", required(table, "окончание"))
                 .put("notActive", false);
         Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addInsurer(data, insurer));
-        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, InboundStatus.PROCESSED,
-                fixedMessageId(table));
+        return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, expected, fixedMessageId(table));
     }
 
     /**

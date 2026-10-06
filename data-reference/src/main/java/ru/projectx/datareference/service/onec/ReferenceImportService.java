@@ -83,7 +83,7 @@ public class ReferenceImportService {
     /**
      * Поток без обработчика — пропуск, а не отказ. Потоки подключаются постепенно, и сообщение потока, до
      * которого ещё не дошли руки, ждёт своего маппера в разобранном виде, а не в виде ошибки. Когда маппер
-     * появится, строку разбирают заново, вернув ей статус {@code NEW}.
+     * появится, строку разбирают заново, вернув ей статус {@code NEW}, пока её тело не стёрто по сроку хранения.
      */
     private ImportResult skipWithoutHandler(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
@@ -104,7 +104,7 @@ public class ReferenceImportService {
     private JsonNode readTree(InboundMessage message) {
         String payload = message.payload();
         if (payload == null) {
-            // Так выглядит строка полиса, у которой вышел срок хранения тела. Повторить её нечем: недостающее
+            // Так выглядит строка, у которой вышел срок хранения тела. Повторить её нечем: недостающее
             // может прислать только источник.
             throw new OneCFieldException("тело сообщения стёрто по сроку хранения, разбирать нечего");
         }

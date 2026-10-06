@@ -50,7 +50,7 @@ class InboundBacklogSnapshotTest {
                 row(OneCStream.MKB10, InboundStatus.FAILED, 1, oldestFailed));
         when(repository.countUnfinishedByStreamAndStatus()).thenReturn(rows);
         when(repository.countTransfersBufferedBefore(NOW.minus(STUCK_THRESHOLD))).thenReturn(3L);
-        when(repository.countPolicyPayloadsReceivedBefore(NOW.minus(PAYLOAD_TTL))).thenReturn(4L);
+        when(repository.countPayloadsToForgetReceivedBefore(NOW.minus(PAYLOAD_TTL))).thenReturn(4L);
         when(quarantine.countBodiesReceivedBefore(NOW.minus(QUARANTINE_TTL))).thenReturn(5L);
 
         InboundBacklog backlog = reads().read();

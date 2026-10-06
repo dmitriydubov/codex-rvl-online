@@ -6,7 +6,10 @@ import static ru.projectx.datareference.support.OneCMessages.envelope;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,7 @@ import ru.projectx.datareference.support.TestJdbc;
 class AgedInboundMessagesQueryTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_policies";
+    private static final String REASON = "причина";
     private static final UUID OLD_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000001");
     private static final UUID OLDER_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000002");
     private static final UUID FRESH_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000003");
@@ -72,7 +76,7 @@ class AgedInboundMessagesQueryTest {
 
     /** Пачка не больше предела, и первыми стираются самые старые тела. */
     @Test
-    void forgetPolicyPayloads_erasesOldestRowsUpToLimit() {
+    void forgetPayloads_erasesOldestRowsUpToLimit() {
         UUID oldest = store(OneCStream.POLICIES, Duration.ofDays(40));
         UUID older = store(OneCStream.POLICIES, Duration.ofDays(35));
         UUID old = store(OneCStream.POLICIES, Duration.ofDays(31));
@@ -85,10 +89,10 @@ class AgedInboundMessagesQueryTest {
         assertThat(payloadOf(old)).isNotNull();
     }
 
-    /** Свежие тела, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
+    /** Тела ровно на границе срока, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
     @Test
-    void forgetPolicyPayloads_skipsFreshOtherStreamAndErasedRows() {
-        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(29));
+    void forgetPayloads_skipsFreshOtherStreamAndErasedRows() {
+        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(30));
         UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
         store(OneCStream.POLICIES, Duration.ofDays(40));
         forget(10);
@@ -103,7 +107,7 @@ class AgedInboundMessagesQueryTest {
      * полей. У справочного потока причина остаётся, как и тело: по ним сообщение переобрабатывают.
      */
     @Test
-    void forgetPolicyPayloads_erasesTheReasonTogetherWithTheBody() {
+    void forgetPayloads_erasesTheReasonTogetherWithTheBody() {
         UUID policy = store(OneCStream.POLICIES, Duration.ofDays(40));
         UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
         testJdbc.update("update inbound_message set status = 'FAILED', last_error = 'причина' where message_id in (?, ?)",
@@ -117,6 +121,72 @@ class AgedInboundMessagesQueryTest {
         assertThat(erased.status()).isEqualTo(InboundStatus.FAILED);
         assertThat(inboundMessageRepository.findById(reference).orElseThrow().outcome().lastError())
                 .isEqualTo("причина");
+    }
+
+    /**
+     * Тело договора страхования стирается в любом статусе: страхователем бывает человек. Причина исхода, статус и
+     * число попыток остаются — это текст сервиса без значений полей.
+     */
+    @Test
+    void forgetPayloads_erasesInsuranceContractBodiesInEveryStatusAndKeepsTheOutcome() {
+        List<UUID> contracts = Stream.of("NEW", "RETRY", "PROCESSED", "SKIPPED", "FAILED")
+                .map(status -> storeWithOutcome(OneCStream.INSURANCE_CONTRACTS, status))
+                .toList();
+
+        assertThat(forget(10)).isEqualTo(contracts.size());
+
+        assertThat(contracts).allSatisfy(contract -> {
+            assertThat(payloadOf(contract)).isNull();
+            assertThat(outcomeOf(contract).lastError()).isEqualTo(REASON);
+            assertThat(outcomeOf(contract).attempt()).isEqualTo(2);
+        });
+        assertThat(contracts).extracting(contract -> outcomeOf(contract).status().name())
+                .containsExactly("NEW", "RETRY", "PROCESSED", "SKIPPED", "FAILED");
+    }
+
+    /**
+     * Тело пропущенного сообщения стирается в любом потоке, причина пропуска остаётся. Тела справочных сообщений
+     * в остальных статусах не трогаются: по ним сообщение переобрабатывают.
+     */
+    @Test
+    void forgetPayloads_erasesSkippedBodiesOfEveryStreamAndKeepsOtherReferenceBodies() {
+        UUID skipped = storeWithOutcome(OneCStream.MKB10, "SKIPPED");
+        List<UUID> kept = Stream.of("NEW", "RETRY", "PROCESSED", "FAILED", "BUFFERED")
+                .map(status -> storeWithOutcome(OneCStream.MKB10, status))
+                .toList();
+
+        assertThat(forget(10)).isEqualTo(1);
+
+        assertThat(payloadOf(skipped)).isNull();
+        assertThat(outcomeOf(skipped).lastError()).isEqualTo(REASON);
+        assertThat(kept).allSatisfy(reference -> assertThat(payloadOf(reference)).isNotNull());
+    }
+
+    /** Причина стирается только у полиса, в том числе у пропущенного; у пропущенного справочного она остаётся. */
+    @Test
+    void forgetPayloads_erasesTheReasonOfSkippedPolicyOnly() {
+        UUID policy = storeWithOutcome(OneCStream.POLICIES, "SKIPPED");
+        UUID reference = storeWithOutcome(OneCStream.CONTRAGENTS, "SKIPPED");
+
+        forget(10);
+
+        assertThat(outcomeOf(policy).lastError()).isNull();
+        assertThat(outcomeOf(reference).lastError()).isEqualTo(REASON);
+    }
+
+    /** Подсчёт для метрики видит ровно те тела, которые сотрёт проход: ни больше, ни меньше. */
+    @Test
+    void countPayloadsToForget_matchesWhatTheErasePassErases() {
+        Stream.of(OneCStream.POLICIES, OneCStream.INSURANCE_CONTRACTS).forEach(stream -> storeWithOutcome(stream, "FAILED"));
+        Stream.of("SKIPPED", "PROCESSED", "FAILED").forEach(status -> storeWithOutcome(OneCStream.PROGRAMS, status));
+        store(OneCStream.INSURANCE_CONTRACTS, Duration.ofDays(30));
+        Instant receivedBefore = FixedClockConfig.NOW.minus(Duration.ofDays(30));
+
+        long counted = inboundMessageRepository.countPayloadsToForgetReceivedBefore(receivedBefore);
+
+        assertThat(counted).isEqualTo(3);
+        assertThat(forget(10)).isEqualTo(counted);
+        assertThat(inboundMessageRepository.countPayloadsToForgetReceivedBefore(receivedBefore)).isZero();
     }
 
     /**
@@ -190,7 +260,7 @@ class AgedInboundMessagesQueryTest {
     }
 
     private int forget(int limit) {
-        return transactions.execute(status -> agedMessages.forgetPolicyPayloads(Duration.ofDays(30), limit));
+        return transactions.execute(status -> agedMessages.forgetPayloads(Duration.ofDays(30), limit));
     }
 
     private void buffer(UUID transfer, Duration age) {
@@ -205,6 +275,18 @@ class AgedInboundMessagesQueryTest {
         testJdbc.update("update inbound_message set received_at = ? where message_id = ?",
                 Timestamp.from(FixedClockConfig.NOW.minus(age)), messageId);
         return messageId;
+    }
+
+    /** Строка старше срока хранения с заданным статусом, причиной исхода и двумя попытками. */
+    private UUID storeWithOutcome(OneCStream stream, String status) {
+        UUID messageId = store(stream, Duration.ofDays(40));
+        testJdbc.update("update inbound_message set status = ?, last_error = ?, attempt = 2 where message_id = ?",
+                status, REASON, messageId);
+        return messageId;
+    }
+
+    private InboundOutcome outcomeOf(UUID messageId) {
+        return inboundMessageRepository.findById(messageId).orElseThrow().outcome();
     }
 
     private String payloadOf(UUID messageId) {

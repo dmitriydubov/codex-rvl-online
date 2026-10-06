@@ -58,11 +58,11 @@ public record InboundBacklog(List<StatusCount> statuses, long stuckTransfers, Ov
     }
 
     /**
-     * Тела с персональными данными, которые пережили срок хранения и ещё не стёрты: стирание отстаёт или не работает.
+     * Тела, которые пережили срок хранения и ещё не стёрты: стирание отстаёт или не работает.
      *
-     * @param policyPayloads    тела сообщений полисов в таблице сырья
+     * @param payloads          тела в таблице сырья, которые срок хранения должен был стереть
      * @param quarantineBodies  тела карантинных сообщений
      */
-    public record Overdue(long policyPayloads, long quarantineBodies) {
+    public record Overdue(long payloads, long quarantineBodies) {
     }
 }

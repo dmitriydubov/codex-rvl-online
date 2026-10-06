@@ -97,17 +97,6 @@ class InboundMessageTransitionsTest {
         assertThat(message.transferPart()).isEqualTo(new InboundTransferPart(CID, 3, 7));
     }
 
-    @Test
-    void forgottenPayload_leavesTheRestOfTheRow() {
-        InboundMessage message = retriedOnce();
-
-        message.forgetPayload();
-
-        assertThat(message.payload()).isNull();
-        assertThat(message.receipt().messageId()).isEqualTo(MESSAGE_ID);
-        assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.RETRY, 1, RETRY_AT, ERROR, null));
-    }
-
     private static InboundMessage received() {
         return InboundMessage.receive(
                 new InboundReceipt(MESSAGE_ID, OneCStream.PRICE_LISTS, QUEUE, RECEIVED_AT), PAYLOAD);

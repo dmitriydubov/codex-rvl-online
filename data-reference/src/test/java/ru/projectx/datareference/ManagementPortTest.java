@@ -113,7 +113,7 @@ class ManagementPortTest {
                 .contains("onec_inbound_messages{status=\"NEW\",stream=\"POLICIES\"} 0.0")
                 .contains("onec_inbound_pending_oldest_age_seconds{stream=\"PRICE_LISTS\"} 0.0")
                 .contains("onec_price_transfers_stuck 0.0")
-                .contains("onec_retention_overdue_policy_payloads 0.0")
+                .contains("onec_retention_overdue_payloads 0.0")
                 .contains("onec_retention_overdue_quarantine_bodies 0.0")
                 .contains("# TYPE onec_inbound_backlog_staleness_seconds gauge")
                 .contains("# HELP onec_inbound_messages Сырые сообщения 1С по потоку и статусу")

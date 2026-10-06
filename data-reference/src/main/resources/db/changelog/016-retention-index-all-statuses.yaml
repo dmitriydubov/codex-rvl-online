@@ -1,0 +1,29 @@
+# Индекс под стирание тел по сроку хранения: договоры страхования и пропущенные сообщения любого потока.
+databaseChangeLog:
+
+  - changeSet:
+      id: 016-retention-index-all-statuses
+      author: rvl-online
+      comment: >
+        Срок хранения теперь стирает не только тела полисов, но и тела договоров страхования в любом статусе:
+        страхователем бывает человек, и в теле его ФИО. Ещё стираются тела пропущенных сообщений любого потока:
+        по ним уже ничего не применяется. Прежний частичный индекс покрывал только строки полисов с телом.
+        Он пересоздаётся с тем же именем под новый отбор. Условие индекса записано так же, как в запросах
+        стирания и подсчёта: тогда PostgreSQL видит, что индекс им подходит. Сырым sql: у createIndex в Liquibase
+        нет условия частичного индекса (docs.liquibase.com, change-types/create-index). Сами тела стирает
+        проход по расписанию, пачками, а не эта миграция.
+      changes:
+        - sql:
+            sql: drop index idx_inbound_message_retention
+        - sql:
+            sql: >
+              create index idx_inbound_message_retention on inbound_message (received_at)
+              where payload is not null
+                and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+      rollback:
+        - sql:
+            sql: drop index idx_inbound_message_retention
+        - sql:
+            sql: >
+              create index idx_inbound_message_retention on inbound_message (received_at)
+              where stream = 'POLICIES' and payload is not null
