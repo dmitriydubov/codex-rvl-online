@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +32,7 @@ final class OneCMoneyScaleMessages {
     private static final BigDecimal COPAYMENT_THIRD_DIGIT = new BigDecimal("10.251");
 
     private static final String RENAMED_POLICY = "СТЕНД-0001, редакция 2";
+    private static final String RESENT = "новая отправка ";
     private static final Map<String, Function<ObjectNode, ObjectNode>> POLICY_ROWS = Map.of(
             "amount", OneCMoneyScaleMessages::policyProgram,
             "amountD", OneCMoneyScaleMessages::policyProgram,
@@ -81,9 +83,15 @@ final class OneCMoneyScaleMessages {
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /** Тот же полис под прежним номером, поле — присланное число. Разбор его применяет. */
+    /**
+     * Тот же полис под прежним номером, поле — присланное число. Разбор его применяет. Это новая отправка из 1С:УСК, и
+     * у неё свой {@code message-id}, даже если число совпало с прежним и сообщение повторяет прежнее слово в слово.
+     */
     static OneCMessage policy(OneCMessage policy, String field, BigDecimal value) {
-        return policyWith(policy.data().deepCopy(), policy, field, value, InboundStatus.PROCESSED);
+        OneCMessage resent = policyWith(policy.data().deepCopy(), policy, field, value, InboundStatus.PROCESSED);
+        UUID messageId = UUID.nameUUIDFromBytes(
+                (RESENT + resent.messageId()).getBytes(StandardCharsets.UTF_8));
+        return new OneCMessage(resent.stream(), resent.queue(), resent.data(), resent.expected(), messageId);
     }
 
     /** Тот же полис под новым номером, поле — число с третьим знаком. Разбор его отклоняет. */

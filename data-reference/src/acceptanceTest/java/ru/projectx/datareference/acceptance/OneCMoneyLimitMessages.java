@@ -28,6 +28,7 @@ final class OneCMoneyLimitMessages {
             "отрицательное на одну сотую за пределом", new BigDecimal("-10000000000000.00"),
             "лишняя цифра слева и третий знак справа", new BigDecimal("10000000000000.001"));
     private static final Map<String, BigDecimal> PERCENT_RECORDS = Map.of(
+            "на одну сотую за пределом", new BigDecimal("1000.00"),
             "экспонента с огромным порядком", new BigDecimal("1e500"),
             "экспонента сразу за пределом", new BigDecimal("1E+3"),
             "отрицательное на одну сотую за пределом", new BigDecimal("-1000.00"),
