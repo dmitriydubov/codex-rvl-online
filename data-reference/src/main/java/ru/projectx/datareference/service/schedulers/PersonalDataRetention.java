@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.config.ImportProperties;
+import ru.projectx.datareference.service.ExpiredPolicyPersonalData;
 
 /**
  * Срок хранения персональных данных: тел сообщений 1С:УСК в таблице сырья и в карантине и ФИО, даты рождения и почты
@@ -20,7 +21,7 @@ import ru.projectx.datareference.config.ImportProperties;
  * на все тела: они не разобраны, и поручиться, что ПДн в них нет, нельзя. В полисе ПДн живут, пока полис действует,
  * и ещё запас после окончания срока или перевода в архив; номер, даты и программы полиса остаются.
  *
- * <p>Стирание идёт пачками от самых старых строк, каждая пачка — своя короткая транзакция, чтобы не держать
+ * <p>Стирание идёт пачками (тела — от самых старых строк), каждая пачка — своя короткая транзакция, чтобы не держать
  * блокировки строк, которые читает разбор. Проход продолжается, пока пачки полные. В журнал идёт только число
  * стёртого и срок, без самих данных.
  */

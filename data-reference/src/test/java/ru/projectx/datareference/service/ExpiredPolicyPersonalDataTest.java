@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.schedulers;
+package ru.projectx.datareference.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

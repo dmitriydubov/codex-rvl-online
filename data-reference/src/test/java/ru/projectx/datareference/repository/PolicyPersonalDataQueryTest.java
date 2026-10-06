@@ -1,15 +1,23 @@
 package ru.projectx.datareference.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.support.DatabaseCleaner;
@@ -19,7 +27,8 @@ import ru.projectx.datareference.support.IntegrationTest;
  * Запросы срока хранения персональных данных полисов на настоящем PostgreSQL: подсчёт и стирание пачкой. Граница —
  * день 12 февраля и момент 12 февраля 09:15 UTC: полис, кончившийся раньше этого дня или переведённый в архив не позже
  * этого момента, теряет ФИО, дату рождения и почту, а номер, пол и признак архива остаются. Условия, предел пачки и
- * проверочные ограничения таблицы проверяет только база.
+ * поведение при одновременном разборе проверяет только база: стирание не трогает полис, которому разбор в это время
+ * вернул действие, потому что PostgreSQL перепроверяет внешнее условие запроса на новой версии строки.
  */
 @IntegrationTest
 class PolicyPersonalDataQueryTest {
@@ -28,6 +37,11 @@ class PolicyPersonalDataQueryTest {
     private static final Instant ARCHIVED_BY = Instant.parse("2026-02-12T09:15:00Z");
     private static final Instant ERASED_AT = Instant.parse("2026-03-14T09:15:00Z");
     private static final LocalDate FAR_END = LocalDate.of(2030, 12, 31);
+    private static final long WAIT_SECONDS = 10;
+    private static final String RETURNED_TO_ACTION =
+            "update policies set is_archive = false, archived_at = null where external_id = :externalId";
+    private static final String ERASURE_WAITS_FOR_LOCK = "select count(*) from pg_stat_activity "
+            + "where wait_event_type = 'Lock' and query like 'update policies%personal_data_erased_at = %'";
 
     @Autowired
     private PolicyRepository policies;
@@ -37,6 +51,9 @@ class PolicyPersonalDataQueryTest {
 
     @Autowired
     private DatabaseCleaner databaseCleaner;
+
+    @Autowired
+    private JdbcClient jdbc;
 
     @BeforeEach
     void clearTables() {
@@ -67,6 +84,47 @@ class PolicyPersonalDataQueryTest {
         assertThat(erase(1)).isEqualTo(1);
         assertThat(erase(1)).isEqualTo(1);
         assertThat(erase(1)).isZero();
+    }
+
+    /**
+     * Разбор снял полис с архива и держит строку, пока стирание ждёт её блокировку. После фиксации разбора стирание
+     * видит новую версию строки: полис больше не за границей хранения, и его данные остаются.
+     */
+    @Test
+    void policyReturnedToActionWhileErasureWaits_keepsItsPersonalData() throws Exception {
+        UUID archived = store(FAR_END, true, ARCHIVED_BY.minusSeconds(60));
+        CountDownLatch rowLocked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService threads = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> parsing = threads.submit(() -> transactions.executeWithoutResult(status -> {
+                jdbc.sql(RETURNED_TO_ACTION).param("externalId", archived).update();
+                rowLocked.countDown();
+                awaitQuietly(release);
+            }));
+            assertThat(rowLocked.await(WAIT_SECONDS, TimeUnit.SECONDS)).as("разбор взял строку").isTrue();
+            Future<Integer> erasure = threads.submit(() -> erase(10));
+            await().atMost(Duration.ofSeconds(WAIT_SECONDS))
+                    .until(() -> jdbc.sql(ERASURE_WAITS_FOR_LOCK).query(Long.class).single() > 0);
+            release.countDown();
+            parsing.get(WAIT_SECONDS, TimeUnit.SECONDS);
+
+            assertThat(erasure.get(WAIT_SECONDS, TimeUnit.SECONDS)).isZero();
+        }
+        finally {
+            release.countDown();
+            threads.shutdownNow();
+        }
+        assertKept(archived);
+    }
+
+    private static void awaitQuietly(CountDownLatch release) {
+        try {
+            release.await(WAIT_SECONDS, TimeUnit.SECONDS);
+        }
+        catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void assertErased(UUID externalId) {

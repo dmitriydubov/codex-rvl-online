@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.schedulers;
+package ru.projectx.datareference.service;
 
 import java.time.Clock;
 import java.time.Instant;

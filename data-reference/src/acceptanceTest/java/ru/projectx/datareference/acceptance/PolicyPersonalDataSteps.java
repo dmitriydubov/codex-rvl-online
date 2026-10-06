@@ -145,7 +145,7 @@ public class PolicyPersonalDataSteps {
         static StoredPolicy of(ObjectNode data) {
             JsonNode header = data.path("header").path(0);
             return new StoredPolicy(data.path("number").asString(), day(header.path("beginDate")),
-                    Optional.of(day(header.path("endDate"))).filter(end -> !OPEN_END.equals(end)).orElse(null),
+                    Optional.ofNullable(day(header.path("endDate"))).filter(end -> !OPEN_END.equals(end)).orElse(null),
                     data.path("deleteMark").asBoolean(), text(data.path("gender")),
                     new PersonalData(text(data.path("lastName")), text(data.path("firstName")),
                             text(data.path("middleName")), day(data.path("dateOfBirth")),
@@ -166,8 +166,8 @@ public class PolicyPersonalDataSteps {
         }
 
         /** Дата сообщения 1С бывает моментом; в таблице — календарный день, как он написан. */
-        private static String day(JsonNode node) {
-            return node.asString().substring(0, DAY_LENGTH);
+        private static @Nullable String day(JsonNode node) {
+            return node.isMissingNode() ? null : node.asString().substring(0, DAY_LENGTH);
         }
     }
 }
