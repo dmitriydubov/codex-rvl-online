@@ -8,12 +8,11 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Страхователь — юрлицо, заключившее договор страхования в пользу своих сотрудников
- * (ТЗ-3, ветка {@code thisIsLPU = false}). Фильтра у ветки нет: сохраняются все.
+ * Страхователь — юридическое лицо, заключившее договор страхования в пользу своих сотрудников.
  *
- * <p>Справочник приезжает <b>одним потоком с санаториями</b>, поэтому и разбирается
- * рядом с ними, хотя смысл у него другой. Именно к страхователю привязан HR: его ручки
- * отвечают за сотрудников своего юрлица.
+ * <p>Страхователи приезжают одним потоком с санаториями: это контрагенты, не отмеченные как
+ * лечебное учреждение. Отбора у них нет, сохраняются все. К страхователю привязан сервис Заявок:
+ * его запросы касаются сотрудников своего юридического лица.
  */
 @Entity
 @Table(name = "insurers")
@@ -38,13 +37,19 @@ public class Insurer extends OneCEntity {
         // JPA
     }
 
-    private Insurer(UUID externalId, Details details, Instant now) {
+    private Insurer(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(details, now);
     }
 
+    /**
+     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static Insurer create(UUID externalId, Details details, Instant now) {
-        return new Insurer(externalId, details, now);
+        Insurer insurer = new Insurer(externalId, now);
+        insurer.applySnapshot(details, now);
+        return insurer;
     }
 
     public void applySnapshot(Details details, Instant now) {
@@ -55,7 +60,7 @@ public class Insurer extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения ТЗ-3, ветка страхователя. */
+    /** Разобранные поля сообщения о контрагенте-страхователе. */
     public record Details(
             String name,
             @Nullable String fullName,

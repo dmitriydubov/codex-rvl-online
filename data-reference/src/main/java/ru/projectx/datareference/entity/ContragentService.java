@@ -11,14 +11,12 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Услуга, оказываемая санаторием в рамках договора (ТЗ-10). К ней привязан прейскурант
- * (ТЗ-9), поэтому услуга — та единица, по которой цена замещается целиком.
+ * Услуга, которую санаторий оказывает по договору. К услуге привязан прейскурант, поэтому цены
+ * замещаются целиком по услуге.
  *
- * <p>Номенклатура медицинских услуг ({@code medicalServise} сообщения) отдельным
- * справочником не хранится: ТЗ-10 прямо это оговаривает.
- *
- * <p>Вид обращения хранится GUID'ом источника: ТЗ помечает его необязательным, и услуга
- * не должна пропадать из-за справочника, который ещё не приехал.
+ * <p>Номенклатура медицинских услуг отдельным справочником не хранится. Вид обращения хранится
+ * GUID'ом источника: в сообщении он необязателен, и услуга не должна пропадать из-за справочника,
+ * который ещё не приехал.
  */
 @Entity
 @Table(name = "contragent_services")
@@ -42,13 +40,19 @@ public class ContragentService extends OneCEntity {
         // JPA
     }
 
-    private ContragentService(UUID externalId, LpuContract contract, Details details, Instant now) {
+    private ContragentService(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(contract, details, now);
     }
 
+    /**
+     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static ContragentService create(UUID externalId, LpuContract contract, Details details, Instant now) {
-        return new ContragentService(externalId, contract, details, now);
+        ContragentService service = new ContragentService(externalId, now);
+        service.applySnapshot(contract, details, now);
+        return service;
     }
 
     public void applySnapshot(LpuContract contract, Details details, Instant now) {
@@ -59,7 +63,7 @@ public class ContragentService extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения ТЗ-10. */
+    /** Разобранные поля сообщения об услуге санатория. */
     public record Details(
             @Nullable UUID externalAppealTypeId,
             @Nullable String code,
