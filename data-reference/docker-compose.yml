@@ -1,58 +1,38 @@
-# Локальный контур для запуска сервиса вне тестов. Тесты поднимают своё
-# через Testcontainers и в этом файле не нуждаются.
+# Локальный контур для запуска сервиса вне тестов (тесты поднимают своё через Testcontainers).
 #
-# Значения базы и брокера захардкожены нарочно: это локальный контур, секретов здесь нет.
-# Порты опубликованы только на 127.0.0.1: известные пароли локального контура не должны
-# открывать базу и брокер всей сети, в которой стоит машина.
-# Переменные сервиса и аргументы сборки образа — из .env (шаблон .env.example, сам .env
-# в git не попадает); без .env действуют умолчания application.yml и Dockerfile.
+# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1, а не всей сети.
+# Переменные сервиса и аргументы сборки — из .env (шаблон .env.example), без него действуют
+# умолчания application.yml и Dockerfile.
 #
-# Запуск: docker compose up -d
-# Вместе с самим сервисом из Dockerfile: docker compose --profile app up -d
+#   docker compose up -d                  # база и брокер
+#   docker compose --profile app up -d    # и сам сервис из Dockerfile
 #
-# Брокер здесь изображает межсервисный брокер контура, а не брокер 1С:УСК, и очередей 1С
-# в нём нет. Поэтому слушатели очередей 1С в compose выключены (RABBITMQ_LISTENER_AUTO_STARTUP
-# по умолчанию false ниже; в application.yml умолчание — включены). Проверить на нём приём
-# и подтверждение всё же можно: RABBITMQ_LISTENER_AUTO_STARTUP=true в .env и очереди 1С,
-# заведённые через панель; данных 1С в нём всё равно нет.
+# Брокер здесь — не брокер 1С:УСК: очередей 1С в нём нет, поэтому слушатели 1С по умолчанию
+# выключены. Чтобы проверить приём, задайте RABBITMQ_LISTENER_AUTO_STARTUP=true в .env
+# и заведите очереди в панели брокера.
 #
-# ---------------------------------------------------------------------------------------
-# Стенд потребителя для сервиса Договоров — профиль stand: PostgreSQL, сервис и закладка
-# синтетического сырья 1С (ТЗ-3 → ТЗ-2 → ТЗ-6 → ТЗ-1), которое штатно разбирает планировщик
-# сервиса. Брокер стенду не нужен и с ним не стартует. Файлы закладки и примеры запросов
-# с ответами — src/test/resources/stand/ (README.md там же); тест ConsumerStandTest сверяет
-# примеры с ответами сервиса на тех же файлах.
+# Стенд для разработчиков сервиса Договоров (профиль stand): база, сервис и закладка
+# синтетических данных 1С — контрагентов, договоров страхования, программ и полисов.
+# Брокер стенду не нужен. Файлы и примеры запросов — src/test/resources/stand/ (там README.md).
 #
-#   ./gradlew clean bootJar        # при JAR_SOURCE=host; с умолчанием build jar собирается в образе
+#   ./gradlew clean bootJar               # только при JAR_SOURCE=host
 #   docker compose up --build stand-seed
 #
-# Сервис назван явно: профиль stand, включённый целиком (--profile stand up), поднял бы
-# и брокер — сервисы без profiles входят в любой набор. Названный сервис включает свой
-# профиль сам и тянет только свои depends_on: закладка — сервис стенда и postgres.
+# Запускайте именно stand-seed, а не --profile stand: профиль целиком поднял бы и брокер.
+# Стенд готов, когда закладка напечатала «сырьё 1С заложено» и пример 09 из README
+# отвечает 200 (health отвечает UP раньше, чем данные разобраны). Статус SKIPPED у строки
+# страхователя в inbound_message ожидаем: страхователь — не санаторий.
+# Сервис — http://localhost:8080; профили app и stand вместе не поднимать (порт один).
+# Клиенту из другого контейнера нужна сеть data-reference_default (адрес
+# http://data-reference-stand:8080) или network_mode: host.
+# Сброс: docker compose --profile stand down -v. Удаляет и базу, общую с профилем app,
+# и данные брокера; только базу — docker volume rm data-reference_postgres-data после down без -v.
 #
-# Стенд готов, когда закладка напечатала «сырьё 1С заложено» и прошёл опрос планировщика
-# (раз в 10 с): строки inbound_message — PROCESSED, кроме страхователя: у него SKIPPED
-# с причиной, так ТЗ-3 помечает контрагента, ставшего страхователем, а не санаторием.
-# Сервис — http://localhost:8080 (порт тот же, что у профиля app: вместе их не поднимать),
-# только с самой машины: порт опубликован на 127.0.0.1. Клиенту в контейнере на Linux
-# host.docker.internal его не покажет — такой клиент подключают к сети этого compose
-# (data-reference_default, адрес http://data-reference-stand:8080) или запускают с network_mode: host.
-# /actuator/health (порт актуатора, http://localhost:8081) отвечает UP, как только сервис
-# поднят, — раньше, чем данные заложены и разобраны. Данные готовы, когда запрос примера 09 —
-# полис для сервиса Договоров без ПДн
-# (/internal/v1/policies/contract-view?external_id=9e6ee30d-2275-417d-a44c-039d3b8c2ac5) — отвечает 200.
-# Повторный up данных не дублирует.
-# Сброс: docker compose --profile stand down -v. Удаляет все тома проекта — и базу, общую
-# с профилем app, и данные брокера; только базу — docker volume rm data-reference_postgres-data
-# после down без -v.
-#
-# Там, где контейнеры не выходят в сеть, а Docker Hub отвечает 429 (Too Many Requests):
-# в .env — JAR_SOURCE=host и JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jre,
-# образ базы — заранее из зеркала:
+# Если Docker Hub отвечает 429 (Too Many Requests): в .env — JAR_SOURCE=host и
+# JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jre, а образ базы — из зеркала:
 #   docker pull mirror.gcr.io/library/postgres:16.10-alpine
 #   docker tag mirror.gcr.io/library/postgres:16.10-alpine postgres:16.10-alpine
-# В рабочем контуре образы postgres:16.10-alpine и eclipse-temurin:21.0.12.1_1-jre — из Nexus.
-# ---------------------------------------------------------------------------------------
+# В рабочем контуре все образы берутся из Nexus.
 
 name: data-reference
 
@@ -76,18 +56,17 @@ services:
       retries: 10
 
   rabbitmq:
-    # Та же версия, что у брокера 1С:УСК на контуре (RabbitMQ 4.1.2, Erlang 27.3.4.2).
+    # Та же версия, что у брокера 1С:УСК.
     image: rabbitmq:4.1.2-management-alpine
     container_name: data-reference-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: data_reference
       RABBITMQ_DEFAULT_PASS: data_reference
     ports:
-      # 5672 — AMQP; тестовый контур слушает 5671 (TLS), локально TLS не нужен.
+      # Локально без TLS.
       - "127.0.0.1:5672:5672"
-      # Панель управления на http://localhost:15672 — оттуда и создаются очереди,
-      # если слушателей включили: сервис их не объявляет (spring.rabbitmq.dynamic: false),
-      # потому что на контуре они заведены со стороны 1С:УСК.
+      # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
+      # в рабочем контуре их заводит 1С:УСК.
       - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
@@ -97,19 +76,14 @@ services:
       timeout: 10s
       retries: 10
 
-  # Сам сервис из Dockerfile — проверить образ локально. В профиле, чтобы обычный
-  # docker compose up поднимал только базу и брокер и не собирал образ каждый раз.
-  # Переменные — из .env (шаблон .env.example); адреса базы и брокера подменяются
-  # на имена сервисов compose: внутри его сети localhost — это сам контейнер.
+  # Сервис из Dockerfile. В профиле, чтобы обычный up не собирал образ каждый раз.
+  # Внутри контейнера localhost — он сам, поэтому база и брокер указаны по именам сервисов.
   data-reference:
     profiles: [ app ]
     build: &data-reference-build
       context: .
-      # Аргументы сборки без значений: compose передаёт только те, что заданы в .env
-      # или в окружении, остальные берут умолчания из ARG в Dockerfile (jar собирается
-      # в образе, базовые образы с Docker Hub, Gradle с services.gradle.org). Форма
-      # «ИМЯ: ${ИМЯ:-умолчание}» здесь не годится: она передаёт значение всегда,
-      # и умолчания Dockerfile перестают действовать. См. .env.example.
+      # Без значений: compose передаёт только заданные в .env или окружении аргументы,
+      # остальные берут умолчания из Dockerfile. Запись ${ИМЯ:-умолчание} их бы перекрыла.
       args:
         - JAR_SOURCE
         - PUBLIC_REPOSITORIES
@@ -120,9 +94,7 @@ services:
     env_file:
       - path: .env
         required: false
-    # Пароли — локального контура выше: в application.yml у них умолчаний нет. TLS выключен
-    # явно — у локального брокера его нет. Слушатели 1С — false, если .env не задал иначе
-    # (подстановка ${...:-false} читает .env рядом с этим файлом).
+    # Пароли заданы явно: в application.yml умолчаний у них нет. У локального брокера нет TLS.
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/data_reference
       DB_PASSWORD: data_reference
@@ -130,11 +102,11 @@ services:
       RABBITMQ_PASSWORD: data_reference
       RABBITMQ_SSL_ENABLED: "false"
       RABBITMQ_LISTENER_AUTO_STARTUP: ${RABBITMQ_LISTENER_AUTO_STARTUP:-false}
-      # Тот же порт, что опубликован ниже, откуда бы он ни пришёл: из .env или из окружения.
+      # Тот же порт, что опубликован ниже.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     ports:
       - "127.0.0.1:8080:8080"
-      # Актуатор (health, prometheus) — на своём порту, MANAGEMENT_PORT из .env, умолчание 8081.
+      # Актуатор (health, prometheus).
       - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
     depends_on:
       postgres:
@@ -142,12 +114,8 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Стенд потребителя, см. шапку. Тот же образ, что у профиля app, но без брокера: нет
-  # depends_on на rabbitmq, слушатели 1С выключены явно — умолчание в application.yml
-  # их включает. Пароль базы — тоже явно, умолчания у него нет. Переменные
-  # сервиса из .env (env_file) сюда не подключаются — стенд не зависит от локальных
-  # настроек профиля app; аргументы сборки образа те же, что у app. Проверка здоровья
-  # брокера выключена: брокера у стенда нет, и /actuator/health иначе отвечал бы DOWN.
+  # Сервис стенда (см. шапку): тот же образ, но без брокера и без .env, чтобы стенд
+  # не зависел от локальных настроек. Проверка брокера в health выключена, иначе был бы DOWN.
   data-reference-stand:
     profiles: [ stand ]
     build: *data-reference-build
@@ -159,14 +127,14 @@ services:
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
       - "127.0.0.1:8080:8080"
-      # Актуатор — на своём порту; .env стенд не читает, порт — умолчание application.yml.
+      # Актуатор; порт — умолчание application.yml.
       - "127.0.0.1:8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
 
-  # Одноразовая закладка сырья стенда: ждёт схему, которую накатывает сервис на старте,
-  # и кладёт seed.sql. Файлы — только для чтения. Идемпотентна по message_id.
+  # Разовая закладка данных стенда: ждёт схему, которую создаёт сервис на старте, и кладёт
+  # seed.sql. Повторный запуск ничего не дублирует.
   stand-seed:
     profiles: [ stand ]
     image: postgres:16.10-alpine
