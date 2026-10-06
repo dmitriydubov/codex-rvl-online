@@ -4,6 +4,7 @@ import jakarta.servlet.Filter;
 import java.util.List;
 import javax.sql.DataSource;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.context.WebApplicationContext;
@@ -13,8 +14,8 @@ import org.springframework.web.context.WebApplicationContext;
 public class TestSupportConfig {
 
     @Bean
-    public DatabaseCleaner databaseCleaner(DataSource dataSource) {
-        return new DatabaseCleaner(dataSource);
+    public DatabaseCleaner databaseCleaner(DataSource dataSource, CacheManager cacheManager) {
+        return new DatabaseCleaner(dataSource, cacheManager);
     }
 
     @Bean

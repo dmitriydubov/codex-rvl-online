@@ -70,6 +70,11 @@ public class OneCSteps {
         inbox.receive(OneCReferenceMessages.programWithLpuList(externalId, lines));
     }
 
+    @Дано("1С:УСК прислала адрес санатория:")
+    public void sanatoriumAddressSent(Map<String, String> address) {
+        inbox.receive(OneCReferenceMessages.sanatoriumAddress(address));
+    }
+
     @Дано("1С:УСК прислала полис:")
     public void policySent(Map<String, String> policy) {
         inbox.receive(OneCMessages.policy(policy));

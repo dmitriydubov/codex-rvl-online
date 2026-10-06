@@ -17,8 +17,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Сообщения 1С:УСК справочников каталога ЛПУ и МКБ-10 из таблиц шагов «Дано»: вид обращения (ТЗ-7), код МКБ-10
- * (ТЗ-4), договор ЛПУ (ТЗ-5) и программа РВЛ с перечнем учреждений (ТЗ-6). Ключ таблицы — поле контракта
- * по-русски, значение — как его прислала бы 1С.
+ * (ТЗ-4), договор ЛПУ (ТЗ-5), программа РВЛ с перечнем учреждений (ТЗ-6) и адрес санатория (ТЗ-8). Ключ
+ * таблицы — поле контракта по-русски, значение — как его прислала бы 1С.
  *
  * <p>Поля контракта, которых сценарий не называет, заполняются здесь постоянными значениями. Договор ЛПУ, если
  * сценарий не назвал иного, — главный: без ссылки на главный договор и со своими ценами. Строка перечня программы — первый слой рисковой части
@@ -44,6 +44,8 @@ final class OneCReferenceMessages {
     private static final String MKB10_QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
     private static final String LPU_CONTRACTS_QUEUE = "1c-usk_to_rvl-online_contragents-contracts-changes";
     private static final String PROGRAMS_QUEUE = "1c-usk_to_rvl-online_programms-changes";
+    private static final String CONTACTS_QUEUE = "1c-usk_to_rvl-online_contact-information-changes";
+    private static final String ACTUAL_ADDRESS = "Фактический адрес контрагента";
 
     private static final JsonMapper JSON = JsonMapper.shared();
 
@@ -107,6 +109,27 @@ final class OneCReferenceMessages {
                     .putObject("value").put("value", flag(table, SOB_EXPORT));
         }
         return new OneCMessage(OneCStream.LPU_CONTRACTS, LPU_CONTRACTS_QUEUE, data, InboundStatus.PROCESSED);
+    }
+
+    /**
+     * Контактная информация санатория (ТЗ-8) с одним действительным адресом: представление адреса и регион. Вид
+     * адреса — фактический, номер строки — первый.
+     */
+    static OneCMessage sanatoriumAddress(Map<String, String> table) {
+        onlyKnown(table, SANATORIUM, "адрес", "регион");
+        String sanatorium = required(table, SANATORIUM);
+        ObjectNode data = JSON.createObjectNode();
+        data.putArray("filter").addObject()
+                .put("fieldName", "object")
+                .putObject("value").put("value", sanatorium);
+        ObjectNode address = data.putArray("recordSet").addObject()
+                .put("type", "Адрес")
+                .put("rowNumber", 1)
+                .put("representation", required(table, "адрес"))
+                .put("field2", required(table, "регион"));
+        address.putObject("kind").put("representation", ACTUAL_ADDRESS);
+        address.putObject("object").put("value", sanatorium);
+        return new OneCMessage(OneCStream.LPU_CONTACTS, CONTACTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
     /** Программа РВЛ с перечнем учреждений (ТЗ-6): строка перечня на каждую строку таблицы шага. */

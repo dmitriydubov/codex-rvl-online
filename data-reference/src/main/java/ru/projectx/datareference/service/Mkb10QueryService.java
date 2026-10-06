@@ -5,9 +5,11 @@ import java.util.Locale;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
@@ -23,6 +25,9 @@ import ru.projectx.datareference.exception.InvalidRequestException;
  * <p>Здесь проверяется вход, а читает базу {@link Mkb10Lookup}. Сам этот класс транзакцию не открывает
  * намеренно: неверный параметр отклоняется ошибкой вызывающего, даже когда база недоступна. Верхние пределы
  * строки и перечня проверяются первыми, до обрезки пробелов и удаления повторов (см. {@link SearchInputLimits}).
+ *
+ * <p>Ответы кэшируются по входу, как его прислал вызывающий. Неверный вход отклоняется исключением и в кэш
+ * не попадает.
  */
 @Service
 public class Mkb10QueryService implements Mkb10Reads {
@@ -40,6 +45,7 @@ public class Mkb10QueryService implements Mkb10Reads {
     }
 
     @Override
+    @Cacheable(ReferenceCaches.MKB10_SEARCH)
     public Mkb10Response search(String rawQuery, @Nullable Integer requestedLimit) {
         SearchInputLimits.requireQueryNotLongerThan(rawQuery, api.mkb10().maxQueryLength());
         Limit limit = Limit.of(ResultLimits.resolve(requestedLimit, api.mkb10().defaultLimit(), api.mkb10().maxLimit()));
@@ -51,6 +57,7 @@ public class Mkb10QueryService implements Mkb10Reads {
     }
 
     @Override
+    @Cacheable(ReferenceCaches.MKB10_CODES)
     public Mkb10Response byCodes(List<String> rawCodes) {
         SearchInputLimits.requireCodesNotMoreThan(rawCodes, api.mkb10().maxCodes());
         requireOneCodePerValue(rawCodes);

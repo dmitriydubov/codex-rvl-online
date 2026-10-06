@@ -2,8 +2,10 @@ package ru.projectx.datareference.service;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.ServicePriceResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.price.ServicePriceCalculator;
@@ -18,6 +20,9 @@ import ru.projectx.datareference.service.price.StayPeriod;
  * Порядок дат проверяется первым: выезд раньше заезда называется именно так, а не слишком длинным периодом. Формат
  * дат проверяется ещё раньше, при чтении параметров запроса. Расчёт идёт после транзакции чтения и соединение с базой
  * не держит.
+ *
+ * <p>Готовый расчёт кэшируется по сегодняшнему дню контура, услуге и периоду: выбор прайсового договора и услуг
+ * учреждения зависит от сегодняшнего дня. Отказ в кэш не попадает.
  */
 @Service
 public class ServicePriceQueryService implements ServicePriceReads {
@@ -36,6 +41,7 @@ public class ServicePriceQueryService implements ServicePriceReads {
     }
 
     @Override
+    @Cacheable(cacheNames = ReferenceCaches.SERVICE_PRICES, keyGenerator = ReferenceCaches.TODAY_KEY)
     public ServicePriceResponse price(UUID serviceId, LocalDate checkIn, LocalDate checkOut) {
         if (!checkOut.isAfter(checkIn)) {
             throw new InvalidRequestException(CHECK_OUT, CHECK_OUT_AFTER_CHECK_IN);

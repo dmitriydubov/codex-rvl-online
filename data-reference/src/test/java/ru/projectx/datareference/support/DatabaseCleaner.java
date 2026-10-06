@@ -4,7 +4,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Objects;
 import javax.sql.DataSource;
+import org.springframework.cache.CacheManager;
 
 /**
  * Пустая база перед каждым тестом.
@@ -21,7 +23,9 @@ import javax.sql.DataSource;
  * тогда, когда появится следующая таблица, и тест начнёт падать по причине, не связанной
  * с тем, что он проверяет. Служебные таблицы Liquibase не трогаются — схема накатана
  * один раз на весь прогон.
-
+ *
+ * <p>Вместе с базой очищаются кэши ответов справочных ручек: они — копия строк базы, и ответ, взятый в кэш
+ * соседним тестом, вернулся бы вместо строк этого теста.
  */
 public class DatabaseCleaner {
 
@@ -33,12 +37,19 @@ public class DatabaseCleaner {
             """;
 
     private final DataSource dataSource;
+    private final CacheManager cacheManager;
 
-    public DatabaseCleaner(DataSource dataSource) {
+    public DatabaseCleaner(DataSource dataSource, CacheManager cacheManager) {
         this.dataSource = dataSource;
+        this.cacheManager = cacheManager;
     }
 
     public void clear() {
+        clearTables();
+        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).invalidate());
+    }
+
+    private void clearTables() {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
 
