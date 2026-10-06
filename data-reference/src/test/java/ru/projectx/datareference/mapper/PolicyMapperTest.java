@@ -216,6 +216,29 @@ class PolicyMapperTest {
         assertThat(line.availability()).isTrue();
     }
 
+    /** Процент франшизы хранится в колонке процента: три цифры до запятой. */
+    @Test
+    void copaymentAtPercentColumnLimit_isStored() {
+        when(repository.findByExternalId(POLICY)).thenReturn(Optional.empty());
+        ObjectNode data = policy();
+        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("999.99"));
+
+        mapper.apply(data);
+
+        assertThat(saved().serviceLines().getFirst().copayment()).isEqualByComparingTo("999.99");
+    }
+
+    @Test
+    void copaymentBeyondPercentColumn_isContractViolationNamingField() {
+        ObjectNode data = policy();
+        ((ObjectNode) data.path("services").get(0)).put("copayment", new BigDecimal("1000.00"));
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment больше допустимого");
+        verify(repository, never()).save(any());
+    }
+
     @Test
     void serviceLineWithEmptyReferences_isStoredWithoutThem() {
         when(repository.findByExternalId(POLICY)).thenReturn(Optional.empty());

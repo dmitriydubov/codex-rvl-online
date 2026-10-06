@@ -5,7 +5,7 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Обязательные поля сообщения 1С:УСК, которые читаются строго по типу JSON: целое число, логическое значение и число.
+ * Обязательные поля сообщения 1С:УСК, которые читаются строго по типу JSON: целое число, логическое значение и процент.
  *
  * <p>Поле без значения или с JSON null — нарушение контракта, а не ноль и не false. Значение другого типа, даже похожее
  * на верное (строка {@code "1"}, число вместо логического), тоже отклоняется: подставленное значение ушло бы соседним
@@ -45,23 +45,15 @@ public final class OneCRequiredValues {
     }
 
     /**
-     * Число по тому же правилу, что и необязательное денежное значение ({@link OneCValues#amount}).
-     *
-     * @throws OneCFieldException если поля нет, оно не число JSON или у него больше двух знаков после запятой
-     */
-    public static BigDecimal amount(JsonNode data, String field) {
-        requirePresent(data, field);
-        return OneCValues.amount(data, field).orElseThrow(() -> wrongType(field, "числом"));
-    }
-
-    /**
-     * Процент по правилу денежного значения. Знаки после запятой проверяются при чтении числа, раньше диапазона.
+     * Процент: не больше двух знаков после запятой и от 0 до 100. Знаки проверяются при чтении числа, раньше диапазона.
+     * Диапазон строже колонки процента, поэтому и огромное значение отклоняется им.
      *
      * @throws OneCFieldException если поля нет, оно не число JSON, у него больше двух знаков после запятой или оно вне
      *                            диапазона от 0 до 100 включительно
      */
     public static BigDecimal percent(JsonNode data, String field) {
-        BigDecimal value = amount(data, field);
+        requirePresent(data, field);
+        BigDecimal value = OneCMoneyScale.read(data, field).orElseThrow(() -> wrongType(field, "числом"));
         if (value.signum() < 0 || value.compareTo(FULL_PERCENT) > 0) {
             throw new OneCFieldException("поле %s вне диапазона от 0 до %s".formatted(field, FULL_PERCENT));
         }
