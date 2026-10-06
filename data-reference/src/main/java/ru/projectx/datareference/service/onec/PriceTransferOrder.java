@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Порядок передач прайса по услуге: цены меняет только передача, финальное сообщение которой принято не раньше
@@ -19,8 +18,6 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 public class PriceTransferOrder {
-
-    private static final String KEY_VALUE = "keyValue";
 
     private final PriceListFinalizationRepository finalizations;
     private final InboundMessageRepository inbound;
@@ -40,14 +37,6 @@ public class PriceTransferOrder {
                 .filter(applied -> applied.isNewerThan(finalMessage.receipt().receivedAt()))
                 .map(newer -> ImportResult.skipped(newer.reason()))
                 .orElseGet(() -> replaceAndRemember(service, finalMessage, replacement));
-    }
-
-    /**
-     * Блокирует строку услуги, названной в части передачи, до того как читаются остальные части: тогда закрытие
-     * зависших передач той же услуги не меняет их у сборки за спиной. Часть без читаемого GUID услуги не блокирует.
-     */
-    void lockServiceOf(ObjectNode part) {
-        OneCValues.text(part, KEY_VALUE).flatMap(OneCGuid::parse).ifPresent(finalizations::lockByService);
     }
 
     /** Последняя применённая передача по услуге; строка услуги заблокирована до конца транзакции вызывающего. */

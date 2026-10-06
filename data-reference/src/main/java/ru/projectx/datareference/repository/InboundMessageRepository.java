@@ -3,6 +3,7 @@ package ru.projectx.datareference.repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -79,6 +80,22 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
              limit 1
             """)
     Optional<String> findBufferedTransferService(@Param("cid") UUID cid);
+
+    /**
+     * GUID услуги каждой части передачи {@code cid}, лежащей в буфере, так, как он записан в её теле; пустой элемент —
+     * у части без этого поля. Читается одно поле тела, сущности в контекст не загружаются: запрос можно делать до
+     * блокировки строки услуги, не рискуя потом работать с устаревшими частями.
+     */
+    @Query(nativeQuery = true, value = """
+            select payload -> 'data' ->> 'keyValue'
+              from inbound_message
+             where correlation_id = :cid
+               and status = 'BUFFERED'
+            """)
+    List<String> findBufferedTransferServices(@Param("cid") UUID cid);
+
+    /** Есть ли у передачи {@code cid} часть в одном из статусов {@code statuses}. Строки сырья не загружаются. */
+    boolean existsByCorrelationIdAndStatusIn(UUID correlationId, Set<InboundStatus> statuses);
 
     /**
      * Многочастные передачи в буфере, первая часть которых принята раньше {@code receivedBefore}: по строке на

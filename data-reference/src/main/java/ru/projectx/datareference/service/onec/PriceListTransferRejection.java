@@ -31,15 +31,15 @@ public class PriceListTransferRejection implements RejectionScope {
     private static final String DATA = "data";
 
     private final InboundMessageRepository repository;
-    private final PriceTransferOrder order;
+    private final PriceTransferServiceLock serviceLock;
     private final PriceListPartCheck partCheck;
     private final ObjectMapper json;
 
-    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferOrder order,
+    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferServiceLock serviceLock,
             PriceListMapper priceList, ObjectMapper json) {
 
         this.repository = repository;
-        this.order = order;
+        this.serviceLock = serviceLock;
         this.partCheck = new PriceListPartCheck(priceList);
         this.json = json;
     }
@@ -59,9 +59,12 @@ public class PriceListTransferRejection implements RejectionScope {
                 });
     }
 
-    /** Строка услуги блокируется до чтения частей, как при разборе: закрытие зависших не пишет их одновременно. */
+    /**
+     * Строка услуги передачи блокируется до чтения частей, как при разборе: закрытие зависших не пишет их
+     * одновременно, даже если отклоняемая часть называет другую услугу.
+     */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
-        order.lockServiceOf(part.data());
+        serviceLock.lockTransferService(part.markup().cid(), part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.markup().cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
         part.markup().applyTo(message);
@@ -89,9 +92,10 @@ public class PriceListTransferRejection implements RejectionScope {
                 .toList();
     }
 
-    /** Та же проверка, что прервала разбор части: если она находит ошибку, отказ принадлежит этой части. */
+    /** Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. */
     private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
         try {
+            serviceLock.serviceOf(part.markup().cid(), part.data());
             partCheck.check(message.receipt().messageId(), part.markup(), part.data(), parts);
             return false;
         }

@@ -234,6 +234,33 @@ class PriceListTransferAssemblerTest {
         steps.verify(repository).findByCorrelationId(CID);
     }
 
+    /**
+     * Услуга части сверяется с частями передачи в буфере раньше, чем блокируется её строка: блокируется только
+     * услуга, которую передача называет целиком.
+     */
+    @Test
+    void serviceOfPart_isCheckedBeforeItsRowIsLocked() {
+        receive(message(batchData(row(1, "100.00"))));
+
+        InOrder steps = inOrder(finalizations, repository);
+        steps.verify(repository).findBufferedTransferServices(CID);
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+    }
+
+    /** Часть называет не ту услугу, что части в буфере: ошибка части, ничего не заблокировано и не сохранено. */
+    @Test
+    void partNamingAnotherServiceThanTransfer_isContractViolation_beforeLocking() {
+        InboundMessage batch = message(batchData(row(1, "100.00")));
+        when(repository.findBufferedTransferServices(CID)).thenReturn(List.of(UUID.randomUUID().toString()));
+
+        assertThatThrownBy(() -> assembler().handle(batch, dataOf(batch)))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("части передачи " + CID + " называют разные услуги");
+        verify(finalizations, never()).lockByService(any());
+        verify(repository, never()).save(any());
+        verify(priceListMapper, never()).apply(any());
+    }
+
     /** Применённая передача становится последней по услуге: следующие сравниваются с её финальным сообщением. */
     @Test
     void appliedTransfer_becomesTheLastOfItsService() {
@@ -384,7 +411,8 @@ class PriceListTransferAssemblerTest {
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
         PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
-        return new PriceListTransferAssembler(inboundMessageService, priceListMapper, order,
+        return new PriceListTransferAssembler(inboundMessageService, priceListMapper,
+                new PriceTransferServiceLock(repository, finalizations),
                 new PriceListReplacement(priceListMapper, order, json), clock);
     }
 
