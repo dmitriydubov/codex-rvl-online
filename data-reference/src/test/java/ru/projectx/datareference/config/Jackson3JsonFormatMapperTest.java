@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 /**
- * Мост к Jackson 3 переводит объектное поле {@code jsonb} в JSON и обратно без потерь: первое такое поле должно
- * заработать сразу, а не упасть при первой записи или чтении.
+ * Мост к Jackson 3 переводит объект в JSON и обратно без потерь. Hibernate вызывает эти методы для колонки
+ * {@code jsonb}, когда в ней хранится объект, а не строка.
  */
 class Jackson3JsonFormatMapperTest {
 

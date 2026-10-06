@@ -40,7 +40,7 @@ class ProgramResponseTest {
     }
 
     @Test
-    void service_keepsDirectAttachmentOffWhenRowHasItOff() {
+    void service_withoutAppealTypeAndDates_leavesThemEmpty() {
         Lpu lpu = Lpu.create(UUID.randomUUID(),
                 new Lpu.Details("Санаторий", null, null, null, null, null, false), NOW);
         Program program = Program.create(UUID.randomUUID(),
@@ -50,7 +50,7 @@ class ProgramResponseTest {
 
         ProgramResponse.Service service = ProgramResponse.of(program).services().get(0);
 
-        assertThat(service.directAttachment()).isFalse();
-        assertThat(service.coverageType()).isEqualTo(ProgramLpu.CoverageType.R);
+        assertThat(service).isEqualTo(new ProgramResponse.Service(lpu.id(), lpu.externalId(), "Санаторий",
+                null, null, null, 1, false, BigDecimal.ZERO, ProgramLpu.CoverageType.R));
     }
 }
