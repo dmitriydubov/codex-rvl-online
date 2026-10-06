@@ -239,7 +239,9 @@ tasks.register('checkstyleGate', JavaExec) {
 // PMD through the same CLI as CPD, for the same reason as Checkstyle. It needs the compiled classes and their
 // dependencies (--aux-classpath) so that rules about types, overrides and resources can resolve symbols.
 // Suppressed violations (NOPMD, @SuppressWarnings("PMD...")) count as violations: rules are switched off
-// only by the human, in gauntlet/config/pmd-ruleset.xml.
+// only by the human, in gauntlet/config/pmd-ruleset.xml. Suppressions declared there (rule properties
+// violationSuppressXPath and violationSuppressRegex, report types "xpath" and "regex") are that human decision and
+// do not count.
 tasks.register('pmdGate', JavaExec) {
     group = 'gauntlet'
     description = 'Anti-pattern rules from gauntlet/config/pmd-ruleset.xml (main sources in scope).'
@@ -273,7 +275,8 @@ tasks.register('pmdGate', JavaExec) {
         root.file.each { f ->
             f.violation.each { v -> violations << "[ERROR] ${f.@name}:${v.@beginline}: ${v.text().trim()} [${v.@rule}]" }
         }
-        root.suppressedviolation.each { s ->
+        def rulesetSuppressions = ['xpath', 'regex']
+        root.suppressedviolation.findAll { !(it.@suppressiontype.text() in rulesetSuppressions) }.each { s ->
             violations << "[ERROR] ${s.@filename}: suppressed (${s.@suppressiontype}) - ${s.@msg} [suppression]"
         }
         root.error.each { e -> violations << "[ERROR] ${e.@filename}: PMD could not analyse the file - ${e.@msg} [error]" }
