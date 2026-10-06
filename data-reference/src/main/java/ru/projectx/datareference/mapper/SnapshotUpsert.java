@@ -5,7 +5,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import ru.projectx.datareference.service.onec.ImportResult;
 
 /**
  * Общий шаг разбора справочника 1С: найти запись по GUID 1С, создать её или применить к ней новый

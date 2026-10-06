@@ -12,8 +12,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.RejectionScope;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -28,13 +26,11 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class PriceListTransferRejection implements RejectionScope {
 
-    private static final String DATA = "data";
-
     private final InboundMessageRepository repository;
     private final PriceTransferServiceLock serviceLock;
     private final PriceTransferServiceCheck serviceCheck;
     private final PriceListPartCheck partCheck;
-    private final ObjectMapper json;
+    private final StoredEnvelope envelope;
 
     public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferServiceLock serviceLock,
             PriceListMapper priceList, ObjectMapper json) {
@@ -43,7 +39,7 @@ public class PriceListTransferRejection implements RejectionScope {
         this.serviceLock = serviceLock;
         this.serviceCheck = new PriceTransferServiceCheck(repository);
         this.partCheck = new PriceListPartCheck(priceList);
-        this.json = json;
+        this.envelope = new StoredEnvelope(json);
     }
 
     @Override
@@ -112,12 +108,9 @@ public class PriceListTransferRejection implements RejectionScope {
      */
     private Optional<TransferPart> partOf(InboundMessage message) {
         try {
-            return Optional.ofNullable(message.payload())
-                    .map(payload -> json.readTree(payload).path(DATA))
-                    .filter(JsonNode::isObject)
-                    .map(data -> new TransferPart(PriceListTransferMarkup.of((ObjectNode) data), (ObjectNode) data));
+            return envelope.dataOf(message).map(data -> new TransferPart(PriceListTransferMarkup.of(data), data));
         }
-        catch (JacksonException | OneCFieldException notTransferPart) {
+        catch (OneCFieldException notTransferPart) {
             return Optional.empty();
         }
     }

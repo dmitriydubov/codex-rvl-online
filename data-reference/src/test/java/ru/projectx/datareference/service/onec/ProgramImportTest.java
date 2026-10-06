@@ -14,22 +14,23 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-import ru.projectx.datareference.mapper.ProgramMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.mapper.ProgramMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-6: страховые программы РВЛ и перечень доступных по ним учреждений — то, что
+ * Страховые программы РВЛ (ТЗ-6) и перечень доступных по ним учреждений — то, что
  * отвечает на вопрос «куда можно записаться по программе застрахованного».
  *
  * <p>{@code @Transactional} здесь не ради отката, а ради открытой сессии: проверки
@@ -158,7 +159,7 @@ class ProgramImportTest {
     }
 
     /**
-     * ТЗ-6, п. 6.3: программа потеряла признак РВЛ. Она архивируется, а не удаляется,
+     * Программа потеряла признак РВЛ. Она архивируется, а не удаляется,
      * и перечень учреждений очищается — по не-РВЛ программе нельзя никуда.
      */
     @Test

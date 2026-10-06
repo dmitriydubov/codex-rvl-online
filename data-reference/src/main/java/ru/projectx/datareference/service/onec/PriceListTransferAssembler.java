@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.node.ObjectNode;
@@ -84,14 +85,14 @@ public class PriceListTransferAssembler implements StreamHandler {
     private ImportResult fail(PriceListTransfer.Mismatched transfer) {
         log.error(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.skipped(transfer.reason());
+        return ImportResult.rejected(transfer.reason());
     }
 
     /** Отказ передачи уже записан и о нём уже сообщено; опоздавшая часть просто разделяет его. */
     private ImportResult rejectLate(PriceListTransfer.Rejected transfer) {
         log.warn(transfer.reason());
         saveAll(transfer.fail());
-        return ImportResult.skipped(transfer.reason());
+        return ImportResult.rejected(transfer.reason());
     }
 
     /** Пропущенная передача уже не применится; поздняя часть разделяет её пропуск. */

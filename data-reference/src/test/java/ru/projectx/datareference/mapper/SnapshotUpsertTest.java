@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.service.onec.ImportResult;
 
 /**
  * Защищает общий шаг разбора справочников 1С: запись, которой ещё нет, создаётся из снимка, известная

@@ -18,8 +18,6 @@ import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -28,7 +26,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>В отличие от остальных мапперов, этот не разбирает отдельное сообщение источника. 1С присылает
  * прейскурант по услуге несколькими сообщениями, и сюда приходит уже собранная передача: строки всех
- * её сообщений вместе. Собирает передачу {@code service.onec.PriceListTransferAssembler}, а здесь
+ * её сообщений вместе. Собирает передачу сборщик прайс-листов в разборе сообщений, а здесь
  * остаются правила справочника: принимаются только цены услуг, которые есть в справочнике, и старые
  * цены услуги целиком заменяются новыми.
  *

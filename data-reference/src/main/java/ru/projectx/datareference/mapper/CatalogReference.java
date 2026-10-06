@@ -3,7 +3,6 @@ package ru.projectx.datareference.mapper;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import ru.projectx.datareference.service.onec.ImportResult;
 
 /**
  * Общий фильтр потоков 1С: сообщение применяется, только если запись, на которую оно ссылается, уже

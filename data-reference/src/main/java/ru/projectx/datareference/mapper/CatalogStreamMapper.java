@@ -6,8 +6,6 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.StreamMapper;
 
 /**
  * Разбор потока 1С, который ведёт справочник по GUID 1С: сообщение создаёт запись или заменяет её

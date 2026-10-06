@@ -26,7 +26,6 @@ import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;

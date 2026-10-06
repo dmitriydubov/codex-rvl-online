@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.amqp.core.QueueInformation;
-import ru.projectx.datareference.service.onec.OneCGuid;
+import ru.projectx.datareference.mapper.OneCGuid;
 
 /**
  * Шаги «1С:УСК публикует …» и проверки состояния очередей брокера.

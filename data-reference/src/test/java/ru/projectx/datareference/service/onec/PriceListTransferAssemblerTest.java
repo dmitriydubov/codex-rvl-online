@@ -30,6 +30,7 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
@@ -155,7 +156,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(finalMessage);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportResult.rejected(reason));
         assertThat(List.of(finalMessage, batch)).allSatisfy(message -> {
             assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
             assertThat(message.outcome().lastError()).isEqualTo(reason);
@@ -200,7 +201,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(lateFinal);
 
-        assertThat(result).isEqualTo(ImportResult.skipped(reason));
+        assertThat(result).isEqualTo(ImportResult.rejected(reason));
         assertThat(lateFinal.outcome().status()).isEqualTo(InboundStatus.FAILED);
         assertThat(lateFinal.outcome().lastError()).isEqualTo(reason);
         assertThat(rejected.outcome().lastError()).isEqualTo("в строке прайса нет цены");
@@ -217,7 +218,7 @@ class PriceListTransferAssemblerTest {
 
         ImportResult result = receive(lateBatch);
 
-        assertThat(result).isEqualTo(ImportResult.skipped("передача " + CID + " уже отклонена"));
+        assertThat(result).isEqualTo(ImportResult.rejected("передача " + CID + " уже отклонена"));
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 
@@ -341,6 +342,20 @@ class PriceListTransferAssemblerTest {
         assertThatThrownBy(() -> receive(finalMessage))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("тело сообщения передачи стёрто, собрать её нечем");
+    }
+
+    /** Конверт части без объекта data — нарушение контракта с тем же текстом, что при разборе одного сообщения. */
+    @Test
+    void batchWithoutDataObject_isContractViolation() {
+        InboundMessage batch = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW), "{\"metadata\":{}}");
+        batch.markBuffered(CID, null, 1);
+        correlated.add(batch);
+        InboundMessage finalMessage = message(finalData(1, 1));
+
+        assertThatThrownBy(() -> receive(finalMessage))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("в конверте сообщения нет объекта data");
     }
 
     @Test
