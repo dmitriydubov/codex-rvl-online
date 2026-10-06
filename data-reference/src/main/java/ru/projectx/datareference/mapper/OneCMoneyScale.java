@@ -36,13 +36,14 @@ final class OneCMoneyScale {
 
     /**
      * Лишние знаки ищутся одним отбрасыванием всего, что дальше второго знака. Нули в конце не снимаются по одному: у
-     * числа из сотен тысяч цифр это заняло бы секунды.
+     * числа из сотен тысяч цифр это заняло бы секунды. Число, у которого знаков после запятой и так не больше двух, не
+     * пересчитывается: число с огромным порядком иначе развернулось бы в цифры.
      *
      * @throws OneCFieldException если у значения больше двух значащих знаков после запятой
      */
     private static BigDecimal checked(BigDecimal amount, String field) {
-        if (amount.scale() > MAX_FRACTION_DIGITS
-                && amount.compareTo(amount.setScale(MAX_FRACTION_DIGITS, RoundingMode.DOWN)) != 0) {
+        int keptScale = Math.min(amount.scale(), MAX_FRACTION_DIGITS);
+        if (amount.compareTo(amount.setScale(keptScale, RoundingMode.DOWN)) != 0) {
             throw new OneCFieldException("поле %s содержит больше двух знаков после запятой".formatted(field));
         }
         return amount;
