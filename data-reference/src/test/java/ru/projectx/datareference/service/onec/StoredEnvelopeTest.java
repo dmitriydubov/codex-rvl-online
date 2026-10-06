@@ -114,11 +114,11 @@ class StoredEnvelopeTest {
 
     /**
      * Скорость чтения длинных чисел: пакет прайса из ста строк, где цена, цена со скидкой и незнакомое поле — числа самой
-     * большой длины, какую хранит база. Время чтения растёт с числом таких чисел линейно, без квадратичного разбора.
-     * Сколько чисел может прийти в одном сообщении, этот тест не ограничивает.
+     * большой длины, какую хранит база. Все триста чисел читаются за секунды. Сколько чисел может прийти в одном
+     * сообщении, этот тест не ограничивает.
      */
     @Test
-    void messageFullOfLongestNumbers_isReadInBoundedTime() {
+    void messageFullOfLongestNumbers_isReadFast() {
         String row = "{\"price\":%1$s,\"priceWithDiscount\":%1$s,\"unknown\":%1$s}".formatted(LONGEST_STORED_NUMBER);
         String rows = IntStream.range(0, 100).mapToObj(index -> row).collect(Collectors.joining(","));
         InboundMessage message = message(envelopeOf("{\"recordSet\":[" + rows + "]}"));
