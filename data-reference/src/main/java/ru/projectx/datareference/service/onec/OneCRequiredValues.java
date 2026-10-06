@@ -34,16 +34,13 @@ public final class OneCRequiredValues {
     }
 
     /**
-     * Число читается из его текста, а не через {@code double}: двоичная дробь дала бы копеечные расхождения.
+     * Число по тому же правилу, что и необязательное денежное значение ({@link OneCValues#amount}).
      *
      * @throws OneCFieldException если поля нет или оно не число JSON
      */
     public static BigDecimal amount(JsonNode data, String field) {
-        JsonNode value = present(data, field);
-        if (value.isNumber()) {
-            return new BigDecimal(value.asString());
-        }
-        throw wrongType(field, "числом");
+        present(data, field);
+        return OneCValues.amount(data, field).orElseThrow(() -> wrongType(field, "числом"));
     }
 
     private static JsonNode present(JsonNode data, String field) {

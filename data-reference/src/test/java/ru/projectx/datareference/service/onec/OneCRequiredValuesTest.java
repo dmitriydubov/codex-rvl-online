@@ -81,7 +81,7 @@ class OneCRequiredValuesTest {
     }
 
     @Test
-    void amount_isReadFromNumberTextWithoutBinaryRounding() {
+    void numberWithFractionOrInteger_isReadAsSent() {
         assertThat(OneCRequiredValues.amount(node("{\"share\":12.34}"), "share")).isEqualByComparingTo("12.34");
         assertThat(OneCRequiredValues.amount(node("{\"share\":0}"), "share")).isZero();
     }
