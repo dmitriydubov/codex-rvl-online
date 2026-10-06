@@ -7,7 +7,7 @@ import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
@@ -91,26 +91,22 @@ public class LpuContractMapper extends OwnedCatalogStreamMapper<LpuContract, Lpu
 
     /**
      * Санаторий отделения важнее санатория головной организации. Отделение, о котором ещё ничего не известно,
-     * договор ждёт, даже если головная организация уже есть. Если отделение не указано, совпадает с головной
-     * организацией или признано не нашим, решает головная организация.
+     * договор ждёт, даже если головная организация уже есть. Если отделение не указано или признано не нашим, решает
+     * головная организация. Отделение, совпадающее с головной организацией, проходит тот же путь и приходит к тому же
+     * исходу.
      */
     private ImportResult applyToSanatorium(ObjectNode data) {
-        return branchOf(data)
+        return OneCValues.uuid(data, BRANCH_ID)
                 .map(branch -> sanatoriums.applyIfKnown(branch, sanatorium -> applyUnder(sanatorium, data),
                         () -> applyToOwner(data)))
                 .orElseGet(() -> applyToOwner(data));
     }
 
     private ImportResult applyToOwner(ObjectNode data) {
+        Supplier<ImportResult> stranger = () -> stranger(data);
         return OneCValues.uuid(data, OWNER_ID)
-                .map(owner -> sanatoriums.applyIfKnown(owner, sanatorium -> applyUnder(sanatorium, data),
-                        () -> stranger(data)))
-                .orElseGet(() -> stranger(data));
-    }
-
-    private static Optional<UUID> branchOf(JsonNode data) {
-        Optional<UUID> owner = OneCValues.uuid(data, OWNER_ID);
-        return OneCValues.uuid(data, BRANCH_ID).filter(branch -> owner.filter(branch::equals).isEmpty());
+                .map(owner -> sanatoriums.applyIfKnown(owner, sanatorium -> applyUnder(sanatorium, data), stranger))
+                .orElseGet(stranger);
     }
 
     private ImportResult applyUnder(Lpu sanatorium, ObjectNode data) {
