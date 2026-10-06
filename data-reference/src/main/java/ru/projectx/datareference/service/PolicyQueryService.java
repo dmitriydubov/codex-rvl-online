@@ -82,8 +82,8 @@ public class PolicyQueryService implements PolicyReads {
     }
 
     /**
-     * Договор и программы подтягиваются по GUID 1С: обе связи логические, без внешнего ключа (ТЗ-1),
-     * и отсутствие записи в справочнике — норма, а не ошибка.
+     * Договор и программы подтягиваются по GUID 1С. Обе связи логические, без внешнего ключа, — так их присылает
+     * 1С, и отсутствие записи в справочнике — норма, а не ошибка.
      */
     private PolicyResponse assemble(Policy policy) {
         InsuranceContract contract = insuranceContracts.findByExternalId(policy.details().externalContractId())
