@@ -35,6 +35,12 @@ public class OneCMoneyLimitSteps {
                 inbox.lastOf(OneCStream.POLICIES), field, OneCMoneyLimitMessages.recorded(field, record)));
     }
 
+    @Дано("1С:УСК прислала тот же полис под новым номером, а в его программе ещё незнакомое поле — число, записанное как {string}")
+    public void policyWithUnknownFieldSent(String record) {
+        inbox.receive(OneCMoneyScaleMessages.renamedPolicyWithUnknownField(
+                inbox.lastOf(OneCStream.POLICIES), OneCMoneyLimitMessages.recorded("bonusAmount", record)));
+    }
+
     @Дано("1С:УСК прислала ту же программу РВЛ под новым наименованием, а в строке услуги поле {string} — число, записанное как {string}")
     public void programRecordedSent(String field, String record) {
         inbox.receive(OneCMoneyLimitMessages.program(inbox.lastOf(OneCStream.PROGRAMS), field, record));
