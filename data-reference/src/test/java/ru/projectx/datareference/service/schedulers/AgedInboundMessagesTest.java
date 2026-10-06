@@ -56,6 +56,16 @@ class AgedInboundMessagesTest {
         assertThat(agedMessages().transfersBufferedLongerThan(Duration.ofHours(1), 20)).isSameAs(stuck);
     }
 
+    /** Закрытию нужны все зависшие передачи, без предела числа названных в предупреждении. */
+    @Test
+    void allTransfersBufferedLongerThan_asksWithoutLimit() {
+        List<BufferedTransfer> stuck = List.of(mock(BufferedTransfer.class));
+        when(repository.findTransfersBufferedBefore(NOW.minus(Duration.ofHours(1)), Limit.unlimited()))
+                .thenReturn(stuck);
+
+        assertThat(agedMessages().allTransfersBufferedLongerThan(Duration.ofHours(1))).isSameAs(stuck);
+    }
+
     private AgedInboundMessages agedMessages() {
         return new AgedInboundMessages(repository, quarantine, Clock.fixed(NOW, ZoneOffset.UTC));
     }

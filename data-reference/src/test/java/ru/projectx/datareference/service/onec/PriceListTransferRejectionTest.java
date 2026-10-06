@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.mockito.ArgumentMatchers;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
@@ -19,6 +21,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -35,8 +38,22 @@ class PriceListTransferRejectionTest {
 
     private final InboundMessageRepository repository = mock(InboundMessageRepository.class);
     private final PriceListMapper priceList = mock(PriceListMapper.class);
-    private final PriceListTransferRejection rejection =
-            new PriceListTransferRejection(repository, priceList, JsonMapper.builder().build());
+    private final PriceListFinalizationRepository finalizations = mock(PriceListFinalizationRepository.class);
+    private final PriceListTransferRejection rejection = new PriceListTransferRejection(repository,
+            new PriceTransferOrder(finalizations, repository), priceList, JsonMapper.builder().build());
+
+    /** Строка услуги блокируется до чтения частей: закрытие зависших передач не пишет их одновременно с отказом. */
+    @Test
+    void serviceRowIsLocked_beforeTransferPartsAreRead() {
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of());
+
+        rejection.reject(trigger, "база данных отклонила запись: X, SQLSTATE 22003");
+
+        InOrder steps = inOrder(finalizations, repository);
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+        steps.verify(repository).findByCorrelationId(CID);
+    }
 
     @Test
     void decidesRejectionsOfPriceListStream() {

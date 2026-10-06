@@ -2,6 +2,7 @@ package ru.projectx.datareference.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -63,6 +64,21 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
      * в непредсказуемом порядке.
      */
     List<InboundMessage> findByCorrelationId(UUID correlationId);
+
+    /**
+     * GUID услуги передачи {@code cid} так, как он записан в теле её части, ещё лежащей в буфере: финального
+     * сообщения, если оно пришло, иначе самой ранней. Пусто, если в буфере частей передачи нет. Читается одно поле
+     * тела, а не строки целиком.
+     */
+    @Query(nativeQuery = true, value = """
+            select payload -> 'data' ->> 'keyValue'
+              from inbound_message
+             where correlation_id = :cid
+               and status = 'BUFFERED'
+             order by batch_count nulls last, received_at
+             limit 1
+            """)
+    Optional<String> findBufferedTransferService(@Param("cid") UUID cid);
 
     /**
      * Многочастные передачи в буфере, первая часть которых принята раньше {@code receivedBefore}: по строке на

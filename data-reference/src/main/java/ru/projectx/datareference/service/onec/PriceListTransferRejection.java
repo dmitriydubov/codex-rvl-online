@@ -31,11 +31,15 @@ public class PriceListTransferRejection implements RejectionScope {
     private static final String DATA = "data";
 
     private final InboundMessageRepository repository;
+    private final PriceTransferOrder order;
     private final PriceListPartCheck partCheck;
     private final ObjectMapper json;
 
-    public PriceListTransferRejection(InboundMessageRepository repository, PriceListMapper priceList, ObjectMapper json) {
+    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferOrder order,
+            PriceListMapper priceList, ObjectMapper json) {
+
         this.repository = repository;
+        this.order = order;
         this.partCheck = new PriceListPartCheck(priceList);
         this.json = json;
     }
@@ -55,7 +59,9 @@ public class PriceListTransferRejection implements RejectionScope {
                 });
     }
 
+    /** Строка услуги блокируется до чтения частей, как при разборе: закрытие зависших не пишет их одновременно. */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
+        order.lockServiceOf(part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.markup().cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
         part.markup().applyTo(message);
@@ -67,7 +73,7 @@ public class PriceListTransferRejection implements RejectionScope {
 
     private Reasons reasonsFor(InboundMessage message, TransferPart part, List<InboundMessage> parts, String reason) {
         UUID cid = part.markup().cid();
-        if (hasOwnDefect(part, parts)) {
+        if (hasOwnDefect(message, part, parts)) {
             return new Reasons(reason, "передача %s отклонена: ошибка в сообщении %s: %s"
                     .formatted(cid, message.receipt().messageId(), reason));
         }
@@ -84,9 +90,9 @@ public class PriceListTransferRejection implements RejectionScope {
     }
 
     /** Та же проверка, что прервала разбор части: если она находит ошибку, отказ принадлежит этой части. */
-    private boolean hasOwnDefect(TransferPart part, List<InboundMessage> parts) {
+    private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
         try {
-            partCheck.check(part.markup(), part.data(), parts);
+            partCheck.check(message.receipt().messageId(), part.markup(), part.data(), parts);
             return false;
         }
         catch (OneCFieldException defect) {

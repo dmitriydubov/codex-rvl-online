@@ -50,6 +50,10 @@ public class OneCInbox {
             update inbound_message set received_at = now() - cast(:age as interval) where message_id = :messageId
             """;
 
+    private static final String AGE_ALL = """
+            update inbound_message set received_at = received_at - cast(:age as interval)
+            """;
+
     private final JdbcClient jdbc;
     private final List<String> expectedStatuses = new ArrayList<>();
     private final List<OneCMessage> received = new ArrayList<>();
@@ -154,6 +158,16 @@ public class OneCInbox {
                 .update();
         if (aged != 1) {
             throw new IllegalStateException("в сырье нет строки последнего сообщения");
+        }
+    }
+
+    /**
+     * Отодвигает момент приёма всех сообщений сырья в прошлое на одну и ту же величину {@code age}: порядок приёма и
+     * промежутки между сообщениями сохраняются, а сообщения, присланные позже, примутся «сейчас».
+     */
+    public void ageAll(Duration age) {
+        if (jdbc.sql(AGE_ALL).param("age", age.toSeconds() + " seconds").update() == 0) {
+            throw new IllegalStateException("в сырье нет сообщений");
         }
     }
 

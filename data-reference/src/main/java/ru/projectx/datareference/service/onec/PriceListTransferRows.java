@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.onec;
 
 import java.util.Comparator;
+import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.InboundMessage;
@@ -38,6 +39,15 @@ final class PriceListTransferRows {
                 .sorted(Comparator.comparingInt(PriceListRowNumber::of))
                 .forEach(recordSet::add);
         return assembled;
+    }
+
+    /**
+     * GUID услуги собранной передачи.
+     *
+     * @throws OneCFieldException если в финальном сообщении нет GUID услуги
+     */
+    static UUID serviceOf(ObjectNode assembled) {
+        return OneCValues.requiredUuid(assembled, KEY_VALUE);
     }
 
     private ObjectNode dataOf(InboundMessage message) {

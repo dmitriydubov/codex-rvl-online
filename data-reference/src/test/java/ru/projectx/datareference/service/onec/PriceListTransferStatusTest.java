@@ -105,6 +105,51 @@ class PriceListTransferStatusTest {
                 .isInstanceOf(PriceListTransfer.Pending.class);
     }
 
+    /** Исход пропущенной передачи тоже записан: опоздавшие части не ждут в буфере, а пропускаются вслед за ней. */
+    @Test
+    void partsArrivingAfterSkip_areSkippedRightAway() {
+        InboundMessage skippedFinal = finalMessage(1, 1);
+        skippedFinal.markSkipped("прайс по услуге вне справочника", PROCESSED_AT);
+        InboundMessage lateBatch = batch(1);
+        InboundMessage lateFinal = finalMessage(1, 1);
+
+        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(skippedFinal, lateBatch, lateFinal));
+
+        assertThat(transfer).isEqualTo(new PriceListTransfer.Closed(
+                "передача " + CID + " уже пропущена", List.of(lateBatch, lateFinal)));
+    }
+
+    @Test
+    void closedTransfer_skipsEveryLatePartWithReason() {
+        InboundMessage lateBatch = batch(1);
+        InboundMessage lateFinal = finalMessage(1, 1);
+        PriceListTransfer.Closed transfer = new PriceListTransfer.Closed("уже пропущена", List.of(lateBatch, lateFinal));
+
+        List<InboundMessage> skipped = transfer.skip(PROCESSED_AT);
+
+        assertThat(skipped).containsExactly(lateBatch, lateFinal).allSatisfy(message -> {
+            assertThat(message.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+            assertThat(message.outcome().lastError()).isEqualTo("уже пропущена");
+            assertThat(message.outcome().processedAt()).isEqualTo(PROCESSED_AT);
+        });
+    }
+
+    /** Закрыта передача, исход которой записан отказом или пропуском; у применённой исход не закрывает её частей. */
+    @Test
+    void transferIsClosed_onlyWhenRejectedOrSkipped() {
+        InboundMessage applied = batch(1);
+        applied.markProcessed(PROCESSED_AT);
+        InboundMessage rejected = batch(1);
+        rejected.markFailed("в строке прайса нет цены");
+        InboundMessage skipped = batch(1);
+        skipped.markSkipped("прайс по услуге вне справочника", PROCESSED_AT);
+
+        assertThat(PriceListTransfer.isClosed(List.of(rejected))).isTrue();
+        assertThat(PriceListTransfer.isClosed(List.of(skipped, batch(1)))).isTrue();
+        assertThat(PriceListTransfer.isClosed(List.of(applied, batch(1)))).isFalse();
+        assertThat(PriceListTransfer.isClosed(List.of(batch(1)))).isFalse();
+    }
+
     @Test
     void rejectedTransfer_failsEveryLatePartWithReason() {
         InboundMessage lateFinal = finalMessage(1, 1);

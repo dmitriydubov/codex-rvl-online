@@ -1,0 +1,65 @@
+# Последняя применённая передача прайса по каждой услуге: по ней решается, какая передача новее.
+databaseChangeLog:
+
+  - changeSet:
+      id: 017-price-list-finalization
+      author: rvl-online
+      comment: >
+        Прайс по услуге приходит передачами, и цены определяет передача, финальное сообщение которой принято
+        последним, а не та, что собралась последней. Здесь по строке на услугу (GUID услуги источника) лежит
+        финальное сообщение последней применённой передачи. Момент приёма и идентификатор передачи читаются из
+        его строки сырья и не копируются. Строку услуги блокирует и сборка передачи, и закрытие зависших
+        передач: так они не решают одновременно за одну услугу. Таблица создаётся, только если её ещё нет.
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: price_list_finalization
+      changes:
+        - createTable:
+            tableName: price_list_finalization
+            columns:
+              - column:
+                  name: service_external_id
+                  type: uuid
+                  constraints: { primaryKey: true, primaryKeyName: pk_price_list_finalization, nullable: false }
+              - column:
+                  name: final_message_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_price_list_finalization_final_message
+                    references: 'inbound_message(message_id)'
+      rollback:
+        - dropTable:
+            tableName: price_list_finalization
+
+  - changeSet:
+      id: 017-price-list-finalization-fill
+      author: rvl-online
+      comment: >
+        Заполняет последнюю применённую передачу по каждой услуге из сырья: финальные сообщения прайсов в статусе
+        «применено», по услуге — принятое последним, а из принятых в один момент — собранное позже. Без этого
+        первая передача после обновления применилась бы без сравнения и могла бы затереть более новые цены.
+        Строки, которые уже есть, не меняются, поэтому повторный запуск ничего не портит. GUID услуги берётся
+        из тела только в канонической записи. Отката нет: строки уходят вместе с таблицей при откате её создания.
+      changes:
+        - sql:
+            sql: >
+              insert into price_list_finalization (service_external_id, final_message_id)
+              select distinct on (applied.service_external_id) applied.service_external_id, applied.message_id
+                from (select cast(payload -> 'data' ->> 'keyValue' as uuid) as service_external_id,
+                             message_id,
+                             received_at,
+                             processed_at
+                        from inbound_message
+                       where stream = 'PRICE_LISTS'
+                         and status = 'PROCESSED'
+                         and batch_count is not null
+                         and payload -> 'data' ->> 'keyValue'
+                             ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') as applied
+               order by applied.service_external_id, applied.received_at desc, applied.processed_at desc nulls last,
+                       applied.message_id desc
+              on conflict (service_external_id) do nothing
+      rollback:
+        - empty: {}
