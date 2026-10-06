@@ -66,6 +66,30 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).contains(new ParentWait(BRANCH, LATER, RECORD));
     }
 
+    /** Часть передачи прайса, вручную возвращённая в разбор, ждёт услугу заново, а не с прежнего момента. */
+    @Test
+    void transferPartAfterManualReturnToParsing_startsTheWaitAnew() {
+        InboundMessage part = waiting();
+        part.markParentWaitExpired();
+        ReflectionTestUtils.setField(part, "status", InboundStatus.NEW);
+
+        part.markBuffered(UUID.randomUUID(), 1, 1);
+        part.markAwaitingParent(BRANCH, null, LATER);
+
+        assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
+    }
+
+    /** Ждущая часть, которую сборщик снова кладёт в буфер при пересмотре, сохраняет момент начала ожидания. */
+    @Test
+    void waitingTransferPartBufferedAgain_keepsTheMomentOfTheWait() {
+        InboundMessage part = waiting();
+
+        part.markBuffered(UUID.randomUUID(), 1, 1);
+        part.markAwaitingParent(BRANCH, null, LATER);
+
+        assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(WAITING_SINCE);
+    }
+
     @Test
     void expiredWait_isFinalRejectionNamingTheParent_andKeepsTheWait() {
         InboundMessage message = received();

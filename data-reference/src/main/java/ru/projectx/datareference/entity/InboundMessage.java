@@ -139,10 +139,14 @@ public class InboundMessage {
      * Сообщение — часть передачи, которая ещё не собралась. Разметка передачи сохраняется здесь же: по ней
      * сборщик находит остальные сообщения передачи, не разбирая тела заново.
      *
+     * <p>Часть, вручную возвращённая в разбор, забывает прежнее ожидание услуги: иначе собранная заново передача
+     * истекла бы в том же проходе.
+     *
      * @param batchCount сколько пакетов строк ожидается; есть только у финального сообщения, у пакетов пусто
      * @param rowCount   строк в этом пакете, а у финального сообщения — сколько их ожидается во всей передаче
      */
     public void markBuffered(UUID correlationId, @Nullable Integer batchCount, int rowCount) {
+        this.parentWaitSince = status == InboundStatus.NEW ? null : parentWaitSince;
         this.status = InboundStatus.BUFFERED;
         this.correlationId = correlationId;
         this.batchCount = batchCount;
@@ -240,13 +244,13 @@ public class InboundMessage {
     }
 
     /**
-     * Исход обработки на текущий момент. Вид, GUID родителя и момент начала ожидания записывает и стирает только один
-     * переход, поэтому они либо заданы все, либо пусты все.
+     * Исход обработки на текущий момент. Сообщение ждёт или ждало родителя, если задан момент начала ожидания: вид и
+     * GUID родителя записывает вместе с ним только один переход.
      */
     public InboundOutcome outcome() {
-        ParentWait awaited = awaitedParentKind == null ? null : new ParentWait(
-                new AwaitedParent(awaitedParentKind, Objects.requireNonNull(awaitedParentId)),
-                Objects.requireNonNull(parentWaitSince), recordExternalId);
+        ParentWait awaited = parentWaitSince == null ? null : new ParentWait(
+                new AwaitedParent(Objects.requireNonNull(awaitedParentKind), Objects.requireNonNull(awaitedParentId)),
+                parentWaitSince, recordExternalId);
         return new InboundOutcome(status, attempt, nextRetryAt, lastError, processedAt, awaited);
     }
 
