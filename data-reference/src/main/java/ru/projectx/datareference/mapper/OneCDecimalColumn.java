@@ -12,8 +12,10 @@ import tools.jackson.databind.JsonNode;
  * такое значение отклоняется при разборе, с именем поля и без самого значения. Сначала проверяются знаки после запятой
  * ({@link OneCMoneyScale}), потом длина целой части.
  *
- * <p>Число с огромным порядком, например {@code 1e999999999}, не разворачивается в цифры: длина целой части считается
- * по точности и масштабу {@link BigDecimal}, иначе миллиард нулей занял бы память и время.
+ * <p>Разбор читает сообщение из таблицы сырья, где база хранит число цифрами, без порядка, поэтому длинная целая
+ * часть приходит сюда сотнями цифр. Длина целой части считается по точности и масштабу {@link BigDecimal}, без
+ * разворачивания числа в цифры, а разность — в {@code long}: у числа с большим порядком масштаб отрицательный, и в
+ * {@code int} она могла бы переполниться и пропустить такое число. Ноль помещается в любую колонку при любой записи.
  */
 enum OneCDecimalColumn {
 
@@ -38,9 +40,8 @@ enum OneCDecimalColumn {
         return OneCMoneyScale.read(data, field).map(value -> fitted(value, field));
     }
 
-    /** Масштаб у числа с большим порядком отрицательный, поэтому разность считается в {@code long}, без переполнения. */
     private BigDecimal fitted(BigDecimal value, String field) {
-        if ((long) value.precision() - value.scale() > maxIntegerDigits) {
+        if (value.signum() != 0 && (long) value.precision() - value.scale() > maxIntegerDigits) {
             throw new OneCFieldException("поле %s больше допустимого".formatted(field));
         }
         return value;

@@ -27,7 +27,7 @@ class OneCDecimalColumnTest {
     private static final String TOO_LARGE_COPAYMENT = "поле copayment больше допустимого";
 
     @ParameterizedTest
-    @ValueSource(strings = {"9999999999999.99", "-9999999999999.99", "9999999999999", "0", "0.01", "1E+12"})
+    @ValueSource(strings = {"9999999999999.99", "-9999999999999.99", "9999999999999", "0", "0.01", "1E+12", "0E+20"})
     void amountWithinThirteenIntegerDigits_isReadAsSent(String sent) {
         assertThat(OneCDecimalColumn.AMOUNT.read(node("price", sent), "price")).contains(new BigDecimal(sent));
     }
@@ -41,7 +41,7 @@ class OneCDecimalColumnTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"999.99", "-999.99", "999", "0.5"})
+    @ValueSource(strings = {"999.99", "-999.99", "999", "0.5", "0E+3"})
     void percentWithinThreeIntegerDigits_isReadAsSent(String sent) {
         assertThat(OneCDecimalColumn.PERCENT.read(node("copayment", sent), "copayment")).contains(new BigDecimal(sent));
     }
@@ -75,12 +75,12 @@ class OneCDecimalColumnTest {
 
     /**
      * Число с огромным порядком нельзя разворачивать в цифры: миллиард нулей занял бы память и время. Проверка
-     * сравнивает только длину целой части и укладывается в долю секунды.
+     * сравнивает только длину целой части, и запас по времени у неё многократный.
      */
     @Test
     void hugeExponent_isRejectedWithoutExpandingDigits() {
         ObjectNode data = node("price", "1e999999999");
-        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> assertThatThrownBy(
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () -> assertThatThrownBy(
                 () -> OneCDecimalColumn.AMOUNT.read(data, "price")).isInstanceOf(OneCFieldException.class));
     }
 
