@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 /**
  * У строки прейскуранта нет ключа источника, и идентификатор ей присваивает сам сервис при создании. Строки одной
  * услуги могут совпадать датами и ценами, поэтому у каждой должен быть свой идентификатор: без него строка не
- * сохранится, а повторённый идентификатор нарушит первичный ключ таблицы цен.
+ * сохранится, а повторённый идентификатор нарушит первичный ключ таблицы цен. Значения строки хранятся как пришли:
+ * по ним выбирается цена на дату.
  */
 class PriceListItemTest {
 
@@ -21,17 +22,37 @@ class PriceListItemTest {
 
     @Test
     void sameRowTwice_givesTwoItemsWithDifferentIds() {
-        Lpu lpu = Lpu.create(UUID.randomUUID(),
-                new Lpu.Details("Санаторий", null, null, null, null, null, false), NOW);
-        LpuContract contract = LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details(
-                "Д-1", null, null, false, false, LocalDate.of(2026, 1, 1), null, false), NOW);
-        ContragentService service = ContragentService.create(UUID.randomUUID(), contract,
-                new ContragentService.Details(null, "A01", "Проживание", false), NOW);
+        ContragentService service = service();
 
         PriceListItem first = PriceListItem.of(service, ROW, NOW);
         PriceListItem second = PriceListItem.of(service, ROW, NOW);
 
         assertThat(first.id()).isNotNull().isNotEqualTo(second.id());
         assertThat(first.service()).isSameAs(service);
+    }
+
+    @Test
+    void of_keepsEveryValueOfTheRow() {
+        var row = new PriceListItem.Row("Проживание", "A01", "PF-01", new BigDecimal("3500.00"),
+                new BigDecimal("3150.00"), LocalDate.of(2026, 1, 1), LocalDate.of(2026, 6, 30));
+
+        PriceListItem item = PriceListItem.of(service(), row, NOW);
+
+        assertThat(item.serviceName()).isEqualTo("Проживание");
+        assertThat(item.serviceCode()).isEqualTo("A01");
+        assertThat(item.serviceCodePf()).isEqualTo("PF-01");
+        assertThat(item.price()).isEqualByComparingTo("3500.00");
+        assertThat(item.priceWithDiscount()).isEqualByComparingTo("3150.00");
+        assertThat(item.validFrom()).isEqualTo(LocalDate.of(2026, 1, 1));
+        assertThat(item.validTo()).isEqualTo(LocalDate.of(2026, 6, 30));
+    }
+
+    private static ContragentService service() {
+        Lpu lpu = Lpu.create(UUID.randomUUID(),
+                new Lpu.Details("Санаторий", null, null, null, null, null, false), NOW);
+        LpuContract contract = LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details(
+                "Д-1", null, null, false, false, LocalDate.of(2026, 1, 1), null, false), NOW);
+        return ContragentService.create(UUID.randomUUID(), contract,
+                new ContragentService.Details(null, "A01", "Проживание", false), NOW);
     }
 }
