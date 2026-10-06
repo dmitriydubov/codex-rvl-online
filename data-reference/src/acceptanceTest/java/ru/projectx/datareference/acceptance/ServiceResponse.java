@@ -2,6 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.client.ExchangeResult;
 import tools.jackson.databind.JsonNode;
@@ -24,6 +25,9 @@ record ServiceResponse(int status, HttpHeaders headers, JsonNode body, int bodyB
 
     private static final JsonMapper JSON = JsonMapper.shared();
     private static final String JSON_SUBTYPE = "json";
+    /** Путь к полю: имена через точку, у имени — необязательные индексы массива в квадратных скобках. */
+    private static final Pattern FIELD_PATH =
+            Pattern.compile("[A-Za-z_][A-Za-z0-9_]*(\\[\\d+])*(\\.[A-Za-z_][A-Za-z0-9_]*(\\[\\d+])*)*");
 
     static ServiceResponse of(ExchangeResult result) {
         byte[] content = result.getResponseBodyContent();
@@ -42,7 +46,15 @@ record ServiceResponse(int status, HttpHeaders headers, JsonNode body, int bodyB
                 .orElse(true);
     }
 
+    /**
+     * Узел по пути из сценария. Путь вне грамматики (незакрытая скобка, пустое имя, индекс не числом) —
+     * ошибка самого шага: иначе искажённый путь вроде {@code services[0.layer_number} молча свёлся бы к тому же
+     * JSON Pointer, что и верный, и проверка прошла бы по полю, которого сценарий не называл.
+     */
     JsonNode field(String path) {
+        if (!FIELD_PATH.matcher(path).matches()) {
+            throw new IllegalArgumentException("путь к полю ответа не по грамматике «имя[индекс].имя»: " + path);
+        }
         return body.at("/" + path.replace("]", "").replace('[', '.').replace('.', '/'));
     }
 

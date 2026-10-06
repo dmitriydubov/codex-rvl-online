@@ -100,6 +100,19 @@ class ProgramMapperTest {
                 .isSameAs(sanatorium);
     }
 
+    /** Строка услуги без обязательного условия отклоняет сообщение до записи: частичной программы нет. */
+    @Test
+    void rvlProgramWithIncompleteRow_isRejectedWithoutSaving() {
+        when(repository.findByExternalId(PROGRAM)).thenReturn(Optional.empty());
+        ObjectNode data = program(true);
+        ((ObjectNode) data.path("service").get(0)).remove("percentCopayment");
+
+        assertThatThrownBy(() -> mapper.apply(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля percentCopayment");
+        verify(repository, never()).save(any());
+    }
+
     @Test
     void programWithEmptyOptionalFields_isStoredWithoutThem() {
         when(repository.findByExternalId(PROGRAM)).thenReturn(Optional.empty());
@@ -241,6 +254,8 @@ class ProgramMapperTest {
         data.putArray("service").addObject()
                 .put("idLPU", SANATORIUM.toString())
                 .put("numberLayer", 1)
+                .put("directAttachment", true)
+                .put("percentCopayment", new BigDecimal("10.00"))
                 .put("r", true);
         return data;
     }

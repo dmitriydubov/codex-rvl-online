@@ -18,17 +18,6 @@ final class PriceListRowNumber {
 
     /** @throws OneCFieldException если номера нет или он не целое число */
     static int of(JsonNode row) {
-        JsonNode value = row.path(ROW_NUMBER);
-        if (value.isMissingNode() || value.isNull()) {
-            throw new OneCFieldException("нет обязательного поля " + ROW_NUMBER);
-        }
-        return integral(value);
-    }
-
-    private static int integral(JsonNode value) {
-        if (value.isIntegralNumber() && value.canConvertToInt()) {
-            return value.intValue();
-        }
-        throw new OneCFieldException("поле " + ROW_NUMBER + " не является целым числом");
+        return OneCRequiredValues.integer(row, ROW_NUMBER);
     }
 }

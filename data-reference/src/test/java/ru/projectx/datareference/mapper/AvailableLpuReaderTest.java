@@ -1,6 +1,7 @@
 package ru.projectx.datareference.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -14,8 +15,11 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -81,7 +85,7 @@ class AvailableLpuReaderTest {
     }
 
     @Test
-    void rowWithoutOptionalFields_isReadWithTheirDefaults() {
+    void rowWithoutOptionalFields_hasNoAppealTypeAndOpenDates() {
         ObjectNode data = program(row(SANATORIUM, "r")
                 .put("idTreatment", "00000000-0000-0000-0000-000000000000")
                 .put("beginDate", "0001-01-01T00:00:00+00:00"));
@@ -91,9 +95,50 @@ class AvailableLpuReaderTest {
         assertThat(row.externalAppealTypeId()).isNull();
         assertThat(row.beginDate()).isNull();
         assertThat(row.endDate()).isNull();
-        assertThat(row.layerNumber()).isZero();
+    }
+
+    /** Ноль сооплаты и false прямого прикрепления — присланные значения, а не отсутствие полей. */
+    @Test
+    void zeroCopaymentAndIndirectAttachment_areReadAsSent() {
+        ObjectNode data = program(row(SANATORIUM, "r")
+                .put("numberLayer", 3)
+                .put("directAttachment", false)
+                .put("percentCopayment", 0));
+
+        ProgramLpu.Row row = reader.read(data).rows().getFirst();
+
+        assertThat(row.layerNumber()).isEqualTo(3);
         assertThat(row.directAttachment()).isFalse();
         assertThat(row.percentCopayment()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    /** Строка, которая была бы сохранена, без обязательного условия отклоняет всё сообщение. */
+    @ParameterizedTest
+    @ValueSource(strings = {"numberLayer", "directAttachment", "percentCopayment"})
+    void storedRowWithoutRequiredTerm_rejectsTheMessage(String field) {
+        ObjectNode incomplete = row(SANATORIUM, "d");
+        incomplete.remove(field);
+        ObjectNode data = program(row(SANATORIUM, "r"), incomplete);
+
+        assertThatThrownBy(() -> reader.read(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля " + field);
+    }
+
+    /** Строки, которые и так не сохраняются, условия не проверяют: их условия никому не уходят. */
+    @ParameterizedTest
+    @ValueSource(strings = {"numberLayer", "directAttachment", "percentCopayment"})
+    void droppedRowWithoutRequiredTerm_isOnlyCounted(String field) {
+        ObjectNode stranger = row(STRANGER, "r");
+        stranger.remove(field);
+        ObjectNode withoutCoverage = row(SANATORIUM, null);
+        withoutCoverage.remove(field);
+
+        AvailableLpuReader.AvailableLpu read = reader.read(program(row(SANATORIUM, "r"), stranger, withoutCoverage));
+
+        assertThat(read.rows()).hasSize(1);
+        assertThat(read.unknownSanatorium()).isEqualTo(1);
+        assertThat(read.withoutCoverage()).isEqualTo(1);
     }
 
     @Test
@@ -151,7 +196,11 @@ class AvailableLpuReaderTest {
     }
 
     private static ObjectNode row(UUID sanatorium, String coverage) {
-        ObjectNode row = JSON.createObjectNode().put("idLPU", sanatorium.toString());
+        ObjectNode row = JSON.createObjectNode()
+                .put("idLPU", sanatorium.toString())
+                .put("numberLayer", 1)
+                .put("directAttachment", true)
+                .put("percentCopayment", new BigDecimal("10.00"));
         if (coverage != null) {
             row.put(coverage, true);
         }
