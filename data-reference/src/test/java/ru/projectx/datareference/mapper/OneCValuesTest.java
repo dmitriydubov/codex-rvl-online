@@ -338,7 +338,7 @@ class OneCValuesTest {
      * по которой не видно, какое поле виновато. Так же — число из тысячи с лишним цифр, каким база возвращает сырьё.
      */
     @ParameterizedTest
-    @ValueSource(strings = {"2147483648", "-2147483649", "10000000000", "-100000000000000000000", "1e10"})
+    @ValueSource(strings = {"2147483648", "-2147483649", "10000000000", "-100000000000000000000"})
     void integerBeyondIntBound_isRejectedNamingFieldButNotValue(String sent) {
         ObjectNode data = node("{\"layerNumber\":%s}".formatted(sent));
 
@@ -354,6 +354,32 @@ class OneCValuesTest {
         assertThatThrownBy(() -> OneCValues.integer(data, "rowNumber"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле rowNumber больше допустимого");
+    }
+
+    /**
+     * Дробная запись в целом поле — испорченное значение: обрезанная дробь легла бы в справочник молча. Нулевая дробь
+     * тоже дробная, как и у обязательных целых полей. Число с порядком база возвращает из сырья без порядка, и дробным
+     * оно остаётся, только если у него есть знаки после запятой, как у 25e-1. Причина называет поле, но не значение, и
+     * дробь за пределом целого тоже считается дробью, а не превышением.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"2.5", "-2.5", "2.0", "2.00", "0.0", "25e-1", "3000000000.5"})
+    void integerWrittenAsFraction_isRejectedNamingFieldButNotValue(String sent) {
+        ObjectNode data = node("{\"layerNumber\":%s}".formatted(sent));
+
+        assertThatThrownBy(() -> OneCValues.integer(data, "layerNumber"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layerNumber не является целым числом");
+    }
+
+    /** Сообщения 1С разбираются с дробями в BigDecimal, и нулевая дробь в записи сохраняется: 2.0 — не целое. */
+    @Test
+    void integerWrittenAsDecimalWithZeroFraction_isRejected() {
+        ObjectNode data = JSON.createObjectNode().put("hierarchyLevel", new BigDecimal("2.0"));
+
+        assertThatThrownBy(() -> OneCValues.integer(data, "hierarchyLevel"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле hierarchyLevel не является целым числом");
     }
 
     /** Число, записанное строкой, числом не считается: контракт передаёт числа числами. */

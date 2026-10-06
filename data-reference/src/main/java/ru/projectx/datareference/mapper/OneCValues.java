@@ -97,22 +97,13 @@ public final class OneCValues {
     }
 
     /**
-     * Целое число поля. Не число JSON — пустой результат.
+     * Целое число поля. Не число JSON — пустой результат. Дробная запись, в том числе {@code 2.0}, и число за пределами
+     * {@code int} — испорченное значение: отказ называет поле, но не значение.
      *
-     * <p>Число за пределами {@code int} — испорченное значение, а не отсутствующее: отказ называет поле, но не значение.
-     * Так же отклоняется число из тысяч цифр, каким база возвращает из сырья число, записанное в 1С с порядком.
-     *
-     * @throws OneCFieldException если число не помещается в {@code int}
+     * @throws OneCFieldException если число записано дробью или не помещается в {@code int}
      */
     public static Optional<Integer> integer(JsonNode data, String field) {
-        JsonNode value = data.path(field);
-        if (!value.isNumber()) {
-            return Optional.empty();
-        }
-        if (!value.canConvertToInt()) {
-            throw new OneCFieldException("поле %s больше допустимого".formatted(field));
-        }
-        return Optional.of(value.asInt());
+        return OneCInteger.read(data, field);
     }
 
     /**

@@ -49,7 +49,10 @@ final class OneCMoneyLimitMessages {
     private static final Map<String, BigDecimal> INTEGER_RECORDS = Map.of(
             "экспонента за пределом целого", new BigDecimal("1e10"),
             "отрицательное с экспонентой за пределом целого", new BigDecimal("-1e20"),
-            "экспонента сразу за прежним пределом длины", new BigDecimal("1e1000"));
+            "экспонента сразу за прежним пределом длины", new BigDecimal("1e1000"),
+            "дробное в пределах целого", new BigDecimal("2.5"),
+            "отрицательное дробное", new BigDecimal("-2.5"),
+            "целое с нулевой дробной частью", new BigDecimal("2.0"));
 
     private OneCMoneyLimitMessages() {
     }
