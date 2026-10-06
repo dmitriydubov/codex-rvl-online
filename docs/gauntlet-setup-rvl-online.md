@@ -551,9 +551,11 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   `options`, postgresql.org/docs/16/libpq-envars.html). Значения должны совпасть с настройками сервиса; база и роли при
   этом не меняются. Расхождение — повод пересмотреть способ задания таймаутов. Проверку при старте в самом сервисе (WARN
   при расхождении) добавил шаг Ш41+Ш26 (PR #25; свойства таймаутов пула — `projectx.database.session-timeouts.*`, те же
-  переменные `DB_*`). Три `@Scheduled` при виртуальных потоках по-прежнему выполняются одним
-  потоком `SimpleAsyncTaskScheduler` (Ш14b): зависший запрос теперь обрывается (ожидание блокировки — через 5 с,
-  оператор — через 30 с, молчащий сокет — через 60 с), но до этого держит и стирание ПДн, и алерт.
+  переменные `DB_*`). Задачи по расписанию идут в пуле из 5 потоков
+  (`spring.task.scheduling.pool.size: 5`, `application.yml`; пул задаёт `SchedulingConfig`): зависший запрос одной задачи
+  (обрывается: ожидание блокировки — через 5 с, оператор — через 30 с, молчащий сокет — через 60 с) не держит остальные,
+  прежде всего проверку базы для возобновления приёма. Раньше, при одном потоке `SimpleAsyncTaskScheduler` (Ш14b), он
+  держал и стирание ПДн, и алерт.
   - **Миграции** (блок `spring.liquibase`, `application.yml:135-144` на `1aeefa1`). При заданном `spring.liquibase.url`
     spring-boot-liquibase 4.0.7 собирает Liquibase `SimpleDriverDataSource` через `DataSourceBuilder.create()` и берёт
     `user` и `password` только из `spring.liquibase.*`, из `spring.datasource` не наследует
@@ -574,13 +576,23 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     `statement_timeout` 30 с на оператор, `lock_timeout` 5 с, `socketTimeout` 60 с.
   - **Разбор.** Проход (до 100 сообщений, `projectx.import.batch-size`) упирается в занятую чужой блокировкой таблицу
     справочника по разу на каждое сообщение, которое её пишет (при ACCESS EXCLUSIVE — и читает), и стоит до ~8 мин
-    (100 × 5 с `lock_timeout`) — всё это время на общем потоке стоят и стирание ПДн, и алерт (выше; до Ш14b). Блокировка
+    (100 × 5 с `lock_timeout`); остальные задачи по расписанию идут в своих потоках пула (выше). Блокировка
     такой таблицы дольше ~36 мин уводит затронутые сообщения в FAILED по исчерпанию лестницы 30 с / 5 мин / 30 мин — их
     возвращают в работу вручную (мониторинг FAILED — раздел 8). Блокировка самой `inbound_message` (как в
     `DatabaseTimeoutsTest`) статусов не меняет: падает выборка, проход повторяется на следующем тике.
 - **Приём при сбое базы.**
-  - Слушатель любой сбой записи считает недоступностью базы: 5 с паузы, затем nack с возвратом. Тело, которое Jackson
-    принимает, а `jsonb` нет (`\u0000`, UTF-8 BOM, UTF-16), крутится бесконечно.
+  - Сбой записи сырья разбирается по классу SQLSTATE (`OneCStorageFailure`, `OneCStorageFailures`):
+    - класс 22 — база не принимает тело (`\u0000`, UTF-16, число больше 131 072 цифр): тело байт в байт уходит в таблицу
+      `quarantine`, брокеру ack, ERROR «сообщение … в карантине: база не принимает его тело, SQLSTATE …», метрика
+      `onec_ingest_deliveries_total{outcome="quarantined"}`; автоматического повтора нет, разбор ручной, тела стираются
+      через `quarantine-ttl` (30 суток);
+    - 23505 (две доставки одного сообщения столкнулись) — 5 с паузы (`duplicate-delivery-backoff`), затем nack с
+      возвратом, WARN «сырьё сообщения … не сохранено, вернём источнику через 5s», `outcome="returned"`;
+    - прочее (08xxx, 55P03, 57014, неизвестное) — недоступность базы: сообщение возвращается без ack, все потребители 1С
+      встают на паузу (WARN «приём из 1С:УСК приостановлен до восстановления базы…», `onec_ingest_paused=1`, health
+      `onecIngest` DOWN), раз в `storage-check-interval` (10 с) сервис проверяет базу и сам возобновляет приём (INFO
+      «база снова отвечает… приём из 1С:УСК возобновлён»); `outcome="storage_outage"`.
+  - Ведущий UTF-8 BOM снимается до разбора конверта (`OneCDelivery`) и сообщение принимается как обычно.
   - До Ш31 WARN «не сохранено» бывает и при сбое ack уже сохранённого сообщения (закрытый канал: `IllegalStateException`
     прокси `CachingConnectionFactory`) — данные не теряются, сообщение вернётся при закрытии канала и пройдёт дублем.
     Через 5 с к WARN добавляется ERROR «Shutdown Signal» с кодом 406 (unknown delivery tag): nack ушёл в новый канал,
@@ -605,8 +617,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 
   Тело полиса стирается через 30 суток, после этого строку не переобработать.
 - **`TEST_POSTGRES_URL` на нетестовую базу** — полная очистка её таблиц.
-- **Пропускная способность и мониторинг.** Чистка ПДн — не больше 500 тел в час. Мониторинга FAILED, SKIPPED и зависших
-  передач ТЗ-9 нет, только WARN.
+- **Пропускная способность и мониторинг.** Чистка ПДн — раз в час (`retention-poll-interval`) пачками по 500
+  (`retention-batch-size`); проход повторяет пачки, пока они полные (`PersonalDataRetention.eraseInBatches`), так что за
+  проход стирается всё просроченное. FAILED, SKIPPED и зависшие передачи ТЗ-9 видны в метриках
+  (`onec_inbound_messages{status}`, `onec_inbound_transitions_total`, `onec_price_transfers_stuck`) и в журнале.
 
 **Сборка и образ**
 - **Gradle 8.14.3 запускается на JVM 8–24.** Тулчейн Java 21 без плагина-резолвера: на машине сборки нужен JDK 21.
@@ -756,9 +770,17 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - GUID видов обращения РВЛ (OQ-48).
   - Порядок первичной выгрузки.
   - Верное имя очереди ТЗ-2.
-- **Мониторинг до метрик.** Метрик в сервисе нет, открыт только `/actuator/health`. До шага метрик (план, Ш24) нужны:
-  - алерты по журналу: ERROR «потеряно» (нечитаемый конверт), WARN «не соответствует контракту», WARN «передачи прайсов не
-    собрались», повторяющийся WARN «сырьё … не сохранено»;
+- **Мониторинг.** Метрики 1С — `/actuator/prometheus` на порту управления (`MANAGEMENT_PORT`, 8081): исходы приёма
+  `onec_ingest_deliveries_total{stream,queue,outcome}`, пауза приёма `onec_ingest_paused` и `onec_ingest_pauses_total`,
+  переходы статусов `onec_inbound_transitions_total{stream,status}`, очередь разбора `onec_inbound_messages{stream,status}`,
+  `onec_inbound_pending_oldest_age_seconds{stream}`, `onec_price_transfers_stuck`,
+  `onec_inbound_parent_wait_expired_total{stream}`, сроки ПДн `onec_retention_overdue_payloads`,
+  `onec_retention_overdue_quarantine_bodies`, `policies_retention_overdue_personal_data`. Health — компонент `onecIngest`
+  (DOWN во время паузы приёма и при очереди без потребителя: `onec_ingest_paused` второй случай не показывает). Вдобавок
+  к метрикам полезны:
+  - алерты по журналу: ERROR «потеряно» (нечитаемый конверт), ERROR «в карантине», ERROR «отклонено окончательно»
+    (нарушение контракта или исчерпанные повторы), WARN «передачи прайсов не собрались», WARN «приём из 1С:УСК
+    приостановлен», повторяющийся WARN «сырьё … не сохранено»;
   - с PR #25 (Ш41+Ш26): WARN «база недоступна или не ответила вовремя: <тип>, sqlstate=<код>, request_id=<id>» — каждый
     503 REST, алерт по частоте; при старте — WARN «проверка таймаутов PostgreSQL: …», «таймаут сеанса PostgreSQL расходится
     с настройкой: соединение=…, параметр=…, ожидается=…, фактически=…», «лимит REST-чтения … не меньше lock_timeout …» —
@@ -766,7 +788,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - периодический SQL-отчёт по `inbound_message`: FAILED, SKIPPED, BUFFERED старше часа, RETRY, давность последнего PROCESSED
     как признак зависшего планировщика.
 
-  Исчерпание лестницы повторов в журнал не пишется: только статус FAILED. С Ш4 (PR #15) FAILED дают и долгие чужие
+  Исчерпание лестницы повторов даёт FAILED «повторы исчерпаны на попытке 4: …» и ERROR «сообщение … отклонено
+  окончательно на попытке 4…» (`InboundMessageService`, `FinalRejectionJournal`); тот же ERROR — у любого окончательного
+  отказа разбора. С Ш4 (PR #15) FAILED дают и долгие чужие
   блокировки справочников, и операторы дольше `statement_timeout` (раздел 6, «Таймауты PostgreSQL», «Разбор»).
 - **Эксплуатация контура.**
   - Одна реплика и выкатка без перекрытия (Recreate): выборка сырья без блокировки, порядок держится на одном потребителе.
