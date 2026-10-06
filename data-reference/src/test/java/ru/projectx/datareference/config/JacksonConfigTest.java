@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -15,6 +18,20 @@ import tools.jackson.databind.ObjectMapper;
 class JacksonConfigTest {
 
     private final ObjectMapper json = OneCJson.mapper();
+
+    /**
+     * Правила доходят до маппера, который получают сервисы. Свой бин маппера сюда не попал бы: основной маппер
+     * автоконфигурации Spring Boot помечен как главный, и дробь снова читалась бы двоичной.
+     */
+    @Test
+    void mapperOfTheApplication_readsFractionExactly() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(JacksonAutoConfiguration.class))
+                .withUserConfiguration(JacksonConfig.class)
+                .run(context -> assertThat(context.getBean(ObjectMapper.class)
+                        .readTree("{\"limit\":9999999999999.991}").path("limit").decimalValue())
+                        .isEqualTo(new BigDecimal("9999999999999.991")));
+    }
 
     @Test
     void fraction_isReadExactlyWithItsTrailingZeros() {
