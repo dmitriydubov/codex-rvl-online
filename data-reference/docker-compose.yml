@@ -22,16 +22,17 @@
 # Стенд готов, когда закладка напечатала «сырьё 1С заложено» и пример 09 из README
 # отвечает 200 (health отвечает UP раньше, чем данные разобраны). Статус SKIPPED у строки
 # страхователя в inbound_message ожидаем: страхователь — не санаторий.
-# Сервис — http://localhost:8080; профили app и stand вместе не поднимать (порт один). Клиенту из другого контейнера нужна сеть data-reference_default (адрес
+# Сервис — http://localhost:8080; профили app и stand вместе не поднимать (порт один).
+# Клиенту из другого контейнера нужна сеть data-reference_default (адрес
 # http://data-reference-stand:8080) или network_mode: host.
-# Сброс: docker compose --profile stand down -v (удаляет и базу, и данные брокера).
+# Сброс: docker compose --profile stand down -v. Удаляет и базу, общую с профилем app,
+# и данные брокера; только базу — docker volume rm data-reference_postgres-data после down без -v.
 #
 # Если Docker Hub отвечает 429 (Too Many Requests): в .env — JAR_SOURCE=host и
 # JRE_IMAGE=mirror.gcr.io/library/eclipse-temurin:21.0.12.1_1-jre, а образ базы — из зеркала:
 #   docker pull mirror.gcr.io/library/postgres:16.10-alpine
 #   docker tag mirror.gcr.io/library/postgres:16.10-alpine postgres:16.10-alpine
 # В рабочем контуре все образы берутся из Nexus.
-
 
 name: data-reference
 
@@ -64,7 +65,8 @@ services:
     ports:
       # Локально без TLS.
       - "127.0.0.1:5672:5672"
-      # Панель брокера. Очереди заводятся здесь: сервис их не создаёт, их создаёт 1С:УСК.
+      # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
+      # в рабочем контуре их заводит 1С:УСК.
       - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq

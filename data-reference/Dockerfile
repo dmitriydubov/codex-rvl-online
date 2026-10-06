@@ -7,7 +7,8 @@
 #   build — собрать внутри образа (так собирает CI). Нужна сеть до Nexus и дистрибутива Gradle;
 #           вне контура задайте PUBLIC_REPOSITORIES=true, чтобы брать зависимости из Maven Central
 #           (переменные, по которым сборка сама выбирает репозитории, внутрь docker build не попадают).
-#   host  — взять собранный на машине (./gradlew bootJar). Подходит, когда у контейнера нет сети.
+#   host  — взять собранный на машине: ./gradlew bootJar && docker build --build-arg JAR_SOURCE=host .
+#           Подходит, когда у контейнера нет сети.
 #
 # Строки «# syntax=» нет нарочно: с ней BuildKit скачивал бы фронтенд с Docker Hub.
 #
@@ -93,4 +94,5 @@ ENV JDK_JAVA_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 # Адреса и пароли базы и брокера приходят переменными окружения (см. application.yml).
 # Умолчаний у паролей нет: пароль из репозитория подошёл бы к любой базе с таким же паролем.
+# Слушатели очередей 1С включены, пока их не выключат переменной RABBITMQ_LISTENER_AUTO_STARTUP.
 ENTRYPOINT ["java", "-jar", "application.jar"]
