@@ -2570,7 +2570,7 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   (`stream`, `queue`, `outcome` = stored / duplicate / quarantined / unidentified / returned / storage_outage; нулевые ряды при
   старте), `onec_ingest_pauses_total`, `onec_ingest_paused`, `onec_inbound_transitions_total` (`stream`, `status`; счёт в
   `afterCommit`), gauge `onec_inbound_messages` (`stream`, `status`), `onec_inbound_pending_oldest_age_seconds`,
-  `onec_price_transfers_stuck`, `onec_retention_overdue_policy_payloads`, `onec_retention_overdue_quarantine_bodies`,
+  `onec_price_transfers_stuck`, `onec_retention_overdue_payloads`, `onec_retention_overdue_quarantine_bodies`,
   `onec_inbound_backlog_staleness_seconds`; gauge очереди разбора читают снимок, который задача по расписанию обновляет
   раз в 30 с (`projectx.metrics.backlog-refresh-interval`, новое свойство; `spring.task.scheduling.pool.size` 4 → 5).
   Новая миграция 014 — частичный индекс `idx_inbound_message_unfinished` (не `CONCURRENTLY`: при переносе катить вне
@@ -2981,6 +2981,17 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   адрес просто считается последним — проверить в том же шаге.
 - Критерий: дробь в целочисленном поле — FAILED с причиной «поле X не является целым числом» без значения; `2.0` — решить на
   остановке спецификации. Файлы: `OneCValues.integer` и вызывающие мапперы (после Ш59). Оценка: 2 ч.
+
+**Ш63a. Целое за пределом `int` — «больше допустимого» во всех полях** — тип: со спецификацией; бэклог. **Задача для Jira
+утверждена владельцем 2026-10-06 («2) да»)**; запуск новой сессией от `main` после мержа Ш63 (PR #117).
+- Основание: вопрос Ш63, п. 1. Обязательные целые поля (номер слоя программы `numberLayer`, номер строки прайса
+  `rowNumber`) на число за пределом `int` отвечают «не является целым числом», необязательные — «больше допустимого».
+  Ответ координатора «выровнять в шаге» дошёл до сессии после заморозки спецификации; владелец «1) да» — вариант б:
+  заморозку не снимать, отдельный шаг.
+- Критерий: `numberLayer` = 2147483648 → FAILED «поле numberLayer больше допустимого»; `rowNumber` = 10000000000 →
+  «поле rowNumber больше допустимого», передача отклонена целиком; дробь и нечисло — по-прежнему «не является целым
+  числом». Файлы: `OneCRequiredValues.integer` (проверка из `OneCInteger`). Оценка: 1 ч. Тексты для эксплуатации — в
+  отчёт; памятку по очередям обновить.
 
 **Ш61. Ожидание родителя — два редких случая** — тип: со спецификацией (багфикс); бэклог, низкий приоритет. Владелец
 2026-10-06 «1) да».
@@ -3856,6 +3867,12 @@ REST.
   следов нет; Grok APPROVED дважды, сессия ответила. Allowlist — PR #112 (пять строк `PriceListTransferMarkup`, мутанты
   RUN_ERROR меняются от прогона к прогону). Контрольный `gauntletFast` на `main` 80cdbf2 зелёный: 1690 тестов (+28),
   588 сценариев (+7), 0 skipped. Факт ~5,5 ч против 5–6. Открыт PR #114 — переключатель репозиториев.
+- 2026-10-06, **PR #115 смержен 22:43 UTC; сессия Ш63 открыта 22:31 UTC** (session_011FNfNQ5Tz5uSJDAoKJopj2, Opus 5.5,
+  `claude/sh63-integer-fraction`). Памятка сопровождения по очередям 1С:УСК (PDF) передана владельцу, в репозиторий не
+  кладётся («1) нет»). По её сверке документ эксплуатации отстал от кода в шести местах — исправлено («2) да»): приём при
+  сбое базы (карантин класса 22, пауза потребителей, 23505; BOM снимается), пул задач по расписанию из 5 потоков,
+  чистка ПДн пачками до опустошения, мониторинг (метрики и health `onecIngest` вместо «метрик нет»), ERROR «отклонено
+  окончательно» при исчерпании повторов; в плане — имя метрики `onec_retention_overdue_payloads`.
 - 2026-10-06, **PR #114 (переключатель репозиториев) смержен 22:27 UTC.** Следом PR координатора с проверкой циклов
   между подпакетами: `noCyclesBetweenPackages` в `ArchitectureTest` (`slices().matching(BASE + ".(**)")`; `(**)` — любая
   последовательность с точками, javadoc `PackageMatcher` ArchUnit 1.5.1 по тегу v1.5.1). Правило по компонентам остаётся:
