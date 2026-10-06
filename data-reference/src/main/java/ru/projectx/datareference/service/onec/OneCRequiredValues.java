@@ -20,7 +20,7 @@ public final class OneCRequiredValues {
 
     /** @throws OneCFieldException если поля нет или оно не целое число JSON в пределах {@code int} */
     public static int integer(JsonNode data, String field) {
-        JsonNode value = present(data, field);
+        JsonNode value = requirePresent(data, field);
         if (value.isIntegralNumber() && value.canConvertToInt()) {
             return value.intValue();
         }
@@ -29,7 +29,7 @@ public final class OneCRequiredValues {
 
     /** @throws OneCFieldException если поля нет или оно не логическое значение JSON */
     public static boolean flag(JsonNode data, String field) {
-        return present(data, field).booleanValueOpt()
+        return requirePresent(data, field).booleanValueOpt()
                 .orElseThrow(() -> wrongType(field, "логическим значением"));
     }
 
@@ -39,11 +39,11 @@ public final class OneCRequiredValues {
      * @throws OneCFieldException если поля нет или оно не число JSON
      */
     public static BigDecimal amount(JsonNode data, String field) {
-        present(data, field);
+        requirePresent(data, field);
         return OneCValues.amount(data, field).orElseThrow(() -> wrongType(field, "числом"));
     }
 
-    private static JsonNode present(JsonNode data, String field) {
+    private static JsonNode requirePresent(JsonNode data, String field) {
         JsonNode value = data.path(field);
         if (value.isMissingNode() || value.isNull()) {
             throw new OneCFieldException(NO_REQUIRED_FIELD_MESSAGE + field);
