@@ -8,14 +8,12 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Код МКБ-10 (ТЗ-4). Справочник иерархический, фильтра нет — сохраняется целиком.
+ * Код диагноза по МКБ-10 из 1С. Справочник иерархический и сохраняется целиком.
  *
- * <p>Родитель хранится <b>GUID'ом источника</b>, а не разрешённой ссылкой на нашу строку.
- * Причина в порядке доставки: справочник приходит сообщениями по одному коду, порядок
- * не гарантирован, и ссылку на ещё не приехавшего родителя пришлось бы либо ронять
- * в ошибку, либо записывать пустой «до следующего сообщения» — а следующего может
- * не быть годами, и дерево осталось бы рваным без единого следа. GUID пишется всегда
- * и разрешается запросом, когда родитель появится.
+ * <p>Родитель хранится <b>GUID'ом источника</b>, а не ссылкой на нашу строку. Коды приходят
+ * по одному и в любом порядке, и ссылку на ещё не приехавшего родителя пришлось бы либо
+ * отвергнуть, либо оставить пустой. GUID пишется всегда и разрешается запросом, когда
+ * родитель появится.
  */
 @Entity
 @Table(name = "mkb10")
@@ -43,13 +41,19 @@ public class Mkb10 extends OneCEntity {
         // JPA
     }
 
-    private Mkb10(UUID externalId, Details details, Instant now) {
+    private Mkb10(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(details, now);
     }
 
+    /**
+     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static Mkb10 create(UUID externalId, Details details, Instant now) {
-        return new Mkb10(externalId, details, now);
+        Mkb10 code = new Mkb10(externalId, now);
+        code.applySnapshot(details, now);
+        return code;
     }
 
     public void applySnapshot(Details details, Instant now) {
@@ -61,7 +65,7 @@ public class Mkb10 extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения ТЗ-4. Разбор — в маппере, инварианты — здесь. */
+    /** Разобранные поля сообщения о коде МКБ-10. */
     public record Details(
             @Nullable UUID externalParentId,
             String code,

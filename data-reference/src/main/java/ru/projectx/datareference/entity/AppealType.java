@@ -8,10 +8,10 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Вид обращения за медицинской помощью (ТЗ-7): амбулаторная помощь, стационар,
- * восстановительное лечение и так далее. Иерархический, без фильтра.
+ * Вид обращения за медицинской помощью из 1С: амбулаторная помощь, стационар,
+ * восстановительное лечение и так далее. Справочник иерархический и сохраняется целиком.
  *
- * <p>Родитель — GUID'ом источника, по той же причине, что и у {@link Mkb10}.
+ * <p>Родитель хранится GUID'ом источника по той же причине, что и у {@link Mkb10}.
  */
 @Entity
 @Table(name = "appeal_types")
@@ -51,13 +51,19 @@ public class AppealType extends OneCEntity {
         // JPA
     }
 
-    private AppealType(UUID externalId, Details details, Instant now) {
+    private AppealType(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(details, now);
     }
 
+    /**
+     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static AppealType create(UUID externalId, Details details, Instant now) {
-        return new AppealType(externalId, details, now);
+        AppealType appealType = new AppealType(externalId, now);
+        appealType.applySnapshot(details, now);
+        return appealType;
     }
 
     public void applySnapshot(Details details, Instant now) {
@@ -72,7 +78,7 @@ public class AppealType extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения ТЗ-7. */
+    /** Разобранные поля сообщения о виде обращения. */
     public record Details(
             @Nullable UUID externalParentId,
             @Nullable String externalCode,
