@@ -31,7 +31,8 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
      * <p>{@code SKIPPED} и {@code FAILED} сюда не попадают: они терминальные. Переобработать такую строку можно,
      * переведя её обратно в {@code NEW} обычным SQL, но только помня о порядке: строка встанет в поток по своему
      * старому моменту приёма, и её данные затрут то, что пришло после неё. Переобрабатывать безопасно последнее
-     * сообщение по объекту или все сообщения потока начиная с него.
+     * сообщение по объекту или все сообщения потока начиная с него. Переобработать можно, только пока тело не
+     * стёрто по сроку хранения: у пропущенных сообщений, полисов и договоров страхования оно живёт ограниченно.
      *
      * <p>Порядок задаёт момент приёма с точностью до микросекунды. Сообщения одного потока с одинаковым моментом
      * приёма друг друга не держат, и их порядок в пачке не определён. Такое возможно только у прайс-листов, которые
@@ -140,7 +141,9 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
      * сообщений любого потока. У полиса вместе с телом стирается причина исхода: в ней мог остаться текст ошибки
      * базы со значениями полей. Транзакцию открывает вызывающий, отдельную на каждую пачку.
      *
-     * <p>Запрос на SQL PostgreSQL: в языке запросов JPA у подзапроса нет ограничения числа строк. Потоки и статус
+     * <p>Отбор повторён и снаружи подзапроса: если строку пачки в это время изменили, например вернули
+     * пропущенное сообщение в разбор, PostgreSQL перепроверит внешнее условие на её новой версии и тело не сотрёт.
+     * Запрос на SQL PostgreSQL: в языке запросов JPA у подзапроса нет ограничения числа строк. Потоки и статус
      * записаны значениями, а не параметрами, чтобы PostgreSQL при любом плане видел подходящий частичный индекс.
      */
     @Modifying
@@ -148,7 +151,9 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
             update inbound_message
                set payload = null,
                    last_error = case when stream = 'POLICIES' then null else last_error end
-             where message_id in (select message_id
+             where payload is not null
+               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+               and message_id in (select message_id
                                     from inbound_message
                                    where payload is not null
                                      and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')

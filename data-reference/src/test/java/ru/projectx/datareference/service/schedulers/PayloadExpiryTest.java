@@ -27,7 +27,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
- * Проход срока хранения без базы: сколько пачек он стирает — в сырье полисов и в карантине, — каждую ли в
+ * Проход срока хранения без базы: сколько пачек он стирает — в сырье и в карантине, — каждую ли в
  * своей транзакции и о чём сообщает. Что запросы стирают только тела старше срока и оставляют сами строки,
  * проверяет на настоящей базе {@link PersonalDataRetentionTest}; здесь — решения самого прохода.
  *
@@ -75,7 +75,7 @@ class PayloadExpiryTest {
         verifyNoMoreInteractions(agedMessages);
     }
 
-    /** Карантин стирается тем же правилом пачек и со своим сроком, независимо от остатка полисов. */
+    /** Карантин стирается тем же правилом пачек и со своим сроком, независимо от остатка в сырье. */
     @Test
     void quarantineRemainder_isErasedInItsOwnBatchesWithItsOwnTtl() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
@@ -131,7 +131,7 @@ class PayloadExpiryTest {
         });
     }
 
-    /** Стирать нечего — по одному запросу на полисы и карантин, по одной транзакции и молчание в журнале. */
+    /** Стирать нечего — по одному запросу на сырьё и карантин, по одной транзакции и молчание в журнале. */
     @Test
     void nothingExpired_oneQueryEachAndNothingLogged() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
