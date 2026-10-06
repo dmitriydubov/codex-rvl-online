@@ -3597,6 +3597,14 @@ InboundMessageService, а их к лимитам приводят Ш16 и Ш17 �
   Проверка после мержа: строки `Dockerfile` без комментариев на 90e0e95 и cce6647 совпадают; `docker compose config` до и
   после совпадает; кодов ТЗ и следов разработки в новых строках нет. `application.yml` в PR не вошёл — сессия доводит его
   новым PR из ветки `claude/sh55-application-yml` от main (смерженный PR не переиспользуется).
+- 2026-10-06, **Ш22 — PR #94 открыт, подписка ~15:37 UTC; ответы координатора.** 1) RUN_ERROR `PolicyResponse#lambda$of$1`
+  NullReturnValsMutator (строка 55, лямбда `.map(row -> ProgramLine.of(...))`): координатор прогнал `mutationGate` на ветке
+  8cb8861 — RUN_ERROR подтверждён (ещё два RUN_ERROR покрыты существующими строками); убивающий ассерт —
+  `extracting(line -> line.program().externalId())` в `PolicyQueryServiceTest.byId_carriesContractAndOnlyActiveRvlPrograms_…`
+  (NPE на `null` в списке). Строка `PolicyResponse#lambda$of$*  NullReturnValsMutator` — PR координатора (маска: компилятор
+  нумерует лямбды; `lambda$of$0` — фильтр с `boolean`, NullReturnVals к нему не применим). 2) «Update branch» PR #94 нажал
+  координатор (guard сессии не даёт слить main с правками файлов человека). 3) `toString()` записи `Policy.Details` без ПДн —
+  в этом шаге, с тестом (владелец поручил ответить по рекомендации).
 - 2026-10-06, **Ш43 — правка замороженной спецификации по поручению владельца («сделай ты», ~12:15 UTC).** Сессия
   остановилась: хук не даёт агенту менять фичу, а сценарий «поиск полисов не кэшируется» искал по `query=СТЕНД` и получал
   пустую выдачу уже до правки номера. Координатор прогнал приёмку на ветке, нашёл причину и коммитом `spec:` b261785 в
