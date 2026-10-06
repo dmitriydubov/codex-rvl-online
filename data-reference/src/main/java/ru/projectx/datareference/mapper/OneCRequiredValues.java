@@ -5,7 +5,7 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Обязательные поля сообщения 1С:УСК, которые читаются строго по типу JSON: целое число, логическое значение и число.
+ * Обязательные поля сообщения 1С:УСК, которые читаются строго по типу JSON: целое число, логическое значение и процент.
  *
  * <p>Поле без значения или с JSON null — нарушение контракта, а не ноль и не false. Значение другого типа, даже похожее
  * на верное (строка {@code "1"}, число вместо логического), тоже отклоняется: подставленное значение ушло бы соседним
@@ -42,17 +42,6 @@ public final class OneCRequiredValues {
     public static boolean flag(JsonNode data, String field) {
         return requirePresent(data, field).booleanValueOpt()
                 .orElseThrow(() -> wrongType(field, "логическим значением"));
-    }
-
-    /**
-     * Число по тому же правилу, что и необязательное денежное значение ({@link OneCValues#amount}).
-     *
-     * @throws OneCFieldException если поля нет, оно не число JSON, у него больше двух знаков после запятой или целая
-     *                            часть длиннее денежной колонки
-     */
-    public static BigDecimal amount(JsonNode data, String field) {
-        requirePresent(data, field);
-        return OneCValues.amount(data, field).orElseThrow(() -> wrongType(field, "числом"));
     }
 
     /**

@@ -66,24 +66,24 @@ class OneCRequiredValuesTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"share\":null}"})
-    void absentAmount_isMissingField(String json) {
-        assertThatThrownBy(() -> OneCRequiredValues.amount(node(json), "share"))
+    void absentPercent_isMissingField(String json) {
+        assertThatThrownBy(() -> OneCRequiredValues.percent(node(json), "share"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("нет обязательного поля share");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"\"10.00\"", "true", "[]"})
-    void amountOfAnotherType_isRejectedWithoutValue(String value) {
-        assertThatThrownBy(() -> OneCRequiredValues.amount(node("{\"share\":" + value + "}"), "share"))
+    void percentOfAnotherType_isRejectedWithoutValue(String value) {
+        assertThatThrownBy(() -> OneCRequiredValues.percent(node("{\"share\":" + value + "}"), "share"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле share не является числом");
     }
 
     @Test
-    void numberWithFractionOrInteger_isReadAsSent() {
-        assertThat(OneCRequiredValues.amount(node("{\"share\":12.34}"), "share")).isEqualByComparingTo("12.34");
-        assertThat(OneCRequiredValues.amount(node("{\"share\":0}"), "share")).isZero();
+    void percentWithFractionOrInteger_isReadAsSent() {
+        assertThat(OneCRequiredValues.percent(node("{\"share\":12.34}"), "share")).isEqualByComparingTo("12.34");
+        assertThat(OneCRequiredValues.percent(node("{\"share\":0}"), "share")).isZero();
     }
 
     @ParameterizedTest
@@ -121,14 +121,6 @@ class OneCRequiredValuesTest {
         assertThatThrownBy(() -> OneCRequiredValues.percent(node("{\"share\":" + value + "}"), "share"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле share вне диапазона от 0 до 100");
-    }
-
-    /** Обязательная сумма читается по пределу денежной колонки, как и необязательная. */
-    @Test
-    void amountBeyondMoneyColumn_isRejected() {
-        assertThatThrownBy(() -> OneCRequiredValues.amount(node("{\"share\":1E+13}"), "share"))
-                .isInstanceOf(OneCFieldException.class)
-                .hasMessage("поле share больше допустимого");
     }
 
     @Test
