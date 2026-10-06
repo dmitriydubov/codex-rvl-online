@@ -231,7 +231,7 @@ class PolicyMapperTest {
 
     /** Диапазон строже колонки процента, поэтому и значение за пределом колонки отклоняется диапазоном. */
     @ParameterizedTest
-    @ValueSource(strings = {"-0.01", "100.01", "999.99", "1000.00", "-1000.00", "1E+3", "1e500"})
+    @ValueSource(strings = {"-0.01", "100.01", "999.99", "1000.00", "-1000.00", "1E+3", "1e500", "1e999999999"})
     void copaymentOutOfRange_isContractViolationNamingFieldButNotValue(String sent) {
         ObjectNode data = policy();
         serviceLine(data).put("copayment", new BigDecimal(sent));
@@ -251,6 +251,7 @@ class PolicyMapperTest {
         assertThatThrownBy(() -> mapper.apply(data))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле copayment содержит больше двух знаков после запятой");
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -260,8 +261,13 @@ class PolicyMapperTest {
         ObjectNode nullValue = policy();
         serviceLine(nullValue).putNull("copayment");
 
-        assertThatThrownBy(() -> mapper.apply(absent)).hasMessage("нет обязательного поля copayment");
-        assertThatThrownBy(() -> mapper.apply(nullValue)).hasMessage("нет обязательного поля copayment");
+        assertThatThrownBy(() -> mapper.apply(absent))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля copayment");
+        assertThatThrownBy(() -> mapper.apply(nullValue))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля copayment");
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -271,8 +277,13 @@ class PolicyMapperTest {
         ObjectNode flag = policy();
         serviceLine(flag).put("copayment", true);
 
-        assertThatThrownBy(() -> mapper.apply(text)).hasMessage("поле copayment не является числом");
-        assertThatThrownBy(() -> mapper.apply(flag)).hasMessage("поле copayment не является числом");
+        assertThatThrownBy(() -> mapper.apply(text))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment не является числом");
+        assertThatThrownBy(() -> mapper.apply(flag))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле copayment не является числом");
+        verify(repository, never()).save(any());
     }
 
     @Test
