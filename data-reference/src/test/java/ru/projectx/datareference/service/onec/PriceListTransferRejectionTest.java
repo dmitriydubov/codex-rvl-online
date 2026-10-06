@@ -163,8 +163,7 @@ class PriceListTransferRejectionTest {
     /** Тело, которое не читается, ни к какой передаче не относится; отказ не должен падать сам. */
     @Test
     void unreadableOrErasedBody_failsAlone() {
-        InboundMessage erased = received(batchData(GOOD_ROW));
-        erased.forgetPayload();
+        InboundMessage erased = InboundMessage.receive(receipt(), null);
         InboundMessage malformed = InboundMessage.receive(receipt(), "{не JSON");
         InboundMessage withoutData = InboundMessage.receive(receipt(), "{\"data\":[]}");
 

@@ -35,3 +35,5 @@ databaseChangeLog:
       file: db/changelog/014-inbound-backlog-index.yaml
   - include:
       file: db/changelog/015-erase-policy-reasons.yaml
+  - include:
+      file: db/changelog/016-retention-index-all-statuses.yaml

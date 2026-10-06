@@ -78,8 +78,8 @@ public class InboundBacklogMetrics implements MeterBinder {
         }
         gauge(registry, STUCK_TRANSFERS, "Передачи прайсов, которые ждут своих частей дольше порога тревоги",
                 current -> current.stuckTransfers());
-        gauge(registry, OVERDUE_POLICY_PAYLOADS, "Тела сообщений полисов старше срока хранения, ещё не стёртые",
-                current -> current.overdue().policyPayloads());
+        gauge(registry, OVERDUE_POLICY_PAYLOADS, "Тела сырья старше срока хранения, ещё не стёртые",
+                current -> current.overdue().payloads());
         gauge(registry, OVERDUE_QUARANTINE_BODIES, "Тела карантинных сообщений старше срока хранения, ещё не стёртые",
                 current -> current.overdue().quarantineBodies());
         TimeGauge.builder(STALENESS, this, TimeUnit.SECONDS, metrics -> metrics.secondsSince(metrics.backlog.takenAt()))

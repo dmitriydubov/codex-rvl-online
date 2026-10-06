@@ -35,10 +35,10 @@ class AgedInboundMessagesTest {
     private QuarantineRepository quarantine;
 
     @Test
-    void forgetPolicyPayloads_erasesRowsReceivedBeforeNowMinusAge() {
-        when(repository.forgetPolicyPayloads(NOW.minus(Duration.ofDays(30)), 500)).thenReturn(17);
+    void forgetPayloads_erasesRowsReceivedBeforeNowMinusAge() {
+        when(repository.forgetPayloadsReceivedBefore(NOW.minus(Duration.ofDays(30)), 500)).thenReturn(17);
 
-        assertThat(agedMessages().forgetPolicyPayloads(Duration.ofDays(30), 500)).isEqualTo(17);
+        assertThat(agedMessages().forgetPayloads(Duration.ofDays(30), 500)).isEqualTo(17);
     }
 
     @Test

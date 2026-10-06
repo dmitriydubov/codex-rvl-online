@@ -33,13 +33,13 @@ public class AgedInboundMessages {
     }
 
     /**
-     * Стирает тела и причины исхода не больше {@code limit} сообщений полисов, принятых раньше, чем {@code age}
-     * назад, начиная с самых старых. Метод не открывает транзакцию: её открывает вызывающий.
+     * Стирает тела не больше {@code limit} сообщений с ограниченным сроком хранения, принятых раньше, чем
+     * {@code age} назад, начиная с самых старых. Метод не открывает транзакцию: её открывает вызывающий.
      *
      * @return сколько тел стёрто
      */
-    public int forgetPolicyPayloads(Duration age, int limit) {
-        return repository.forgetPolicyPayloads(receivedBefore(age), limit);
+    public int forgetPayloads(Duration age, int limit) {
+        return repository.forgetPayloadsReceivedBefore(receivedBefore(age), limit);
     }
 
     /**

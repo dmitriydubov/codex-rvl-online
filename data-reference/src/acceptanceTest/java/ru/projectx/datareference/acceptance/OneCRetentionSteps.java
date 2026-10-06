@@ -13,7 +13,7 @@ import ru.projectx.datareference.config.ImportProperties;
 /**
  * Шаги о сроке хранения тела и причины исхода сообщения 1С:УСК в сырье.
  *
- * <p>Срок хранения тел полисов — настройка сервиса; сценарий закрепляет границу: на час старше срока стирается,
+ * <p>Срок хранения тел — настройка сервиса; сценарий закрепляет границу: на час старше срока стирается,
  * на час моложе — нет. Строку до прохода стирания шаг запоминает, когда сдвигает момент приёма: с ней сравнивается
  * то, что осталось после прохода.
  */
@@ -24,6 +24,7 @@ public class OneCRetentionSteps {
             "больше", ttl -> ttl.plus(HOUR),
             "меньше", ttl -> ttl.minus(HOUR));
     private static final Map<String, Boolean> ERASED = Map.of("стёрты", true, "сохранены", false);
+    private static final Map<String, Boolean> BODY_ERASED = Map.of("стёрто", true, "сохранено", false);
 
     private final OneCInbox inbox;
     private final ImportProperties properties;
@@ -55,6 +56,21 @@ public class OneCRetentionSteps {
             assertThat(after.payload()).as("тело последнего сообщения").isNotNull().isEqualTo(before.payload());
             assertThat(after.lastError()).as("причина отказа последнего сообщения").isNotNull()
                     .isEqualTo(before.lastError());
+        }
+    }
+
+    /** Только тело: причина исхода у таких сообщений остаётся, и её проверяет шаг об исходе. */
+    @Тогда("тело последнего сообщения {word}")
+    public void body(String state) {
+        assertThat(BODY_ERASED).as("состояния тела, которые знает шаг").containsKey(state);
+        InboundRow after = inbox.last();
+
+        if (BODY_ERASED.get(state)) {
+            assertThat(after.payload()).as("тело последнего сообщения").isNull();
+        }
+        else {
+            assertThat(after.payload()).as("тело последнего сообщения").isNotNull()
+                    .isEqualTo(rowBeforeRetention().payload());
         }
     }
 

@@ -218,8 +218,10 @@ class PriceListTransferAssemblerTest {
     /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
     @Test
     void batchWithErasedBody_isContractViolation() {
-        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
-        batch.forgetPayload();
+        InboundMessage batch = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW), null);
+        batch.markBuffered(CID, null, 1);
+        correlated.add(batch);
         InboundMessage finalMessage = message(finalData(1, 1));
 
         assertThatThrownBy(() -> receive(finalMessage))

@@ -43,7 +43,7 @@ public class InboundBacklogReads {
                 inboundMessages.countUnfinishedByStreamAndStatus().stream().map(InboundBacklogReads::statusCount).toList(),
                 inboundMessages.countTransfersBufferedBefore(now.minus(properties.stuckTransferThreshold())),
                 new InboundBacklog.Overdue(
-                        inboundMessages.countPolicyPayloadsReceivedBefore(now.minus(properties.payloadTtl())),
+                        inboundMessages.countPayloadsToForgetReceivedBefore(now.minus(properties.payloadTtl())),
                         quarantine.countBodiesReceivedBefore(now.minus(properties.quarantineTtl()))),
                 now);
     }

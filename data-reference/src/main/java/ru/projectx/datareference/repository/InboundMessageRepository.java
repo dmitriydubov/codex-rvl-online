@@ -122,41 +122,39 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
     long countTransfersBufferedBefore(@Param("receivedBefore") Instant receivedBefore);
 
     /**
-     * Сколько тел полисов, принятых раньше {@code receivedBefore}, ещё не стёрто. Тот же отбор, что у
-     * {@link #forgetPolicyPayloads}, и тот же частичный индекс; поток записан значением по той же причине.
+     * Сколько тел, принятых раньше {@code receivedBefore}, ещё ждут стирания по сроку хранения. Отбор тот же, что
+     * у {@link #forgetPayloadsReceivedBefore}, слово в слово: так обоим запросам подходит один частичный индекс.
      */
-    @Query("""
-            select count(message)
-              from InboundMessage message
-             where message.stream = POLICIES
-               and message.payload is not null
-               and message.receivedAt < :receivedBefore
+    @Query(nativeQuery = true, value = """
+            select count(*)
+              from inbound_message
+             where payload is not null
+               and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
+               and received_at < :receivedBefore
             """)
-    long countPolicyPayloadsReceivedBefore(@Param("receivedBefore") Instant receivedBefore);
+    long countPayloadsToForgetReceivedBefore(@Param("receivedBefore") Instant receivedBefore);
 
     /**
-     * Стирает тела не больше {@code limit} строк потока полисов, принятых раньше {@code receivedBefore}, начиная
-     * с самых старых, и возвращает, сколько стёрто. Нужен сроку хранения персональных данных: строки остаются,
-     * тела не читаются в память. Вместе с телом стирается причина исхода: у полиса она могла содержать текст
-     * ошибки базы со значениями полей. Метод не открывает транзакцию: её открывает вызывающий, отдельную на каждую
-     * пачку.
+     * Стирает тела не больше {@code limit} строк, принятых раньше {@code receivedBefore}, начиная с самых старых, и
+     * возвращает, сколько стёрто. Стираются тела полисов и договоров страхования в любом статусе и тела пропущенных
+     * сообщений любого потока. У полиса вместе с телом стирается причина исхода: в ней мог остаться текст ошибки
+     * базы со значениями полей. Транзакцию открывает вызывающий, отдельную на каждую пачку.
      *
-     * <p>Запрос написан на SQL PostgreSQL, потому что в языке запросов JPA у подзапроса нет ограничения числа
-     * строк. Поток записан в запросе значением, а не параметром: так PostgreSQL при любом плане видит, что
-     * подходит частичный индекс по строкам полисов с телом, и не перебирает всю таблицу сырья.
+     * <p>Запрос на SQL PostgreSQL: в языке запросов JPA у подзапроса нет ограничения числа строк. Потоки и статус
+     * записаны значениями, а не параметрами, чтобы PostgreSQL при любом плане видел подходящий частичный индекс.
      */
     @Modifying
     @Query(nativeQuery = true, value = """
             update inbound_message
                set payload = null,
-                   last_error = null
+                   last_error = case when stream = 'POLICIES' then null else last_error end
              where message_id in (select message_id
                                     from inbound_message
-                                   where stream = 'POLICIES'
-                                     and payload is not null
+                                   where payload is not null
+                                     and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED')
                                      and received_at < :receivedBefore
                                    order by received_at
                                    limit :limit)
             """)
-    int forgetPolicyPayloads(@Param("receivedBefore") Instant receivedBefore, @Param("limit") int limit);
+    int forgetPayloadsReceivedBefore(@Param("receivedBefore") Instant receivedBefore, @Param("limit") int limit);
 }
