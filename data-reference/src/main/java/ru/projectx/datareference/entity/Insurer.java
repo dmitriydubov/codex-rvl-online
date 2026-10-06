@@ -41,11 +41,7 @@ public class Insurer extends OneCEntity {
         super(externalId, now);
     }
 
-    /**
-     * Новая запись из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
-     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
-     * вызов раньше, чем инициализировались его собственные поля.
-     */
+    /** Новая запись из первого сообщения 1С. */
     public static Insurer create(UUID externalId, Details details, Instant now) {
         Insurer insurer = new Insurer(externalId, now);
         insurer.applySnapshot(details, now);

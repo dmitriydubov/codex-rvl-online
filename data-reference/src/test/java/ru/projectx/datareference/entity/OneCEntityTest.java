@@ -19,7 +19,7 @@ class OneCEntityTest {
 
     @Test
     void newRecord_keepsExternalId_isActive_andIsCreatedAndUpdatedAtTheSameTime() {
-        OneCEntity record = new OneCEntity(EXTERNAL_ID, CREATED);
+        OneCEntity record = record(CREATED);
 
         assertThat(record.externalId()).isEqualTo(EXTERNAL_ID);
         assertThat(record.isArchive()).isFalse();
@@ -29,15 +29,15 @@ class OneCEntityTest {
 
     @Test
     void newRecords_getTheirOwnIds_independentOfExternalId() {
-        OneCEntity first = new OneCEntity(EXTERNAL_ID, CREATED);
-        OneCEntity second = new OneCEntity(EXTERNAL_ID, CREATED);
+        OneCEntity first = record(CREATED);
+        OneCEntity second = record(CREATED);
 
         assertThat(first.id()).isNotNull().isNotEqualTo(second.id()).isNotEqualTo(EXTERNAL_ID);
     }
 
     @Test
     void applyCommon_withDeleteMark_archives_andMarksOnlyUpdateTime() {
-        OneCEntity record = new OneCEntity(EXTERNAL_ID, CREATED);
+        OneCEntity record = record(CREATED);
 
         record.applyCommon(true, UPDATED);
 
@@ -48,7 +48,7 @@ class OneCEntityTest {
 
     @Test
     void applyCommon_withoutDeleteMark_returnsArchivedRecordToActive() {
-        OneCEntity record = new OneCEntity(EXTERNAL_ID, CREATED);
+        OneCEntity record = record(CREATED);
         record.applyCommon(true, CREATED);
 
         record.applyCommon(false, UPDATED);
@@ -58,11 +58,17 @@ class OneCEntityTest {
 
     @Test
     void archiveCommon_archivesActiveRecord_andMarksUpdateTime() {
-        OneCEntity record = new OneCEntity(EXTERNAL_ID, CREATED);
+        OneCEntity record = record(CREATED);
 
         record.archiveCommon(UPDATED);
 
         assertThat(record.isArchive()).isTrue();
         assertThat(record.updatedAt()).isEqualTo(UPDATED);
+    }
+
+    /** Запись конкретной сущности: сама общая часть не сохраняется, её создают только наследники. */
+    private static OneCEntity record(Instant now) {
+        return new OneCEntity(EXTERNAL_ID, now) {
+        };
     }
 }
