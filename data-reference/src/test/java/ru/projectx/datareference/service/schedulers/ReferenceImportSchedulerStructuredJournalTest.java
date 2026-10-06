@@ -96,7 +96,7 @@ class ReferenceImportSchedulerStructuredJournalTest {
         when(repository.findDueForImport(any(), any())).thenReturn(List.of(message));
         when(importService.importMessage(message)).thenThrow(
                 new CannotAcquireLockException("параметры запроса: [" + PERSONAL_DATA + "]"));
-        when(inboundMessageService.recordTemporaryFailure(any(), any())).thenReturn(InboundStatus.RETRY);
+        when(inboundMessageService.recordTemporaryFailure(any(), any(), any())).thenReturn(InboundStatus.RETRY);
 
         scheduler().importPendingMessages();
 

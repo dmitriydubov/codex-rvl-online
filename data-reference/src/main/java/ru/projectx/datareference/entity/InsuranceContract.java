@@ -9,16 +9,14 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Договор страхования (ТЗ-2). Хранятся только договоры ДМС — прочие продукты источника
- * (еОСАГО и остальные) фильтруются при разборе и до этой таблицы не доходят.
+ * Договор добровольного медицинского страхования (ДМС) из 1С. Договоры других продуктов, например
+ * еОСАГО, отбрасываются при разборе сообщения.
  *
- * <p>Полис ссылается на договор полем {@code external_contract_id}, и ссылка эта
- * логическая: полисы приезжают своим потоком и раньше договоров, а ТЗ-1 прямо
- * оговаривает, что отсутствие связанной записи ошибкой не считается.
+ * <p>Полис ссылается на договор GUID'ом без внешнего ключа: полисы приезжают своим потоком, бывает,
+ * что раньше договора, и отсутствие договора ошибкой не считается.
  *
- * <p>Страхователь тоже связан логически, и причина названа в самом ТЗ-2: страхователем
- * может быть физлицо, которого в {@code insurers} нет вовсе — туда попадают только
- * контрагенты-юрлица из ТЗ-3. Внешний ключ превратил бы такой договор в отказ применения.
+ * <p>Страхователь связан так же: им может быть физическое лицо, а в справочник страхователей попадают
+ * только юридические лица. Внешний ключ превратил бы такой договор в отказ применения.
  */
 @Entity
 @Table(name = "insurance_contracts")
@@ -35,7 +33,7 @@ public class InsuranceContract extends OneCEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    /** GUID страхователя в 1С. Без FK — см. javadoc класса. */
+    /** GUID страхователя в 1С, без внешнего ключа. */
     @Nullable
     @Column(name = "external_insurer_id")
     private UUID externalInsurerId;
@@ -44,13 +42,15 @@ public class InsuranceContract extends OneCEntity {
         // JPA
     }
 
-    private InsuranceContract(UUID externalId, Details details, Instant now) {
+    private InsuranceContract(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(details, now);
     }
 
+    /** Новая запись из первого сообщения 1С. */
     public static InsuranceContract create(UUID externalId, Details details, Instant now) {
-        return new InsuranceContract(externalId, details, now);
+        InsuranceContract contract = new InsuranceContract(externalId, now);
+        contract.applySnapshot(details, now);
+        return contract;
     }
 
     public void applySnapshot(Details details, Instant now) {
@@ -62,7 +62,7 @@ public class InsuranceContract extends OneCEntity {
     }
 
     /**
-     * Разобранные поля сообщения ТЗ-2.
+     * Разобранные поля сообщения о договоре страхования.
      *
      * @param notActive признак архивности этого потока. Называется не {@code deleteMark},
      *                как у остальных справочников, а {@code notActive} — имя источника

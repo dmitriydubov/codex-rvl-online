@@ -79,6 +79,32 @@ class InboundMessageParentWaitTest {
         assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
     }
 
+    /**
+     * Первая попытка после ручного возврата упала на временной ошибке базы. Повтор ждёт родителя заново: прежний срок
+     * отклонил бы сообщение в том же проходе.
+     */
+    @Test
+    void waitingAfterManualReturnAndRetry_startsTheWaitAnew() {
+        InboundMessage message = returnedToParsingAfterExpiry();
+
+        message.markRetrying("временный отказ базы", LATER);
+        message.markAwaitingParent(BRANCH, RECORD, LATER);
+
+        assertThat(message.outcome().parentWait()).contains(new ParentWait(BRANCH, LATER, RECORD));
+    }
+
+    /** То же для части передачи прайса: после повтора она собирается в буфере и ждёт услугу заново. */
+    @Test
+    void transferPartAfterManualReturnAndRetry_startsTheWaitAnew() {
+        InboundMessage part = returnedToParsingAfterExpiry();
+
+        part.markRetrying("временный отказ базы", LATER);
+        part.markBuffered(UUID.randomUUID(), 1, 1);
+        part.markAwaitingParent(BRANCH, null, LATER);
+
+        assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
+    }
+
     /** Ждущая часть, которую сборщик снова кладёт в буфер при пересмотре, сохраняет момент начала ожидания. */
     @Test
     void waitingTransferPartBufferedAgain_keepsTheMomentOfTheWait() {
@@ -152,6 +178,14 @@ class InboundMessageParentWaitTest {
     private static InboundMessage waiting() {
         InboundMessage message = received();
         message.markAwaitingParent(BRANCH, RECORD, WAITING_SINCE);
+        return message;
+    }
+
+    /** Отклонённое по сроку сообщение, которое дежурный вернул в разбор SQL-запросом, переводя строку в NEW. */
+    private static InboundMessage returnedToParsingAfterExpiry() {
+        InboundMessage message = waiting();
+        message.markParentWaitExpired();
+        ReflectionTestUtils.setField(message, "status", InboundStatus.NEW);
         return message;
     }
 

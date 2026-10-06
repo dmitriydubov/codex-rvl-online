@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Поля сообщения применяются к страхователю уже при создании, а не только при следующем обновлении.
  * Пометка удаления становится признаком архивности: удалённый в 1С страхователь остаётся в справочнике
- * архивной записью, а не пропадает.
+ * архивной записью, а не пропадает. Следующее сообщение заменяет реквизиты целиком, включая пустые.
  */
 class InsurerTest {
 
@@ -47,5 +47,18 @@ class InsurerTest {
         assertThat(insurer.isArchive()).isTrue();
         assertThat(insurer.updatedAt()).isEqualTo(UPDATED);
         assertThat(insurer.createdAt()).isEqualTo(CREATED);
+    }
+
+    @Test
+    void applySnapshot_replacesRequisitesEntirely_includingEmptyOnes() {
+        Insurer insurer = Insurer.create(UUID.randomUUID(),
+                new Insurer.Details("ООО «Страхователь»", "Общество «Страхователь»", "7701000000", "770101001", false),
+                CREATED);
+
+        insurer.applySnapshot(new Insurer.Details("ООО «Страхователь»", null, null, null, false), UPDATED);
+
+        assertThat(insurer.fullName()).isNull();
+        assertThat(insurer.inn()).isNull();
+        assertThat(insurer.kpp()).isNull();
     }
 }

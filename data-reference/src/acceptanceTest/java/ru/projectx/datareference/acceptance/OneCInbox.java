@@ -47,6 +47,10 @@ public class OneCInbox {
             update inbound_message set status = 'NEW', next_retry_at = null, last_error = null, processed_at = null
             where message_id = :messageId
             """;
+    private static final String RETURN_TRANSFER_TO_PARSING = """
+            update inbound_message set status = 'NEW', next_retry_at = null, last_error = null, processed_at = null
+            where correlation_id = :cid
+            """;
     private static final String AGE = """
             update inbound_message set received_at = now() - cast(:age as interval) where message_id = :messageId
             """;
@@ -161,6 +165,16 @@ public class OneCInbox {
     /** Все присланные сообщения потока в порядке присылки. */
     public List<OneCMessage> receivedOf(OneCStream stream) {
         return received.stream().filter(message -> message.stream() == stream).toList();
+    }
+
+    /**
+     * Все части передачи прайса снова ждут разбора, как после ручной переобработки передачи целиком: тела и моменты
+     * приёма прежние, исход стёрт.
+     */
+    public void returnTransferToParsing(UUID cid) {
+        if (jdbc.sql(RETURN_TRANSFER_TO_PARSING).param("cid", cid).update() == 0) {
+            throw new IllegalStateException("в сырье нет частей передачи " + cid);
+        }
     }
 
     /** Сообщение, присланное последним шагом «1С:УСК прислала …». */

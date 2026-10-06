@@ -1,11 +1,9 @@
 package ru.projectx.datareference.service;
 
 import java.time.Clock;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -18,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.InboundRetryProperties;
 import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
@@ -36,13 +35,6 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 public class InboundMessageService {
 
     private static final Logger log = LoggerFactory.getLogger(InboundMessageService.class);
-
-    /**
-     * Статусы сообщений, которые ещё ждут разбора; у остальных исход разбора зафиксирован. Сообщение, которое ждёт
-     * родителя, разбирают снова, когда родитель пришёл, и его отказ записывается так же, как у нового.
-     */
-    private static final Set<InboundStatus> AWAITING_PARSE =
-            EnumSet.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.AWAITING_PARENT);
 
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
@@ -121,12 +113,15 @@ public class InboundMessageService {
      * Записывает временный отказ базы: повтор через задержку из настроенного списка, а когда список исчерпан, —
      * окончательный отказ. Транзакция своя: транзакция вызывающего уже откатилась вместе с неудавшимися изменениями.
      *
+     * @param beforeAttempt исход сообщения, каким его прочитали до неудавшейся попытки
      * @return статус, с которым сообщение осталось: повтор, отказ или уже зафиксированный исход
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public InboundStatus recordTemporaryFailure(UUID messageId, ParseFailure.Temporary failure) {
+    public InboundStatus recordTemporaryFailure(UUID messageId, InboundOutcome beforeAttempt,
+            ParseFailure.Temporary failure) {
+
         InboundMessage message = require(messageId);
-        if (isOutcomeCommitted(message)) {
+        if (isOutcomeCommitted(message, beforeAttempt)) {
             return keepCommitted(message, failure);
         }
         int failedAttempt = failedAttempt(message);
@@ -145,12 +140,15 @@ public class InboundMessageService {
      * Записывает постоянную ошибку и сразу завершает обработку окончательным отказом. Транзакция своя, как у
      * временного отказа; исход, зафиксированный до отказа, остаётся прежним.
      *
+     * @param beforeAttempt исход сообщения, каким его прочитали до неудавшейся попытки
      * @return статус, с которым сообщение осталось: отказ или уже зафиксированный исход
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public InboundStatus recordPermanentFailure(UUID messageId, ParseFailure.Permanent failure) {
+    public InboundStatus recordPermanentFailure(UUID messageId, InboundOutcome beforeAttempt,
+            ParseFailure.Permanent failure) {
+
         InboundMessage message = require(messageId);
-        if (isOutcomeCommitted(message)) {
+        if (isOutcomeCommitted(message, beforeAttempt)) {
             return keepCommitted(message, failure);
         }
         fail(message, failure.reason(), failure).forEach(transitions::record);
@@ -177,13 +175,22 @@ public class InboundMessageService {
     }
 
     /**
-     * Исход разбора уже зафиксирован, если сообщение больше не ждёт разбора. Разбор берёт только новые сообщения и
-     * сообщения, назначенные на повтор, а неудавшаяся попытка откатывает свой статус вместе с изменениями. Другой
-     * статус здесь значит, что попытка зафиксировалась, а отказ пришёл позже: например, соединение оборвалось сразу
-     * после фиксации, и приложение не узнало, что база её приняла.
+     * Исход разбора уже зафиксирован, если строка сообщения отличается от той, что была до попытки. Неудавшаяся
+     * попытка откатывает свой исход вместе с изменениями справочников, и строка остаётся прежней. Другая строка здесь
+     * значит, что попытка зафиксировалась, а отказ пришёл позже: например, соединение оборвалось сразу после
+     * фиксации, и приложение не узнало, что база её приняла.
+     *
+     * <p>Сравнивается исход целиком, а не только статус. Сообщение, которое ждало родителя, после пересмотра может
+     * снова ждать, уже другого родителя, и статус при этом прежний. Если же пересмотр записал ровно то, что уже было,
+     * он ничего не изменил, и повтор безопасен.
+     *
+     * <p>Оба исхода прочитаны из базы: исход до попытки — выборкой прохода, которая идёт без транзакции, текущий — в
+     * своей транзакции этого сервиса, с новым контекстом персистентности. Поэтому копия сообщения, которую разбор менял
+     * в памяти, сюда не попадает, и моменты времени сравниваются с одной точностью. Строку, которую между чтением и
+     * отказом изменил кто-то другой, например дежурный запросом, сервис тоже сочтёт зафиксированной и не тронет.
      */
-    private static boolean isOutcomeCommitted(InboundMessage message) {
-        return !AWAITING_PARSE.contains(message.outcome().status());
+    private static boolean isOutcomeCommitted(InboundMessage message, InboundOutcome beforeAttempt) {
+        return !message.outcome().equals(beforeAttempt);
     }
 
     /**

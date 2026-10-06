@@ -75,6 +75,12 @@ public class OneCOutcomeSteps {
         assertPostponed(inbox.first(), "первого", attempt, reason);
     }
 
+    /** То же для сообщения с заданным сценарием {@code message-id}, например части передачи прайса. */
+    @Тогда("сообщение 1С:УСК {string} отложено до повтора после попытки {int} с причиной {string}")
+    public void messagePostponed(String messageId, int attempt, String reason) {
+        assertPostponed(inbox.row(UUID.fromString(messageId)), messageId, attempt, reason);
+    }
+
     /**
      * Исходы всех строк сырья сценария в порядке приёма, словами через запятую. Незнакомое слово роняет шаг: иначе
      * мутация значения в спецификации прошла бы незамеченной.

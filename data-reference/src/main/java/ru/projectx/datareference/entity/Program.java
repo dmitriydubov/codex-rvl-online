@@ -13,13 +13,11 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Страховая программа РВЛ (ТЗ-6) вместе с перечнем доступных по ней учреждений.
+ * Страховая программа РВЛ вместе с перечнем учреждений, где по ней обслуживают.
  *
- * <p>Перечень — табличная часть сообщения и живёт по правилу <b>полного замещения</b>:
- * строки принадлежат программе, а не существуют сами по себе, отсюда
- * {@code orphanRemoval} и замена целиком. Дописывать в него по одной строке нельзя —
- * источник присылает актуальный состав, и «дописать» означало бы навсегда сохранить
- * строки, которых в 1С уже нет.
+ * <p>Перечень приходит табличной частью сообщения и замещается целиком: 1С присылает актуальный
+ * состав, а дописывание сохранило бы навсегда строки, которых в 1С уже нет. Строки принадлежат
+ * программе: строка, выбывшая из перечня, удаляется из базы.
  */
 @Entity
 @Table(name = "programs")
@@ -41,9 +39,8 @@ public class Program extends OneCEntity {
     private String typeProgramm;
 
     /*
-     * Поле не final, хотя по стилю проекта хотелось бы: Hibernate подменяет коллекцию
-     * своей реализацией через reflection, и final здесь — известная мина, которая
-     * срабатывает не на компиляции, а на первой загрузке сущности.
+     * Коллекция не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
+     * полей сущности, а Hibernate при загрузке подменяет коллекцию своей реализацией.
      */
     @OneToMany(mappedBy = "program", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProgramLpu> availableLpu = new ArrayList<>();
@@ -52,13 +49,15 @@ public class Program extends OneCEntity {
         // JPA
     }
 
-    private Program(UUID externalId, Details details, Instant now) {
+    private Program(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(details, now);
     }
 
+    /** Новая запись из первого сообщения 1С. */
     public static Program create(UUID externalId, Details details, Instant now) {
-        return new Program(externalId, details, now);
+        Program program = new Program(externalId, now);
+        program.applySnapshot(details, now);
+        return program;
     }
 
     public void applySnapshot(Details details, Instant now) {
@@ -69,18 +68,13 @@ public class Program extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** ТЗ-6, п. 6.3: пришло обновление с {@code rvl = false} — программа больше не наша. */
+    /** Пришло обновление, в котором программа больше не относится к РВЛ: поля применяются, запись уходит в архив. */
     public void archiveAfterLosingRvl(Details details, Instant now) {
         applySnapshot(details, now);
         archiveCommon(now);
     }
 
-    /**
-     * Полное замещение табличной части {@code service[]}.
-     *
-     * <p>Обычный цикл, а не стрим: он наполняет коллекцию сущности, то есть имеет
-     * побочный эффект по определению.
-     */
+    /** Замещает перечень учреждений целиком: строки, которых нет в сообщении, удаляются. */
     public void replaceAvailableLpu(List<ProgramLpu.Row> rows, Instant now) {
         availableLpu.clear();
         for (ProgramLpu.Row row : rows) {
@@ -88,7 +82,7 @@ public class Program extends OneCEntity {
         }
     }
 
-    /** Разобранные поля шапки сообщения ТЗ-6. */
+    /** Разобранные поля шапки сообщения о программе. */
     public record Details(
             @Nullable UUID externalProductId,
             @Nullable UUID externalParentId,

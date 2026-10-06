@@ -24,11 +24,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import ru.projectx.datareference.config.InboundRetryProperties;
+import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundOutcome;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -53,6 +55,12 @@ class InboundCommittedOutcomeTest {
             "DataAccessResourceFailureException", "08006");
     private static final ParseFailure.Permanent COMMIT_FAILED = new ParseFailure.Permanent(
             "непредвиденная ошибка разбора: TransactionSystemException", "TransactionSystemException", "нет");
+    private static final AwaitedParent PARENT =
+            new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
+    private static final AwaitedParent HEAD_OFFICE =
+            new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("b515b8fc-d13c-4b0b-aae3-33e0ca86ff1c"));
+    /** Исход нового сообщения: так строка выглядела до попытки, которая зафиксировала исход. */
+    private static final InboundOutcome NEW = new InboundOutcome(InboundStatus.NEW, 0, null, null, null, null);
 
     @Mock
     private InboundMessageRepository repository;
@@ -77,7 +85,7 @@ class InboundCommittedOutcomeTest {
         InboundMessage message = existing();
         message.markProcessed(NOW);
 
-        InboundStatus left = service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST);
+        InboundStatus left = service().recordTemporaryFailure(MESSAGE_ID, NEW, CONNECTION_LOST);
 
         assertThat(left).isEqualTo(InboundStatus.PROCESSED);
         assertThat(message.outcome()).isEqualTo(new InboundOutcome(InboundStatus.PROCESSED, 0, null, null, NOW, null));
@@ -90,7 +98,7 @@ class InboundCommittedOutcomeTest {
     void temporaryFailureAfterCommittedOutcome_isReportedInJournal() {
         existing().markSkipped("программа не РВЛ", NOW);
 
-        service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST);
+        service().recordTemporaryFailure(MESSAGE_ID, NEW, CONNECTION_LOST);
 
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
@@ -105,7 +113,8 @@ class InboundCommittedOutcomeTest {
     void temporaryFailureAfterBuffered_keepsTheOutcome() {
         existing().markBuffered(UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000cc"), 2, 10);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST)).isEqualTo(InboundStatus.BUFFERED);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, NEW, CONNECTION_LOST))
+                .isEqualTo(InboundStatus.BUFFERED);
     }
 
     @Test
@@ -113,12 +122,67 @@ class InboundCommittedOutcomeTest {
         InboundMessage message = existing();
         message.markProcessed(NOW);
 
-        InboundStatus left = service().recordPermanentFailure(MESSAGE_ID, COMMIT_FAILED);
+        InboundStatus left = service().recordPermanentFailure(MESSAGE_ID, NEW, COMMIT_FAILED);
 
         assertThat(left).isEqualTo(InboundStatus.PROCESSED);
         assertThat(message.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
         assertThat(counted(InboundStatus.FAILED)).isZero();
         assertThat(logged.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
+    }
+
+    /**
+     * Ожидание родителя — тоже зафиксированный исход, если попытка его записала: строка отличается от той, что была
+     * до попытки. Повтор поверх него держал бы поток и засчитывал попытку, а отказ стёр бы ожидание.
+     */
+    @Test
+    void temporaryFailureAfterCommittedWait_keepsTheWait() {
+        InboundMessage message = existing();
+        InboundOutcome before = message.outcome();
+        message.markAwaitingParent(PARENT, null, NOW);
+        InboundOutcome committed = message.outcome();
+
+        InboundStatus left = service().recordTemporaryFailure(MESSAGE_ID, before, CONNECTION_LOST);
+
+        assertThat(left).isEqualTo(InboundStatus.AWAITING_PARENT);
+        assertThat(message.outcome()).isEqualTo(committed);
+        assertThat(counted(InboundStatus.AWAITING_PARENT)).isEqualTo(1);
+        assertThat(logged.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
+    }
+
+    @Test
+    void permanentFailureAfterCommittedWait_keepsTheWait() {
+        InboundMessage message = existing();
+        InboundOutcome before = message.outcome();
+        message.markAwaitingParent(PARENT, null, NOW);
+
+        assertThat(service().recordPermanentFailure(MESSAGE_ID, before, COMMIT_FAILED))
+                .isEqualTo(InboundStatus.AWAITING_PARENT);
+        assertThat(message.outcome().parentWait()).isPresent();
+        assertThat(counted(InboundStatus.FAILED)).isZero();
+    }
+
+    /** Пересмотр, после которого сообщение ждёт другого родителя, тоже зафиксирован, хотя статус прежний. */
+    @Test
+    void temporaryFailureAfterCommittedWaitForAnotherParent_keepsTheWait() {
+        InboundMessage message = existing();
+        message.markAwaitingParent(PARENT, null, NOW);
+        InboundOutcome before = message.outcome();
+        message.markAwaitingParent(HEAD_OFFICE, null, NOW);
+
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, before, CONNECTION_LOST))
+                .isEqualTo(InboundStatus.AWAITING_PARENT);
+        assertThat(message.outcome().attempt()).isZero();
+    }
+
+    /** Пересмотр ожидавшего сообщения откатился: строка та же, что до попытки, и отказ ставит повтор. */
+    @Test
+    void temporaryFailureOfRolledBackRecheck_schedulesARetry() {
+        InboundMessage message = existing();
+        message.markAwaitingParent(PARENT, null, NOW);
+
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST))
+                .isEqualTo(InboundStatus.RETRY);
+        assertThat(logged.list).isEmpty();
     }
 
     /** Отказ сообщения, которое ждёт повтора, записывается как обычно: исход ещё не зафиксирован. */
@@ -127,7 +191,8 @@ class InboundCommittedOutcomeTest {
         InboundMessage message = existing();
         message.markRetrying("первая ошибка", NOW);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST)).isEqualTo(InboundStatus.RETRY);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST))
+                .isEqualTo(InboundStatus.RETRY);
         assertThat(message.outcome().attempt()).isEqualTo(2);
         assertThat(logged.list).isEmpty();
     }
@@ -138,14 +203,15 @@ class InboundCommittedOutcomeTest {
         message.markRetrying("первая ошибка", NOW);
         message.markRetrying("вторая ошибка", NOW);
 
-        assertThat(service().recordTemporaryFailure(MESSAGE_ID, CONNECTION_LOST)).isEqualTo(InboundStatus.FAILED);
+        assertThat(service().recordTemporaryFailure(MESSAGE_ID, message.outcome(), CONNECTION_LOST))
+                .isEqualTo(InboundStatus.FAILED);
     }
 
     @Test
     void permanentFailureOfNewMessage_returnsFailed() {
         existing();
 
-        assertThat(service().recordPermanentFailure(MESSAGE_ID, COMMIT_FAILED)).isEqualTo(InboundStatus.FAILED);
+        assertThat(service().recordPermanentFailure(MESSAGE_ID, NEW, COMMIT_FAILED)).isEqualTo(InboundStatus.FAILED);
     }
 
     /** Сколько переходов потока MKB10 в статус {@code status} посчитано. */

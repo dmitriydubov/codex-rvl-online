@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ru.Когда;
+import java.util.UUID;
 
 /**
  * Шаги о времени и ручной работе с сырьём 1С:УСК: наступивший срок повтора и возврат сообщения к разбору дежурным.
@@ -22,5 +23,10 @@ public class OneCRetrySteps {
     @Когда("дежурный вернул последнее сообщение 1С:УСК к разбору")
     public void lastReturnedToParsing() {
         inbox.returnLastToParsing();
+    }
+
+    @Когда("дежурный вернул к разбору все сообщения передачи прайса {string}")
+    public void transferReturnedToParsing(String cid) {
+        inbox.returnTransferToParsing(UUID.fromString(cid));
     }
 }
