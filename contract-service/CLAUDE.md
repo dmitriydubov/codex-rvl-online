@@ -162,6 +162,10 @@
                     таблицы справочников и полисов в PostgreSQL
 ```
 
+Поток в `inbound_message.stream` и номер ТЗ 1С:УСК соответствуют так: `POLICIES` — ТЗ-1, `INSURANCE_CONTRACTS` — ТЗ-2,
+`CONTRAGENTS` — ТЗ-3, `MKB10` — ТЗ-4, `LPU_CONTRACTS` — ТЗ-5, `PROGRAMS` — ТЗ-6, `APPEAL_TYPES` — ТЗ-7, `LPU_CONTACTS` — ТЗ-8,
+`PRICE_LISTS` — ТЗ-9, `CONTRAGENT_SERVICES` — ТЗ-10. В коде номер не хранится: решения принимаются по потоку.
+
 Наружу из этих таблиц читает REST (фаза 6). Обратного потока — от соседей в справочники —
 нет: писать в них может только 1С.
 
