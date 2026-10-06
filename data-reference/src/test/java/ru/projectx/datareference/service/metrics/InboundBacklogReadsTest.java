@@ -59,7 +59,7 @@ class InboundBacklogReadsTest {
 
         assertThat(backlog.statuses()).isEmpty();
         assertThat(backlog.stuckTransfers()).isZero();
-        assertThat(backlog.overdue()).isEqualTo(new InboundBacklog.Overdue(0, 0));
+        assertThat(backlog.overdue()).isEqualTo(new InboundBacklog.Overdue(0, 0, 0));
         assertThat(backlog.takenAt()).isEqualTo(NOW);
     }
 
@@ -106,7 +106,7 @@ class InboundBacklogReadsTest {
         quarantine(Duration.ofDays(35));
         quarantine(Duration.ofDays(1));
 
-        assertThat(reads.read().overdue()).isEqualTo(new InboundBacklog.Overdue(1, 2));
+        assertThat(reads.read().overdue()).isEqualTo(new InboundBacklog.Overdue(1, 2, 0));
     }
 
     private UUID store(OneCStream stream, InboundStatus status, Duration age) {

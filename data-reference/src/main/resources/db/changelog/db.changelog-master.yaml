@@ -41,3 +41,5 @@ databaseChangeLog:
       file: db/changelog/017-price-list-finalization.yaml
   - include:
       file: db/changelog/018-parent-wait.yaml
+  - include:
+      file: db/changelog/019-policy-personal-data-retention.yaml

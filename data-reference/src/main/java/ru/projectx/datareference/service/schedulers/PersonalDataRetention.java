@@ -7,19 +7,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.config.ImportProperties;
+import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
 /**
- * Срок хранения тел сообщений 1С:УСК в таблице сырья и в карантине: по истечении срока тело стирается, строка остаётся.
+ * Срок хранения персональных данных: тел сообщений 1С:УСК в таблице сырья и в карантине и ФИО, даты рождения и почты
+ * застрахованного в полисах. По истечении срока данные стираются, строка остаётся.
  *
  * <p>Стираются тела полисов и договоров страхования в любом статусе: в них бывают персональные данные (ПДн) —
  * ФИО застрахованного или страхователя-человека. Стираются и тела пропущенных сообщений любого потока: по ним уже
  * ничего не применяется. Тело справочного сообщения в остальных статусах остаётся, по нему сообщение
  * переобрабатывают после починки разбора. Статус и число попыток не стираются; у полиса вместе с телом стирается
  * причина исхода, потому что в ней мог остаться текст ошибки базы со значениями полей. В карантине срок действует
- * на все тела: они не разобраны, и поручиться, что ПДн в них нет, нельзя.
+ * на все тела: они не разобраны, и поручиться, что ПДн в них нет, нельзя. В полисе ПДн живут, пока полис действует,
+ * и ещё запас после окончания срока или перевода в архив; номер, даты и программы полиса остаются.
  *
- * <p>Стирание идёт пачками от самых старых строк, каждая пачка — своя короткая транзакция, чтобы не держать
- * блокировки строк, которые читает разбор. Проход продолжается, пока пачки полные.
+ * <p>Стирание идёт пачками (тела — от самых старых строк), каждая пачка — своя короткая транзакция, чтобы не держать
+ * блокировки строк, которые читает разбор. Проход продолжается, пока пачки полные. В журнал идёт только число
+ * стёртого и срок, без самих данных.
  */
 @Component
 public class PersonalDataRetention {
@@ -27,19 +31,21 @@ public class PersonalDataRetention {
     private static final Logger log = LoggerFactory.getLogger(PersonalDataRetention.class);
 
     private final AgedInboundMessages agedMessages;
+    private final ExpiredPolicyPersonalData expiredPolicies;
     private final TransactionOperations transactions;
     private final ImportProperties properties;
 
-    public PersonalDataRetention(
-            AgedInboundMessages agedMessages, TransactionOperations transactions, ImportProperties properties) {
+    public PersonalDataRetention(AgedInboundMessages agedMessages, ExpiredPolicyPersonalData expiredPolicies,
+            TransactionOperations transactions, ImportProperties properties) {
 
         this.agedMessages = agedMessages;
+        this.expiredPolicies = expiredPolicies;
         this.transactions = transactions;
         this.properties = properties;
     }
 
-    /** Один проход: стирает пачками все тела сырья и карантина старше их сроков хранения. */
-    public void forgetExpiredPayloads() {
+    /** Один проход: стирает пачками тела сырья и карантина и персональные данные полисов старше их сроков хранения. */
+    public void forgetExpiredPersonalData() {
         int inbound = eraseInBatches(
                 () -> agedMessages.forgetPayloads(properties.payloadTtl(), properties.retentionBatchSize()));
         report(inbound, "сообщений в сырье", properties.payloadTtl());
@@ -47,6 +53,9 @@ public class PersonalDataRetention {
         int quarantined = eraseInBatches(
                 () -> agedMessages.forgetQuarantineBodies(properties.quarantineTtl(), properties.retentionBatchSize()));
         report(quarantined, "карантинных сообщений", properties.quarantineTtl());
+
+        int policies = eraseInBatches(() -> expiredPolicies.erase(properties.retentionBatchSize()));
+        reportPolicies(policies);
     }
 
     private int eraseInBatches(IntSupplier batch) {
@@ -63,6 +72,13 @@ public class PersonalDataRetention {
     private static void report(int erased, String what, Duration ttl) {
         if (erased > 0) {
             log.info("стёрты тела {} {} старше {}: срок хранения персональных данных", erased, what, ttl);
+        }
+    }
+
+    private void reportPolicies(int erased) {
+        if (erased > 0) {
+            log.info("обезличены полисы: {}, после окончания срока или перевода в архив прошло больше {}", erased,
+                    properties.policyPersonalDataGrace());
         }
     }
 }

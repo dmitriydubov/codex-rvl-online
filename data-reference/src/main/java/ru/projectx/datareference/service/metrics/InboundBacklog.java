@@ -15,7 +15,7 @@ import ru.projectx.datareference.entity.OneCStream;
  *
  * @param statuses                пары «поток, статус» с числом сообщений; пар без сообщений здесь нет
  * @param stuckTransfers          передачи прайсов, которые ждут частей дольше порога тревоги
- * @param overdue                 тела, не стёртые после срока хранения
+ * @param overdue                 персональные данные, не стёртые после срока хранения
  * @param takenAt                 момент снимка
  */
 public record InboundBacklog(List<StatusCount> statuses, long stuckTransfers, Overdue overdue, Instant takenAt) {
@@ -29,7 +29,7 @@ public record InboundBacklog(List<StatusCount> statuses, long stuckTransfers, Ov
 
     /** Пустой снимок: до первого чтения из базы метрики показывают нули. */
     public static InboundBacklog empty(Instant takenAt) {
-        return new InboundBacklog(List.of(), 0, new Overdue(0, 0), takenAt);
+        return new InboundBacklog(List.of(), 0, new Overdue(0, 0, 0), takenAt);
     }
 
     /** Сколько сообщений потока {@code stream} в статусе {@code status}. */
@@ -58,11 +58,12 @@ public record InboundBacklog(List<StatusCount> statuses, long stuckTransfers, Ov
     }
 
     /**
-     * Тела, которые пережили срок хранения и ещё не стёрты: стирание отстаёт или не работает.
+     * Персональные данные, которые пережили срок хранения и ещё не стёрты: стирание отстаёт или не работает.
      *
      * @param payloads          тела в таблице сырья, которые срок хранения должен был стереть
      * @param quarantineBodies  тела карантинных сообщений
+     * @param policies          полисы, у которых срок хранения ФИО, даты рождения и почты истёк
      */
-    public record Overdue(long payloads, long quarantineBodies) {
+    public record Overdue(long payloads, long quarantineBodies, long policies) {
     }
 }

@@ -121,6 +121,7 @@ class PolicyLookupKeysTest {
 
     private static PolicyResponse policy() {
         return new PolicyResponse(POLICY_ID, POLICY_EXTERNAL_ID, POLICY_NUMBER, "Фамилия", "Имя", null,
-                LocalDate.of(2000, 1, 1), null, null, LocalDate.of(2026, 1, 1), null, true, false, null, List.of());
+                LocalDate.of(2000, 1, 1), null, null, LocalDate.of(2026, 1, 1), null, true, false, false, null,
+                List.of());
     }
 }

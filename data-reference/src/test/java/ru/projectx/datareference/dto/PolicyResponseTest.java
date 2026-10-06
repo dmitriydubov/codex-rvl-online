@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import ru.projectx.datareference.entity.PersonalDataCutoff;
 import ru.projectx.datareference.entity.Policy;
 
 /**
@@ -30,7 +31,7 @@ class PolicyResponseTest {
 
         assertThat(response).isEqualTo(new PolicyResponse(policy.id(), policy.externalId(), "П-0001",
                 "Тестов", "Макет", "Заглушкович", BIRTH, "Мужской", "test@example.org", BEGIN, END, true, false,
-                null, List.of()));
+                false, null, List.of()));
     }
 
     @Test
@@ -41,7 +42,20 @@ class PolicyResponseTest {
         PolicyResponse response = PolicyResponse.of(policy, null, Map.of());
 
         assertThat(response).isEqualTo(new PolicyResponse(policy.id(), policy.externalId(), "П-0002",
-                "Тестов", "Макет", null, BIRTH, null, null, BEGIN, null, false, true, null, List.of()));
+                "Тестов", "Макет", null, BIRTH, null, null, BEGIN, null, false, true, false, null, List.of()));
+    }
+
+    /** Стёртые по сроку данные приходят пустыми и с признаком, а реквизиты и пол — как были. */
+    @Test
+    void of_policyWithErasedPersonalData_hasEmptyNameBirthDateEmailAndTheMark() {
+        Policy policy = policy(new Policy.Details(UUID.randomUUID(), "П-0004", "Тестов", "Макет", "Заглушкович",
+                BIRTH, "Мужской", "test@example.org", BEGIN, END, true, false));
+        policy.erasePersonalDataBeyond(new PersonalDataCutoff(END.plusDays(1), NOW), NOW);
+
+        PolicyResponse response = PolicyResponse.of(policy, null, Map.of());
+
+        assertThat(response).isEqualTo(new PolicyResponse(policy.id(), policy.externalId(), "П-0004",
+                null, null, null, null, "Мужской", null, BEGIN, END, true, false, true, null, List.of()));
     }
 
     @Test

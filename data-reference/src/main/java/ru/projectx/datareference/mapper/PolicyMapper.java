@@ -6,6 +6,7 @@ import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
 import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -37,7 +38,8 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Ничего из разобранного не попадает ни в журнал, ни в текст исключения. Здесь проходят ФИО,
  * дата рождения и почта, то есть персональные данные (ПДн). Сообщение об ошибке называет поле,
- * но не значение, а разбирать проблемный случай нужно по строке сырья в базе.
+ * но не значение, а разбирать проблемный случай нужно по строке сырья в базе. Полис, срок хранения ПДн
+ * которого уже истёк, сохраняется без них.
  */
 @Component
 public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot> {
@@ -56,10 +58,28 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
 
     private final PolicyContractProperties contract;
 
-    public PolicyMapper(PolicyRepository repository, PolicyContractProperties contract, Clock clock) {
+    public PolicyMapper(
+            PolicyRepository repository, PolicyContractProperties contract, Clock clock, PolicyPersonalDataTerm term) {
+
         super(OneCStream.POLICIES, repository::findByExternalId,
-                Policy::create, Policy::applySnapshot, repository::save, clock);
+                (externalId, snapshot, now) -> withinTerm(Policy.create(externalId, snapshot, now), term, now),
+                (policy, snapshot, now) -> withinTerm(refreshed(policy, snapshot, now), term, now),
+                repository::save, clock);
         this.contract = contract;
+    }
+
+    /**
+     * Полис, пришедший уже после срока хранения своих персональных данных, сохраняется без них в том же разборе:
+     * иначе они пролежали бы в базе до ближайшего прохода стирания.
+     */
+    private static Policy withinTerm(Policy policy, PolicyPersonalDataTerm term, Instant now) {
+        policy.erasePersonalDataBeyond(term.cutoffAt(now), now);
+        return policy;
+    }
+
+    private static Policy refreshed(Policy policy, Policy.Snapshot snapshot, Instant now) {
+        policy.applySnapshot(snapshot, now);
+        return policy;
     }
 
     @Override
