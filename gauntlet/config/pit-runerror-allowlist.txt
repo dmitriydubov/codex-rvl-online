@@ -23,6 +23,8 @@ ru.projectx.datareference.config.InboundRetryProperties#delayBeforeAttempt  Remo
 ru.projectx.datareference.dto.PolicyResponse#of                              NullReturnValsMutator              # byId_carries...: response.contract() on null
 ru.projectx.datareference.dto.PolicyResponse#of                              RemoveConditionalMutator_EQUAL_ELSE # policyWithoutPrograms...: ContractRef.of(null)
 ru.projectx.datareference.dto.PolicyResponse#lambda$of$*                     NullReturnValsMutator              # byId_carries...: extracting(line.program()) on a null ProgramLine
+ru.projectx.datareference.dto.PolicyResponse#lambda$of$*                     BooleanFalseReturnValsMutator      # byId_carries...: filter drops all, containsExactly(RVL_PROGRAM) gets empty list
+ru.projectx.datareference.dto.PolicyResponse#lambda$of$*                     BooleanTrueReturnValsMutator       # byId_carries...: archived/line-only program passes, ProgramLine.of NPE on null Program
 ru.projectx.datareference.dto.PolicyResponse$ProgramLine#lambda$of$*         BooleanFalseReturnValsMutator      # byId_carries...: services() hasSize(1) gets 0
 ru.projectx.datareference.dto.PolicyResponse$ProgramLine#lambda$of$*         BooleanTrueReturnValsMutator       # byId_carries...: services() hasSize(1) gets 2
 
