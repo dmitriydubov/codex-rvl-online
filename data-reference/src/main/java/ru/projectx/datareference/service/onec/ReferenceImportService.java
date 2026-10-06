@@ -12,9 +12,9 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -37,11 +37,9 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 public class ReferenceImportService {
 
-    private static final String DATA_FIELD = "data";
-
     private final Map<OneCStream, StreamHandler> handlers;
     private final InboundMessageService inboundMessageService;
-    private final ObjectMapper json;
+    private final StoredEnvelope envelope;
 
     /**
      * @param mappers           мапперы потоков с обычным путём: каждый становится обработчиком своего потока
@@ -59,7 +57,7 @@ public class ReferenceImportService {
                         dedicatedHandlers.stream())
                 .collect(Collectors.toUnmodifiableMap(StreamHandler::stream, Function.identity()));
         this.inboundMessageService = inboundMessageService;
-        this.json = json;
+        this.envelope = new StoredEnvelope(json);
     }
 
     /**
@@ -92,29 +90,12 @@ public class ReferenceImportService {
         return ImportResult.skipped(reason);
     }
 
-    /** Полезная нагрузка лежит в {@code data} конверта; {@code metadata} нужна была приёму, а не разбору. */
+    /**
+     * Стёртое тело — строка, у которой вышел срок хранения. Повторить её нечем: недостающее может прислать только
+     * источник.
+     */
     private ObjectNode dataOf(InboundMessage message) {
-        JsonNode data = readTree(message).get(DATA_FIELD);
-        if (data == null || !data.isObject()) {
-            throw new OneCFieldException("в конверте сообщения нет объекта data");
-        }
-        return (ObjectNode) data;
-    }
-
-    private JsonNode readTree(InboundMessage message) {
-        String payload = message.payload();
-        if (payload == null) {
-            // Так выглядит строка, у которой вышел срок хранения тела. Повторить её нечем: недостающее
-            // может прислать только источник.
-            throw new OneCFieldException("тело сообщения стёрто по сроку хранения, разбирать нечего");
-        }
-        try {
-            return json.readTree(payload);
-        }
-        catch (JacksonException malformed) {
-            // В таблицу попадает только то, что PostgreSQL принял как JSON, так что случай почти невозможный.
-            // Но и тогда нужна внятная постоянная ошибка, а не обращение к пустой ссылке дальше по разбору.
-            throw new OneCFieldException("тело сообщения не читается как JSON", malformed);
-        }
+        return envelope.dataOf(message).orElseThrow(
+                () -> new OneCFieldException("тело сообщения стёрто по сроку хранения, разбирать нечего"));
     }
 }

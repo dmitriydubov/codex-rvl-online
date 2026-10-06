@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.Mkb10;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.Mkb10Repository;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
 /**

@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -40,7 +43,7 @@ class PriceListTransferRejectionTest {
     private final PriceListMapper priceList = mock(PriceListMapper.class);
     private final PriceListFinalizationRepository finalizations = mock(PriceListFinalizationRepository.class);
     private final PriceListTransferRejection rejection = new PriceListTransferRejection(repository,
-            new PriceTransferOrder(finalizations, repository), priceList, JsonMapper.builder().build());
+            new PriceTransferServiceLock(repository, finalizations), priceList, JsonMapper.builder().build());
 
     /** Строка услуги блокируется до чтения частей: закрытие зависших передач не пишет их одновременно с отказом. */
     @Test
@@ -53,6 +56,57 @@ class PriceListTransferRejectionTest {
         InOrder steps = inOrder(finalizations, repository);
         steps.verify(finalizations).lockByService(SERVICE_ID);
         steps.verify(repository).findByCorrelationId(CID);
+    }
+
+    /**
+     * Часть называет другую услугу: блокируется услуга, которую называют части в буфере, — та же, что у проверки
+     * зависших передач.
+     */
+    @Test
+    void serviceOfBufferedParts_isLocked_whenPartNamesAnotherService() {
+        UUID otherService = UUID.randomUUID();
+        InboundMessage trigger = received(batchData(GOOD_ROW).replace(SERVICE_ID.toString(), otherService.toString()));
+        when(repository.findBufferedTransferService(CID)).thenReturn(Optional.of(SERVICE_ID.toString()));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of());
+
+        rejection.reject(trigger, "части передачи " + CID + " называют разные услуги");
+
+        InOrder steps = inOrder(finalizations, repository);
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+        steps.verify(repository).findByCorrelationId(CID);
+        verify(finalizations, never()).lockByService(otherService);
+    }
+
+    /** Разные услуги в частях — ошибка той части, на которой это обнаружено: у остальных ссылка на неё. */
+    @Test
+    void partNamingAnotherService_keepsItsOwnReason_andOthersPointToIt() {
+        InboundMessage other = buffered(null);
+        String otherService = UUID.randomUUID().toString();
+        InboundMessage trigger = received(batchData(GOOD_ROW).replace(SERVICE_ID.toString(), otherService));
+        when(repository.findBufferedTransferServices(CID)).thenReturn(List.of(SERVICE_ID.toString()));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(other));
+        String reason = "части передачи " + CID + " называют разные услуги";
+
+        rejection.reject(trigger, reason);
+
+        assertFailed(trigger, reason);
+        assertFailed(other, "передача " + CID + " отклонена: ошибка в сообщении " + trigger.receipt().messageId()
+                + ": " + reason);
+    }
+
+    /** Часть без GUID услуги — тоже её собственная ошибка. */
+    @Test
+    void partWithoutService_keepsItsOwnReason_andOthersPointToIt() {
+        InboundMessage other = buffered(null);
+        InboundMessage trigger = received("{\"cid\":\"%s\",\"recordSet\":[%s]}".formatted(CID, GOOD_ROW));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(other));
+        String reason = "нет обязательного GUID в поле keyValue";
+
+        rejection.reject(trigger, reason);
+
+        assertFailed(trigger, reason);
+        assertFailed(other, "передача " + CID + " отклонена: ошибка в сообщении " + trigger.receipt().messageId()
+                + ": " + reason);
     }
 
     @Test

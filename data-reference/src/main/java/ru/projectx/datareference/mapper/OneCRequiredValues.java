@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.onec;
+package ru.projectx.datareference.mapper;
 
 import java.math.BigDecimal;
 import ru.projectx.datareference.exception.OneCFieldException;
@@ -47,14 +47,19 @@ public final class OneCRequiredValues {
     /**
      * Число по тому же правилу, что и необязательное денежное значение ({@link OneCValues#amount}).
      *
-     * @throws OneCFieldException если поля нет или оно не число JSON
+     * @throws OneCFieldException если поля нет, оно не число JSON или у него больше двух знаков после запятой
      */
     public static BigDecimal amount(JsonNode data, String field) {
         requirePresent(data, field);
         return OneCValues.amount(data, field).orElseThrow(() -> wrongType(field, "числом"));
     }
 
-    /** @throws OneCFieldException если поля нет, оно не число JSON или оно вне диапазона от 0 до 100 включительно */
+    /**
+     * Процент по правилу денежного значения. Знаки после запятой проверяются при чтении числа, раньше диапазона.
+     *
+     * @throws OneCFieldException если поля нет, оно не число JSON, у него больше двух знаков после запятой или оно вне
+     *                            диапазона от 0 до 100 включительно
+     */
     public static BigDecimal percent(JsonNode data, String field) {
         BigDecimal value = amount(data, field);
         if (value.signum() < 0 || value.compareTo(FULL_PERCENT) > 0) {

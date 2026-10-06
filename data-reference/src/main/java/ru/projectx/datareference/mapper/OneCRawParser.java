@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.onec;
+package ru.projectx.datareference.mapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

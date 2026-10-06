@@ -10,8 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.service.onec.ImportResult.applied;
-import static ru.projectx.datareference.service.onec.ImportResult.skipped;
+import static ru.projectx.datareference.mapper.ImportResult.applied;
+import static ru.projectx.datareference.mapper.ImportResult.rejected;
+import static ru.projectx.datareference.mapper.ImportResult.skipped;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -148,6 +149,26 @@ class ReferenceImportPassTest {
             assertThat(event.getFormattedMessage())
                     .isEqualTo("сообщение " + message.receipt().messageId()
                             + " потока MKB10 пропущено: программа не РВЛ");
+        });
+    }
+
+    /**
+     * Отклонённое при разборе сообщение — предупреждение с причиной, а не пропуск: например, передача прайса, части
+     * которой не сошлись со счётчиками, отклонена целиком.
+     */
+    @Test
+    void rejectedMessage_isReportedInJournalAsWarningWithReason() {
+        InboundMessage message = received();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(message));
+        when(importService.importMessage(message)).thenReturn(rejected("передача отклонена"));
+
+        scheduler().importPendingMessages();
+
+        assertThat(logged.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage())
+                    .isEqualTo("сообщение " + message.receipt().messageId()
+                            + " потока MKB10 отклонено: передача отклонена");
         });
     }
 

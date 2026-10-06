@@ -6,25 +6,26 @@ import static ru.projectx.datareference.support.OneCMessages.sanatorium;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.jspecify.annotations.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.ContragentService;
+import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * ТЗ-5 и ТЗ-10 вместе: договор с санаторием и услуги по нему — звенья одной цепочки,
+ * Договор с санаторием и услуги по нему (ТЗ-5 и ТЗ-10) — звенья одной цепочки,
  * и обрыв любого из них означает, что до цен дело не дойдёт.
  *
  * <p>{@code @Transactional} здесь не ради отката, а ради открытой сессии: проверки
@@ -82,7 +83,7 @@ class ContractAndServiceImportTest {
     }
 
     /**
-     * УСЛОВИЕ 2 ТЗ-5: договор отделения принадлежит отделению, а не головной
+     * Договор отделения принадлежит отделению, а не головной
      * организации — отделение у нас отдельный санаторий.
      */
     @Test
@@ -115,7 +116,7 @@ class ContractAndServiceImportTest {
     }
 
     /**
-     * ТЗ-5 v2: оба поля источника сохраняются как есть. Признак ценообразующего договора
+     * Оба поля источника сохраняются как есть. Признак ценообразующего договора
      * из них больше не выводится — он считается при расчёте цены.
      */
     @Test

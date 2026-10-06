@@ -12,8 +12,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.RejectionScope;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -28,20 +26,20 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class PriceListTransferRejection implements RejectionScope {
 
-    private static final String DATA = "data";
-
     private final InboundMessageRepository repository;
-    private final PriceTransferOrder order;
+    private final PriceTransferServiceLock serviceLock;
+    private final PriceTransferServiceCheck serviceCheck;
     private final PriceListPartCheck partCheck;
-    private final ObjectMapper json;
+    private final StoredEnvelope envelope;
 
-    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferOrder order,
+    public PriceListTransferRejection(InboundMessageRepository repository, PriceTransferServiceLock serviceLock,
             PriceListMapper priceList, ObjectMapper json) {
 
         this.repository = repository;
-        this.order = order;
+        this.serviceLock = serviceLock;
+        this.serviceCheck = new PriceTransferServiceCheck(repository);
         this.partCheck = new PriceListPartCheck(priceList);
-        this.json = json;
+        this.envelope = new StoredEnvelope(json);
     }
 
     @Override
@@ -59,9 +57,12 @@ public class PriceListTransferRejection implements RejectionScope {
                 });
     }
 
-    /** Строка услуги блокируется до чтения частей, как при разборе: закрытие зависших не пишет их одновременно. */
+    /**
+     * Строка услуги передачи блокируется до чтения частей, как при разборе: закрытие зависших не пишет их
+     * одновременно, даже если отклоняемая часть называет другую услугу.
+     */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
-        order.lockServiceOf(part.data());
+        serviceLock.lockTransferService(part.markup().cid(), part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.markup().cid());
         Reasons reasons = reasonsFor(message, part, parts, reason);
         part.markup().applyTo(message);
@@ -89,9 +90,10 @@ public class PriceListTransferRejection implements RejectionScope {
                 .toList();
     }
 
-    /** Та же проверка, что прервала разбор части: если она находит ошибку, отказ принадлежит этой части. */
+    /** Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. */
     private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
         try {
+            serviceCheck.serviceOf(part.markup().cid(), part.data());
             partCheck.check(message.receipt().messageId(), part.markup(), part.data(), parts);
             return false;
         }
@@ -106,12 +108,9 @@ public class PriceListTransferRejection implements RejectionScope {
      */
     private Optional<TransferPart> partOf(InboundMessage message) {
         try {
-            return Optional.ofNullable(message.payload())
-                    .map(payload -> json.readTree(payload).path(DATA))
-                    .filter(JsonNode::isObject)
-                    .map(data -> new TransferPart(PriceListTransferMarkup.of((ObjectNode) data), (ObjectNode) data));
+            return envelope.dataOf(message).map(data -> new TransferPart(PriceListTransferMarkup.of(data), data));
         }
-        catch (JacksonException | OneCFieldException notTransferPart) {
+        catch (OneCFieldException notTransferPart) {
             return Optional.empty();
         }
     }

@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.schedulers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.service.onec.ImportResult.applied;
+import static ru.projectx.datareference.mapper.ImportResult.applied;
 
 import java.time.Clock;
 import java.time.Instant;

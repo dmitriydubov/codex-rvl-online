@@ -2,6 +2,7 @@ package ru.projectx.datareference.service.onec;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.PriceListMapper;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;

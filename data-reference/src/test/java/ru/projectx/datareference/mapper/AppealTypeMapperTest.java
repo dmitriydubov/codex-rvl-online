@@ -21,7 +21,6 @@ import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.AppealTypeRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.mapper.ImportResult;
 
 /**
  * Передача прайс-листа по одной услуге: во что сложились её отложенные сообщения и какой исход у них общий.
@@ -103,6 +104,14 @@ sealed interface PriceListTransfer {
         return List.copyOf(messages);
     }
 
+    /** Отклоняет все сообщения передачи с одной причиной; возвращает их же, чтобы сохранить. */
+    private static List<InboundMessage> failAll(List<InboundMessage> messages, String reason) {
+        for (InboundMessage message : messages) {
+            message.markFailed(reason);
+        }
+        return messages;
+    }
+
     /** Передача ещё не пришла целиком; её сообщения остаются в буфере. */
     record Pending(String reason) implements PriceListTransfer {
     }
@@ -112,10 +121,7 @@ sealed interface PriceListTransfer {
 
         /** @return части с новым статусом, которые осталось сохранить */
         List<InboundMessage> fail() {
-            for (InboundMessage message : lateParts) {
-                message.markFailed(reason);
-            }
-            return lateParts;
+            return failAll(lateParts, reason);
         }
     }
 
@@ -142,11 +148,7 @@ sealed interface PriceListTransfer {
          * @return сообщения с новым статусом, которые осталось сохранить
          */
         List<InboundMessage> fail() {
-            List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
-            for (InboundMessage message : messages) {
-                message.markFailed(reason);
-            }
-            return messages;
+            return failAll(wholeTransfer(finalMessage, batches), reason);
         }
     }
 
@@ -154,7 +156,7 @@ sealed interface PriceListTransfer {
     record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements PriceListTransfer {
 
         /**
-         * Отмечает все сообщения передачи исходом применения прайса: применены или пропущены с его причиной.
+         * Отмечает все сообщения передачи исходом применения прайса: применены, пропущены или отклонены с его причиной.
          *
          * @return сообщения с новым статусом, которые осталось сохранить
          */
@@ -162,6 +164,7 @@ sealed interface PriceListTransfer {
             return switch (result) {
                 case ImportResult.Applied ignored -> markProcessed(at);
                 case ImportResult.Skipped skipped -> markSkipped(skipped.reason(), at);
+                case ImportResult.Rejected rejected -> failAll(wholeTransfer(finalMessage, batches), rejected.reason());
             };
         }
 

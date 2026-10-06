@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.onec;
+package ru.projectx.datareference.mapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -102,16 +102,21 @@ public final class OneCValues {
     }
 
     /**
-     * Денежное значение или процент.
+     * Денежное значение или процент: не больше двух знаков после запятой.
      *
-     * <p>Число с дробью разбор JSON хранит как {@code double}, и значение берётся из его кратчайшей десятичной
-     * записи ({@link Double#toString(double)}). Для числа не длиннее 15 значащих цифр, то есть для любой цены
-     * или процента с копейками, она равна присланной по значению, но число знаков после точки может отличаться:
-     * {@code 100.00} читается как {@code 100.0}. Более длинное число теряет точность ещё при разборе JSON.
+     * <p>Колонки денег хранят два знака, и база молча округлила бы лишние, так что сумма у нас разошлась бы с суммой
+     * в 1С. Поэтому третий знак — нарушение контракта, отказ называет поле и правило, но не значение. Нули в конце
+     * дроби знаками не считаются: {@code 100.00} и {@code 100.0} — одно значение.
+     *
+     * <p>Значение берётся из десятичной записи числа. Сообщения 1С разбираются с дробями в {@link BigDecimal}, и
+     * запись совпадает с присланной. Число, разобранное в {@code double}, дало бы кратчайшую запись двоичной дроби,
+     * а у числа длиннее 15 значащих цифр последний знак пропал бы ещё при разборе, до этой проверки.
      */
     public static Optional<BigDecimal> amount(JsonNode data, String field) {
         JsonNode value = data.path(field);
-        return value.isNumber() ? Optional.of(new BigDecimal(value.asString())) : Optional.empty();
+        return value.isNumber()
+                ? Optional.of(OneCMoneyScale.checked(new BigDecimal(value.asString()), field))
+                : Optional.empty();
     }
 
     /** Разбирает непустой текст поля. Значение, которое не прошло {@code meaningful}, даёт пустой результат. */

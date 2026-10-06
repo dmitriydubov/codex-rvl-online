@@ -24,6 +24,8 @@ final class OneCPriceTransferMessages {
     private static final String TABLE_ROW_NUMBER = "номер строки";
     private static final String CID = "cid";
     private static final String KEY_VALUE = "keyValue";
+    /** Так сценарий называет часть, в которой поля GUID услуги нет вовсе. */
+    private static final String NO_SERVICE = "нет";
 
     /** Строка пакета из одной строки, от которой сценарий отличает испорченную: номер 2, цена 6000.00. */
     private static final Map<String, String> SINGLE_ROW = Map.of(
@@ -42,9 +44,7 @@ final class OneCPriceTransferMessages {
     }
 
     static OneCMessage finalMessage(UUID messageId, UUID cid, String service, int batches, int rows) {
-        ObjectNode data = JSON.createObjectNode()
-                .put(CID, cid.toString())
-                .put(KEY_VALUE, service)
+        ObjectNode data = transferData(cid, service)
                 .put("countMessages", batches)
                 .put("countRows", rows);
         return new OneCMessage(OneCStream.PRICE_LISTS, FINAL_QUEUE, data, InboundStatus.PROCESSED, messageId);
@@ -80,8 +80,10 @@ final class OneCPriceTransferMessages {
         return batchMessage(messageId, JSON.createObjectNode().put(KEY_VALUE, service), recordSet, InboundStatus.FAILED);
     }
 
+    /** Услуга кладётся в keyValue как есть, в том числе не GUID; «нет» — поля keyValue в части нет. */
     private static ObjectNode transferData(UUID cid, String service) {
-        return JSON.createObjectNode().put(CID, cid.toString()).put(KEY_VALUE, service);
+        ObjectNode data = JSON.createObjectNode().put(CID, cid.toString());
+        return NO_SERVICE.equals(service) ? data : data.put(KEY_VALUE, service);
     }
 
     private static OneCMessage batchMessage(UUID messageId, ObjectNode data, ArrayNode recordSet, InboundStatus expected) {
