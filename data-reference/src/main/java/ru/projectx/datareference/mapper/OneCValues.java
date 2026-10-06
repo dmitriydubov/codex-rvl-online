@@ -114,7 +114,7 @@ public final class OneCValues {
      * а у числа длиннее 15 значащих цифр последний знак пропал бы ещё при разборе, до этой проверки.
      */
     public static Optional<BigDecimal> amount(JsonNode data, String field) {
-        return OneCDecimalColumn.AMOUNT.read(data, field);
+        return OneCDecimalColumn.amount(data, field);
     }
 
     /** Разбирает непустой текст поля. Значение, которое не прошло {@code meaningful}, даёт пустой результат. */
