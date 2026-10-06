@@ -40,7 +40,15 @@
     <rule ref="category/java/design.xml/DoNotExtendJavaLangError"/>
     <rule ref="category/java/design.xml/MutableStaticState"/>
     <rule ref="category/java/design.xml/SingularField"/>
-    <rule ref="category/java/design.xml/ImmutableField"/>
+    <!-- Owner's decision Р2 (2026-09-30): a persistent collection of a JPA entity stays non-final - the provider
+         replaces it with its own implementation (Jakarta Persistence 3.2, section 2.1: persistent fields must not
+         be final). Only fields mapped as @OneToMany, @ManyToMany or @ElementCollection are exempt. -->
+    <rule ref="category/java/design.xml/ImmutableField">
+        <properties>
+            <property name="violationSuppressXPath"
+                      value="./ancestor::FieldDeclaration[pmd-java:hasAnnotation('jakarta.persistence.OneToMany') or pmd-java:hasAnnotation('jakarta.persistence.ManyToMany') or pmd-java:hasAnnotation('jakarta.persistence.ElementCollection')]"/>
+        </properties>
+    </rule>
     <rule ref="category/java/design.xml/FinalFieldCouldBeStatic"/>
     <rule ref="category/java/design.xml/UselessOverridingMethod"/>
     <rule ref="category/java/design.xml/ClassWithOnlyPrivateConstructorsShouldBeFinal"/>
