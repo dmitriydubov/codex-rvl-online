@@ -669,9 +669,10 @@ MVC подключён стартером `spring-boot-starter-web`, а не `sp
 
 Проверка перед коммитом: `./gradlew build`.
 
-Репозитории выбирает `settings.gradle`: в облачной сессии Claude Code (`CLAUDE_CODE_REMOTE`)
-и в GitHub Actions — только публичные (портал плагинов Gradle, Maven Central), во всех
-остальных случаях — только Nexus контура; принудительно — `-PpublicRepositories=true|false`.
+Репозитории выбирает свойство `publicRepositories` в `settings.gradle`: по умолчанию — только
+Nexus контура, со значением `true` — только публичные (портал плагинов Gradle, Maven Central).
+Задаётся `-PpublicRepositories=true|false` или переменной `ORG_GRADLE_PROJECT_publicRepositories`;
+вне контура её выставляют хуки набора проверок и CI.
 Central через прокси иногда отвечает 429 на пачку новых артефактов: повторить
 сборку, докачается со второго-третьего раза; к коду это отношения не имеет.
 

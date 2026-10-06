@@ -48,8 +48,8 @@
 
 ## 4. Сборка модуля (рабочий контур без набора)
 Скопируй схему `data-reference`:
-- `settings.gradle` — переключатель репозиториев: публичные в облаке (`CLAUDE_CODE_REMOTE`) и GitHub
-  Actions (`GITHUB_ACTIONS`), иначе Nexus контура; закомментированный вариант «только Nexus»; флаг
+- `settings.gradle` — переключатель репозиториев: свойство `publicRepositories` (по умолчанию Nexus контура);
+  в облаке его выставляют хуки набора, в GitHub Actions — `env` в `gauntlet.yml`; закомментированный вариант «только Nexus»; флаг
   `gradle.ext.gauntletEnabled` — набор подключается, только когда `../gauntlet/gauntlet.gradle` рядом и
   репозитории публичные.
 - `build.gradle` — плагин PIT в `buildscript {}` (только при `gradle.ext.gauntletEnabled`, с портала
