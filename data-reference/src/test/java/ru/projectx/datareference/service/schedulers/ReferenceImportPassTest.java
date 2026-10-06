@@ -10,8 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.service.onec.ImportResult.applied;
-import static ru.projectx.datareference.service.onec.ImportResult.skipped;
+import static ru.projectx.datareference.mapper.ImportResult.applied;
+import static ru.projectx.datareference.mapper.ImportResult.skipped;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;

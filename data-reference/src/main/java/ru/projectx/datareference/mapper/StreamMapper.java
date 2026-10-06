@@ -1,12 +1,11 @@
-package ru.projectx.datareference.service.onec;
+package ru.projectx.datareference.mapper;
 
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбор сообщений одного потока 1С: фильтры потока, контроль версии и upsert
- * в таблицы справочника.
+ * Разбор сообщений одного потока 1С: фильтры потока и upsert в таблицы справочника.
  *
  * <p>По реализации на поток. Общего у них ровно столько, сколько в этом интерфейсе:
  * диспетчер выбирает реализацию по {@link OneCStream} и не знает ни одного правила

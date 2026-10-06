@@ -14,9 +14,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.ProgramRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**

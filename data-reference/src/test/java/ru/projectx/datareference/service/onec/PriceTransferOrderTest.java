@@ -18,6 +18,7 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.PriceListFinalization;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 

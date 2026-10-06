@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;

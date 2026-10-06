@@ -1,7 +1,7 @@
 package ru.projectx.datareference.controller;
 
 import java.beans.PropertyEditorSupport;
-import ru.projectx.datareference.service.onec.OneCGuid;
+import ru.projectx.datareference.service.CanonicalGuids;
 
 /**
  * Читает UUID из пути и параметров запроса REST по тому же правилу, по которому сервис читает GUID
@@ -27,7 +27,7 @@ final class CanonicalUuidEditor extends PropertyEditorSupport {
             setValue(null);
             return;
         }
-        setValue(OneCGuid.parse(text)
+        setValue(CanonicalGuids.parse(text)
                 .orElseThrow(() -> new IllegalArgumentException("UUID не в канонической записи 8-4-4-4-12")));
     }
 }

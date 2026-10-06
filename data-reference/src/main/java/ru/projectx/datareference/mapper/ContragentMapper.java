@@ -13,10 +13,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCGuid;
-import ru.projectx.datareference.service.onec.OneCValues;
-import ru.projectx.datareference.service.onec.StreamMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

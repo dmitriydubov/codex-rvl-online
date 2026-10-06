@@ -3,6 +3,8 @@ package ru.projectx.datareference.service.onec;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.datareference.mapper.OneCGuid;
+import ru.projectx.datareference.mapper.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
 /**

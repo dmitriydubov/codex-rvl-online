@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.service.onec.OneCGuid;
+import ru.projectx.datareference.mapper.OneCGuid;
 import ru.projectx.datareference.service.schedulers.PersonalDataRetention;
 
 /**

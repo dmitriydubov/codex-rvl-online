@@ -10,8 +10,6 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
 /**

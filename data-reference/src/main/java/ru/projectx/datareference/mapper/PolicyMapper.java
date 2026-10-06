@@ -19,7 +19,6 @@ import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.PolicyRepository;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

@@ -3,7 +3,6 @@ package ru.projectx.datareference.mapper;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.service.onec.OneCValues;
 import tools.jackson.databind.JsonNode;
 
 /**

@@ -21,7 +21,7 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.ParseFailure;
 import ru.projectx.datareference.service.ParseFailures;
-import ru.projectx.datareference.service.onec.ImportResult;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
 /**

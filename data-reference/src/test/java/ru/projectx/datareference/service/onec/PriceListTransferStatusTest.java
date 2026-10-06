@@ -10,6 +10,7 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.mapper.ImportResult;
 
 /**
  * Защищает решение, во что сложилась передача прайс-листа, и общий исход для всех её сообщений.

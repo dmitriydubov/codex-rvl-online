@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.UUID;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.mapper.ImportResult;
 
 /**
  * Передача прайс-листа по одной услуге: во что сложились её отложенные сообщения и какой исход у них общий.

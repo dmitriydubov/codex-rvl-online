@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.onec;
+package ru.projectx.datareference.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

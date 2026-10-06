@@ -27,7 +27,6 @@ import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
-import ru.projectx.datareference.service.onec.ImportResult;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

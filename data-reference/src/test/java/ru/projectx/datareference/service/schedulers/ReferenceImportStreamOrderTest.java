@@ -7,7 +7,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.service.onec.ImportResult.applied;
+import static ru.projectx.datareference.mapper.ImportResult.applied;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
