@@ -108,6 +108,16 @@ class ArchitectureTest {
         }
     }
 
+    // Every package is its own slice ((**) captures the full sub-package path, dots included), so a cycle
+    // between sub-packages of one component (service.onec <-> service.retention) fails too. Kept next to the
+    // component rule: a component cycle can run through four distinct packages without a package cycle.
+    @Test
+    void noCyclesBetweenPackages() {
+        if (Boolean.parseBoolean(POLICY.getProperty("fail.on.cycles", "true"))) {
+            slices().matching(BASE + ".(**)").should().beFreeOfCycles().allowEmptyShould(true).check(CLASSES);
+        }
+    }
+
     @Test
     void componentMetrics() {
         JavaPackage base = CLASSES.getPackage(BASE);
