@@ -73,6 +73,18 @@ class SupersededTransferClosureTest {
                 .isEqualTo(2.0);
     }
 
+    /** GUID услуги в сырье с пробелами по краям — та же услуга, как и при разборе части: передача закрывается. */
+    @Test
+    void serviceWrittenWithSpacesAround_isTheSameService() {
+        InboundMessage stuck = part(APPLIED_FINAL.minusSeconds(60), null);
+        stuckTransferOfService(" " + SERVICE + " ");
+        appliedFinal();
+
+        assertThat(closure().closeIfSuperseded(STUCK_CID)).isTrue();
+        assertThat(stuck.outcome().status()).isEqualTo(InboundStatus.SKIPPED);
+        verify(finalizations).lockByService(SERVICE);
+    }
+
     /** Строка услуги блокируется раньше, чем читаются части: иначе решение принималось бы по устаревшим статусам. */
     @Test
     void serviceRowIsLocked_beforeTransferPartsAreRead() {

@@ -19,8 +19,8 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Каждая часть откладывается в буфер, и после каждой проверяется, не собралась ли передача: порядок двух очередей
  * не гарантирован. Прайс замещается только передачей целиком, и исход записывается сразу всем её частям. Цены
  * меняет передача, финальное сообщение которой принято не раньше финала уже применённой ({@link PriceTransferOrder}).
- * Часть с собственной ошибкой ({@link PriceListPartCheck}) прерывает разбор: её и остальные части передачи отклоняет
- * {@link PriceListTransferRejection} после отката.
+ * Часть с собственной ошибкой ({@link PriceTransferServiceCheck}, {@link PriceListPartCheck}) прерывает разбор: её и
+ * остальные части передачи отклоняет {@link PriceListTransferRejection} после отката.
  */
 @Component
 public class PriceListTransferAssembler implements StreamHandler {
@@ -28,7 +28,7 @@ public class PriceListTransferAssembler implements StreamHandler {
     private static final Logger log = LoggerFactory.getLogger(PriceListTransferAssembler.class);
 
     private final InboundMessageService inboundMessageService;
-    private final PriceTransferOrder order;
+    private final PriceTransferServiceLock serviceLock;
     private final PriceListReplacement replacement;
     private final PriceListPartCheck partCheck;
     private final Clock clock;
@@ -36,12 +36,12 @@ public class PriceListTransferAssembler implements StreamHandler {
     public PriceListTransferAssembler(
             InboundMessageService inboundMessageService,
             PriceListMapper priceListMapper,
-            PriceTransferOrder order,
+            PriceTransferServiceLock serviceLock,
             PriceListReplacement replacement,
             Clock clock) {
 
         this.inboundMessageService = inboundMessageService;
-        this.order = order;
+        this.serviceLock = serviceLock;
         this.replacement = replacement;
         this.partCheck = new PriceListPartCheck(priceListMapper);
         this.clock = clock;
@@ -53,15 +53,16 @@ public class PriceListTransferAssembler implements StreamHandler {
     }
 
     /**
-     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась. Строка услуги
-     * блокируется первой: проверка зависших передач решает за ту же услугу только до или после этого разбора.
+     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась. Сначала
+     * проверяется, что часть называет ту же услугу, что и вся передача; затем блокируется строка этой услуги, и
+     * проверка зависших передач решает за неё только до или после этого разбора.
      *
      * @throws OneCFieldException если часть нарушает контракт: передачу отклоняют после отката
      */
     @Override
     public ImportResult handle(InboundMessage message, ObjectNode data) {
-        order.lockServiceOf(data);
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(data);
+        serviceLock.lockServiceOf(markup.cid(), data);
         markup.applyTo(message);
         inboundMessageService.saveTransferPart(message);
         List<InboundMessage> parts = inboundMessageService.transferParts(markup.cid());

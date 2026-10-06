@@ -20,8 +20,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Защищает порядок передач прайса по услуге: цены меняет только передача, финал которой не старше финала уже
@@ -114,23 +112,6 @@ class PriceTransferOrderTest {
         verify(finalizations, never()).recordApplied(any(), any());
     }
 
-    /** Строка услуги из части передачи блокируется до того, как сборка прочтёт остальные части. */
-    @Test
-    void serviceNamedInPart_isLocked() {
-        order.lockServiceOf(part("{\"keyValue\":\"" + SERVICE + "\"}"));
-
-        verify(finalizations).lockByService(SERVICE);
-    }
-
-    /** Часть без читаемого GUID услуги ничего не блокирует: отклонять её за это не правило порядка. */
-    @Test
-    void partWithoutReadableService_locksNothing() {
-        order.lockServiceOf(part("{}"));
-        order.lockServiceOf(part("{\"keyValue\":\"не GUID\"}"));
-
-        verify(finalizations, never()).lockByService(any());
-    }
-
     @Test
     void appliedTransfer_isReadFromItsFinalMessage() {
         appliedFinal(APPLIED_AT);
@@ -156,10 +137,6 @@ class PriceTransferOrderTest {
         assertThatThrownBy(() -> order.lockApplied(SERVICE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("нет строки сырья финального сообщения " + finalId + " применённой передачи");
-    }
-
-    private static ObjectNode part(String json) {
-        return (ObjectNode) JsonMapper.builder().build().readTree(json);
     }
 
     private PriceListFinalization appliedFinal(Instant receivedAt) {
