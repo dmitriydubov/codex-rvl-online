@@ -70,6 +70,21 @@ class OneCDecimalColumnTest {
     }
 
     /**
+     * Самое длинное число, которое база может вернуть из сырья: 131072 цифры до запятой и 16383 нуля после. Нули дроби
+     * не снимаются по одному, а значение не разбирается заново из текста, поэтому отказ занимает доли секунды, а не
+     * десятки секунд.
+     */
+    @Test
+    void longestStoredNumber_isRejectedQuickly() {
+        ObjectNode data = JSON.createObjectNode()
+                .put("price", new BigDecimal("1" + "0".repeat(131_071) + "." + "0".repeat(16_383)));
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertThatThrownBy(
+                () -> OneCDecimalColumn.AMOUNT.read(data, "price"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage(TOO_LARGE_PRICE));
+    }
+
+    /**
      * Диапазон сооплаты строже колонки процента, поэтому и огромное значение отклоняется им, а не пределом колонки:
      * причина одна для всех значений больше 100 или меньше 0.
      */

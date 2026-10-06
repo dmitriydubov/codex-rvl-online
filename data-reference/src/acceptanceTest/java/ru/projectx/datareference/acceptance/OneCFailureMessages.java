@@ -3,6 +3,8 @@ package ru.projectx.datareference.acceptance;
 import java.math.BigDecimal;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
+import tools.jackson.core.StreamReadConstraints;
+import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,8 +28,21 @@ final class OneCFailureMessages {
     private static final String CONTACTS_QUEUE = "1c-usk_to_rvl-online_contact-information-changes";
 
     private static final JsonMapper JSON = JsonMapper.shared();
-    private static final JsonMapper EXACT_JSON =
-            JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
+
+    /**
+     * Самое длинное число, которое хранит {@code numeric}: 131072 цифры до запятой и 16383 после. Должно совпадать с
+     * пределом, с которым сервис читает сырьё ({@code StoredEnvelope.MAX_STORED_NUMBER_DIGITS}).
+     */
+    private static final int MAX_STORED_NUMBER_DIGITS = 131_072 + 16_383;
+
+    /** Сырьё читается так же, как его читает разбор: числа — точно и такой длины, какую хранит {@code numeric}. */
+    private static final JsonMapper EXACT_JSON = JsonMapper.builder(JsonFactory.builder()
+                    .streamReadConstraints(StreamReadConstraints.builder()
+                            .maxNumberLength(MAX_STORED_NUMBER_DIGITS)
+                            .build())
+                    .build())
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+            .build();
 
     private OneCFailureMessages() {
     }

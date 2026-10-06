@@ -33,6 +33,8 @@ final class OneCMoneyScaleMessages {
 
     private static final String RENAMED_POLICY = "СТЕНД-0001, редакция 2";
     private static final String RESENT = "новая отправка ";
+    /** Поле строки программы полиса, которого нет в контракте полисов: разбор его не читает. */
+    private static final String UNKNOWN_POLICY_FIELD = "bonusAmount";
     private static final Map<String, Function<ObjectNode, ObjectNode>> POLICY_ROWS = Map.of(
             "amount", OneCMoneyScaleMessages::policyProgram,
             "amountD", OneCMoneyScaleMessages::policyProgram,
@@ -98,6 +100,13 @@ final class OneCMoneyScaleMessages {
     static OneCMessage renamedPolicy(OneCMessage policy, String field, BigDecimal value) {
         ObjectNode data = policy.data().deepCopy().put("number", RENAMED_POLICY);
         return policyWith(data, policy, field, value, InboundStatus.FAILED);
+    }
+
+    /** Тот же полис под новым номером; у строки программы ещё поле, которого нет в контракте, с числом. Разбор его применяет. */
+    static OneCMessage renamedPolicyWithUnknownField(OneCMessage policy, BigDecimal value) {
+        ObjectNode data = policy.data().deepCopy().put("number", RENAMED_POLICY);
+        policyProgram(data).put(UNKNOWN_POLICY_FIELD, value);
+        return new OneCMessage(policy.stream(), policy.queue(), data, InboundStatus.PROCESSED);
     }
 
     /** Значение поля полиса с двумя знаками после запятой: процент франшизы — свой, остальные — сумма. */
