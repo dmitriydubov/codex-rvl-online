@@ -54,11 +54,12 @@ public record PolicyResponse(
                 .filter(row -> rvlPrograms.containsKey(row.externalProgramId()))
                 .map(row -> ProgramLine.of(row, rvlPrograms.get(row.externalProgramId()), policy.serviceLines()))
                 .toList();
+        Policy.Details details = policy.details();
         return new PolicyResponse(
-                policy.id(), policy.externalId(), policy.number(),
-                policy.lastName(), policy.firstName(), policy.middleName(),
-                policy.dateOfBirth(), policy.gender(), policy.email(),
-                policy.beginDate(), policy.endDate(), policy.availability(), policy.isArchive(),
+                policy.id(), policy.externalId(), details.number(),
+                details.lastName(), details.firstName(), details.middleName(),
+                details.dateOfBirth(), details.gender(), details.email(),
+                details.beginDate(), details.endDate(), details.availability(), policy.isArchive(),
                 contract == null ? null : ContractRef.of(contract), programs);
     }
 

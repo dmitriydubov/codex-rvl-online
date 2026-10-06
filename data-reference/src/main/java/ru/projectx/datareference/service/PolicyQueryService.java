@@ -86,7 +86,8 @@ public class PolicyQueryService implements PolicyReads {
      * и отсутствие записи в справочнике — норма, а не ошибка.
      */
     private PolicyResponse assemble(Policy policy) {
-        InsuranceContract contract = insuranceContracts.findByExternalId(policy.externalContractId()).orElse(null);
+        InsuranceContract contract = insuranceContracts.findByExternalId(policy.details().externalContractId())
+                .orElse(null);
         return PolicyResponse.of(policy, contract, rvlPrograms(policy));
     }
 

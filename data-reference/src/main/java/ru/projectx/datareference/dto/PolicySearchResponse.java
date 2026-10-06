@@ -25,8 +25,9 @@ public record PolicySearchResponse(List<Item> items) {
             @Nullable String middleName) {
 
         static Item of(Policy policy) {
-            return new Item(policy.id(), policy.externalId(), policy.number(),
-                    policy.lastName(), policy.firstName(), policy.middleName());
+            Policy.Details details = policy.details();
+            return new Item(policy.id(), policy.externalId(), details.number(),
+                    details.lastName(), details.firstName(), details.middleName());
         }
     }
 }

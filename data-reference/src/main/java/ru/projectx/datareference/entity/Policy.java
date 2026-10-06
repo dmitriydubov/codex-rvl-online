@@ -77,6 +77,10 @@ public class Policy extends OneCEntity {
     @Column(nullable = false)
     private boolean availability;
 
+    /*
+     * Коллекции не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
+     * полей сущности, а Hibernate при загрузке подменяет коллекцию своей реализацией.
+     */
     @OneToMany(mappedBy = "policy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PolicyProgram> programs = new ArrayList<>();
 
@@ -87,13 +91,19 @@ public class Policy extends OneCEntity {
         // JPA
     }
 
-    private Policy(UUID externalId, Snapshot snapshot, Instant now) {
+    private Policy(UUID externalId, Instant now) {
         super(externalId, now);
-        applySnapshot(snapshot, now);
     }
 
+    /**
+     * Новый полис из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
+     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
+     * вызов раньше, чем инициализировались его собственные поля.
+     */
     public static Policy create(UUID externalId, Snapshot snapshot, Instant now) {
-        return new Policy(externalId, snapshot, now);
+        Policy policy = new Policy(externalId, now);
+        policy.applySnapshot(snapshot, now);
+        return policy;
     }
 
     public void applySnapshot(Snapshot snapshot, Instant now) {
@@ -162,52 +172,13 @@ public class Policy extends OneCEntity {
             boolean deleteMark) {
     }
 
-    public UUID externalContractId() {
-        return externalContractId;
-    }
-
-    public String number() {
-        return number;
-    }
-
-    public String lastName() {
-        return lastName;
-    }
-
-    public String firstName() {
-        return firstName;
-    }
-
-    @Nullable
-    public String middleName() {
-        return middleName;
-    }
-
-    public LocalDate dateOfBirth() {
-        return dateOfBirth;
-    }
-
-    @Nullable
-    public String gender() {
-        return gender;
-    }
-
-    @Nullable
-    public String email() {
-        return email;
-    }
-
-    public LocalDate beginDate() {
-        return beginDate;
-    }
-
-    @Nullable
-    public LocalDate endDate() {
-        return endDate;
-    }
-
-    public boolean availability() {
-        return availability;
+    /**
+     * Поля полиса, как их применило последнее сообщение. Пометка удаления в ответе — это признак
+     * архивности записи: иначе, чем через сообщение, он у полиса не меняется.
+     */
+    public Details details() {
+        return new Details(externalContractId, number, lastName, firstName, middleName, dateOfBirth, gender, email,
+                beginDate, endDate, availability, isArchive());
     }
 
     public List<PolicyProgram> programs() {
