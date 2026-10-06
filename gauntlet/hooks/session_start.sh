@@ -27,6 +27,12 @@ fi
 
 printf '%s' "$input" | python3 gauntlet/hooks/stop_gate.py --record-start
 
+# The build uses public repositories only when told to (settings.gradle of a module): a cloud session is outside
+# the corporate network, so expose the property to every later Bash command of the session.
+if [ "$CLAUDE_CODE_REMOTE" = "true" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
+  echo 'export ORG_GRADLE_PROJECT_publicRepositories=true' >> "$CLAUDE_ENV_FILE"
+fi
+
 # Tests with a database or a broker run on Testcontainers and fail without Docker. In a cloud session the
 # daemon is not running after the container starts (processes are not part of the environment snapshot), and
 # `service docker start` fails on ulimit there, so start dockerd directly (it needs root) and wait at most

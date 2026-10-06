@@ -15,6 +15,8 @@ jobs:
     name: gauntlet
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      ORG_GRADLE_PROJECT_publicRepositories: "true"   # outside the corporate network: public repositories
     steps:
       - uses: actions/checkout@v4
         with:

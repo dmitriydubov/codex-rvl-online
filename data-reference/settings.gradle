@@ -3,11 +3,11 @@
  * BOM'а и модулей платформы здесь нет намеренно — соседние компоненты ProjectX живут
  * в своих репозиториях и общих артефактов с этим сервисом не имеют.
  *
- * Репозитории зависят от того, где идёт сборка:
- *   - внешняя сборка (переменная окружения CLAUDE_CODE_REMOTE или GITHUB_ACTIONS равна true) —
- *     только публичные: портал плагинов Gradle и Maven Central;
- *   - всё остальное, то есть рабочий контур, — только Nexus контура.
- * Принудительно: -PpublicRepositories=true|false.
+ * Репозитории выбирает свойство publicRepositories:
+ *   - по умолчанию, то есть в рабочем контуре, — только Nexus контура;
+ *   - со свойством, равным true, — только публичные: портал плагинов Gradle и Maven Central.
+ * Свойство задаётся параметром -PpublicRepositories=true|false или переменной окружения
+ * ORG_GRADLE_PROJECT_publicRepositories, её выставляет сборка вне контура.
  *
  * Выбор хранится в gradle.ext: build.gradle по нему же решает, подключать ли внешний
  * набор проверок качества. pluginManagement {} обязан быть первым выражением файла
@@ -16,7 +16,7 @@
  */
 pluginManagement {
     gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
-            .getOrElse(System.getenv('CLAUDE_CODE_REMOTE') == 'true' || System.getenv('GITHUB_ACTIONS') == 'true')
+            .getOrElse(false)
     repositories {
         if (gradle.ext.publicRepositories) {
             gradlePluginPortal()

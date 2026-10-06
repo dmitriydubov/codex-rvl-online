@@ -233,6 +233,14 @@ def run_all(modules, task, excluded, timeout):
     return worst, "\n".join(outputs)
 
 
+def gradle_env():
+    """The build picks public repositories only when told to; a cloud session is outside the corporate network."""
+    env = dict(os.environ)
+    if env.get("CLAUDE_CODE_REMOTE") == "true":
+        env.setdefault("ORG_GRADLE_PROJECT_publicRepositories", "true")
+    return env
+
+
 def run_gradle(task, excluded, timeout, module="."):
     gradle = "./gradlew" if os.access(os.path.join(module, "gradlew"), os.X_OK) else "gradle"
     cmd = [gradle, task, "--continue", "--console=plain"]
@@ -243,7 +251,7 @@ def run_gradle(task, excluded, timeout, module="."):
     log_path = log_file(module, task)
     try:
         proc = subprocess.run(cmd, cwd=module, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                              timeout=timeout)
+                              timeout=timeout, env=gradle_env())
         code, output = proc.returncode, proc.stdout
     except subprocess.TimeoutExpired as e:
         code = 124
