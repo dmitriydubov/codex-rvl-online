@@ -55,3 +55,11 @@ ru.projectx.datareference.config.ImportProperties#isParentWaitShorterThanPayload
 # ExpiredParentWaitTest: messageThatWaitedForNothing_isRefused (orElseThrow supplier returning null throws
 # NullPointerException instead of IllegalStateException).
 ru.projectx.datareference.service.onec.ExpiredParentWait#lambda$of$*                 NullReturnValsMutator              # isExactlyInstanceOf(IllegalStateException) fails on NPE
+
+# PriceListTransferMarkupTest (Ш59, PR #111). Запись PriceListTransferMarkup: какой мутант уронит JVM на redefineClasses,
+# меняется от прогона к прогону (прогон координатора на 4fd0dc2: cidOf, lambda$counter$ Empty, of EQUAL_ELSE; прогоны сессии — иные).
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#lambda$counter$*  EmptyObjectReturnValsMutator         # counterWrittenAsText_isReadAsBefore: isEqualTo((CID, 2, 3)) gets (CID, 0, 0)
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#lambda$counter$*  NullReturnValsMutator                # counterWrittenAsText_isReadAsBefore: unboxing null throws NullPointerException
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#cidOf             NullReturnValsMutator                # finalMessage_carriesCountersOfWholeTransfer: isEqualTo((CID, 2, 3)) gets cid null
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                RemoveConditionalMutator_EQUAL_ELSE  # finalMessage_carriesCountersOfWholeTransfer: isEqualTo((CID, 2, 3)) gets (CID, null, 0)
+ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                RemoveConditionalMutator_EQUAL_IF    # batch_hasNoExpectedBatches_andCountsItsOwnRows: isEqualTo((CID, null, 2)) gets a final
