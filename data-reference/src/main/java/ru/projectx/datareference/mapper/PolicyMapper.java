@@ -136,8 +136,7 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
                 uuidOrNull(row, PROGRAM_ID),
                 OneCValues.integer(row, "layerNumber")
                         .orElseThrow(() -> new OneCFieldException("в строке условий нет номера слоя")),
-                OneCDecimalColumn.PERCENT.read(row, "copayment")
-                        .orElseThrow(() -> new OneCFieldException("в строке условий нет процента франшизы")),
+                OneCRequiredValues.percent(row, "copayment"),
                 dateOrNull(row, BEGIN_DATE),
                 dateOrNull(row, END_DATE),
                 OneCValues.flag(row, AVAILABILITY));

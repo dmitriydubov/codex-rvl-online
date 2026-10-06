@@ -6,7 +6,8 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Колонки, в которых хранятся деньги и проценты из сообщений 1С:УСК, и предел целой части каждой из них.
+ * Колонки, в которых хранятся деньги из сообщений 1С:УСК, и предел целой части каждой из них. У процентов свой предел —
+ * диапазон от 0 до 100 ({@link OneCRequiredValues#percent}), он строже колонки процента.
  *
  * <p>Значение с целой частью длиннее колонки база не запишет, но в её отказе не видно, какое поле виновато. Поэтому
  * такое значение отклоняется при разборе, с именем поля и без самого значения. Сначала проверяются знаки после запятой
@@ -21,10 +22,7 @@ import tools.jackson.databind.JsonNode;
 enum OneCDecimalColumn {
 
     /** Суммы и цены, {@code numeric(15,2)}. */
-    AMOUNT(15, 2),
-
-    /** Проценты, {@code numeric(5,2)}. */
-    PERCENT(5, 2);
+    AMOUNT(15, 2);
 
     private final long maxIntegerDigits;
 
