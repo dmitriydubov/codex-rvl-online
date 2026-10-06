@@ -9,7 +9,7 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ProgramRepository;
 
 /**
- * Программа страхования по нашему {@code id} (R-09) — с перечнем услуг одним запросом
+ * Программа страхования по нашему {@code id} — с перечнем услуг одним запросом
  * ({@code join fetch}), иначе N+1 на каждую строку перечня.
  *
  * <p>Транзакция чтения здесь, а не в контроллере: ответ собирается внутри неё, за её границей

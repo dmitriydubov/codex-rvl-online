@@ -38,6 +38,6 @@ public class DatabaseCleanupHook {
     public void emptyDatabase() {
         List<String> tables = jdbc.sql(DOMAIN_TABLES).query(String.class).list();
         jdbc.sql("truncate table " + String.join(", ", tables) + " cascade").update();
-        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
+        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).invalidate());
     }
 }

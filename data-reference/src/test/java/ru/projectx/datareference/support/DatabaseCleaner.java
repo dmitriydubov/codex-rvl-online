@@ -46,7 +46,7 @@ public class DatabaseCleaner {
 
     public void clear() {
         clearTables();
-        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).clear());
+        cacheManager.getCacheNames().forEach(name -> Objects.requireNonNull(cacheManager.getCache(name)).invalidate());
     }
 
     private void clearTables() {
