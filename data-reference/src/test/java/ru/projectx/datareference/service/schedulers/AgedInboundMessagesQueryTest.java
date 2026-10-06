@@ -89,10 +89,10 @@ class AgedInboundMessagesQueryTest {
         assertThat(payloadOf(old)).isNotNull();
     }
 
-    /** Свежие тела, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
+    /** Тела ровно на границе срока, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
     @Test
     void forgetPayloads_skipsFreshOtherStreamAndErasedRows() {
-        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(29));
+        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(30));
         UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
         store(OneCStream.POLICIES, Duration.ofDays(40));
         forget(10);
@@ -179,7 +179,7 @@ class AgedInboundMessagesQueryTest {
     void countPayloadsToForget_matchesWhatTheErasePassErases() {
         Stream.of(OneCStream.POLICIES, OneCStream.INSURANCE_CONTRACTS).forEach(stream -> storeWithOutcome(stream, "FAILED"));
         Stream.of("SKIPPED", "PROCESSED", "FAILED").forEach(status -> storeWithOutcome(OneCStream.PROGRAMS, status));
-        store(OneCStream.INSURANCE_CONTRACTS, Duration.ofDays(29));
+        store(OneCStream.INSURANCE_CONTRACTS, Duration.ofDays(30));
         Instant receivedBefore = FixedClockConfig.NOW.minus(Duration.ofDays(30));
 
         long counted = inboundMessageRepository.countPayloadsToForgetReceivedBefore(receivedBefore);
