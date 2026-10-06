@@ -158,8 +158,7 @@ public class Policy extends OneCEntity {
 
     /**
      * Поля самого полиса в том виде, как их прислала 1С. Тот же набор отдаёт {@link #details()}; там пометка
-     * удаления — это признак архивности записи. В записи персональные данные, поэтому целиком её не пишут
-     * в журнал: стандартный {@code toString()} записи выводит все поля.
+     * удаления — это признак архивности записи.
      */
     public record Details(
             UUID externalContractId,
@@ -174,6 +173,12 @@ public class Policy extends OneCEntity {
             @Nullable LocalDate endDate,
             boolean availability,
             boolean deleteMark) {
+
+        /** Без ФИО, даты рождения, пола, почты и номера полиса: запись может случайно попасть в журнал. */
+        @Override
+        public String toString() {
+            return "Details[externalContractId=" + externalContractId + "]";
+        }
     }
 
     /**

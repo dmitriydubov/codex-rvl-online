@@ -35,6 +35,16 @@ class PolicyTest {
     }
 
     @Test
+    void detailsText_leavesOutPersonalData_butNamesTheContract() {
+        Policy.Details details = details("П-0001", "Тестов", LocalDate.of(2026, 12, 31), false);
+
+        String text = details.toString();
+
+        assertThat(text).contains(details.externalContractId().toString())
+                .doesNotContain("Тестов", "Тестович", "1990-01-01", "test@example.org", "Мужской");
+    }
+
+    @Test
     void applySnapshot_replacesDetails_archivesByDeleteMark_andMarksUpdateTime() {
         Policy policy = Policy.create(UUID.randomUUID(), snapshot(List.of(), List.of()), CREATED);
         Policy.Details updated = details("П-0002", "Изменённая", null, true);
