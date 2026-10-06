@@ -22,7 +22,7 @@ public class PriceListFinalization {
     @Column(name = "service_external_id", nullable = false, updatable = false)
     private UUID serviceExternalId;
 
-    @Column(name = "final_message_id", nullable = false)
+    @Column(name = "final_message_id", nullable = false, updatable = false)
     private UUID finalMessageId;
 
     protected PriceListFinalization() {
@@ -37,11 +37,6 @@ public class PriceListFinalization {
     /** Первая применённая передача по услуге. */
     public static PriceListFinalization of(UUID serviceExternalId, UUID finalMessageId) {
         return new PriceListFinalization(serviceExternalId, finalMessageId);
-    }
-
-    /** По услуге применена более новая передача с этим финальным сообщением. */
-    public void appliedBy(UUID newerFinalMessageId) {
-        this.finalMessageId = newerFinalMessageId;
     }
 
     public UUID serviceExternalId() {

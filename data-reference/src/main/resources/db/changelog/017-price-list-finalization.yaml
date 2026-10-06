@@ -39,10 +39,10 @@ databaseChangeLog:
       author: rvl-online
       comment: >
         Заполняет последнюю применённую передачу по каждой услуге из сырья: финальные сообщения прайсов в статусе
-        «применено», по услуге — принятое последним. Без этого первая передача после обновления применилась бы
-        без сравнения и могла бы затереть более новые цены. Строки, которые уже есть, не меняются, поэтому
-        повторный запуск ничего не портит. GUID услуги берётся из тела только в канонической записи.
-        Отката нет: строки уходят вместе с таблицей при откате её создания.
+        «применено», по услуге — принятое последним, а из принятых в один момент — собранное позже. Без этого
+        первая передача после обновления применилась бы без сравнения и могла бы затереть более новые цены.
+        Строки, которые уже есть, не меняются, поэтому повторный запуск ничего не портит. GUID услуги берётся
+        из тела только в канонической записи. Отката нет: строки уходят вместе с таблицей при откате её создания.
       changes:
         - sql:
             sql: >
@@ -50,14 +50,16 @@ databaseChangeLog:
               select distinct on (applied.service_external_id) applied.service_external_id, applied.message_id
                 from (select cast(payload -> 'data' ->> 'keyValue' as uuid) as service_external_id,
                              message_id,
-                             received_at
+                             received_at,
+                             processed_at
                         from inbound_message
                        where stream = 'PRICE_LISTS'
                          and status = 'PROCESSED'
                          and batch_count is not null
                          and payload -> 'data' ->> 'keyValue'
                              ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') as applied
-               order by applied.service_external_id, applied.received_at desc, applied.message_id desc
+               order by applied.service_external_id, applied.received_at desc, applied.processed_at desc nulls last,
+                       applied.message_id desc
               on conflict (service_external_id) do nothing
       rollback:
         - empty: {}

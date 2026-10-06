@@ -95,7 +95,7 @@ class PriceListFinalizationStorageTest {
     @Test
     void freeServiceRow_isLockedAndRead() {
         UUID finalId = part("PROCESSED", SERVICE, 1, EARLIER);
-        finalizations.save(PriceListFinalization.of(SERVICE, finalId));
+        record(SERVICE, finalId);
 
         Optional<PriceListFinalization> locked = inTransaction(() -> finalizations.lockByService(SERVICE));
 
@@ -153,13 +153,41 @@ class PriceListFinalizationStorageTest {
         UUID recorded = part("PROCESSED", SERVICE, 1, EARLIER);
         part("PROCESSED", SERVICE, 1, LATER);
         UUID otherServiceFinal = part("PROCESSED", OTHER_SERVICE, 1, EARLIER);
-        finalizations.save(PriceListFinalization.of(SERVICE, recorded));
+        record(SERVICE, recorded);
 
         runFill();
         runFill();
 
         assertThat(finalizationsByService()).containsExactlyInAnyOrderEntriesOf(Map.of(
                 SERVICE, recorded, OTHER_SERVICE, otherServiceFinal));
+    }
+
+    /** Из финалов, принятых в один момент, последней становится передача, собранная позже. */
+    @Test
+    void fill_breaksTieOfSameMomentByAssemblyTime() {
+        UUID assembledLater = part("PROCESSED", SERVICE, 1, LATER);
+        UUID assembledEarlier = part("PROCESSED", SERVICE, 1, LATER);
+        testJdbc.update("update inbound_message set processed_at = ? where message_id = ?",
+                Timestamp.from(LATER.plusSeconds(120)), assembledLater);
+        testJdbc.update("update inbound_message set processed_at = ? where message_id = ?",
+                Timestamp.from(LATER.plusSeconds(60)), assembledEarlier);
+
+        runFill();
+
+        assertThat(finalizationsByService()).containsExactlyEntriesOf(Map.of(SERVICE, assembledLater));
+    }
+
+    /** Применение записывает финал последней передачи: строку услуги добавляет, а у существующей заменяет финал. */
+    @Test
+    void recordApplied_addsServiceRow_thenReplacesItsFinal() {
+        UUID first = part("PROCESSED", SERVICE, 1, EARLIER);
+        UUID newer = part("PROCESSED", SERVICE, 1, LATER);
+
+        record(SERVICE, first);
+        assertThat(finalizationsByService()).containsExactlyEntriesOf(Map.of(SERVICE, first));
+        record(SERVICE, newer);
+
+        assertThat(finalizationsByService()).containsExactlyEntriesOf(Map.of(SERVICE, newer));
     }
 
     @Test
@@ -172,6 +200,10 @@ class PriceListFinalizationStorageTest {
     private Map<UUID, UUID> finalizationsByService() {
         return finalizations.findAll().stream().collect(Collectors.toMap(
                 PriceListFinalization::serviceExternalId, PriceListFinalization::finalMessageId));
+    }
+
+    private void record(UUID service, UUID finalMessageId) {
+        inTransaction(() -> finalizations.recordApplied(service, finalMessageId));
     }
 
     private <T> T inTransaction(Supplier<T> work) {

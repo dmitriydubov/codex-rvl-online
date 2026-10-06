@@ -3,7 +3,6 @@ package ru.projectx.datareference.service.onec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -222,6 +221,19 @@ class PriceListTransferAssemblerTest {
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 
+    /**
+     * Строка услуги блокируется раньше, чем читаются части передачи: проверка зависших передач не меняет их у сборки
+     * за спиной.
+     */
+    @Test
+    void serviceRowIsLocked_beforeTransferPartsAreRead() {
+        receive(message(batchData(row(1, "100.00"))));
+
+        InOrder steps = inOrder(finalizations, repository);
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+        steps.verify(repository).findByCorrelationId(CID);
+    }
+
     /** Применённая передача становится последней по услуге: следующие сравниваются с её финальным сообщением. */
     @Test
     void appliedTransfer_becomesTheLastOfItsService() {
@@ -231,9 +243,7 @@ class PriceListTransferAssemblerTest {
 
         receive(finalMessage);
 
-        verify(finalizations).lockByService(SERVICE_ID);
-        verify(finalizations).save(argThat(saved -> saved.serviceExternalId().equals(SERVICE_ID)
-                && saved.finalMessageId().equals(finalMessage.receipt().messageId())));
+        verify(finalizations).recordApplied(SERVICE_ID, finalMessage.receipt().messageId());
     }
 
     /**
@@ -257,7 +267,7 @@ class PriceListTransferAssemblerTest {
             assertThat(message.outcome().processedAt()).isEqualTo(NOW);
         });
         verify(priceListMapper, never()).apply(any());
-        verify(finalizations, never()).save(any());
+        verify(finalizations, never()).recordApplied(any(), any());
     }
 
     /** Исход пропущенной передачи записан: опоздавшая часть пропускается сразу, даже испорченная, прайс не трогается. */
@@ -373,9 +383,9 @@ class PriceListTransferAssemblerTest {
         InboundMessageService inboundMessageService = new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
-        return new PriceListTransferAssembler(inboundMessageService, priceListMapper,
-                new PriceListReplacement(priceListMapper, new PriceTransferOrder(finalizations, repository), json),
-                clock);
+        PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
+        return new PriceListTransferAssembler(inboundMessageService, priceListMapper, order,
+                new PriceListReplacement(priceListMapper, order, json), clock);
     }
 
     private static String batchData(String... rows) {

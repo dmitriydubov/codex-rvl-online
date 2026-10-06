@@ -43,17 +43,16 @@ public class StuckTransferAlert {
         this.clock = clock;
     }
 
-    /** Одна проверка: закрыть обогнанные передачи, затем одно предупреждение об оставшихся или молчание. */
+    /**
+     * Одна проверка: закрыть обогнанные передачи, все без предела, затем одно предупреждение об оставшихся или
+     * молчание.
+     */
     public void reportStuckTransfers() {
-        for (BufferedTransfer transfer : stuckTransfers()) {
+        Duration threshold = properties.stuckTransferThreshold();
+        for (BufferedTransfer transfer : agedMessages.allTransfersBufferedLongerThan(threshold)) {
             closeIfSuperseded(transfer.getCorrelationId());
         }
-        report(stuckTransfers());
-    }
-
-    private List<BufferedTransfer> stuckTransfers() {
-        return agedMessages.transfersBufferedLongerThan(
-                properties.stuckTransferThreshold(), properties.stuckTransferReportLimit());
+        report(agedMessages.transfersBufferedLongerThan(threshold, properties.stuckTransferReportLimit()));
     }
 
     /**

@@ -28,6 +28,7 @@ public class PriceListTransferAssembler implements StreamHandler {
     private static final Logger log = LoggerFactory.getLogger(PriceListTransferAssembler.class);
 
     private final InboundMessageService inboundMessageService;
+    private final PriceTransferOrder order;
     private final PriceListReplacement replacement;
     private final PriceListPartCheck partCheck;
     private final Clock clock;
@@ -35,10 +36,12 @@ public class PriceListTransferAssembler implements StreamHandler {
     public PriceListTransferAssembler(
             InboundMessageService inboundMessageService,
             PriceListMapper priceListMapper,
+            PriceTransferOrder order,
             PriceListReplacement replacement,
             Clock clock) {
 
         this.inboundMessageService = inboundMessageService;
+        this.order = order;
         this.replacement = replacement;
         this.partCheck = new PriceListPartCheck(priceListMapper);
         this.clock = clock;
@@ -50,12 +53,14 @@ public class PriceListTransferAssembler implements StreamHandler {
     }
 
     /**
-     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась.
+     * Откладывает часть передачи в буфер с её разметкой и применяет прайс, если передача собралась. Строка услуги
+     * блокируется первой: проверка зависших передач решает за ту же услугу только до или после этого разбора.
      *
      * @throws OneCFieldException если часть нарушает контракт: передачу отклоняют после отката
      */
     @Override
     public ImportResult handle(InboundMessage message, ObjectNode data) {
+        order.lockServiceOf(data);
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(data);
         markup.applyTo(message);
         inboundMessageService.saveTransferPart(message);
@@ -94,7 +99,7 @@ public class PriceListTransferAssembler implements StreamHandler {
         return ImportResult.skipped(transfer.reason());
     }
 
-    /** Передача, финал которой старше финала уже применённой по услуге, цены не меняет и пропускается целиком. */
+    /** Замещает прайс собранной передачей или пропускает её, если по услуге применена более новая; исход — всем частям. */
     private ImportResult apply(PriceListTransfer.Assembled transfer) {
         ImportResult result = replacement.replace(transfer);
         saveAll(transfer.markOutcome(result, clock.instant()));

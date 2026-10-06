@@ -42,6 +42,7 @@ class StuckTransferAlertTest {
     private static final UUID FIRST_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000001");
     private static final UUID SECOND_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000002");
     private static final UUID THIRD_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000003");
+    private static final UUID FOURTH_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000004");
 
     @Mock
     private AgedInboundMessages agedMessages;
@@ -111,9 +112,10 @@ class StuckTransferAlertTest {
      */
     @Test
     void supersededTransfer_isClosed_andOnlyTheRestAreReported() {
-        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(
-                List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2), transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)),
-                List.of(transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)));
+        when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD)).thenReturn(
+                List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2), transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)));
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT))
+                .thenReturn(List.of(transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)));
         when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenReturn(true);
 
         alert().reportStuckTransfers();
@@ -124,11 +126,29 @@ class StuckTransferAlertTest {
                 .startsWith("передачи прайсов не собрались за PT1H30M: " + SECOND_TRANSFER + " (ждёт PT2H, частей 1).");
     }
 
+    /**
+     * Закрываются все зависшие передачи, а не только названные в предупреждении: иначе обогнанные передачи за пределом
+     * числа названных ждали бы, пока закроются более давние, и могли не закрыться никогда.
+     */
+    @Test
+    void transfersBeyondReportLimit_areClosedToo() {
+        List<BufferedTransfer> beyondLimit = List.of(transfer(FIRST_TRANSFER, Duration.ofHours(9), 1),
+                transfer(SECOND_TRANSFER, Duration.ofHours(8), 1), transfer(THIRD_TRANSFER, Duration.ofHours(7), 1),
+                transfer(FOURTH_TRANSFER, Duration.ofHours(6), 1));
+        when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD)).thenReturn(beyondLimit);
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(beyondLimit.subList(0, 3));
+
+        alert().reportStuckTransfers();
+
+        verify(closure).closeIfSuperseded(FOURTH_TRANSFER);
+    }
+
     /** Все зависшие закрыты — предупреждать не о чем. */
     @Test
     void allStuckTransfersClosed_nothingIsReported() {
-        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(
-                List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2)), List.of());
+        when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD))
+                .thenReturn(List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2)));
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(List.of());
         when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenReturn(true);
 
         alert().reportStuckTransfers();
@@ -144,6 +164,7 @@ class StuckTransferAlertTest {
     void databaseFailureWhileClosing_isLogged_andTransferIsStillReported() {
         List<BufferedTransfer> stuck = List.of(
                 transfer(FIRST_TRANSFER, Duration.ofHours(5), 2), transfer(SECOND_TRANSFER, Duration.ofHours(2), 1));
+        when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD)).thenReturn(stuck);
         when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(stuck);
         when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenThrow(new CannotAcquireLockException("занято",
                 new SQLException("lock timeout", "55P03")));

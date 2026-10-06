@@ -6,9 +6,9 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Порядок передач прайса по услуге: цены меняет только передача, финальное сообщение которой принято не раньше
@@ -19,6 +19,8 @@ import ru.projectx.datareference.repository.PriceListFinalizationRepository;
  */
 @Component
 public class PriceTransferOrder {
+
+    private static final String KEY_VALUE = "keyValue";
 
     private final PriceListFinalizationRepository finalizations;
     private final InboundMessageRepository inbound;
@@ -40,6 +42,14 @@ public class PriceTransferOrder {
                 .orElseGet(() -> replaceAndRemember(service, finalMessage, replacement));
     }
 
+    /**
+     * Блокирует строку услуги, названной в части передачи, до того как читаются остальные части: тогда закрытие
+     * зависших передач той же услуги не меняет их у сборки за спиной. Часть без читаемого GUID услуги не блокирует.
+     */
+    public void lockServiceOf(ObjectNode part) {
+        OneCValues.text(part, KEY_VALUE).flatMap(OneCGuid::parse).ifPresent(finalizations::lockByService);
+    }
+
     /** Последняя применённая передача по услуге; строка услуги заблокирована до конца транзакции вызывающего. */
     Optional<AppliedPriceTransfer> lockApplied(UUID service) {
         return finalizations.lockByService(service)
@@ -57,9 +67,7 @@ public class PriceTransferOrder {
     }
 
     private void remember(UUID service, UUID finalMessageId) {
-        finalizations.findById(service).ifPresentOrElse(
-                finalization -> finalization.appliedBy(finalMessageId),
-                () -> finalizations.save(PriceListFinalization.of(service, finalMessageId)));
+        finalizations.recordApplied(service, finalMessageId);
     }
 
     private AppliedPriceTransfer appliedBy(UUID service, UUID finalMessageId) {

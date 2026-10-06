@@ -14,13 +14,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Защищает порядок передач прайса по услуге: цены меняет только передача, финал которой не старше финала уже
@@ -42,35 +43,28 @@ class PriceTransferOrderTest {
     void firstTransferOfService_isApplied_andBecomesTheLast() {
         InboundMessage finalMessage = finalMessage(CID, APPLIED_AT);
         when(finalizations.lockByService(SERVICE)).thenReturn(Optional.empty());
-        when(finalizations.findById(SERVICE)).thenReturn(Optional.empty());
 
         ImportResult result = order.applyInOrder(SERVICE, finalMessage, ImportResult::applied);
 
         assertThat(result).isEqualTo(ImportResult.applied());
-        ArgumentCaptor<PriceListFinalization> saved = ArgumentCaptor.forClass(PriceListFinalization.class);
-        verify(finalizations).save(saved.capture());
-        assertThat(saved.getValue().serviceExternalId()).isEqualTo(SERVICE);
-        assertThat(saved.getValue().finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
+        verify(finalizations).recordApplied(SERVICE, finalMessage.receipt().messageId());
     }
 
     @Test
     void transferFinalizedAfterTheApplied_replacesPrices_andBecomesTheLast() {
-        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        appliedFinal(APPLIED_AT);
         InboundMessage finalMessage = finalMessage(CID, APPLIED_AT.plusSeconds(1));
-        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
 
         ImportResult result = order.applyInOrder(SERVICE, finalMessage, ImportResult::applied);
 
         assertThat(result).isEqualTo(ImportResult.applied());
-        assertThat(last.finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
-        verify(finalizations, never()).save(any());
+        verify(finalizations).recordApplied(SERVICE, finalMessage.receipt().messageId());
     }
 
     /** Блокировка услуги берётся до замещения цен: иначе закрытие зависших передач решало бы одновременно. */
     @Test
     void serviceRowIsLocked_beforePricesAreReplaced() {
-        PriceListFinalization last = appliedFinal(APPLIED_AT);
-        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
+        appliedFinal(APPLIED_AT);
         AtomicBoolean lockedBeforeReplacing = new AtomicBoolean();
 
         order.applyInOrder(SERVICE, finalMessage(CID, APPLIED_AT.plusSeconds(1)), () -> {
@@ -84,8 +78,7 @@ class PriceTransferOrderTest {
 
     @Test
     void transferFinalizedBeforeTheApplied_isSkipped_andPricesStay() {
-        PriceListFinalization last = appliedFinal(APPLIED_AT);
-        UUID lastFinal = last.finalMessageId();
+        appliedFinal(APPLIED_AT);
         AtomicBoolean replaced = new AtomicBoolean();
 
         ImportResult result = order.applyInOrder(SERVICE, finalMessage(CID, APPLIED_AT.minusSeconds(1)), () -> {
@@ -96,19 +89,17 @@ class PriceTransferOrderTest {
         assertThat(result).isEqualTo(ImportResult.skipped(
                 "по услуге " + SERVICE + " уже применена более новая передача " + APPLIED_CID));
         assertThat(replaced).isFalse();
-        assertThat(last.finalMessageId()).isEqualTo(lastFinal);
-        verify(finalizations, never()).findById(SERVICE);
+        verify(finalizations, never()).recordApplied(any(), any());
     }
 
     /** Финалы приняты в один момент: применяется передача, собравшаяся позже. */
     @Test
     void transferFinalizedAtTheSameMoment_isApplied() {
-        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        appliedFinal(APPLIED_AT);
         InboundMessage finalMessage = finalMessage(CID, APPLIED_AT);
-        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
 
         assertThat(order.applyInOrder(SERVICE, finalMessage, ImportResult::applied)).isEqualTo(ImportResult.applied());
-        assertThat(last.finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
+        verify(finalizations).recordApplied(SERVICE, finalMessage.receipt().messageId());
     }
 
     /** Услуга вне справочника: прайс не применён, и последней такая передача не становится. */
@@ -120,8 +111,24 @@ class PriceTransferOrderTest {
                 () -> ImportResult.skipped("прайс по услуге вне справочника"));
 
         assertThat(result).isEqualTo(ImportResult.skipped("прайс по услуге вне справочника"));
-        verify(finalizations, never()).save(any());
-        verify(finalizations, never()).findById(SERVICE);
+        verify(finalizations, never()).recordApplied(any(), any());
+    }
+
+    /** Строка услуги из части передачи блокируется до того, как сборка прочтёт остальные части. */
+    @Test
+    void serviceNamedInPart_isLocked() {
+        order.lockServiceOf(part("{\"keyValue\":\"" + SERVICE + "\"}"));
+
+        verify(finalizations).lockByService(SERVICE);
+    }
+
+    /** Часть без читаемого GUID услуги ничего не блокирует: отклонять её за это не правило порядка. */
+    @Test
+    void partWithoutReadableService_locksNothing() {
+        order.lockServiceOf(part("{}"));
+        order.lockServiceOf(part("{\"keyValue\":\"не GUID\"}"));
+
+        verify(finalizations, never()).lockByService(any());
     }
 
     @Test
@@ -149,6 +156,10 @@ class PriceTransferOrderTest {
         assertThatThrownBy(() -> order.lockApplied(SERVICE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("нет строки сырья финального сообщения " + finalId + " применённой передачи");
+    }
+
+    private static ObjectNode part(String json) {
+        return (ObjectNode) JsonMapper.builder().build().readTree(json);
     }
 
     private PriceListFinalization appliedFinal(Instant receivedAt) {

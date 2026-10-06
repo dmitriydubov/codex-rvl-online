@@ -60,6 +60,14 @@ public class AgedInboundMessages {
         return repository.findTransfersBufferedBefore(receivedBefore(age), Limit.of(limit));
     }
 
+    /**
+     * Все передачи прайсов, которые ждут своих частей дольше {@code age}, самые давние первыми: проверка закрывает
+     * обогнанные из них, сколько бы их ни было. Тела сообщений не читаются.
+     */
+    public List<BufferedTransfer> allTransfersBufferedLongerThan(Duration age) {
+        return repository.findTransfersBufferedBefore(receivedBefore(age), Limit.unlimited());
+    }
+
     private Instant receivedBefore(Duration age) {
         return clock.instant().minus(age);
     }
