@@ -38,12 +38,13 @@ public class PriceListReplacement {
      *
      * <p>Обычный цикл, а не стрим: каждый шаг пишет в базу.
      *
-     * @param at момент исхода: обработки, пропуска или начала ожидания услуги
+     * @param parsed тела частей, разобранные до блокировки строки услуги
+     * @param at     момент исхода: обработки, пропуска или начала ожидания услуги
      * @return применено, пропущено по порядку передач или по правилам прайса, или ждёт услугу
      * @throws OneCFieldException если тело части стёрто, у строки нет номера или в передаче нет GUID услуги
      */
-    ImportOutcome replace(PriceListTransfer.Assembled transfer, Instant at) {
-        ObjectNode assembled = rows.of(transfer);
+    ImportOutcome replace(PriceListTransfer.Assembled transfer, ParsedTransferParts parsed, Instant at) {
+        ObjectNode assembled = rows.of(transfer, parsed);
         ImportResult result = order.applyInOrder(PriceListTransferRows.serviceOf(assembled), transfer.finalMessage(),
                 () -> priceListMapper.apply(assembled));
         for (InboundMessage part : transfer.markOutcome(result, at)) {

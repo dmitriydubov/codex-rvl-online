@@ -69,6 +69,9 @@ class PriceListTransferAssemblerTest {
     @Mock
     private PriceListFinalizationRepository finalizations;
 
+    @Mock
+    private PriceTransferPartsReader partsReader;
+
     private final List<InboundMessage> correlated = new ArrayList<>();
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -277,6 +280,60 @@ class PriceListTransferAssemblerTest {
     }
 
     /**
+     * Тела частей разбираются раньше первого запроса транзакции разбора и раньше блокировки строки услуги: долгий
+     * разбор не держит блокировку и не простаивает в открытой транзакции.
+     */
+    @Test
+    void transferParts_areReadInAdvance_beforeFirstQueryAndServiceLock() {
+        receive(message(batchData(row(1, "100.00"))));
+
+        InOrder steps = inOrder(partsReader, repository, finalizations);
+        steps.verify(partsReader).parts(CID);
+        steps.verify(repository).existsByCorrelationIdAndStatusIn(any(), any());
+        steps.verify(finalizations).lockByService(SERVICE_ID);
+    }
+
+    /**
+     * Под блокировкой собранная передача берёт тела, разобранные заранее, и сама их не разбирает: здесь к моменту
+     * блокировки тело пакета уже не читается, а прайс применяется строками, разобранными до неё.
+     */
+    @Test
+    void assembledTransfer_takesBodiesParsedBeforeLock_andParsesNothingUnderIt() {
+        InboundMessage batch = message(batchData(row(1, "100.00")));
+        batch.markBuffered(CID, null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        correlated.add(withoutBody(batch));
+        correlated.add(finalMessage);
+        when(repository.findByCorrelationId(CID)).thenReturn(correlated);
+        when(partsReader.parts(CID)).thenReturn(List.of(batch, finalMessage));
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
+
+        ImportOutcome result = assembler().handle(finalMessage, dataOf(finalMessage));
+
+        assertThat(result).isEqualTo(ImportOutcome.applied());
+        verify(priceListMapper).apply(node("""
+                {"keyValue":"%s","recordSet":[%s]}""".formatted(SERVICE_ID, row(1, "100.00"))));
+    }
+
+    /** Часть, которой не было при чтении заранее, сборка разбирает сама: исход передачи от этого не зависит. */
+    @Test
+    void partMissedByAdvanceRead_isParsedByAssembly() {
+        InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
+        InboundMessage finalMessage = message(finalData(1, 1));
+        correlated.add(finalMessage);
+        when(repository.findByCorrelationId(CID)).thenReturn(correlated);
+        when(partsReader.parts(CID)).thenReturn(List.of());
+        when(priceListMapper.apply(any())).thenReturn(ImportResult.applied());
+
+        ImportOutcome result = assembler().handle(finalMessage, dataOf(finalMessage));
+
+        assertThat(result).isEqualTo(ImportOutcome.applied());
+        verify(priceListMapper).apply(node("""
+                {"keyValue":"%s","recordSet":[%s]}""".formatted(SERVICE_ID, row(1, "100.00"))));
+        assertThat(batch.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+    }
+
+    /**
      * Услуга части сверяется с частями передачи в буфере раньше, чем блокируется её строка: блокируется только
      * услуга, которую передача называет целиком.
      */
@@ -411,6 +468,7 @@ class PriceListTransferAssemblerTest {
     private ImportOutcome receive(InboundMessage message) {
         correlated.add(message);
         when(repository.findByCorrelationId(CID)).thenReturn(correlated);
+        when(partsReader.parts(CID)).thenReturn(correlated);
         return assembler().handle(message, dataOf(message));
     }
 
@@ -448,6 +506,13 @@ class PriceListTransferAssemblerTest {
         return message;
     }
 
+    /** Та же часть с той же разметкой, но с телом, стёртым к моменту блокировки. */
+    private static InboundMessage withoutBody(InboundMessage part) {
+        InboundMessage copy = InboundMessage.receive(part.receipt(), null);
+        copy.markBuffered(CID, part.transferPart().batchCount(), part.transferPart().rowCount());
+        return copy;
+    }
+
     private static InboundMessage message(String data) {
         return InboundMessage.receive(
                 new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW), envelope(data));
@@ -467,9 +532,11 @@ class PriceListTransferAssemblerTest {
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
         PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
+        PriceListReplacement replacement = new PriceListReplacement(priceListMapper, order, json, inboundMessageService);
         return new PriceListTransferAssembler(inboundMessageService, priceListMapper,
                 new PriceTransferServiceLock(repository, finalizations),
-                new PriceListReplacement(priceListMapper, order, json, inboundMessageService), clock);
+                new PriceTransferPartsInAdvance(partsReader, json),
+                new PriceTransferConclusion(inboundMessageService, replacement, clock));
     }
 
     private static String batchData(String... rows) {

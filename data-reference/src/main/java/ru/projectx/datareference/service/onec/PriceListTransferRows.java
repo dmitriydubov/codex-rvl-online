@@ -16,6 +16,9 @@ import tools.jackson.databind.node.ObjectNode;
  * Собранная передача прайса в том виде, в каком её принимает замещение прайса: GUID услуги из финального сообщения
  * и строки всех пакетов одним набором по возрастанию номера строки. Порядок задаёт источник, и после доставки
  * двумя очередями восстановить его больше неоткуда.
+ *
+ * <p>Тела частей обычно уже разобраны до блокировки строки услуги ({@link PriceTransferPartsInAdvance}). Здесь
+ * разбирается только часть, которой среди них нет.
  */
 final class PriceListTransferRows {
 
@@ -34,13 +37,13 @@ final class PriceListTransferRows {
      * @throws OneCFieldException если тело части стёрто или не читается как JSON, в её конверте нет объекта
      *                            {@code data} или у строки нет целого номера
      */
-    ObjectNode of(PriceListTransfer.Assembled transfer) {
+    ObjectNode of(PriceListTransfer.Assembled transfer, ParsedTransferParts parsed) {
         ObjectNode assembled = json.createObjectNode();
-        assembled.set(KEY_VALUE, dataOf(transfer.finalMessage()).path(KEY_VALUE));
+        assembled.set(KEY_VALUE, dataOf(transfer.finalMessage(), parsed).path(KEY_VALUE));
 
         ArrayNode recordSet = assembled.putArray(RECORD_SET);
         transfer.batches().stream()
-                .flatMap(batch -> rowsOf(dataOf(batch)))
+                .flatMap(batch -> rowsOf(dataOf(batch, parsed)))
                 .sorted(Comparator.comparingInt(PriceListRowNumber::of))
                 .forEach(recordSet::add);
         return assembled;
@@ -55,8 +58,8 @@ final class PriceListTransferRows {
         return OneCValues.requiredUuid(assembled, KEY_VALUE);
     }
 
-    private ObjectNode dataOf(InboundMessage message) {
-        return envelope.dataOf(message).orElseThrow(
+    private ObjectNode dataOf(InboundMessage message, ParsedTransferParts parsed) {
+        return parsed.dataOf(message).or(() -> envelope.dataOf(message)).orElseThrow(
                 () -> new OneCFieldException("тело сообщения передачи стёрто, собрать её нечем"));
     }
 
