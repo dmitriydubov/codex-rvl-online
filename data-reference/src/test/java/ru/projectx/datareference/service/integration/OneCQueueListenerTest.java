@@ -41,7 +41,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionSystemException;
 import ru.projectx.datareference.config.IngestProperties;
-import ru.projectx.datareference.config.JacksonConfig;
+import ru.projectx.datareference.config.OneCJson;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.service.QuarantineService;
@@ -467,7 +467,7 @@ class OneCQueueListenerTest {
 
     private OneCQueueListener listener(Duration duplicateDeliveryBackoff, OneCIngestMetrics ingestMetrics) {
         return new OneCQueueListener(
-                new OneCEnvelopeParser(new JacksonConfig().objectMapper()),
+                new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
                         new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), ingestMetrics),

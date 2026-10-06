@@ -24,7 +24,8 @@ final class OneCProgramRangeMessages {
     private static final Map<String, BigDecimal> STEPS_PAST_LIMIT = Map.of(
             "на единицу меньше", BigDecimal.ONE.negate(),
             "на одну сотую меньше", new BigDecimal("-0.01"),
-            "на одну сотую больше", new BigDecimal("0.01"));
+            "на одну сотую больше", new BigDecimal("0.01"),
+            "на одну тысячную больше", new BigDecimal("0.001"));
     /** Значение «за пределом» для каждого поля: ближайшее к допустимому, которое правило 1С:УСК запрещает. */
     private static final Map<String, BigDecimal> PAST_LIMIT = Map.of(
             "numberLayer", BigDecimal.ONE.negate(),

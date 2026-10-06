@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import ru.projectx.datareference.config.JacksonConfig;
+import ru.projectx.datareference.config.OneCJson;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
 
 /**
@@ -24,7 +24,7 @@ class OneCEnvelopeParserTest {
 
     private static final UUID MESSAGE_ID = UUID.fromString("9f1c0f2e-0000-4000-8000-00000000000a");
 
-    private final OneCEnvelopeParser parser = new OneCEnvelopeParser(new JacksonConfig().objectMapper());
+    private final OneCEnvelopeParser parser = new OneCEnvelopeParser(OneCJson.mapper());
 
     @Test
     void messageId_isTakenFromMetadata() {
