@@ -166,7 +166,7 @@ class FailedMessageJournalTest {
     private InboundMessageService service() {
         return new InboundMessageService(repository, new InboundRetryProperties(BACKOFF),
                 Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()),
-                new FinalRejectionJournal());
+                new FinalRejectionJournal(), List.of());
     }
 
     private static Logger serviceLog() {

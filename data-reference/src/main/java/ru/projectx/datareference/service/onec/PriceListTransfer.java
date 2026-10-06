@@ -11,29 +11,41 @@ import ru.projectx.datareference.entity.InboundStatus;
 /**
  * Передача прайс-листа по одной услуге: во что сложились её отложенные сообщения и какой исход у них общий.
  *
- * <p>Прайс по услуге источник присылает несколькими пакетами строк и одним финальным сообщением, в котором
- * лежат счётчики: сколько пакетов и строк он отправил. Все сообщения передачи связаны общим идентификатором.
- * Передача бывает в одном из трёх состояний: ещё ждёт своих сообщений, пришла целиком, но счётчики не сошлись,
- * или собрана и готова к применению.
- *
- * <p>Здесь только решение и смена статусов сообщений, без обращений к базе. Сохраняет сообщения и применяет
- * прайс сборщик передачи.
+ * <p>Пакеты строк и финальное сообщение со счётчиками связаны общим идентификатором передачи. Передача ещё ждёт
+ * своих сообщений, уже отклонена, пришла целиком с несошедшимися счётчиками или собрана. Здесь только решение и
+ * смена статусов, без базы: сохраняет сообщения и применяет прайс сборщик передачи.
  */
 sealed interface PriceListTransfer {
 
     /**
-     * Определяет состояние передачи по всем её сообщениям, которые сейчас лежат в буфере.
+     * Состояние передачи по всем её сообщениям. Финальное узнаётся по ожидаемому числу пакетов; в сборку идут
+     * только сообщения в буфере.
      *
-     * <p>Финальное сообщение узнаётся по ожидаемому числу пакетов, которое есть только у него. Сообщения с уже
-     * проставленным исходом в расчёт не идут.
-     *
-     * @param cid        идентификатор передачи
-     * @param correlated все сообщения с этим идентификатором, в любом порядке и в любом статусе
+     * @param correlated все сообщения передачи {@code cid}, в любом порядке и в любом статусе
      */
     static PriceListTransfer of(UUID cid, List<InboundMessage> correlated) {
         List<InboundMessage> buffered = correlated.stream()
                 .filter(message -> message.outcome().status() == InboundStatus.BUFFERED)
                 .toList();
+        if (isRejected(correlated)) {
+            return new Rejected("передача %s уже отклонена".formatted(cid), buffered);
+        }
+        return assembling(cid, buffered);
+    }
+
+    /**
+     * Передача отклонена, если среди её частей есть отказ, а применённых нет: у применённой передачи отказ бывает
+     * только у лишнего пакета.
+     */
+    static boolean isRejected(List<InboundMessage> correlated) {
+        return anyIn(correlated, InboundStatus.FAILED) && !anyIn(correlated, InboundStatus.PROCESSED);
+    }
+
+    private static boolean anyIn(List<InboundMessage> messages, InboundStatus status) {
+        return messages.stream().anyMatch(message -> message.outcome().status() == status);
+    }
+
+    private static PriceListTransfer assembling(UUID cid, List<InboundMessage> buffered) {
         List<InboundMessage> batches = buffered.stream()
                 .filter(message -> message.transferPart().batchCount() == null)
                 .toList();
@@ -87,6 +99,18 @@ sealed interface PriceListTransfer {
     record Pending(String reason) implements PriceListTransfer {
     }
 
+    /** Передача уже отклонена; её части, пришедшие позже, отклоняются сразу и прайс не трогают. */
+    record Rejected(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
+
+        /** @return части с новым статусом, которые осталось сохранить */
+        List<InboundMessage> fail() {
+            for (InboundMessage message : lateParts) {
+                message.markFailed(reason);
+            }
+            return lateParts;
+        }
+    }
+
     /** Передача пришла целиком, но не совпала со своими счётчиками. Прежний прайс по услуге не трогается. */
     record Mismatched(String reason, InboundMessage finalMessage, List<InboundMessage> batches)
             implements PriceListTransfer {
@@ -108,6 +132,18 @@ sealed interface PriceListTransfer {
 
     /** Передача собрана: пришли финальное сообщение и все обещанные пакеты, счётчики сошлись. */
     record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements PriceListTransfer {
+
+        /**
+         * Отмечает все сообщения передачи исходом применения прайса: применены или пропущены с его причиной.
+         *
+         * @return сообщения с новым статусом, которые осталось сохранить
+         */
+        List<InboundMessage> markOutcome(ImportResult result, Instant at) {
+            return switch (result) {
+                case ImportResult.Applied ignored -> markProcessed(at);
+                case ImportResult.Skipped skipped -> markSkipped(skipped.reason(), at);
+            };
+        }
 
         /**
          * Отмечает применёнными все сообщения передачи сразу.

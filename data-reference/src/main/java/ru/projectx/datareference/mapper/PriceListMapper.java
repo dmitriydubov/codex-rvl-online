@@ -24,7 +24,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Замещает прейскурант санатория по одной услуге полным срезом из 1С:УСК (ТЗ-9).
+ * Замещает прейскурант санатория по одной услуге полным срезом из 1С:УСК.
  *
  * <p>В отличие от остальных мапперов, этот не разбирает отдельное сообщение источника. 1С присылает
  * прейскурант по услуге несколькими сообщениями, и сюда приходит уже собранная передача: строки всех
@@ -66,6 +66,16 @@ public class PriceListMapper {
     public ImportResult apply(ObjectNode transfer) {
         return services.applyIfKnown(OneCValues.requiredUuid(transfer, "keyValue"),
                 service -> replacePrices(service, transfer));
+    }
+
+    /**
+     * Проверяет строку прайса по правилам замещения, ничего не записывая: так строку можно отклонить, когда пришёл
+     * её пакет, а не когда соберётся вся передача.
+     *
+     * @throws OneCFieldException если в строке нет цены или даты начала
+     */
+    public void checkRow(JsonNode row) {
+        rowOf(row);
     }
 
     private ImportResult replacePrices(ContragentService service, ObjectNode transfer) {

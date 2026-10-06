@@ -1,0 +1,205 @@
+package ru.projectx.datareference.service.onec;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static ru.projectx.datareference.support.OneCMessages.envelope;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.PriceListMapper;
+import ru.projectx.datareference.repository.InboundMessageRepository;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * Защищает окончательный отказ части передачи прайса: вместе с ней отклоняются все части передачи, ещё лежащие в
+ * буфере, чтобы передача не осталась наполовину собранной. Если ошибка в самой части, у неё своя причина, а у
+ * остальных — ссылка на неё; если отказ случился при сборке, у всех частей одна причина передачи.
+ */
+class PriceListTransferRejectionTest {
+
+    private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
+    private static final UUID SERVICE_ID = UUID.fromString("8e4b0f70-0000-4000-8000-000000000003");
+    private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
+    private static final String GOOD_ROW = "{\"rowNumber\":1,\"price\":100}";
+
+    private final InboundMessageRepository repository = mock(InboundMessageRepository.class);
+    private final PriceListMapper priceList = mock(PriceListMapper.class);
+    private final PriceListTransferRejection rejection =
+            new PriceListTransferRejection(repository, priceList, JsonMapper.builder().build());
+
+    @Test
+    void decidesRejectionsOfPriceListStream() {
+        assertThat(rejection.stream()).isEqualTo(OneCStream.PRICE_LISTS);
+    }
+
+    /** Отказ при сборке не принадлежит ни одной части: у всех частей одна причина передачи. */
+    @Test
+    void failureWhileAssembling_failsEveryBufferedPartWithTransferReason() {
+        InboundMessage finalMessage = buffered(1);
+        InboundMessage batch = buffered(null);
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(finalMessage, batch));
+        String reason = "передача " + CID + " отклонена: база данных отклонила запись: X, SQLSTATE 22003";
+
+        List<InboundMessage> rejected = rejection.reject(trigger, "база данных отклонила запись: X, SQLSTATE 22003");
+
+        assertThat(rejected).containsExactly(trigger, finalMessage, batch);
+        assertThat(rejected).allSatisfy(message -> assertFailed(message, reason));
+    }
+
+    /** Исчерпанные повторы — тоже отказ сборки, а не ошибка части. */
+    @Test
+    void exhaustedRetries_failEveryBufferedPartWithTransferReason() {
+        InboundMessage batch = buffered(null);
+        InboundMessage trigger = received(finalData());
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(batch));
+        String retries = "повторы исчерпаны на попытке 6: временный отказ базы данных: X, SQLSTATE 55P03";
+
+        assertThat(rejection.reject(trigger, retries)).containsExactly(trigger, batch);
+        assertFailed(trigger, "передача " + CID + " отклонена: " + retries);
+        assertFailed(batch, "передача " + CID + " отклонена: " + retries);
+    }
+
+    /** Ошибка в самой части: у неё своя причина, у остальных — какое сообщение и почему сорвало передачу. */
+    @Test
+    void defectOfThePart_keepsItsOwnReason_andOthersPointToIt() {
+        InboundMessage batch = buffered(null);
+        InboundMessage trigger = received(batchData("{\"price\":100}"));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(batch));
+
+        List<InboundMessage> rejected = rejection.reject(trigger, "нет обязательного поля rowNumber");
+
+        assertThat(rejected).containsExactly(trigger, batch);
+        assertFailed(trigger, "нет обязательного поля rowNumber");
+        assertFailed(batch, "передача %s отклонена: ошибка в сообщении %s: нет обязательного поля rowNumber"
+                .formatted(CID, trigger.receipt().messageId()));
+    }
+
+    /** Своя же запись в буфере — не другая часть: отклонённая часть в ответе одна, её копия не трогается. */
+    @Test
+    void ownBufferedCopy_isNotRejectedAsAnotherPart() {
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        InboundMessage ownCopy = InboundMessage.receive(trigger.receipt(), envelope(batchData(GOOD_ROW)));
+        ownCopy.markBuffered(CID, null, 1);
+        InboundMessage batch = buffered(null);
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(ownCopy, batch));
+
+        List<InboundMessage> rejected = rejection.reject(trigger, "исчерпаны повторы");
+
+        assertThat(rejected).containsExactly(trigger, batch);
+        assertThat(ownCopy.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
+    }
+
+    @Test
+    void rowBreakingPriceListRules_isDefectOfThePart() {
+        InboundMessage finalMessage = buffered(1);
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        doThrow(new OneCFieldException("в строке прайса нет цены")).when(priceList).checkRow(ArgumentMatchers.any());
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(finalMessage));
+
+        rejection.reject(trigger, "в строке прайса нет цены");
+
+        assertFailed(trigger, "в строке прайса нет цены");
+        assertFailed(finalMessage, "передача %s отклонена: ошибка в сообщении %s: в строке прайса нет цены"
+                .formatted(CID, trigger.receipt().messageId()));
+    }
+
+    /** Лишний пакет — ошибка его самого; применённые части свой исход сохраняют. */
+    @Test
+    void surplusBatch_failsAlone_andAppliedPartsKeepTheirOutcome() {
+        InboundMessage applied = buffered(null);
+        applied.markProcessed(NOW);
+        InboundMessage trigger = received(batchData(GOOD_ROW));
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of(applied));
+        String reason = "лишний пакет: передача " + CID + " уже применена";
+
+        assertThat(rejection.reject(trigger, reason)).containsExactly(trigger);
+        assertFailed(trigger, reason);
+        assertThat(applied.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
+    }
+
+    /** Отклонённая часть помнит передачу: по ней опоздавшие части узнают, что передача уже отклонена. */
+    @Test
+    void rejectedPart_remembersItsTransfer() {
+        InboundMessage trigger = received(finalData());
+        when(repository.findByCorrelationId(CID)).thenReturn(List.of());
+
+        rejection.reject(trigger, "непредвиденная ошибка разбора: X");
+
+        assertThat(trigger.transferPart().correlationId()).isEqualTo(CID);
+        assertThat(trigger.transferPart().batchCount()).isEqualTo(1);
+        assertFailed(trigger, "передача " + CID + " отклонена: непредвиденная ошибка разбора: X");
+    }
+
+    @Test
+    void partWithoutTransferId_failsAlone() {
+        InboundMessage trigger = received("{\"keyValue\":\"%s\",\"recordSet\":[]}".formatted(SERVICE_ID));
+
+        assertThat(rejection.reject(trigger, "нет обязательного GUID в поле cid")).containsExactly(trigger);
+        assertFailed(trigger, "нет обязательного GUID в поле cid");
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void partWithMalformedTransferId_failsAlone() {
+        InboundMessage trigger = received("{\"cid\":\"не GUID\",\"recordSet\":[]}");
+
+        assertThat(rejection.reject(trigger, "поле cid не является GUID")).containsExactly(trigger);
+        assertFailed(trigger, "поле cid не является GUID");
+        verifyNoInteractions(repository);
+    }
+
+    /** Тело, которое не читается, ни к какой передаче не относится; отказ не должен падать сам. */
+    @Test
+    void unreadableOrErasedBody_failsAlone() {
+        InboundMessage erased = received(batchData(GOOD_ROW));
+        erased.forgetPayload();
+        InboundMessage malformed = InboundMessage.receive(receipt(), "{не JSON");
+        InboundMessage withoutData = InboundMessage.receive(receipt(), "{\"data\":[]}");
+
+        assertThat(List.of(erased, malformed, withoutData)).allSatisfy(message -> {
+            assertThat(rejection.reject(message, "причина")).containsExactly(message);
+            assertFailed(message, "причина");
+        });
+        verifyNoInteractions(repository);
+    }
+
+    private static void assertFailed(InboundMessage message, String reason) {
+        assertThat(message.outcome().status()).isEqualTo(InboundStatus.FAILED);
+        assertThat(message.outcome().lastError()).isEqualTo(reason);
+    }
+
+    private static InboundMessage buffered(Integer batchCount) {
+        InboundMessage message = received(batchData(GOOD_ROW));
+        message.markBuffered(CID, batchCount, 1);
+        return message;
+    }
+
+    private static InboundMessage received(String data) {
+        return InboundMessage.receive(receipt(), envelope(data));
+    }
+
+    private static InboundReceipt receipt() {
+        return new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", NOW);
+    }
+
+    private static String batchData(String... rows) {
+        return "{\"cid\":\"%s\",\"keyValue\":\"%s\",\"recordSet\":[%s]}"
+                .formatted(CID, SERVICE_ID, String.join(",", rows));
+    }
+
+    private static String finalData() {
+        return "{\"cid\":\"%s\",\"keyValue\":\"%s\",\"countMessages\":1,\"countRows\":1}".formatted(CID, SERVICE_ID);
+    }
+}

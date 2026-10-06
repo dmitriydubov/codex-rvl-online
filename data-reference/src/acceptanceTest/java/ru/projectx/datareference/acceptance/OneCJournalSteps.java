@@ -22,7 +22,8 @@ public class OneCJournalSteps {
             "программы", OneCStream.PROGRAMS,
             "контактная информация", OneCStream.LPU_CONTACTS,
             "договоры страхования", OneCStream.INSURANCE_CONTRACTS,
-            "полисы", OneCStream.POLICIES);
+            "полисы", OneCStream.POLICIES,
+            "прейскуранты", OneCStream.PRICE_LISTS);
 
     private final OneCInbox inbox;
     private final ServiceJournal journal;

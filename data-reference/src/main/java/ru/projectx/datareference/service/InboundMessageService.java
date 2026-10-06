@@ -3,8 +3,12 @@ package ru.projectx.datareference.service;
 import java.time.Clock;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -21,13 +25,10 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 /**
  * Сохраняет сообщения 1С в том виде, в каком они пришли, и записывает, чем закончилась их обработка.
  *
- * <p>Здесь в одном месте решается, что делать с сообщением дальше. После временного отказа базы назначается
- * следующая попытка через задержку из настроенного списка повторов. Постоянная ошибка сразу завершает обработку
- * отказом. Каждый окончательный отказ разбора виден в журнале записью ERROR.
- * Пропуск записывается с причиной. Отказ, пришедший уже после того, как исход разбора зафиксирован, исход не
- * меняет. Ни слушатель очереди, ни разбор потока этих решений не принимают, иначе
- * правила в разных местах со временем разойдутся. Каждый записанный здесь исход разбора попадает в счётчик
- * переходов статусов ({@link InboundTransitionMetrics}).
+ * <p>Решение о судьбе сообщения принимается только здесь: временный отказ базы ставит повтор по настроенному
+ * списку задержек, постоянная ошибка и исчерпанные повторы — окончательный отказ с записью ERROR. Окончательный
+ * отказ задевает и сообщения, которые разделяют исход ({@link RejectionScope}). Отказ после фиксации исхода
+ * исход не меняет. Каждый записанный исход попадает в счётчик переходов ({@link InboundTransitionMetrics}).
  */
 @Service
 public class InboundMessageService {
@@ -42,15 +43,20 @@ public class InboundMessageService {
     private final Clock clock;
     private final InboundTransitionMetrics transitions;
     private final FinalRejectionJournal rejections;
+    private final Map<OneCStream, RejectionScope> scopes;
 
+    /** @param scopes области отказа потоков, у которых отказ разделяют несколько сообщений */
     public InboundMessageService(InboundMessageRepository repository, InboundRetryProperties retryProperties,
-            Clock clock, InboundTransitionMetrics transitions, FinalRejectionJournal rejections) {
+            Clock clock, InboundTransitionMetrics transitions, FinalRejectionJournal rejections,
+            List<RejectionScope> scopes) {
 
         this.repository = repository;
         this.retryProperties = retryProperties;
         this.clock = clock;
         this.transitions = transitions;
         this.rejections = rejections;
+        this.scopes = scopes.stream()
+                .collect(Collectors.toUnmodifiableMap(RejectionScope::stream, Function.identity()));
     }
 
     /**
@@ -94,12 +100,8 @@ public class InboundMessageService {
     }
 
     /**
-     * Записывает временный отказ базы. Следующая попытка назначается через задержку из настроенного списка
-     * повторов. Когда список исчерпан, обработка завершается отказом, и он виден в журнале записью ERROR.
-     *
-     * <p>Метод открывает собственную транзакцию. Транзакция вызывающего к этому моменту уже откатилась вместе
-     * с неудавшимися изменениями, и запись об ошибке в ней не сохранилась бы. Если же исход разбора успел
-     * зафиксироваться, а отказ пришёл после фиксации, исход остаётся прежним, а в журнал идёт предупреждение.
+     * Записывает временный отказ базы: повтор через задержку из настроенного списка, а когда список исчерпан, —
+     * окончательный отказ. Транзакция своя: транзакция вызывающего уже откатилась вместе с неудавшимися изменениями.
      *
      * @return статус, с которым сообщение осталось: повтор, отказ или уже зафиксированный исход
      */
@@ -110,20 +112,20 @@ public class InboundMessageService {
             return keepCommitted(message, failure);
         }
         int failedAttempt = failedAttempt(message);
-        retryProperties.delayBeforeAttempt(failedAttempt).ifPresentOrElse(
-                delay -> message.markRetrying(failure.reason(), clock.instant().plus(delay)),
-                () -> fail(message, "повторы исчерпаны на попытке %d: %s".formatted(failedAttempt, failure.reason()),
-                        failure));
-        transitions.record(message);
+        List<InboundMessage> changed = retryProperties.delayBeforeAttempt(failedAttempt)
+                .map(delay -> {
+                    message.markRetrying(failure.reason(), clock.instant().plus(delay));
+                    return List.of(message);
+                })
+                .orElseGet(() -> fail(message,
+                        "повторы исчерпаны на попытке %d: %s".formatted(failedAttempt, failure.reason()), failure));
+        changed.forEach(transitions::record);
         return message.outcome().status();
     }
 
     /**
-     * Записывает постоянную ошибку и сразу завершает обработку отказом: следующая попытка дала бы тот же
-     * результат. Отказ виден в журнале записью ERROR.
-     *
-     * <p>Метод открывает собственную транзакцию, потому что транзакция вызывающего к этому моменту уже откатилась.
-     * Исход, зафиксированный до отказа, остаётся прежним, как и у временного отказа.
+     * Записывает постоянную ошибку и сразу завершает обработку окончательным отказом. Транзакция своя, как у
+     * временного отказа; исход, зафиксированный до отказа, остаётся прежним.
      *
      * @return статус, с которым сообщение осталось: отказ или уже зафиксированный исход
      */
@@ -133,8 +135,7 @@ public class InboundMessageService {
         if (isOutcomeCommitted(message)) {
             return keepCommitted(message, failure);
         }
-        fail(message, failure.reason(), failure);
-        transitions.record(message);
+        fail(message, failure.reason(), failure).forEach(transitions::record);
         return message.outcome().status();
     }
 
@@ -191,11 +192,22 @@ public class InboundMessageService {
         return message.outcome().attempt() + 1;
     }
 
-    /** Окончательный отказ: строка получает причину, а журнал — запись ERROR после фиксации. */
-    private void fail(InboundMessage message, String reason, ParseFailure failure) {
+    /**
+     * Окончательный отказ сообщения и тех, кто разделяет его исход; журнал получает одну запись ERROR — о самом
+     * сообщении — после фиксации.
+     *
+     * @return все сообщения, получившие отказ
+     */
+    private List<InboundMessage> fail(InboundMessage message, String reason, ParseFailure failure) {
         int failedAttempt = failedAttempt(message);
-        message.markFailed(reason);
+        List<InboundMessage> rejected = Optional.ofNullable(scopes.get(message.receipt().stream()))
+                .map(scope -> scope.reject(message, reason))
+                .orElseGet(() -> {
+                    message.markFailed(reason);
+                    return List.of(message);
+                });
         rejections.rejected(message.receipt(), failedAttempt, failure);
+        return rejected;
     }
 
     private InboundMessage require(UUID messageId) {

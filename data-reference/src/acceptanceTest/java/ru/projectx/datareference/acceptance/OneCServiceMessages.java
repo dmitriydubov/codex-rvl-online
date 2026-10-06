@@ -77,7 +77,7 @@ final class OneCServiceMessages {
     }
 
     /** Строка прайса: «нет» в цене со скидкой значит, что поля в строке нет вовсе. */
-    private static ObjectNode priceRow(int rowNumber, Map<String, String> row) {
+    static ObjectNode priceRow(int rowNumber, Map<String, String> row) {
         onlyKnown(row, "начало", "окончание", "цена", "цена со скидкой");
         ObjectNode line = JSON.createObjectNode()
                 .put("rowNumber", rowNumber)
