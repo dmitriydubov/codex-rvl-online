@@ -5,13 +5,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Сообщения программы РВЛ, у строки услуги которой испорчены или отсутствуют обязательные условия: номер слоя,
- * прямое прикрепление и процент сооплаты (ТЗ-6). Каждое строится из программы, присланной сценарием раньше: тот же
- * GUID и та же строка услуги, меняется только то, что называет шаг.
+ * Сообщения программы РВЛ, у строки услуги которой испорчены или отсутствуют обязательные условия (номер слоя,
+ * прямое прикрепление и процент сооплаты, ТЗ-6) или изменён тип покрытия. Каждое строится из программы, присланной
+ * сценарием раньше: тот же GUID и та же строка услуги, меняется только то, что называет шаг.
  *
  * <p>Словари шагов закрытые: незнакомое имя поля или слово роняет шаг, иначе испорченное значение из Примеров молча
  * дало бы другое сообщение и сценарий прошёл бы на нём.
@@ -33,9 +34,11 @@ final class OneCProgramTermsMessages {
             "дробное число", (row, field) -> row.put(field, new BigDecimal("1.5")),
             "логическое значение", (row, field) -> row.put(field, true),
             "целое число", (row, field) -> row.put(field, 1));
-    private static final Map<String, BiConsumer<ObjectNode, String>> DROPPED_ROW = Map.of(
-            "по санаторию вне справочника", (row, field) -> row.put("idLPU", UNKNOWN_SANATORIUM),
-            "без типа покрытия", (row, field) -> row.put("r", false).put("d", false));
+    private static final Map<String, Consumer<ObjectNode>> DROPPED_ROW = Map.of(
+            "по санаторию вне справочника", row -> row.put("idLPU", UNKNOWN_SANATORIUM),
+            "без типа покрытия", row -> row.put("r", false).put("d", false),
+            "с рисковой и депозитной частью сразу", row -> row.put("r", true).put("d", true));
+    private static final Map<String, Boolean> FLAGS = Map.of("true", true, "false", false);
 
     private OneCProgramTermsMessages() {
     }
@@ -52,8 +55,24 @@ final class OneCProgramTermsMessages {
         ObjectNode data = renamed(program);
         ObjectNode extra = firstRow(data).deepCopy();
         extra.remove(requiredTerm(field));
-        lookup(DROPPED_ROW, droppedRow).accept(extra, field);
-        data.withArray(SERVICE).add(extra);
+        markDropped(extra, droppedRow);
+        addRow(data, extra);
+        return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
+    }
+
+    /** Та же программа под новым наименованием и с ещё одной строкой, которую разбор не сохраняет. */
+    static OneCMessage withDroppedRow(OneCMessage program, String droppedRow) {
+        ObjectNode data = renamed(program);
+        ObjectNode extra = firstRow(data).deepCopy();
+        markDropped(extra, droppedRow);
+        addRow(data, extra);
+        return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
+    }
+
+    /** Та же программа под новым наименованием; у строки услуги флаги рисковой и депозитной части — как сказано. */
+    static OneCMessage withCoverage(OneCMessage program, String risk, String deposit) {
+        ObjectNode data = renamed(program);
+        firstRow(data).put("r", lookup(FLAGS, risk)).put("d", lookup(FLAGS, deposit));
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
@@ -64,12 +83,21 @@ final class OneCProgramTermsMessages {
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    private static ObjectNode renamed(OneCMessage program) {
+    static ObjectNode renamed(OneCMessage program) {
         return program.data().deepCopy().put("name", NEW_NAME);
     }
 
-    private static ObjectNode firstRow(ObjectNode data) {
+    static ObjectNode firstRow(ObjectNode data) {
         return (ObjectNode) data.withArray(SERVICE).get(0);
+    }
+
+    /** Делает строку такой, какую разбор не сохраняет: вид строки — из закрытого словаря шага. */
+    static void markDropped(ObjectNode row, String droppedRow) {
+        lookup(DROPPED_ROW, droppedRow).accept(row);
+    }
+
+    static void addRow(ObjectNode data, ObjectNode row) {
+        data.withArray(SERVICE).add(row);
     }
 
     private static String requiredTerm(String field) {
