@@ -19,14 +19,15 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class PriceListTransferRows {
 
-    private static final String DATA = "data";
     private static final String KEY_VALUE = "keyValue";
     private static final String RECORD_SET = "recordSet";
 
     private final ObjectMapper json;
+    private final StoredEnvelope envelope;
 
     PriceListTransferRows(ObjectMapper json) {
         this.json = json;
+        this.envelope = new StoredEnvelope(json);
     }
 
     /** @throws OneCFieldException если тело части стёрто или у строки нет целого номера */
@@ -52,11 +53,8 @@ final class PriceListTransferRows {
     }
 
     private ObjectNode dataOf(InboundMessage message) {
-        String payload = message.payload();
-        if (payload == null) {
-            throw new OneCFieldException("тело сообщения передачи стёрто, собрать её нечем");
-        }
-        return (ObjectNode) json.readTree(payload).path(DATA);
+        return envelope.dataOf(message).orElseThrow(
+                () -> new OneCFieldException("тело сообщения передачи стёрто, собрать её нечем"));
     }
 
     private static Stream<JsonNode> rowsOf(ObjectNode data) {
