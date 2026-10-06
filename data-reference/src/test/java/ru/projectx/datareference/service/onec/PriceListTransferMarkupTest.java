@@ -55,7 +55,7 @@ class PriceListTransferMarkupTest {
 
     /** Счётчик за пределом целого — нарушение контракта с именем поля, без значения. */
     @ParameterizedTest
-    @CsvSource({"countMessages, 1e10, 1", "countMessages, -10000000000, 1", "countRows, 1, 2147483648"})
+    @CsvSource({"countMessages, 10000000000, 1", "countMessages, -10000000000, 1", "countRows, 1, 2147483648"})
     void counterBeyondIntBound_isContractViolationNamingField(String field, String countMessages, String countRows) {
         ObjectNode data = node("""
                 {"cid":"%s","countMessages":%s,"countRows":%s}""".formatted(CID, countMessages, countRows));
@@ -63,6 +63,21 @@ class PriceListTransferMarkupTest {
         assertThatThrownBy(() -> PriceListTransferMarkup.of(data))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле " + field + " больше допустимого");
+    }
+
+    /**
+     * Дробный счётчик — нарушение контракта с именем поля, без значения. Обрезанный до целого, он ждал бы части передачи,
+     * которой нет, или собрал бы передачу без последней части.
+     */
+    @ParameterizedTest
+    @CsvSource({"countMessages, 2.5, 1", "countMessages, 2.0, 1", "countRows, 1, -2.5", "countRows, 1, 2.0"})
+    void fractionalCounter_isContractViolationNamingField(String field, String countMessages, String countRows) {
+        ObjectNode data = node("""
+                {"cid":"%s","countMessages":%s,"countRows":%s}""".formatted(CID, countMessages, countRows));
+
+        assertThatThrownBy(() -> PriceListTransferMarkup.of(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле " + field + " не является целым числом");
     }
 
     /** Счётчик, пришедший не числом JSON, а строкой с целым, читается как прежде — тем же целым. */

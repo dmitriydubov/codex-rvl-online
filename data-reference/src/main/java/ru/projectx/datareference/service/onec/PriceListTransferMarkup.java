@@ -30,7 +30,8 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
      * <p>Финальное сообщение узнаётся по наличию счётчиков, а не по их значению: ноль пакетов — легальный случай,
      * он означает, что прайс по услуге очищается.
      *
-     * @throws OneCFieldException если в сообщении нет идентификатора передачи или счётчик не помещается в {@code int}
+     * @throws OneCFieldException если в сообщении нет идентификатора передачи, счётчик записан дробью или не помещается
+     *                            в {@code int}
      */
     static PriceListTransferMarkup of(ObjectNode data) {
         UUID cid = cidOf(data);
@@ -50,7 +51,7 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
         return OneCValues.requiredUuid(data, CID);
     }
 
-    /** Число за пределами {@code int} отклоняется с именем поля; прочее значение счётчика читается как прежде. */
+    /** Дробь и число за пределами {@code int} отклоняются с именем поля; прочее значение счётчика читается как прежде. */
     private static int counter(ObjectNode data, String field) {
         return OneCValues.integer(data, field).orElseGet(() -> data.path(field).asInt());
     }
