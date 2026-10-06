@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.ProgramLpu;
@@ -135,6 +136,60 @@ class AvailableLpuReaderTest {
         withoutCoverage.remove(field);
 
         AvailableLpuReader.AvailableLpu read = reader.read(program(row(SANATORIUM, "r"), stranger, withoutCoverage));
+
+        assertThat(read.rows()).hasSize(1);
+        assertThat(read.unknownSanatorium()).isEqualTo(1);
+        assertThat(read.withoutCoverage()).isEqualTo(1);
+    }
+
+    /** Тип покрытия у строки ровно один: строка с обеими частями не сохраняется рисковой, а считается строкой без типа. */
+    @Test
+    void rowWithRiskAndDeposit_isDroppedAsRowWithoutCoverage() {
+        ObjectNode both = row(SANATORIUM, "r").put("d", true);
+
+        AvailableLpuReader.AvailableLpu read = reader.read(program(row(SANATORIUM, "d"), both));
+
+        assertThat(read.rows()).singleElement()
+                .extracting(ProgramLpu.Row::coverageType)
+                .isEqualTo(ProgramLpu.CoverageType.D);
+        assertThat(read.withoutCoverage()).isEqualTo(1);
+        assertThat(read.unknownSanatorium()).isZero();
+    }
+
+    /** Слой и сооплата сохраняемой строки за пределом отклоняют всё сообщение. */
+    @ParameterizedTest
+    @CsvSource({
+            "numberLayer, -1, поле numberLayer отрицательное",
+            "percentCopayment, -0.01, поле percentCopayment вне диапазона от 0 до 100",
+            "percentCopayment, 100.01, поле percentCopayment вне диапазона от 0 до 100"})
+    void storedRowWithTermOutOfRange_rejectsTheMessage(String field, String value, String reason) {
+        ObjectNode outOfRange = row(SANATORIUM, "d");
+        outOfRange.set(field, JSON.readTree(value));
+        ObjectNode data = program(row(SANATORIUM, "r"), outOfRange);
+
+        assertThatThrownBy(() -> reader.read(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage(reason);
+    }
+
+    /** Предельные значения допустимы: слой 0 и сооплата 100. */
+    @Test
+    void zeroLayerAndFullCopayment_areReadAsSent() {
+        ObjectNode data = program(row(SANATORIUM, "r").put("numberLayer", 0).put("percentCopayment", 100));
+
+        ProgramLpu.Row row = reader.read(data).rows().getFirst();
+
+        assertThat(row.layerNumber()).isZero();
+        assertThat(row.percentCopayment()).isEqualByComparingTo("100");
+    }
+
+    /** Пределы, как и наличие условий, проверяются только у строк, которые будут сохранены. */
+    @Test
+    void droppedRowWithTermOutOfRange_isOnlyCounted() {
+        ObjectNode stranger = row(STRANGER, "r").put("numberLayer", -1);
+        ObjectNode both = row(SANATORIUM, "r").put("d", true).put("percentCopayment", 101);
+
+        AvailableLpuReader.AvailableLpu read = reader.read(program(row(SANATORIUM, "r"), stranger, both));
 
         assertThat(read.rows()).hasSize(1);
         assertThat(read.unknownSanatorium()).isEqualTo(1);
