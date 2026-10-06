@@ -1,12 +1,14 @@
 package ru.projectx.datareference.service.schedulers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.CannotAcquireLockException;
 import ru.projectx.datareference.repository.BufferedTransfer;
+import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
@@ -41,6 +45,9 @@ class StuckTransferAlertTest {
 
     @Mock
     private AgedInboundMessages agedMessages;
+
+    @Mock
+    private SupersededTransferClosure closure;
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
@@ -98,8 +105,62 @@ class StuckTransferAlertTest {
         assertThat(logged.list).isEmpty();
     }
 
+    /**
+     * Передача, которую уже обогнала применённая по её услуге, закрывается и в предупреждение не попадает; остальные
+     * называются, как прежде. Список для предупреждения читается после закрытия.
+     */
+    @Test
+    void supersededTransfer_isClosed_andOnlyTheRestAreReported() {
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(
+                List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2), transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)),
+                List.of(transfer(SECOND_TRANSFER, Duration.ofHours(2), 1)));
+        when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenReturn(true);
+
+        alert().reportStuckTransfers();
+
+        verify(closure).closeIfSuperseded(FIRST_TRANSFER);
+        verify(closure).closeIfSuperseded(SECOND_TRANSFER);
+        assertThat(logged.list).singleElement().extracting(ILoggingEvent::getFormattedMessage).asString()
+                .startsWith("передачи прайсов не собрались за PT1H30M: " + SECOND_TRANSFER + " (ждёт PT2H, частей 1).");
+    }
+
+    /** Все зависшие закрыты — предупреждать не о чем. */
+    @Test
+    void allStuckTransfersClosed_nothingIsReported() {
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(
+                List.of(transfer(FIRST_TRANSFER, Duration.ofHours(5), 2)), List.of());
+        when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenReturn(true);
+
+        alert().reportStuckTransfers();
+
+        assertThat(logged.list).isEmpty();
+    }
+
+    /**
+     * Отказ базы при закрытии одной передачи не мешает остальным и предупреждению: передача остаётся в буфере, о ней
+     * предупреждают, а следующая проверка попробует закрыть её снова. В журнал — тип отказа и SQLSTATE, без текста.
+     */
+    @Test
+    void databaseFailureWhileClosing_isLogged_andTransferIsStillReported() {
+        List<BufferedTransfer> stuck = List.of(
+                transfer(FIRST_TRANSFER, Duration.ofHours(5), 2), transfer(SECOND_TRANSFER, Duration.ofHours(2), 1));
+        when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(stuck);
+        when(closure.closeIfSuperseded(FIRST_TRANSFER)).thenThrow(new CannotAcquireLockException("занято",
+                new SQLException("lock timeout", "55P03")));
+
+        alert().reportStuckTransfers();
+
+        verify(closure).closeIfSuperseded(SECOND_TRANSFER);
+        assertThat(logged.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN, Level.WARN);
+        assertThat(logged.list.getFirst().getFormattedMessage()).isEqualTo("передачу прайса " + FIRST_TRANSFER
+                + " не удалось проверить на закрытие: CannotAcquireLockException, SQLSTATE 55P03; "
+                + "следующая проверка попробует снова");
+        assertThat(logged.list.getFirst().getThrowableProxy()).isNull();
+        assertThat(logged.list.getLast().getFormattedMessage()).contains(FIRST_TRANSFER.toString());
+    }
+
     private StuckTransferAlert alert() {
-        return new StuckTransferAlert(agedMessages,
+        return new StuckTransferAlert(agedMessages, closure,
                 ImportSettings.defaults().stuckTransferThreshold(THRESHOLD).stuckTransferReportLimit(REPORT_LIMIT)
                         .build(),
                 Clock.fixed(NOW, ZoneOffset.UTC));

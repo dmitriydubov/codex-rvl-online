@@ -1,0 +1,169 @@
+package ru.projectx.datareference.service.onec;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.PriceListFinalization;
+import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.PriceListFinalizationRepository;
+
+/**
+ * Защищает порядок передач прайса по услуге: цены меняет только передача, финал которой не старше финала уже
+ * применённой, и после применения именно она становится последней. Без этого передача, собравшаяся позже, затёрла бы
+ * более новые цены.
+ */
+class PriceTransferOrderTest {
+
+    private static final UUID SERVICE = UUID.fromString("2a6f0c3e-9b18-4d57-8e41-c5d2a7f9b063");
+    private static final UUID APPLIED_CID = UUID.fromString("8e4fab21-5c3d-4a9f-8b72-1d6c9f3a5e28");
+    private static final UUID CID = UUID.fromString("7d3e9a10-4b2c-4f8e-9a61-0c5b8e2f4d17");
+    private static final Instant APPLIED_AT = Instant.parse("2026-03-14T09:00:00Z");
+
+    private final PriceListFinalizationRepository finalizations = mock(PriceListFinalizationRepository.class);
+    private final InboundMessageRepository inbound = mock(InboundMessageRepository.class);
+    private final PriceTransferOrder order = new PriceTransferOrder(finalizations, inbound);
+
+    @Test
+    void firstTransferOfService_isApplied_andBecomesTheLast() {
+        InboundMessage finalMessage = finalMessage(CID, APPLIED_AT);
+        when(finalizations.lockByService(SERVICE)).thenReturn(Optional.empty());
+        when(finalizations.findById(SERVICE)).thenReturn(Optional.empty());
+
+        ImportResult result = order.applyInOrder(SERVICE, finalMessage, ImportResult::applied);
+
+        assertThat(result).isEqualTo(ImportResult.applied());
+        ArgumentCaptor<PriceListFinalization> saved = ArgumentCaptor.forClass(PriceListFinalization.class);
+        verify(finalizations).save(saved.capture());
+        assertThat(saved.getValue().serviceExternalId()).isEqualTo(SERVICE);
+        assertThat(saved.getValue().finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
+    }
+
+    @Test
+    void transferFinalizedAfterTheApplied_replacesPrices_andBecomesTheLast() {
+        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        InboundMessage finalMessage = finalMessage(CID, APPLIED_AT.plusSeconds(1));
+        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
+
+        ImportResult result = order.applyInOrder(SERVICE, finalMessage, ImportResult::applied);
+
+        assertThat(result).isEqualTo(ImportResult.applied());
+        assertThat(last.finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
+        verify(finalizations, never()).save(any());
+    }
+
+    /** Блокировка услуги берётся до замещения цен: иначе закрытие зависших передач решало бы одновременно. */
+    @Test
+    void serviceRowIsLocked_beforePricesAreReplaced() {
+        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
+        AtomicBoolean lockedBeforeReplacing = new AtomicBoolean();
+
+        order.applyInOrder(SERVICE, finalMessage(CID, APPLIED_AT.plusSeconds(1)), () -> {
+            lockedBeforeReplacing.set(mockingDetails(finalizations).getInvocations().stream()
+                    .anyMatch(call -> call.getMethod().getName().equals("lockByService")));
+            return ImportResult.applied();
+        });
+
+        assertThat(lockedBeforeReplacing).isTrue();
+    }
+
+    @Test
+    void transferFinalizedBeforeTheApplied_isSkipped_andPricesStay() {
+        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        UUID lastFinal = last.finalMessageId();
+        AtomicBoolean replaced = new AtomicBoolean();
+
+        ImportResult result = order.applyInOrder(SERVICE, finalMessage(CID, APPLIED_AT.minusSeconds(1)), () -> {
+            replaced.set(true);
+            return ImportResult.applied();
+        });
+
+        assertThat(result).isEqualTo(ImportResult.skipped(
+                "по услуге " + SERVICE + " уже применена более новая передача " + APPLIED_CID));
+        assertThat(replaced).isFalse();
+        assertThat(last.finalMessageId()).isEqualTo(lastFinal);
+        verify(finalizations, never()).findById(SERVICE);
+    }
+
+    /** Финалы приняты в один момент: применяется передача, собравшаяся позже. */
+    @Test
+    void transferFinalizedAtTheSameMoment_isApplied() {
+        PriceListFinalization last = appliedFinal(APPLIED_AT);
+        InboundMessage finalMessage = finalMessage(CID, APPLIED_AT);
+        when(finalizations.findById(SERVICE)).thenReturn(Optional.of(last));
+
+        assertThat(order.applyInOrder(SERVICE, finalMessage, ImportResult::applied)).isEqualTo(ImportResult.applied());
+        assertThat(last.finalMessageId()).isEqualTo(finalMessage.receipt().messageId());
+    }
+
+    /** Услуга вне справочника: прайс не применён, и последней такая передача не становится. */
+    @Test
+    void skippedReplacement_doesNotBecomeTheLast() {
+        when(finalizations.lockByService(SERVICE)).thenReturn(Optional.empty());
+
+        ImportResult result = order.applyInOrder(SERVICE, finalMessage(CID, APPLIED_AT),
+                () -> ImportResult.skipped("прайс по услуге вне справочника"));
+
+        assertThat(result).isEqualTo(ImportResult.skipped("прайс по услуге вне справочника"));
+        verify(finalizations, never()).save(any());
+        verify(finalizations, never()).findById(SERVICE);
+    }
+
+    @Test
+    void appliedTransfer_isReadFromItsFinalMessage() {
+        appliedFinal(APPLIED_AT);
+
+        assertThat(order.lockApplied(SERVICE))
+                .contains(new AppliedPriceTransfer(SERVICE, APPLIED_CID, APPLIED_AT));
+    }
+
+    @Test
+    void serviceWithoutAppliedTransfer_hasNoAppliedTransfer() {
+        when(finalizations.lockByService(SERVICE)).thenReturn(Optional.empty());
+
+        assertThat(order.lockApplied(SERVICE)).isEmpty();
+    }
+
+    /** Строку сырья финала удержал внешний ключ; если её всё же нет, решать порядок не по чему. */
+    @Test
+    void missingFinalMessageOfAppliedTransfer_isAnError() {
+        UUID finalId = UUID.randomUUID();
+        when(finalizations.lockByService(SERVICE)).thenReturn(Optional.of(PriceListFinalization.of(SERVICE, finalId)));
+        when(inbound.findById(finalId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> order.lockApplied(SERVICE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("нет строки сырья финального сообщения " + finalId + " применённой передачи");
+    }
+
+    private PriceListFinalization appliedFinal(Instant receivedAt) {
+        InboundMessage appliedFinal = finalMessage(APPLIED_CID, receivedAt);
+        UUID finalId = appliedFinal.receipt().messageId();
+        PriceListFinalization finalization = PriceListFinalization.of(SERVICE, finalId);
+        when(finalizations.lockByService(SERVICE)).thenReturn(Optional.of(finalization));
+        when(inbound.findById(finalId)).thenReturn(Optional.of(appliedFinal));
+        return finalization;
+    }
+
+    private static InboundMessage finalMessage(UUID cid, Instant receivedAt) {
+        InboundMessage message = InboundMessage.receive(
+                new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", receivedAt), "{}");
+        message.markBuffered(cid, 1, 1);
+        return message;
+    }
+}
