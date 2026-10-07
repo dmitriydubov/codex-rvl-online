@@ -3,6 +3,7 @@ package ru.projectx.datareference.service;
 import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
@@ -16,7 +17,8 @@ import ru.projectx.datareference.repository.ProgramRepository;
  *
  * <p>Транзакция чтения здесь, а не в контроллере: ответ собирается внутри неё, за её границей
  * ленивые связи уже не догрузятся ({@code open-in-view} выключен). Ответ кэшируется по {@code id} программы вместе с
- * порядком перечня.
+ * порядком перечня. Оба запроса читают один снимок базы (повторяемое чтение): сообщение 1С, зафиксированное между ними,
+ * не смешает в ответе старую шапку с новым перечнем, а такой ответ иначе пережил бы сброс кэша после фиксации.
  */
 @Service
 public class ProgramQueryService implements ProgramReads {
@@ -31,7 +33,7 @@ public class ProgramQueryService implements ProgramReads {
 
     @Override
     @Cacheable(ReferenceCaches.PROGRAMS)
-    @RestReadTransaction
+    @RestReadTransaction(isolation = Isolation.REPEATABLE_READ)
     public ProgramResponse byId(UUID id) {
         return programs.findById(id)
                 .map(program -> ProgramResponse.of(program, programRows.findOrderedByProgramId(id)))

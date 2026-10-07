@@ -15,6 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionAttribute;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.Program;
@@ -26,7 +29,8 @@ import ru.projectx.datareference.repository.ProgramRepository;
 /**
  * Чтение программы страхования по {@code id}: перечень учреждений — в том порядке, в каком его отдал упорядоченный
  * запрос строк перечня, а не в порядке коллекции программы; нет записи — 404 с кодом программы, и перечень тогда не
- * читается.
+ * читается. Шапка и перечень читаются двумя запросами одного снимка базы: иначе сообщение 1С, зафиксированное между
+ * ними, смешало бы в ответе и в кэше старую шапку с новым перечнем.
  */
 @ExtendWith(MockitoExtension.class)
 class ProgramQueryServiceTest {
@@ -72,6 +76,19 @@ class ProgramQueryServiceTest {
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
                         notFound -> assertThat(notFound.code()).isEqualTo("PROGRAM_NOT_FOUND"));
         verifyNoInteractions(programRows);
+    }
+
+    @Test
+    void byId_readsProgramAndServicesFromOneSnapshot() throws NoSuchMethodException {
+        AnnotationTransactionAttributeSource transactions = new AnnotationTransactionAttributeSource();
+        transactions.setEmbeddedValueResolver(readTimeoutProperty -> "3");
+
+        TransactionAttribute transaction = transactions.getTransactionAttribute(
+                ProgramQueryService.class.getMethod("byId", UUID.class), ProgramQueryService.class);
+
+        assertThat(transaction).isNotNull();
+        assertThat(transaction.getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        assertThat(transaction.isReadOnly()).isTrue();
     }
 
     private static ProgramLpu.Row row(String lpuName) {

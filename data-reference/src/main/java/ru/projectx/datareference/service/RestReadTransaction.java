@@ -5,6 +5,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.springframework.core.annotation.AliasFor;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -29,10 +31,17 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Лимит действует только на транзакцию, которую метод начинает сам. Вызов из уже открытой
  * транзакции живёт по её лимиту. Значение — целые секунды: {@code timeoutString} разбирается как
  * {@code int} после подстановки свойства.
+ *
+ * <p>Уровень изоляции по умолчанию — базы. Чтению из нескольких запросов, которые должны сойтись в один ответ, нужен
+ * {@link Isolation#REPEATABLE_READ}: в PostgreSQL тогда все запросы транзакции видят один снимок, а не каждый свой.
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Transactional(readOnly = true, timeoutString = "${projectx.api.read-timeout-seconds}")
 public @interface RestReadTransaction {
+
+    /** Уровень изоляции транзакции чтения. */
+    @AliasFor(annotation = Transactional.class)
+    Isolation isolation() default Isolation.DEFAULT;
 }
