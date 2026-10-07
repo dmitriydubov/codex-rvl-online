@@ -6,15 +6,16 @@ Gradle-сборка в своём каталоге; корневой сборк�
 - `data-reference/` — сервис справочных данных: справочники и полисы из 1С:УСК (RabbitMQ 1С),
   REST-чтение справочников для сервисов Заявок и Договоров. Java 21, Spring Boot 4.0, PostgreSQL.
   Охраняется gauntlet (`module=data-reference` в `gauntlet/config/gauntlet.properties`). Его правила и
-  предметная область — в `contract-service/CLAUDE.md`: прочитай перед задачей в `data-reference`.
+  предметная область — в `data-reference/CLAUDE.md`: прочитай перед задачей в `data-reference`.
 - `contract-service/` — сервис Договоров, он же бэкенд ЛК застрахованного. Кода пока нет, только
-  `CLAUDE.md` и документы; под gauntlet подключается, когда появится его сборка.
+  документы; под gauntlet подключается, когда появится его сборка. Его правила будут в
+  `contract-service/CLAUDE.md`.
 - `project_files/` — ТЗ, схемы и структуры данных контура: источник бизнес-правил.
 
 Сервис Заявок (он же сервис HR), BFF и фронтенд — у других разработчиков, в своих репозиториях.
 
 Всё это — внешний контур (облако Claude Code и GitHub). В рабочий контур компании сервисы переносятся
-вручную, без `gauntlet/`, `.claude/`, этого файла, `.github/`, каталогов приёмки и `project_files/`
-(подробно — `gauntlet/CLAUDE.md`, «Рабочий контур»).
+вручную, без `gauntlet/`, `.claude/`, файлов `CLAUDE.md` (этого и модулей), `.github/`, каталогов приёмки
+и `project_files/` (подробно — `gauntlet/CLAUDE.md`, «Рабочий контур»).
 
 @gauntlet/CLAUDE.md

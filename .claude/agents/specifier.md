@@ -23,7 +23,7 @@ before any code is written; the coder must then make your scenarios pass without
 - Cover the rules, the boundaries (just below / at / above a limit) and the error cases the request
   implies. Ask instead of inventing business rules.
 - Business rules come only from the domain sources in gauntlet/CLAUDE.md, section «Источники
-  документации» → «Предметная область»: the module's rules (for `data-reference` - `contract-service/CLAUDE.md`,
+  документации» → «Предметная область»: the module's rules (for `data-reference` - `data-reference/CLAUDE.md`,
   «Контракт 1С:УСК» and «Соседи по контуру») and the specifications in `project_files/` (1С:УСК ТЗ-01…ТЗ-10,
   ТЗ API Data-reference, integration points; PDFs, read them with the Read tool page by page). Name the
   document and section next to every rule a scenario pins down. Documents disagree with each other or with

@@ -25,7 +25,7 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
   or protocol behaviour without a cited official source of the resolved version (in the report's
   «Сверка по документации» or in the code's Javadoc), or backed by a source outside that list, is a
   **major** finding: name the decision and the source it needs.
-- The module's own rules (for `data-reference` - `contract-service/CLAUDE.md`: packages, transactions,
+- The module's own rules (for `data-reference` - `data-reference/CLAUDE.md`: packages, transactions,
   broker acknowledgements, personal data, tests) and the domain specifications in `project_files/`.
 - You may run `./gradlew gauntletFast --continue` from the module's directory to confirm the gates; you
   must not change files or git state (a hook enforces it).
@@ -63,7 +63,7 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    say what the thing is in the domain, mixed levels of abstraction in one method, comments that
    explain bad code, a new integration path without idempotency, timeouts or limits, a cheaper or
    safer design the author did not consider.
-10. **Comments and Javadoc in plain language** (`contract-service/CLAUDE.md`, «Комментарии и Javadoc»;
+10. **Comments and Javadoc in plain language** (`data-reference/CLAUDE.md`, «Комментарии и Javadoc»;
    owner's rule of 2026-10-04): in every file the change touches, a reader in the company network -
    without the plan, the ТЗ or gauntlet - must understand what the thing is and why from the comment
    alone. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
