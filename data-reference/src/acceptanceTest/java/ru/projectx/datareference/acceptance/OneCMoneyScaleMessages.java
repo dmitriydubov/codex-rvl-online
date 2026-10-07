@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
@@ -28,7 +29,7 @@ final class OneCMoneyScaleMessages {
             "начало", "2026-01-01", "окончание", "3000-01-01", "цена", "6000.00", "цена со скидкой", "нет");
     private static final List<String> PRICE_FIELDS = List.of("price", "priceWithDiscount");
     /** Поля строки пакета передачи, которые шаг подменяет числом: деньги и номер строки. */
-    private static final List<String> BATCH_FIELDS = List.of("price", "priceWithDiscount", "rowNumber");
+    private static final List<String> BATCH_FIELDS = Stream.concat(PRICE_FIELDS.stream(), Stream.of("rowNumber")).toList();
 
     /** Строка программы с процентом сооплаты в пределах от 0 до 100, но с третьим знаком после запятой. */
     private static final BigDecimal COPAYMENT_THIRD_DIGIT = new BigDecimal("10.251");

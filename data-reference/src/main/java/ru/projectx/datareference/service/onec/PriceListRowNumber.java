@@ -7,8 +7,8 @@ import tools.jackson.databind.JsonNode;
 /**
  * Номер строки прайса: по нему восстанавливается порядок строк передачи, пришедших разными пакетами.
  *
- * <p>Номер обязателен и должен быть целым числом JSON: текст (даже {@code "2"}) и дробь порядка не задают.
- * Причина отказа называет поле, но не значение.
+ * <p>Номер обязателен и должен быть целым числом JSON в пределах {@code int}: текст (даже {@code "2"}) и дробь
+ * порядка не задают, а целое за пределом отклоняется как больше допустимого. Причина отказа называет поле, но не значение.
  */
 final class PriceListRowNumber {
 
@@ -17,7 +17,7 @@ final class PriceListRowNumber {
     private PriceListRowNumber() {
     }
 
-    /** @throws OneCFieldException если номера нет или он не целое число */
+    /** @throws OneCFieldException если номера нет, он не целое число или не помещается в {@code int} */
     static int of(JsonNode row) {
         return OneCRequiredValues.integer(row, ROW_NUMBER);
     }
