@@ -17,12 +17,13 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class OneCProgramRangeMessages {
 
-    /** Слой — целое число JSON, сооплата — число JSON, как в примере сообщения ТЗ-6. */
+    /** Слой — целое число JSON, в том числе за пределом {@code int}, сооплата — число JSON, как в примере ТЗ-6. */
     private static final Map<String, BiConsumer<ObjectNode, BigDecimal>> NUMERIC_TERMS = Map.of(
-            "numberLayer", (row, value) -> row.put("numberLayer", value.intValueExact()),
+            "numberLayer", (row, value) -> row.put("numberLayer", value.toBigIntegerExact()),
             "percentCopayment", (row, value) -> row.put("percentCopayment", value));
     private static final Map<String, BigDecimal> STEPS_PAST_LIMIT = Map.of(
             "на единицу меньше", BigDecimal.ONE.negate(),
+            "на единицу больше", BigDecimal.ONE,
             "на одну сотую меньше", new BigDecimal("-0.01"),
             "на одну сотую больше", new BigDecimal("0.01"),
             "на одну тысячную больше", new BigDecimal("0.001"));
