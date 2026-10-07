@@ -9,13 +9,16 @@ import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 
 /**
- * Программа страхования для {@code GET /internal/v1/programs/{id}} — то, что ТЗ сервиса
- * Договоров называет «наименование, external_id для 1С:УСК, перечень услуг».
+ * Программа страхования для {@code GET /internal/v1/programs/{id}} — то, что сервис Договоров
+ * берёт из справочника: наименование, {@code external_id} для 1С:УСК и перечень услуг.
  *
- * <p>Перечень услуг — табличная часть {@code service[]} сообщения ТЗ-6, у нас
+ * <p>Перечень услуг — табличная часть {@code service[]} сообщения 1С о страховой программе, у нас
  * {@code program_lpu}: какие учреждения доступны по программе и на каких условиях.
- * Имя {@code services} сохранено от источника, чтобы поле в ответе и поле в ТЗ-6
+ * Имя {@code services} сохранено от источника, чтобы поле в ответе и поле в сообщении 1С
  * читались как одно.
+ *
+ * <p>Строки перечня — строки этой же программы, и идут они в том порядке, в каком их передал вызывающий:
+ * порядок задаёт запрос строк перечня.
  *
  * <p>{@code is_archive} не запрошен, но отдаётся: договор, выпущенный по программе
  * с {@code deleteMark}, — ошибка, которую потребитель без этого признака не заметит.
@@ -28,8 +31,9 @@ public record ProgramResponse(
         boolean isArchive,
         List<Service> services) {
 
-    public static ProgramResponse of(Program program) {
-        List<Service> services = program.availableLpu().stream().map(Service::of).toList();
+    /** Ответ по программе и её строкам перечня, уже упорядоченным; чужие строки сюда не передаются. */
+    public static ProgramResponse of(Program program, List<ProgramLpu> orderedRows) {
+        List<Service> services = orderedRows.stream().map(Service::of).toList();
         return new ProgramResponse(
                 program.id(), program.externalId(), program.name(), program.typeProgramm(),
                 program.isArchive(), services);
