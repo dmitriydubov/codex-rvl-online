@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -45,11 +45,12 @@ final class StandClock extends Clock {
     }
 
     /**
-     * Идущие часы, у которых «сегодня» по Москве — {@code today}: системные часы, сдвинутые на целое число суток.
-     * Московская зона без перехода на летнее время, поэтому сутки — ровно 24 часа.
+     * Идущие часы, у которых «сегодня» по Москве — {@code today}, а время суток — настоящее. Сдвиг считается по
+     * календарю Москвы, а не числом суток по 24 часа: смещение зоны менялось, и для прошлых дат оно другое.
      */
     static StandClock runningOn(LocalDate today) {
-        return new StandClock(Duration.ofDays(ChronoUnit.DAYS.between(LocalDate.now(MOSCOW), today)));
+        ZonedDateTime now = ZonedDateTime.now(MOSCOW);
+        return new StandClock(Duration.between(now, now.with(today)));
     }
 
     void stopAt(Instant moment) {

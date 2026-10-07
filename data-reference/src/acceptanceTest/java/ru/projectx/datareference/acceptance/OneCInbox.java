@@ -83,6 +83,10 @@ public class OneCInbox {
         this.clock = clock;
     }
 
+    /**
+     * Кладёт сообщение в сырьё. На остановленных часах момент приёма может оказаться позже часов: он не раньше последнего
+     * принятого сообщения. Шаг, проверяющий срок от момента приёма, задаёт возраст сам ({@link #ageLast}).
+     */
     public void receive(OneCMessage message) {
         expect(message);
         jdbc.sql(RECEIVE)

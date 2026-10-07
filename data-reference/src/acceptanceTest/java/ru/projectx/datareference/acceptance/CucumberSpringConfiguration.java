@@ -2,6 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.CucumberContextConfiguration;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -89,9 +90,18 @@ public class CucumberSpringConfiguration {
         @Primary
         StandClock standClock(Environment environment) {
             return Optional.ofNullable(environment.getProperty(TODAY))
-                    .map(LocalDate::parse)
+                    .map(Containers::today)
                     .map(StandClock::runningOn)
                     .orElseGet(StandClock::new);
+        }
+
+        private static LocalDate today(String value) {
+            try {
+                return LocalDate.parse(value);
+            } catch (DateTimeParseException e) {
+                throw new IllegalStateException(
+                        TODAY + " (ACCEPTANCE_TODAY) ждёт дату yyyy-MM-dd, а задано: '" + value + "'", e);
+            }
         }
 
         /** Справки об очередях для шагов сценария; очередей сам не объявляет — бинов очередей в контексте нет. */
