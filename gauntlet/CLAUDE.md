@@ -13,8 +13,8 @@
 | Каталог | Что это | Под гейтами |
 |---|---|---|
 | `data-reference/` | сервис справочных данных: справочники и полисы из 1С:УСК (RabbitMQ), REST-чтение для соседних сервисов; пакет `ru.projectx.datareference` | да (`module=data-reference`) |
-| `contract-service/` | сервис Договоров, он же бэкенд ЛК застрахованного; пока без кода — только документы | нет: подключается, когда появится его сборка (`gauntlet/INSTALL.md`, решение владельца) |
-| `project_files/`, `contract-service/project_files/` | ТЗ, схемы и структуры данных — источники предметной области (раздел «Источники документации»). `project_files/` разложен по сервисам: `common/` — документы контура целиком и соседей, `data-reference/` — документы справочного сервиса; документы Договоров переезжают из `contract-service/project_files/` и корня `project_files/` в `project_files/contract-service/` | — |
+| `contract-service/` | сервис Договоров, он же бэкенд ЛК застрахованного; каталога пока нет — появится с каркасом (К1 плана `docs/gauntlet-plan-contract-service.md`) | нет: подключается, когда появится его сборка (`gauntlet/INSTALL.md`, решение владельца) |
+| `project_files/` | ТЗ, схемы и структуры данных — источники предметной области (раздел «Источники документации»). Разложен по сервисам: `common/` — документы контура целиком и соседей, `data-reference/` — документы справочного сервиса, `contract-service/` — документы сервиса Договоров (контракты с Заявками и 1С, ТЗ ЛК, Ordering; до 2026-10-07 лежали в `contract-service/project_files/` и корне `project_files/`) | — |
 
 Сервис Заявок (он же сервис HR), BFF и фронтенд пишут другие разработчики в своих репозиториях.
 Правила и предметная область `data-reference` (контракт 1С:УСК, пакеты, транзакции, ПДн, тесты) описаны
@@ -286,11 +286,11 @@
 | Что | Источник |
 |---|---|
 | Правила и контракт `data-reference` | `data-reference/CLAUDE.md`: «Контракт 1С:УСК», «Соседи по контуру», «Структура пакетов», «Как пишем код» |
-| Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/data-reference/1C_data/*.pdf`, `contract-service/project_files/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ) |
+| Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/data-reference/1C_data/*.pdf`, `project_files/contract-service/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ; там же копии потоков 1С под номерами KDMS) |
 | REST `data-reference` | `project_files/data-reference/ТЗ API Data-reference.pdf` вместе с `project_files/data-reference/Журнал решений REST.md` (правила В-4…В-9 и решения владельца; при расхождении прав журнал); предлагаемые правки ТЗ — `project_files/data-reference/edit/` |
-| Точки интеграции, схемы процесса | `project_files/common/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/common/RVL on-line. Схемы процесса и флоу.pdf` |
-| Структуры данных, ФТ, вопросы и ответы | `project_files/data-reference/Структура БД v.0.2.pdf`, `project_files/Структура данных (Сервис договоров).pdf`, `project_files/common/Структура данных Сервис Заявок v.2.pdf`, `project_files/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/common/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/common/Вопросы и ответы по РВЛ.pdf` |
-| ЛК застрахованного (`contract-service`) | `contract-service/project_files/` (требования к лендингу и ЛК, примеры документов) |
+| Точки интеграции, схемы процесса | `project_files/common/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/contract-service/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/common/RVL on-line. Схемы процесса и флоу.pdf` |
+| Структуры данных, ФТ, вопросы и ответы | `project_files/data-reference/Структура БД v.0.2.pdf`, `project_files/contract-service/Структура данных (Сервис договоров).pdf`, `project_files/common/Структура данных Сервис Заявок v.2.pdf`, `project_files/contract-service/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/common/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/common/Вопросы и ответы по РВЛ.pdf` |
+| ЛК застрахованного (`contract-service`) | `project_files/contract-service/` (требования к лендингу и ЛК `requirements_landing_lk (003).docx`, копии контрактов Договоров под номерами KDMS в `1C_data/`); документы Ordering `project_files/contract-service/ordering/` — только после решения владельца о включении в источники (до этапа оплаты) |
 
 PDF читаются инструментом Read (страницами). Фичи и записи плана до 2026-10-07 называют документы по старым путям
 `project_files/<файл>` — теперь файл лежит в `project_files/common/` или `project_files/data-reference/`. Документы противоречат друг другу или коду — остановись и
