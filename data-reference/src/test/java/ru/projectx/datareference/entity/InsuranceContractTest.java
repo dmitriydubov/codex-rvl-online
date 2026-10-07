@@ -6,10 +6,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Поля сообщения применяются к договору страхования уже при создании. Признак «не действует» становится
- * признаком архивности, а следующее сообщение заменяет поля договора целиком, включая пустые.
+ * признаком архивности, а следующее сообщение заменяет поля договора целиком, включая пустые. Договор действует
+ * в день, который попадает в его срок, включая первый и последний день, и только пока он не в архиве.
  */
 class InsuranceContractTest {
 
@@ -57,5 +60,35 @@ class InsuranceContractTest {
         assertThat(contract.isArchive()).isTrue();
         assertThat(contract.updatedAt()).isEqualTo(UPDATED);
         assertThat(contract.createdAt()).isEqualTo(CREATED);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "2025-12-31, false",
+        "2026-01-01, true",
+        "2026-12-31, true",
+        "2027-01-01, false"})
+    void isActiveOn_coversTheTermIncludingFirstAndLastDay(LocalDate day, boolean active) {
+        InsuranceContract contract = InsuranceContract.create(EXTERNAL_ID,
+                new InsuranceContract.Details("ДМС-0001", BEGIN, END, INSURER_ID, false), CREATED);
+
+        assertThat(contract.isActiveOn(day)).isEqualTo(active);
+    }
+
+    @Test
+    void isActiveOn_withOpenEndDate_lastsIndefinitelyFromBegin() {
+        InsuranceContract contract = InsuranceContract.create(EXTERNAL_ID,
+                new InsuranceContract.Details("ДМС-0001", BEGIN, null, INSURER_ID, false), CREATED);
+
+        assertThat(contract.isActiveOn(LocalDate.of(2999, 12, 31))).isTrue();
+        assertThat(contract.isActiveOn(BEGIN.minusDays(1))).isFalse();
+    }
+
+    @Test
+    void isActiveOn_archivedContract_isNotActiveWithinItsTerm() {
+        InsuranceContract contract = InsuranceContract.create(EXTERNAL_ID,
+                new InsuranceContract.Details("ДМС-0001", BEGIN, END, INSURER_ID, true), CREATED);
+
+        assertThat(contract.isActiveOn(BEGIN)).isFalse();
     }
 }

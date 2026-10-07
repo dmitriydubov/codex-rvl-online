@@ -16,41 +16,19 @@ import ru.projectx.datareference.entity.Policy;
  * Полисы застрахованных. Единственный репозиторий сервиса, за которым лежат
  * персональные данные.
  *
- * <p>Поиск полисов для подсказки кадровику лежит во фрагменте {@link PolicySearchRepository}.
+ * <p>Поиск полисов для подсказки кадровику лежит во фрагменте {@link PolicySearchRepository}, программы действующих
+ * полисов для каталога учреждений — во фрагменте {@link ActivePolicyProgramsRepository}.
  * Отбор по условиям {@link PolicySpecifications}, ранжирование и предел выдачи делаются одним
  * запросом в базе. Запрос собирается на ходу, потому что число слов ФИО в строке поиска заранее
  * неизвестно и статическим запросом его не выразить.
  */
 @Repository
-public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySearchRepository {
+public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySearchRepository, ActivePolicyProgramsRepository {
 
     Optional<Policy> findByExternalId(UUID externalId);
 
     /** Номер полиса уникален в пределах договора, не глобально; больше одной строки — конфликт данных 1С. */
     List<Policy> findAllByNumberAndExternalContractId(String number, UUID externalContractId);
-
-    /**
-     * Программы РВЛ для каталога санаториев по договору страхования: программы, которые дают действующие
-     * полисы договора, — GUID программ из действующих условий обслуживания, найденные
-     * в справочнике программ. Правило то же, что в {@link PolicySpecifications#activeRvlPoliciesOf}
-     * для поиска полисов, на выходе только программы, а не полисы. Равенство с {@code programs}
-     * по GUID — и есть фильтр «только РВЛ»: в справочнике лежат только программы РВЛ,
-     * и вырезать его при оптимизации нельзя.
-     */
-    @Query("""
-            select distinct line.externalProgramId
-              from PolicyServiceLine line
-              join line.policy policy, Program program
-             where policy.externalContractId = :contractExternalId
-               and policy.archive = false
-               and policy.beginDate <= :today
-               and (policy.endDate is null or policy.endDate >= :today)
-               and line.availability = true
-               and (line.endDate is null or line.endDate >= :today)
-               and program.externalId = line.externalProgramId
-               and program.archive = false
-            """)
-    List<UUID> findRvlProgramExternalIdsOfActivePolicies(UUID contractExternalId, LocalDate today);
 
     /**
      * Сколько полисов пережили границу хранения персональных данных, а данные ещё не стёрты. Отбор тот же, что у

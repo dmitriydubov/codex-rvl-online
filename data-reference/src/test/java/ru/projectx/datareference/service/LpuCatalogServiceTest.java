@@ -33,8 +33,9 @@ import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 import ru.projectx.datareference.support.TestApiProperties;
 
 /**
- * R-01: учреждения программ РВЛ действующих полисов по видам обращения РВЛ; с договором — в выдаче,
- * с неоднозначным договором — в {@code skipped}, без договора — нигде.
+ * Каталог учреждений по договору страхования: учреждения программ восстановительного лечения действующих полисов
+ * по видам обращения РВЛ. Учреждение с прайсовым договором попадает в выдачу, с неоднозначным — в {@code skipped},
+ * без договора — никуда. По договору страхования, который сегодня не действует, каталог отвечает «не найден».
  */
 @ExtendWith(MockitoExtension.class)
 class LpuCatalogServiceTest {
@@ -63,15 +64,13 @@ class LpuCatalogServiceTest {
     @Mock
     private RvlAppealTypes rvlAppealTypes;
 
-    @Mock
-    private InsuranceContract contract;
-
     private LpuCatalogService service;
 
     @BeforeEach
     void setUp() {
         var calendar = new ReferenceCalendar(Clock.fixed(ReadFixtures.NOW, ZoneOffset.UTC), TestApiProperties.defaults());
-        service = new LpuCatalogService(insuranceContracts, policies, lpus, priceContracts, rvlAppealTypes, calendar);
+        service = new LpuCatalogService(new ActiveInsuranceContracts(insuranceContracts), policies, lpus, priceContracts,
+                rvlAppealTypes, calendar);
     }
 
     @Test
@@ -115,8 +114,8 @@ class LpuCatalogServiceTest {
     }
 
     @Test
-    void catalog_unknownOrArchivedContract_isNotFound() {
-        when(insuranceContracts.findByExternalIdAndArchiveFalse(CONTRACT)).thenReturn(Optional.empty());
+    void catalog_unknownContract_isNotFound() {
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.catalog(CONTRACT))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
@@ -124,7 +123,19 @@ class LpuCatalogServiceTest {
         verify(priceContracts, never()).resolveAll(anyCollection(), any());
     }
 
+    @Test
+    void catalog_contractNotStartedYet_isNotFound() {
+        InsuranceContract future = InsuranceContract.create(CONTRACT,
+                new InsuranceContract.Details("ДМС-0001", TODAY.plusDays(1), null, null, false), ReadFixtures.NOW);
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.of(future));
+
+        assertThatThrownBy(() -> service.catalog(CONTRACT))
+                .isInstanceOfSatisfying(ReferenceNotFoundException.class,
+                        notFound -> assertThat(notFound.code()).isEqualTo("INSURANCE_CONTRACT_NOT_FOUND"));
+        verify(policies, never()).findRvlProgramExternalIdsOfActivePolicies(any(), any());
+    }
+
     private void knownContract() {
-        when(insuranceContracts.findByExternalIdAndArchiveFalse(CONTRACT)).thenReturn(Optional.of(contract));
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.of(ReadFixtures.contract(CONTRACT, null)));
     }
 }

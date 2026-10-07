@@ -48,6 +48,7 @@ final class OneCMessages {
     private static final String BEGIN = "начало";
     private static final String AVAILABILITY = "availability";
     private static final String LINE_PROGRAM = "условие обслуживания: программа";
+    private static final String LINE_BEGIN = "условие обслуживания: начало";
     private static final String LINE_END = "условие обслуживания: окончание";
     private static final String LINE_AVAILABILITY = "условие обслуживания: доступность";
     private static final String POLICY_AVAILABILITY = "доступность";
@@ -163,7 +164,7 @@ final class OneCMessages {
     static OneCMessage policy(Map<String, String> table) {
         onlyKnown(table, "external_id", "номер", "договор", "программа", BEGIN, "окончание",
                 "фамилия", "имя", "отчество", "дата рождения", "пол", "e-mail", DELETE_MARK, POLICY_AVAILABILITY,
-                LINE_PROGRAM, LINE_END, LINE_AVAILABILITY);
+                LINE_PROGRAM, LINE_BEGIN, LINE_END, LINE_AVAILABILITY);
         ObjectNode data = JSON.createObjectNode()
                 .put("id", required(table, "external_id"))
                 .put("idContract", required(table, "договор"))
@@ -181,15 +182,15 @@ final class OneCMessages {
     }
 
     /**
-     * Строка условий обслуживания по программе: первый слой без франшизы, с началом в день начала полиса. Окончание
-     * и доступность — если сценарий их назвал, иначе строка бессрочна и доступна.
+     * Строка условий обслуживания по программе: первый слой без франшизы. Начало, окончание и доступность — если
+     * сценарий их назвал, иначе строка начинается в день начала полиса, бессрочна и доступна.
      */
     private static void addServiceLine(ObjectNode policy, String program, Map<String, String> table) {
         ObjectNode line = policy.putArray("services").addObject()
                 .put("idProgramm", program)
                 .put("layerNumber", 1)
                 .put("copayment", BigDecimal.ZERO)
-                .put("beginDate", required(table, BEGIN))
+                .put("beginDate", table.getOrDefault(LINE_BEGIN, required(table, BEGIN)))
                 .put(AVAILABILITY, flagOr(table, LINE_AVAILABILITY, true));
         Optional.ofNullable(table.get(LINE_END)).ifPresent(end -> line.put("endDate", end));
     }
