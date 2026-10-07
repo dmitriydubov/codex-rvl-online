@@ -5,6 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,7 +17,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.datareference.config.RestReadDataSource;
+import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;
 
@@ -31,12 +39,19 @@ class RestPoolWaitTest {
     /** Свободный пул отдаёт соединение сразу; секунда — запас на медленную машину сборки. */
     private static final Duration IMMEDIATELY = Duration.ofSeconds(1);
     private static final String UNKNOWN_ID = "f662d1c4-5b26-4248-8ba1-47954abd301b";
+    private static final UUID UNKNOWN_MESSAGE = UUID.fromString(UNKNOWN_ID);
 
     @Autowired
     private MockMvcTester mvc;
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private InboundMessageRepository rawMessages;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -76,6 +91,48 @@ class RestPoolWaitTest {
             MvcTestResult result = mvc.get().uri("/internal/v1/policies/" + UNKNOWN_ID).exchange();
 
             assertThat(result).hasStatus(404);
+        }
+    }
+
+    /**
+     * Поток планировщика или слушателя очереди: HTTP-запроса нет. Репозиторий вне транзакции открывает свою
+     * транзакцию «только чтение» (так Spring Data помечает свои чтения), и она идёт в пул приложения, а не в занятый
+     * пул REST-чтений.
+     */
+    @Test
+    void restReadPoolExhausted_repositoryReadOutsideHttpRequestUsesApplicationPool() throws Exception {
+        try (ExhaustedPool ignored = ExhaustedPool.ofRestReads(dataSource)) {
+            long started = System.nanoTime();
+
+            boolean found = outsideHttpRequest(() -> rawMessages.existsById(UNKNOWN_MESSAGE));
+
+            assertThat(found).isFalse();
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(IMMEDIATELY);
+        }
+    }
+
+    /** Явная транзакция «только чтение» вне HTTP-запроса — тоже пул приложения. */
+    @Test
+    void restReadPoolExhausted_readOnlyTransactionOutsideHttpRequestUsesApplicationPool() throws Exception {
+        TransactionTemplate readOnly = new TransactionTemplate(transactions);
+        readOnly.setReadOnly(true);
+        try (ExhaustedPool ignored = ExhaustedPool.ofRestReads(dataSource)) {
+            long started = System.nanoTime();
+
+            Long messages = outsideHttpRequest(() -> readOnly.execute(status -> rawMessages.count()));
+
+            assertThat(messages).isNotNull();
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(IMMEDIATELY);
+        }
+    }
+
+    /**
+     * Свой поток без HTTP-запроса. В потоке теста Spring держит HTTP-запрос-заглушку, поэтому чтение оттуда выглядело
+     * бы как REST-чтение.
+     */
+    private static <T> T outsideHttpRequest(Callable<T> read) throws Exception {
+        try (ExecutorService thread = Executors.newSingleThreadExecutor()) {
+            return thread.submit(read).get(LOCK_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         }
     }
 

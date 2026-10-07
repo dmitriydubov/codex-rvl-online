@@ -51,7 +51,7 @@ class RestReadRoutingTest {
     }
 
     @Test
-    void readOnlyTransactionOfHttpRequest_goesToRestReadPool() throws SQLException {
+    void httpRequestReadOnlyTransaction_goesToRestReadPool() throws SQLException {
         when(restRead.getConnection()).thenReturn(restReadConnection);
         inHttpRequest();
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
@@ -59,8 +59,9 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(restReadConnection);
     }
 
+    /** Поток планировщика или слушателя очереди: HTTP-запроса нет, транзакция «только чтение». */
     @Test
-    void readOnlyTransactionOutsideHttpRequest_goesToApplicationPool() throws SQLException {
+    void schedulerOrListenerReadOnlyTransaction_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);
         TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
 
@@ -76,8 +77,9 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(applicationConnection);
     }
 
+    /** Вызов вне транзакции Spring — например, прямое чтение через JDBC из потока планировщика. */
     @Test
-    void neitherHttpRequestNorReadOnlyTransaction_goesToApplicationPool() throws SQLException {
+    void callOutsideTransactionAndHttpRequest_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);
 
         assertThat(routing.getConnection()).isSameAs(applicationConnection);
