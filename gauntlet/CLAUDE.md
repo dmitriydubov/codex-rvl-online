@@ -14,7 +14,7 @@
 |---|---|---|
 | `data-reference/` | сервис справочных данных: справочники и полисы из 1С:УСК (RabbitMQ), REST-чтение для соседних сервисов; пакет `ru.projectx.datareference` | да (`module=data-reference`) |
 | `contract-service/` | сервис Договоров, он же бэкенд ЛК застрахованного; пока без кода — только документы | нет: подключается, когда появится его сборка (`gauntlet/INSTALL.md`, решение владельца) |
-| `project_files/`, `contract-service/project_files/` | ТЗ, схемы и структуры данных — источники предметной области (раздел «Источники документации») | — |
+| `project_files/`, `contract-service/project_files/` | ТЗ, схемы и структуры данных — источники предметной области (раздел «Источники документации»). `project_files/` разложен по сервисам: `common/` — документы контура целиком и соседей, `data-reference/` — документы справочного сервиса; документы Договоров переезжают из `contract-service/project_files/` и корня `project_files/` в `project_files/contract-service/` | — |
 
 Сервис Заявок (он же сервис HR), BFF и фронтенд пишут другие разработчики в своих репозиториях.
 Правила и предметная область `data-reference` (контракт 1С:УСК, пакеты, транзакции, ПДн, тесты) описаны
@@ -286,13 +286,14 @@
 | Что | Источник |
 |---|---|
 | Правила и контракт `data-reference` | `data-reference/CLAUDE.md`: «Контракт 1С:УСК», «Соседи по контуру», «Структура пакетов», «Как пишем код» |
-| Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/1C_data/*.pdf`, `contract-service/project_files/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ) |
-| REST `data-reference` | `project_files/ТЗ API Data-reference.pdf` вместе с `project_files/Журнал решений REST.md` (правила В-4…В-9 и решения владельца; при расхождении прав журнал); предлагаемые правки ТЗ — `project_files/edit/` |
-| Точки интеграции, схемы процесса | `project_files/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/RVL on-line. Схемы процесса и флоу.pdf` |
-| Структуры данных, ФТ, вопросы и ответы | `project_files/Структура БД v.0.2.pdf`, `project_files/Структура данных (Сервис договоров).pdf`, `project_files/Структура данных Сервис Заявок v.2.pdf`, `project_files/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/Вопросы и ответы по РВЛ.pdf` |
+| Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/data-reference/1C_data/*.pdf`, `contract-service/project_files/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ) |
+| REST `data-reference` | `project_files/data-reference/ТЗ API Data-reference.pdf` вместе с `project_files/data-reference/Журнал решений REST.md` (правила В-4…В-9 и решения владельца; при расхождении прав журнал); предлагаемые правки ТЗ — `project_files/data-reference/edit/` |
+| Точки интеграции, схемы процесса | `project_files/common/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/common/RVL on-line. Схемы процесса и флоу.pdf` |
+| Структуры данных, ФТ, вопросы и ответы | `project_files/data-reference/Структура БД v.0.2.pdf`, `project_files/Структура данных (Сервис договоров).pdf`, `project_files/common/Структура данных Сервис Заявок v.2.pdf`, `project_files/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/common/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/common/Вопросы и ответы по РВЛ.pdf` |
 | ЛК застрахованного (`contract-service`) | `contract-service/project_files/` (требования к лендингу и ЛК, примеры документов) |
 
-PDF читаются инструментом Read (страницами). Документы противоречат друг другу или коду — остановись и
+PDF читаются инструментом Read (страницами). Фичи и записи плана до 2026-10-07 называют документы по старым путям
+`project_files/<файл>` — теперь файл лежит в `project_files/common/` или `project_files/data-reference/`. Документы противоречат друг другу или коду — остановись и
 спроси владельца, не выбирай сам.
 
 **Технологии** (версия из сборки → источник той же версии):
