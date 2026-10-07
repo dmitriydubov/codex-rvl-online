@@ -36,8 +36,9 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
  * (миграции в контуре идут отдельно) — WARN, что соединение миграций не проверено. Заодно —
  * WARN, если лимит REST-чтения не меньше включённого {@code lock_timeout}: тогда под чужой
  * блокировкой REST не отказывает первым ({@code lock_timeout} 0 — ожидание блокировок без предела,
- * и первым отказывает как раз лимит чтения). И WARN, если сетевой тайм-аут пула REST-чтений не больше лимита
- * чтения: тогда медленное чтение обрывается вместе с соединением раньше, чем его отменит база.
+ * и первым отказывает как раз лимит чтения). И WARN, если сетевой тайм-аут пула REST-чтений меньше лимита чтения
+ * вместе с ожиданием отправки отмены: тогда медленное чтение обрывается вместе с соединением раньше, чем его
+ * отменит база.
  *
  * <p>{@link ApplicationRunner}: Spring Boot вызывает его после старта контекста и до готовности
  * принимать трафик — миграции к этому моменту прошли, их соединение открыто заново.
@@ -70,7 +71,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         read(POOL, connections.pool()).ifPresent(this::checkPool);
         migrationsSource().flatMap(source -> read(MIGRATIONS, source)).ifPresent(this::checkMigrations);
         warnIfReadLimitNotBelowLockTimeout();
-        warnIfRestSocketTimeoutNotAboveReadLimit();
+        warnIfRestSocketTimeoutBelowReadLimitAndCancel();
     }
 
     private void checkPool(Map<String, Duration> actual) {
@@ -124,12 +125,14 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
                         + "блокировкой REST не отказывает первым", readLimit, lockTimeout));
     }
 
-    private void warnIfRestSocketTimeoutNotAboveReadLimit() {
-        Duration readLimit = Duration.ofSeconds(api.readTimeoutSeconds());
+    private void warnIfRestSocketTimeoutBelowReadLimitAndCancel() {
+        Duration readLimitAndCancel = Duration.ofSeconds(api.readTimeoutSeconds())
+                .plusSeconds(restReadPool.cancelSignalTimeoutSeconds());
         Duration socketTimeout = Duration.ofSeconds(restReadPool.socketTimeoutSeconds());
-        if (socketTimeout.compareTo(readLimit) <= 0) {
-            log.warn("сетевой тайм-аут пула REST-чтений {} не больше лимита REST-чтения {}: медленное чтение "
-                    + "оборвётся вместе с соединением раньше, чем его отменит база", socketTimeout, readLimit);
+        if (socketTimeout.compareTo(readLimitAndCancel) < 0) {
+            log.warn("сетевой тайм-аут пула REST-чтений {} меньше лимита REST-чтения вместе с ожиданием отмены {}: "
+                    + "медленное чтение оборвётся вместе с соединением раньше, чем его отменит база",
+                    socketTimeout, readLimitAndCancel);
         }
     }
 

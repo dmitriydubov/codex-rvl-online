@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.zaxxer.hikari.HikariDataSource;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 /**
- * Пул REST-чтений берёт у пула приложения адрес, учётные данные и параметры драйвера, а размер, ожидание
- * соединения и сетевой тайм-аут чтения — свои. Пул приложения при этом не меняется.
+ * Пул REST-чтений берёт у пула приложения адрес и учётные данные, а остальные настройки — из тех же свойств
+ * {@code spring.datasource.hikari.*}. Свои у него имя, размер, ожидание соединения, сетевой тайм-аут чтения и
+ * ожидание отправки отмены. Пул приложения при этом не меняется.
  */
 class RestReadPoolsTest {
 
@@ -17,7 +19,7 @@ class RestReadPoolsTest {
 
     @Test
     void restReadPool_takesAddressAndCredentialsOfApplicationPool() {
-        HikariDataSource restRead = RestReadPools.restReadPool(application(), SETTINGS);
+        HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
 
         assertThat(restRead.getJdbcUrl()).isEqualTo("jdbc:postgresql://db:5432/data_reference");
         assertThat(restRead.getUsername()).isEqualTo("data_reference");
@@ -25,9 +27,20 @@ class RestReadPoolsTest {
         assertThat(restRead.getDriverClassName()).isEqualTo("org.postgresql.Driver");
     }
 
+    /** Пул приложения без явного драйвера: драйвер найдётся по адресу, и у пула REST-чтений тоже. */
+    @Test
+    void restReadPool_withoutDriverOfApplicationPool_leavesDriverUnset() {
+        HikariDataSource application = new HikariDataSource();
+        application.setJdbcUrl("jdbc:postgresql://db:5432/data_reference");
+
+        HikariDataSource restRead = RestReadPools.restReadPool(application, new MockEnvironment(), SETTINGS);
+
+        assertThat(restRead.getDriverClassName()).isNull();
+    }
+
     @Test
     void restReadPool_hasOwnNameSizeAndConnectionWait() {
-        HikariDataSource restRead = RestReadPools.restReadPool(application(), SETTINGS);
+        HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
 
         assertThat(restRead.getPoolName()).isEqualTo("rest-read");
         assertThat(restRead.getMaximumPoolSize()).isEqualTo(5);
@@ -38,7 +51,7 @@ class RestReadPoolsTest {
     void restReadPool_keepsDriverPropertiesButOwnSocketAndCancelTimeouts() {
         HikariDataSource application = application();
 
-        HikariDataSource restRead = RestReadPools.restReadPool(application, SETTINGS);
+        HikariDataSource restRead = RestReadPools.restReadPool(application, applicationPoolProperties(), SETTINGS);
 
         assertThat(restRead.getDataSourceProperties())
                 .containsEntry("options", "-c lock_timeout=5s")
@@ -51,24 +64,18 @@ class RestReadPoolsTest {
     }
 
     @Test
-    void restReadPool_checksConnectionsLikeApplicationPool() {
-        HikariDataSource restRead = RestReadPools.restReadPool(application(), SETTINGS);
+    void restReadPool_takesOtherSettingsOfApplicationPool() {
+        HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
 
         assertThat(restRead.getValidationTimeout()).isEqualTo(1000);
-        assertThat(restRead.getIdleTimeout()).isEqualTo(300_000);
-        assertThat(restRead.getMaxLifetime()).isEqualTo(900_000);
-        assertThat(restRead.getKeepaliveTime()).isEqualTo(60_000);
-        assertThat(restRead.getConnectionInitSql()).isEqualTo("select 1");
-        assertThat(restRead.getConnectionTestQuery()).isEqualTo("select 2");
+        assertThat(restRead.getLeakDetectionThreshold()).isEqualTo(30_000);
         assertThat(restRead.getSchema()).isEqualTo("public");
-        assertThat(restRead.getTransactionIsolation()).isEqualTo("TRANSACTION_READ_COMMITTED");
-        assertThat(restRead.isAutoCommit()).isFalse();
     }
 
     /** Пул не открывается при сборке: соединения он откроет при первом REST-чтении, как и пул приложения. */
     @Test
     void restReadPool_isNotStartedYet() {
-        HikariDataSource restRead = RestReadPools.restReadPool(application(), SETTINGS);
+        HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
 
         assertThat(restRead.isRunning()).isFalse();
     }
@@ -80,20 +87,21 @@ class RestReadPoolsTest {
         application.setUsername("data_reference");
         application.setPassword("secret");
         application.setDriverClassName("org.postgresql.Driver");
-        application.setMaximumPoolSize(10);
-        application.setConnectionTimeout(2000);
-        application.setValidationTimeout(1000);
-        application.setIdleTimeout(300_000);
-        application.setMaxLifetime(900_000);
-        application.setKeepaliveTime(60_000);
-        application.setConnectionInitSql("select 1");
-        application.setConnectionTestQuery("select 2");
-        application.setSchema("public");
-        application.setTransactionIsolation("TRANSACTION_READ_COMMITTED");
-        application.setAutoCommit(false);
-        application.addDataSourceProperty("options", "-c lock_timeout=5s");
-        application.addDataSourceProperty("logServerErrorDetail", "false");
         application.addDataSourceProperty("socketTimeout", "60");
         return application;
+    }
+
+    /** Свойства пула приложения, как в {@code application.yml}, с собственными именем, размером и ожиданием. */
+    private static MockEnvironment applicationPoolProperties() {
+        return new MockEnvironment()
+                .withProperty("spring.datasource.hikari.pool-name", "application")
+                .withProperty("spring.datasource.hikari.maximum-pool-size", "10")
+                .withProperty("spring.datasource.hikari.connection-timeout", "2000")
+                .withProperty("spring.datasource.hikari.validation-timeout", "1000")
+                .withProperty("spring.datasource.hikari.leak-detection-threshold", "30000")
+                .withProperty("spring.datasource.hikari.schema", "public")
+                .withProperty("spring.datasource.hikari.data-source-properties.options", "-c lock_timeout=5s")
+                .withProperty("spring.datasource.hikari.data-source-properties.logServerErrorDetail", "false")
+                .withProperty("spring.datasource.hikari.data-source-properties.socketTimeout", "60");
     }
 }

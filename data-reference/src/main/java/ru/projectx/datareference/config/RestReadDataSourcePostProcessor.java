@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.Environment;
 
 /**
  * Делает пул, который собрал Spring Boot, пулом приложения и ставит рядом пул REST-чтений.
@@ -16,7 +17,7 @@ import org.springframework.core.Ordered;
  * обёртка источника соединений (например, наблюдение или стенд) оборачивает уже готовый источник с двумя пулами, а не
  * подменяет пул Boot до того, как его увидит этот обработчик.
  *
- * <p>Настройки пула REST-чтений берутся из контекста лениво, при обработке пула: обработчик бинов создаётся раньше
+ * <p>Настройки пула REST-чтений и конфигурация приложения берутся из контекста лениво, при обработке пула: обработчик бинов создаётся раньше
  * остальных бинов, а настройки к тому моменту ещё не связаны со свойствами.
  */
 public class RestReadDataSourcePostProcessor implements BeanPostProcessor, Ordered {
@@ -34,7 +35,8 @@ public class RestReadDataSourcePostProcessor implements BeanPostProcessor, Order
     public Object postProcessAfterInitialization(Object bean, String beanName) {
         if (bean instanceof HikariDataSource application && BOOT_POOL.equals(beanName)) {
             RestReadPoolProperties settings = beans.getBean(RestReadPoolProperties.class);
-            return new RestReadDataSource(application, RestReadPools.restReadPool(application, settings));
+            Environment environment = beans.getBean(Environment.class);
+            return new RestReadDataSource(application, RestReadPools.restReadPool(application, environment, settings));
         }
         return bean;
     }

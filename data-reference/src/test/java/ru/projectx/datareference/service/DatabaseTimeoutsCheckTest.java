@@ -36,7 +36,7 @@ class DatabaseTimeoutsCheckTest {
             "lock_timeout", Duration.ofSeconds(5),
             "statement_timeout", Duration.ofSeconds(30),
             "idle_in_transaction_session_timeout", Duration.ofMinutes(1));
-    /** Сетевой тайм-аут пула REST-чтений по умолчанию: больше лимита чтения (3 с). */
+    /** Сетевой тайм-аут пула REST-чтений по умолчанию: лимит чтения (3 с) и ожидание отмены (2 с). */
     private static final int REST_SOCKET_TIMEOUT_SECONDS = 5;
     private static final Map<String, Duration> DISABLED = Map.of(
             "lock_timeout", Duration.ZERO,
@@ -185,27 +185,28 @@ class DatabaseTimeoutsCheckTest {
     }
 
     /**
-     * Сетевой тайм-аут пула REST-чтений не больше лимита чтения — он оборвёт медленное чтение раньше, чем его
-     * отменит сама база, и вместе с ним соединение.
+     * Сетевой тайм-аут пула REST-чтений меньше лимита чтения вместе с ожиданием отмены (3 с + 2 с) — он оборвёт
+     * медленное чтение раньше, чем его отменит сама база, и вместе с ним соединение.
      */
     @Test
-    void restSocketTimeoutNotAboveReadLimit_warns(CapturedOutput output) {
-        withMigrations();
-        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
-        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
-        check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"), 3);
-
-        check.run(null);
-
-        assertThat(output).contains("сетевой тайм-аут пула REST-чтений PT3S не больше лимита REST-чтения PT3S");
-    }
-
-    @Test
-    void restSocketTimeoutAboveReadLimit_doesNotWarn(CapturedOutput output) {
+    void restSocketTimeoutBelowReadLimitAndCancel_warns(CapturedOutput output) {
         withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
         when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
         check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"), 4);
+
+        check.run(null);
+
+        assertThat(output).contains("сетевой тайм-аут пула REST-чтений PT4S меньше лимита REST-чтения вместе с "
+                + "ожиданием отмены PT5S");
+    }
+
+    @Test
+    void restSocketTimeoutEqualToReadLimitAndCancel_doesNotWarn(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"), 5);
 
         check.run(null);
 
