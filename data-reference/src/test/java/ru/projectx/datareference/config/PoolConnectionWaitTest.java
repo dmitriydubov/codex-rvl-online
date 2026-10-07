@@ -18,7 +18,7 @@ import ru.projectx.datareference.support.IntegrationTest;
 
 /**
  * Ожидание соединения из пула: при недоступной базе пул отказывает за секунды, а не за умолчание HikariCP
- * в 30 секунд, и проверка живости соединения укладывается в это ожидание.
+ * в 30 секунд. Сами значения настройки проверяет {@link PoolConnectionWaitSettingTest} без базы.
  *
  * <p>Значения — умолчания {@code application.yml}: переменные окружения пула в тестах не заданы.
  */
@@ -26,7 +26,6 @@ import ru.projectx.datareference.support.IntegrationTest;
 class PoolConnectionWaitTest {
 
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration VALIDATION_TIMEOUT = Duration.ofSeconds(1);
     /** {@code lock_timeout} пула: отказ из-за недоступной базы не должен приходить позже отказа по блокировке. */
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     /** Класс SQLSTATE «нет соединения»: так драйвер PostgreSQL сообщает, что сервер не принял подключение. */
@@ -34,14 +33,6 @@ class PoolConnectionWaitTest {
 
     @Autowired
     private DataSource dataSource;
-
-    @Test
-    void pool_waitsForConnectionSecondsAndChecksAlivenessWithinThatWait() throws SQLException {
-        HikariDataSource pool = dataSource.unwrap(HikariDataSource.class);
-
-        assertThat(Duration.ofMillis(pool.getConnectionTimeout())).isEqualTo(CONNECTION_TIMEOUT);
-        assertThat(Duration.ofMillis(pool.getValidationTimeout())).isEqualTo(VALIDATION_TIMEOUT);
-    }
 
     /**
      * Пул с настройками приложения, но адресом, на котором сервер не слушает, — как остановленная база.

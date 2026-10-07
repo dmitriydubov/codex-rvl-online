@@ -12,6 +12,9 @@ import javax.sql.DataSource;
  * разрешает настройка пула, и получает отказ. Для приложения это тот же путь, что и при недоступной базе:
  * свободного соединения нет, и пул отказывает по истечении своего ожидания. Соединения возвращаются в пул
  * при закрытии.
+ *
+ * <p>Пул занимается из потока теста, поэтому в этот момент соединений не должен держать никто другой: в тестах
+ * с базой задачи по расписанию выключены, а слушатели брокера не подключены.
  */
 public final class ExhaustedPool implements AutoCloseable {
 
@@ -37,8 +40,17 @@ public final class ExhaustedPool implements AutoCloseable {
             return new ExhaustedPool(held);
         }
         catch (SQLException failure) {
-            new ExhaustedPool(held).close();
+            releaseAfterFailure(held, failure);
             throw failure;
+        }
+    }
+
+    private static void releaseAfterFailure(List<Connection> held, SQLException failure) {
+        try {
+            new ExhaustedPool(held).close();
+        }
+        catch (SQLException releaseFailure) {
+            failure.addSuppressed(releaseFailure);
         }
     }
 

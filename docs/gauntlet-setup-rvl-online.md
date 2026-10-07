@@ -570,8 +570,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - **REST-чтения.** С PR #25 (Ш41+Ш26) у чтений свой лимит — `@RestReadTransaction`, 3 с (`API_READ_TIMEOUT_SECONDS`),
     превышение — 503 `SERVICE_UNAVAILABLE`. Ловушки: лимит действует только на транзакцию, которую метод начинает сам;
     Hibernate передаёт остаток в `Statement.setQueryTimeout` целыми секундами — остаток меньше 0,5 с даёт 0, то есть без
-    JDBC-таймаута (держат только `lock_timeout` и `statement_timeout`; Ш41a); лимит начинает действовать только после
-    того, как пул выдал соединение, а ожидание соединения ограничивает свой таймаут пула
+    JDBC-таймаута (держат только `lock_timeout` и `statement_timeout`; Ш41a); ожидание соединения из пула лимит не
+    ограничивает (проверено тестом: при занятом пуле и лимите 3 с ответ 503 приходил через 30 с, Ш64), а ожидание соединения ограничивает свой таймаут пула
     (`spring.datasource.hikari.connection-timeout`, `DB_CONNECTION_TIMEOUT_MS`, 2 с с Ш64; до Ш64 — умолчание HikariCP
     30 с): при недоступной базе или занятом пуле 503 приходит через 2 с, при занятом пуле с последующим чтением — не
     позже 2 с + лимит чтения; проверка живости соединения перед выдачей (`validation-timeout`, 1 с) меньше ожидания
@@ -980,7 +980,7 @@ cascade` (исправление самого теста — план, 3.11). Р
 | `DB_USERNAME`, `DB_PASSWORD` | логин локального контура; у пароля умолчания нет (Ш5) | обязательны, пароль — секрет развёртывания; без него — `password authentication failed` на миграциях |
 | `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `5s`, `30s`, `1min` (Ш4) | можно не задавать; если задавать — только с единицей PostgreSQL (`ms`, `s`, `min`): число без неё — миллисекунды; `0` — без ограничения |
 | `DB_SOCKET_TIMEOUT_SECONDS` | `60` (Ш4) | можно не задавать; целые секунды, больше `DB_STATEMENT_TIMEOUT` |
-| `DB_CONNECTION_TIMEOUT_MS` | `2000` (Ш64) | можно не задавать; миллисекунды (`spring.datasource.hikari.connection-timeout`, единица HikariCP — мс), больше 1000 (проверка живости соединения `validation-timeout` — 1000 мс, должна быть меньше) и не меньше 250 (минимум HikariCP); через это время при недоступной базе REST отвечает 503, приём встаёт на паузу; держать меньше `API_READ_TIMEOUT_SECONDS` и `DB_LOCK_TIMEOUT`; на агенте сборки не задавать |
+| `DB_CONNECTION_TIMEOUT_MS` | `2000` (Ш64) | можно не задавать; миллисекунды (`spring.datasource.hikari.connection-timeout`, единица HikariCP — мс), больше 1000 (проверка живости соединения `validation-timeout` — 1000 мс, должна быть меньше; HikariCP сам этого не проверяет) и не меньше 250 (минимум HikariCP); `0` — ожидание без предела (HikariCP подставляет `Integer.MAX_VALUE`), не задавать; то же время, округлённое до секунды, HikariCP ставит глобальным таймаутом входа JDBC (`DriverManager.setLoginTimeout`), он касается и соединения миграций, если пул открылся раньше него; через это время при недоступной базе REST отвечает 503, приём встаёт на паузу; держать меньше `API_READ_TIMEOUT_SECONDS` и `DB_LOCK_TIMEOUT`; на агенте сборки не задавать |
 | `API_READ_TIMEOUT_SECONDS` | `3` (Ш41, PR #25) | можно не задавать; целые секунды, не меньше 1, меньше `DB_LOCK_TIMEOUT` (иначе WARN при старте) и меньше таймаута клиента Договоров (О8); на агенте сборки не задавать — `RestReadTimeoutTest` ждёт 503 быстрее 5 с |
 | `RABBITMQ_HOST` | `localhost` | обязательна |
 | `RABBITMQ_PORT` | `5672` | `5671` при TLS: иначе TLS уйдёт на 5672 |
