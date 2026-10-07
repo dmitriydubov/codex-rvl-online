@@ -24,7 +24,7 @@
       "gender": "М",
       "email": "insured@example.com",
       "begin_date": "2026-01-01",
-      "end_date": "2030-12-31",
+      "end_date": "2099-12-31",
       "availability": true,
       "is_archive": false,
       "personal_data_erased": false,
@@ -42,14 +42,14 @@
           },
           "limit_amount": 150000.00,
           "begin_date": "2026-01-01",
-          "end_date": "2030-12-31",
+          "end_date": "2099-12-31",
           "availability": true,
           "services": [
             {
               "layer_number": 1,
               "copayment": 20.00,
               "begin_date": "2026-01-01",
-              "end_date": "2030-12-31",
+              "end_date": "2099-12-31",
               "availability": true
             }
           ]
