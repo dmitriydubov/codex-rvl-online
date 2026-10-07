@@ -3,8 +3,6 @@ package ru.projectx.datareference.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -21,15 +19,14 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.yaml.snakeyaml.Yaml;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.service.SqlStates;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.MigrationSql;
 import ru.projectx.datareference.support.TestJdbc;
 
 /**
@@ -241,19 +238,6 @@ class PriceListFinalizationStorageTest {
     }
 
     private static String fillSql() {
-        try (InputStream changelog = new ClassPathResource("db/changelog/017-price-list-finalization.yaml")
-                .getInputStream()) {
-            Map<String, Object> root = new Yaml().load(changelog);
-            return ((List<Map<String, Object>>) root.get("databaseChangeLog")).stream()
-                    .map(entry -> (Map<String, Object>) entry.get("changeSet"))
-                    .filter(changeSet -> FILL_CHANGE_SET.equals(changeSet.get("id")))
-                    .map(changeSet -> ((List<Map<String, Map<String, String>>>) changeSet.get("changes"))
-                            .getFirst().get("sql").get("sql"))
-                    .findFirst()
-                    .orElseThrow();
-        }
-        catch (IOException unreadable) {
-            throw new IllegalStateException("миграция заполнения не читается", unreadable);
-        }
+        return MigrationSql.statementsOf("db/changelog/017-price-list-finalization.yaml", FILL_CHANGE_SET).getFirst();
     }
 }
