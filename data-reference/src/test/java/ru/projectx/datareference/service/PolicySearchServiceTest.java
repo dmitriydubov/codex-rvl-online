@@ -213,7 +213,7 @@ class PolicySearchServiceTest {
     }
 
     @Test
-    void unknownOrArchivedContract_isNotFound_withoutSearch() {
+    void unknownContract_isNotFound_withoutSearch() {
         when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.search(CONTRACT, "иванов", null))

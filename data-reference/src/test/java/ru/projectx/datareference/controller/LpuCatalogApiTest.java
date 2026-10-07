@@ -176,28 +176,37 @@ class LpuCatalogApiTest {
         }
     }
 
-    /** Строка условий обслуживания, которая начнётся завтра, учреждений не даёт; строка без даты начала — даёт. */
+    /** Строка условий обслуживания, которая начнётся завтра, учреждений не даёт. */
     @Test
-    void catalog_countsServiceLineFromItsBeginDate_andEmptyBeginDateDoesNotLimitIt() {
-        Lpu lpu = saveLpu("Сосновый бор", false);
-        saveContract(lpu, "M-1", null, false, TODAY.minusYears(1), null);
-        saveProgram(List.of(row(lpu, RVL_SKL_EXT)));
-        savePolicyWithServiceLineFrom(TODAY.plusDays(1));
+    void catalog_serviceLineStartingTomorrow_givesNoLpu() {
+        lpuOfProgramWithServiceLineFrom(TODAY.plusDays(1));
 
-        MvcTestResult notYet = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
-        assertThat(notYet).hasStatusOk();
-        assertThat(notYet).bodyJson().extractingPath("$.items").asArray().isEmpty();
+        MvcTestResult result = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
 
-        databaseCleaner.clear();
-        referenceData();
-        Lpu sameLpu = saveLpu("Сосновый бор", false);
-        saveContract(sameLpu, "M-1", null, false, TODAY.minusYears(1), null);
-        saveProgram(List.of(row(sameLpu, RVL_SKL_EXT)));
-        savePolicyWithServiceLineFrom(null);
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.items").asArray().isEmpty();
+    }
 
-        MvcTestResult unbounded = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
-        assertThat(unbounded).hasStatusOk();
-        assertThat(unbounded).bodyJson().extractingPath("$.items[*].name").asArray().containsExactly("Сосновый бор");
+    /** Первый день срока строки условий уже входит в срок. */
+    @Test
+    void catalog_serviceLineStartingToday_givesLpu() {
+        lpuOfProgramWithServiceLineFrom(TODAY);
+
+        MvcTestResult result = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.items[*].name").asArray().containsExactly("Сосновый бор");
+    }
+
+    /** Строка условий без даты начала срок с этой стороны не ограничивает. */
+    @Test
+    void catalog_serviceLineWithoutBeginDate_givesLpu() {
+        lpuOfProgramWithServiceLineFrom(null);
+
+        MvcTestResult result = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.items[*].name").asArray().containsExactly("Сосновый бор");
     }
 
     @Test
@@ -383,6 +392,14 @@ class LpuCatalogApiTest {
                 serviceAvailable);
         policyRepository.save(Policy.create(UUID.randomUUID(),
                 new Policy.Snapshot(details, List.of(program), List.of(service)), NOW));
+    }
+
+    /** Учреждение с действующим договором в перечне программы и действующий полис, чья строка условий начинается с {@code lineBegin}. */
+    private void lpuOfProgramWithServiceLineFrom(@Nullable LocalDate lineBegin) {
+        Lpu lpu = saveLpu("Сосновый бор", false);
+        saveContract(lpu, "M-1", null, false, TODAY.minusYears(1), null);
+        saveProgram(List.of(row(lpu, RVL_SKL_EXT)));
+        savePolicyWithServiceLineFrom(lineBegin);
     }
 
     /** Действующий полис, у строки условий которого своя дата начала, а окончания нет. */
