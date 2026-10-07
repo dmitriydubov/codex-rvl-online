@@ -16,6 +16,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.config.RestReadPoolProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 
 /**
@@ -35,7 +36,9 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
  * (миграции в контуре идут отдельно) — WARN, что соединение миграций не проверено. Заодно —
  * WARN, если лимит REST-чтения не меньше включённого {@code lock_timeout}: тогда под чужой
  * блокировкой REST не отказывает первым ({@code lock_timeout} 0 — ожидание блокировок без предела,
- * и первым отказывает как раз лимит чтения).
+ * и первым отказывает как раз лимит чтения). И WARN, если сетевой тайм-аут пула REST-чтений меньше лимита чтения
+ * вместе с ожиданием отправки отмены: тогда медленное чтение обрывается вместе с соединением раньше, чем его
+ * отменит база.
  *
  * <p>{@link ApplicationRunner}: Spring Boot вызывает его после старта контекста и до готовности
  * принимать трафик — миграции к этому моменту прошли, их соединение открыто заново.
@@ -50,12 +53,15 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
 
     private final DatabaseSessionTimeouts configured;
     private final ReferenceApiProperties api;
+    private final RestReadPoolProperties restReadPool;
     private final Connections connections;
     private final List<String> parameters;
 
-    public DatabaseTimeoutsCheck(DatabaseSessionTimeouts configured, ReferenceApiProperties api, Connections connections) {
+    public DatabaseTimeoutsCheck(DatabaseSessionTimeouts configured, ReferenceApiProperties api,
+            RestReadPoolProperties restReadPool, Connections connections) {
         this.configured = configured;
         this.api = api;
+        this.restReadPool = restReadPool;
         this.connections = connections;
         this.parameters = List.copyOf(configured.byParameter().keySet());
     }
@@ -65,6 +71,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         read(POOL, connections.pool()).ifPresent(this::checkPool);
         migrationsSource().flatMap(source -> read(MIGRATIONS, source)).ifPresent(this::checkMigrations);
         warnIfReadLimitNotBelowLockTimeout();
+        warnIfRestSocketTimeoutBelowReadLimitAndCancel();
     }
 
     private void checkPool(Map<String, Duration> actual) {
@@ -116,6 +123,17 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
                 .filter(lockTimeout -> lockTimeout.isPositive() && readLimit.compareTo(lockTimeout) >= 0)
                 .ifPresent(lockTimeout -> log.warn("лимит REST-чтения {} не меньше lock_timeout {}: под чужой "
                         + "блокировкой REST не отказывает первым", readLimit, lockTimeout));
+    }
+
+    private void warnIfRestSocketTimeoutBelowReadLimitAndCancel() {
+        Duration readLimitAndCancel = Duration.ofSeconds(api.readTimeoutSeconds())
+                .plusSeconds(restReadPool.cancelSignalTimeoutSeconds());
+        Duration socketTimeout = Duration.ofSeconds(restReadPool.socketTimeoutSeconds());
+        if (socketTimeout.compareTo(readLimitAndCancel) < 0) {
+            log.warn("сетевой тайм-аут пула REST-чтений {} меньше лимита REST-чтения вместе с ожиданием отмены {}: "
+                    + "медленное чтение оборвётся вместе с соединением раньше, чем его отменит база",
+                    socketTimeout, readLimitAndCancel);
+        }
     }
 
     private static void warnIfDiffers(String connection, String parameter, Duration expected, Map<String, Duration> actual) {
