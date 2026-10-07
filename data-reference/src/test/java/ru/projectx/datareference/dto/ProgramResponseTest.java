@@ -32,7 +32,7 @@ class ProgramResponseTest {
         program.replaceAvailableLpu(List.of(new ProgramLpu.Row(lpu, APPEAL_TYPE, BEGIN, END, 2, true,
                 new BigDecimal("15.00"), ProgramLpu.CoverageType.D)), NOW);
 
-        ProgramResponse.Service service = ProgramResponse.of(program).services().get(0);
+        ProgramResponse.Service service = ProgramResponse.of(program, program.availableLpu()).services().get(0);
 
         assertThat(service).isEqualTo(new ProgramResponse.Service(lpu.id(), lpu.externalId(),
                 "Санаторий «Берёзка»", APPEAL_TYPE, BEGIN, END, 2, true, new BigDecimal("15.00"),
@@ -48,9 +48,30 @@ class ProgramResponseTest {
         program.replaceAvailableLpu(List.of(new ProgramLpu.Row(lpu, null, null, null, 1, false,
                 BigDecimal.ZERO, ProgramLpu.CoverageType.R)), NOW);
 
-        ProgramResponse.Service service = ProgramResponse.of(program).services().get(0);
+        ProgramResponse.Service service = ProgramResponse.of(program, program.availableLpu()).services().get(0);
 
         assertThat(service).isEqualTo(new ProgramResponse.Service(lpu.id(), lpu.externalId(), "Санаторий",
                 null, null, null, 1, false, BigDecimal.ZERO, ProgramLpu.CoverageType.R));
+    }
+
+    @Test
+    void services_keepTheOrderOfTheGivenRows_notTheOrderOfTheProgramList() {
+        Lpu first = Lpu.create(UUID.randomUUID(),
+                new Lpu.Details("Санаторий «Альфа»", null, null, null, null, null, false), NOW);
+        Lpu second = Lpu.create(UUID.randomUUID(),
+                new Lpu.Details("Санаторий «Бета»", null, null, null, null, null, false), NOW);
+        Program program = Program.create(UUID.randomUUID(),
+                new Program.Details(null, null, "Программа РВЛ", null, false), NOW);
+        program.replaceAvailableLpu(List.of(row(second), row(first)), NOW);
+        List<ProgramLpu> ordered = List.of(program.availableLpu().get(1), program.availableLpu().get(0));
+
+        List<ProgramResponse.Service> services = ProgramResponse.of(program, ordered).services();
+
+        assertThat(services).extracting(ProgramResponse.Service::lpuName)
+                .containsExactly("Санаторий «Альфа»", "Санаторий «Бета»");
+    }
+
+    private static ProgramLpu.Row row(Lpu lpu) {
+        return new ProgramLpu.Row(lpu, APPEAL_TYPE, BEGIN, END, 1, false, BigDecimal.ZERO, ProgramLpu.CoverageType.R);
     }
 }

@@ -33,6 +33,8 @@ final class OneCReferenceMessages {
     private static final String END = "окончание";
     private static final String SANATORIUM = "санаторий";
     private static final String BRANCH = "отделение";
+    private static final String LAYER = "слой";
+    private static final String FIRST_LAYER = "1";
     private static final String DELETE_MARK = "deleteMark";
     private static final String PROGRAM_NAME = "Стенд: программа РВЛ";
     private static final String MAIN_CONTRACT = "главный договор";
@@ -136,7 +138,10 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.LPU_CONTACTS, CONTACTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /** Программа РВЛ с перечнем учреждений (ТЗ-6): строка перечня на каждую строку таблицы шага. */
+    /**
+     * Программа РВЛ с перечнем учреждений (ТЗ-6): строка перечня на каждую строку таблицы шага, в том же порядке.
+     * Столбец «слой» необязателен: без него у строки первый слой.
+     */
     static OneCMessage programWithLpuList(String externalId, List<Map<String, String>> lines) {
         ObjectNode data = JSON.createObjectNode()
                 .put("id", externalId)
@@ -149,13 +154,13 @@ final class OneCReferenceMessages {
     }
 
     private static void addLpuLine(ArrayNode list, Map<String, String> line) {
-        onlyKnown(line, SANATORIUM, "вид обращения", BEGIN, END);
+        onlyKnown(line, SANATORIUM, "вид обращения", BEGIN, END, LAYER);
         list.addObject()
                 .put("idLPU", required(line, SANATORIUM))
                 .put("idTreatment", required(line, "вид обращения"))
                 .put("beginDate", required(line, BEGIN))
                 .put("endDate", required(line, END))
-                .put("numberLayer", 1)
+                .put("numberLayer", Integer.parseInt(line.getOrDefault(LAYER, FIRST_LAYER)))
                 .put("directAttachment", false)
                 .put("percentCopayment", BigDecimal.ZERO)
                 .put("r", true)
