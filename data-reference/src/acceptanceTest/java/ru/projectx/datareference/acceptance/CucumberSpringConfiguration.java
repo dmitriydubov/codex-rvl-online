@@ -1,7 +1,10 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.spring.CucumberContextConfiguration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -12,6 +15,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.datareference.config.OneCQueueProperties;
@@ -38,6 +42,9 @@ import ru.projectx.datareference.config.OneCQueueProperties;
  * ({@link SwitchableDataSource}): остановить саму базу нельзя, она одна на все сценарии.
  *
  * <p>Время сервиса — часы стенда ({@link StandClock}): идут как системные, пока сценарий их не остановит.
+ * Свойство {@value Containers#TODAY} (дата {@code yyyy-MM-dd}) переносит идущие часы на этот день по Москве: так вся
+ * приёмка проверяется на будущую дату. Задаётся при запуске переменной окружения {@code ACCEPTANCE_TODAY} — Spring
+ * читает её как это свойство. Без него часы показывают настоящее «сегодня».
  *
  * <p>Контекст и контейнеры общие на все сценарии, поэтому перед каждым сценарием база и кэши ответов
  * очищаются ({@link DatabaseCleanupHook}), а состояние сценария живёт в бинах
@@ -59,6 +66,8 @@ public class CucumberSpringConfiguration {
         /** Та же версия, что у брокера 1С:УСК на контуре. */
         private static final String RABBITMQ_IMAGE = "rabbitmq:4.1.2-alpine";
         private static final String DATA_SOURCE_BEAN = "dataSource";
+        /** Свойство с «сегодня» стенда; при запуске — переменная окружения {@code ACCEPTANCE_TODAY}. */
+        static final String TODAY = "acceptance.today";
 
         @Bean
         @ServiceConnection
@@ -74,12 +83,25 @@ public class CucumberSpringConfiguration {
 
         /**
          * Часы сервиса, которыми управляют шаги сценария ({@link ClockSteps}). Приоритетный кандидат выигрывает
-         * инъекцию {@link java.time.Clock} по типу у часов из конфигурации сервиса.
+         * инъекцию {@link java.time.Clock} по типу у часов из конфигурации сервиса. Со свойством {@value #TODAY}
+         * идущие часы показывают этот день.
          */
         @Bean
         @Primary
-        StandClock standClock() {
-            return new StandClock();
+        StandClock standClock(Environment environment) {
+            return Optional.ofNullable(environment.getProperty(TODAY))
+                    .map(Containers::today)
+                    .map(StandClock::runningOn)
+                    .orElseGet(StandClock::new);
+        }
+
+        private static LocalDate today(String value) {
+            try {
+                return LocalDate.parse(value);
+            } catch (DateTimeParseException e) {
+                throw new IllegalStateException(
+                        TODAY + " (ACCEPTANCE_TODAY) ждёт дату yyyy-MM-dd, а задано: '" + value + "'", e);
+            }
         }
 
         /** Справки об очередях для шагов сценария; очередей сам не объявляет — бинов очередей в контексте нет. */
