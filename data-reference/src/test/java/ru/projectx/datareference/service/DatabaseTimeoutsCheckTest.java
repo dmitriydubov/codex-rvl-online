@@ -18,6 +18,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
+import ru.projectx.datareference.config.RestReadPoolProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
@@ -35,6 +36,8 @@ class DatabaseTimeoutsCheckTest {
             "lock_timeout", Duration.ofSeconds(5),
             "statement_timeout", Duration.ofSeconds(30),
             "idle_in_transaction_session_timeout", Duration.ofMinutes(1));
+    /** Сетевой тайм-аут пула REST-чтений по умолчанию: больше лимита чтения (3 с). */
+    private static final int REST_SOCKET_TIMEOUT_SECONDS = 5;
     private static final Map<String, Duration> DISABLED = Map.of(
             "lock_timeout", Duration.ZERO,
             "statement_timeout", Duration.ZERO,
@@ -181,6 +184,34 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output).doesNotContain("лимит REST-чтения");
     }
 
+    /**
+     * Сетевой тайм-аут пула REST-чтений не больше лимита чтения — он оборвёт медленное чтение раньше, чем его
+     * отменит сама база, и вместе с ним соединение.
+     */
+    @Test
+    void restSocketTimeoutNotAboveReadLimit_warns(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"), 3);
+
+        check.run(null);
+
+        assertThat(output).contains("сетевой тайм-аут пула REST-чтений PT3S не больше лимита REST-чтения PT3S");
+    }
+
+    @Test
+    void restSocketTimeoutAboveReadLimit_doesNotWarn(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"), 4);
+
+        check.run(null);
+
+        assertThat(output).doesNotContain("WARN");
+    }
+
     @Test
     void liquibaseWithoutDataSource_warnsSo(CapturedOutput output) {
         when(liquibaseProvider.getIfAvailable()).thenReturn(liquibase);
@@ -198,7 +229,13 @@ class DatabaseTimeoutsCheckTest {
     }
 
     private DatabaseTimeoutsCheck check(DatabaseSessionTimeouts timeouts) {
-        return new DatabaseTimeoutsCheck(timeouts, TestApiProperties.defaults(),
+        return check(timeouts, REST_SOCKET_TIMEOUT_SECONDS);
+    }
+
+    private DatabaseTimeoutsCheck check(DatabaseSessionTimeouts timeouts, int restSocketTimeoutSeconds) {
+        RestReadPoolProperties restReadPool =
+                new RestReadPoolProperties(5, Duration.ofSeconds(2), restSocketTimeoutSeconds, 2);
+        return new DatabaseTimeoutsCheck(timeouts, TestApiProperties.defaults(), restReadPool,
                 new DatabaseTimeoutsCheck.Connections(sessionSettings, pool, liquibaseProvider));
     }
 }

@@ -146,7 +146,8 @@ www.jacoco.org
   только адрес и учётные данные, а тест сверяет умолчания `application.yml`. То же для `API_READ_TIMEOUT_SECONDS` (Ш41,
   PR #25): `RestReadTimeoutTest` ждёт 503 раньше `lock_timeout` 5 с, и значение 5 и больше его уронит. И для
   `DB_CONNECTION_TIMEOUT_MS` (Ш64): `PoolConnectionWaitTest` сверяет умолчание 2000, `RestPoolWaitTest` и
-  `IngestPoolWaitTest` ждут отказа пула за 2–5 с.
+  `IngestPoolWaitTest` ждут отказа пула за 2–5 с. И для `DB_REST_*` (Ш69): `RestPoolWaitTest` ждёт отказа пула REST за
+  2–5 с, `HungDatabaseRestReadTest` — 503 при зависшей базе быстрее 10 с.
 - `RABBITMQ_SSL_ENABLED`: `bootRun` и приёмка пошли бы по TLS.
 
 `BASH_MAX_TIMEOUT_MS` можно задать, если нужны команды дольше 10 минут. Полный `mutationGate -Pgauntlet.scope=all` до Ш3
@@ -575,15 +576,45 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     (`spring.datasource.hikari.connection-timeout`, `DB_CONNECTION_TIMEOUT_MS`, 2 с с Ш64; до Ш64 — умолчание HikariCP
     30 с): при недоступной базе или занятом пуле 503 приходит через 2 с, при занятом пуле с последующим чтением — не
     позже 2 с + лимит чтения; проверка живости соединения перед выдачей (`validation-timeout`, 1 с) меньше ожидания
-    соединения, как требует README HikariCP 7.0.2. Оповещение — на рост `hikaricp_connections_timeout_total`
-    (метрики пула Spring Boot публикует с префиксом `hikaricp`): пул не выдал соединение за 2 с. Симптом, когда REST
-    выбирает весь пул (10 соединений, REST на виртуальных потоках без ограничения параллельности): 503 при живой базе,
-    приём из 1С:УСК встаёт на паузу с WARN «…до восстановления базы…», разбор тратит ступени повторов, компонент db в
-    health мигает DOWN. Ограничение параллельных REST-чтений ниже размера пула — шаг Ш69 (бэклог); лимит должен быть меньше
-    `lock_timeout` (иначе WARN при старте: под чужой блокировкой REST не отказывает первым); ленивая догрузка табличных
-    частей полиса в `@Service` (R-05) при таймауте даёт 500, а не 503 — Spring переводит исключения Hibernate только у
-    прокси `@Repository` (дефект, Ш41a). Без лимита (вложенный вызов) чтение ограничено лишь сессионными таймаутами пула:
-    `statement_timeout` 30 с на оператор, `lock_timeout` 5 с, `socketTimeout` 60 с.
+    соединения, как требует README HikariCP 7.0.2. Лимит должен быть меньше `lock_timeout` (иначе WARN при старте: под
+    чужой блокировкой REST не отказывает первым); ленивая догрузка табличных частей полиса в `@Service` (R-05) при
+    таймауте даёт 500, а не 503 — Spring переводит исключения Hibernate только у прокси `@Repository` (дефект, Ш41a).
+    Без лимита (вложенный вызов) чтение ограничено лишь сессионными таймаутами пула: `statement_timeout` 30 с на оператор,
+    `lock_timeout` 5 с, `socketTimeout` пула (5 с у REST-чтений, 60 с у пула приложения).
+  - **Свой пул REST-чтений (Ш69).** До Ш69 REST на виртуальных потоках без ограничения параллельности выбирал весь пул
+    (10 соединений): 503 при живой базе, пауза приёма с WARN «…до восстановления базы…», ступени повторов разбора, db в
+    health мигал DOWN. С Ш69 у REST-чтений свой пул HikariCP `rest-read` (`projectx.database.rest-read-pool`): 5
+    соединений (`DB_REST_POOL_SIZE`), ожидание соединения 2 с (`DB_REST_CONNECTION_TIMEOUT_MS`), сетевой тайм-аут чтения
+    драйвера 5 с (`DB_REST_SOCKET_TIMEOUT_SECONDS`) и ожидание отправки отмены 2 с (`DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS`).
+    Пул приложения называется `application`, его размер (10) и `socketTimeout` (60 с) не менялись. Адрес, учётные данные,
+    таймауты сеанса (`options`) и проверку соединений пул REST берёт у пула приложения.
+    - Как выбирается пул: Spring Boot собирает свой пул как прежде, `RestReadDataSourcePostProcessor` оборачивает его в
+      `RestReadDataSource` (`LazyConnectionDataSourceProxy` над `RestReadRouting`, `AbstractRoutingDataSource`). Пул
+      REST получает только транзакция «только чтение» в потоке HTTP-запроса; приём, разбор, задачи по расписанию и
+      проверка здоровья — пул приложения, даже когда их транзакция только читает (Spring Data открывает такую на каждый
+      вызов репозитория вне транзакции: `SimpleJpaRepository` помечен `@Transactional(readOnly = true)`). Соединение
+      берётся перед первым оператором — к этому моменту Spring уже отметил транзакцию как «только чтение» (так эту связку
+      описывает Javadoc `LazyConnectionDataSourceProxy` 7.0.8). Своя маршрутизация вместо встроенной
+      `setReadOnlyDataSource` — как раз из-за транзакций Spring Data: встроенная увела бы в пул REST и чтения разбора.
+    - Что видит клиент: всплеск сверх 5 одновременных чтений — 503 `SERVICE_UNAVAILABLE` через 2 с ожидания соединения
+      (`RestPoolWaitTest`, приёмка `rest_read_overload.feature`); зависшая база (контейнер на паузе, сервер не отвечает) —
+      503 примерно через 5 с (`HungDatabaseRestReadTest`: 5,7 с; до Ш69 — 60 с, измерение координатора). Почему иначе
+      нельзя: лимит чтения 3 с ставится как `Statement.setQueryTimeout`, отмену pgjdbc шлёт отдельным соединением, зависшая
+      база её не исполняет, и чтение ждёт `socketTimeout`; соединение, которым пользовались меньше 0,5 с назад, HikariCP
+      выдаёт без проверки (`aliveBypassWindowMs`, `HikariPool` 7.0.2). Вдобавок pgjdbc 42.7.11, прежде чем вернуть
+      ошибку, ждёт отправки уже начатой отмены (`PgStatement.killTimerTask`) до `cancelSignalTimeout` (умолчание драйвера
+      10 с; без своего предела ответ шёл 13 с) — отсюда `DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS`: лимит чтения 3 с + 2 с
+      укладываются в 5 с. Худшее время ответа REST при отказе базы — около 5 с (ожидание соединения 2 с + лимит 3 с, или
+      сетевой тайм-аут 5 с); тайм-аут клиента Договоров к data-reference должен быть больше (О8), с запасом — от 7 с.
+    - Что видят приём и разбор: ничего — их соединения в пуле приложения, всплеск REST их не занимает (`RestPoolWaitTest`,
+      приёмка). Health и readiness при занятом пуле REST остаются 200: индикатор `db` проверяет только пул приложения
+      (`dbHealthContributor` в `RestReadPoolConfig`), readiness по умолчанию содержит только `readinessState`
+      (`RestReadPoolHealthTest`). Зависшая или недоступная база — по-прежнему DOWN в `db`.
+    - Соединений к базе от экземпляра: 10 + 5 = 15 (пул HikariCP держит `minimumIdle` = размеру пула), на время старта —
+      ещё одно соединение миграций; на N реплик — 15·N (+N на старте). `max_connections` PostgreSQL по умолчанию 100.
+    - Обязательное условие: сетевой тайм-аут пула REST больше лимита чтения, иначе медленное чтение оборвётся вместе с
+      соединением раньше, чем его отменит база (WARN «сетевой тайм-аут пула REST-чтений … не больше лимита REST-чтения …»
+      при старте); лимит чтения + ожидание отправки отмены — не больше сетевого тайм-аута.
   - **Разбор.** Проход (до 100 сообщений, `projectx.import.batch-size`) упирается в занятую чужой блокировкой таблицу
     справочника по разу на каждое сообщение, которое её пишет (при ACCESS EXCLUSIVE — и читает), и стоит до ~8 мин
     (100 × 5 с `lock_timeout`); остальные задачи по расписанию идут в своих потоках пула (выше). Блокировка
@@ -797,7 +828,28 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - с PR #25 (Ш41+Ш26): WARN «база недоступна или не ответила вовремя: <тип>, sqlstate=<код>, request_id=<id>» — каждый
     503 REST, алерт по частоте; при старте — WARN «проверка таймаутов PostgreSQL: …», «таймаут сеанса PostgreSQL расходится
     с настройкой: соединение=…, параметр=…, ожидается=…, фактически=…», «лимит REST-чтения … не меньше lock_timeout …» —
-    неверная настройка контура, старт не прерывают;
+    неверная настройка контура, старт не прерывают; с Ш69 — и WARN «сетевой тайм-аут пула REST-чтений … не больше лимита
+    REST-чтения …»;
+  - с Ш69 — пулы соединений (метрики HikariCP, их публикует Spring Boot; имена — по выдаче `/actuator/prometheus` в
+    `RestReadPoolHealthTest`): `hikaricp_connections_timeout_total{pool="application"}` — пул приёма и разбора не выдал
+    соединение за 2 с, это оповещение; `hikaricp_connections_timeout_total{pool="rest-read"}` — всплеск REST-чтений, это
+    наблюдение, не оповещение. Метка — точное имя пула из конфигурации (`spring.datasource.hikari.pool-name: application`,
+    пул REST — `rest-read`), без регулярного выражения. Правила-примеры (Prometheus, функции `increase()` и `rate()`;
+    пороги — предложение, в контуре их настраивает владелец):
+
+    ```yaml
+    - alert: DataReferenceApplicationPoolExhausted
+      expr: increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0
+    - alert: DataReferenceRest503Share        # предложение: порог 5 % за 10 минут
+      expr: |
+        sum(rate(http_server_requests_seconds_count{uri=~"/internal/v1/.+", status="503"}[5m]))
+          / sum(rate(http_server_requests_seconds_count{uri=~"/internal/v1/.+"}[5m])) > 0.05
+      for: 10m
+    ```
+
+    Доля 503 считается по REST-ручкам (`uri` начинается с `/internal/v1/`), запросы актуатора в неё не входят. Рост
+    `hikaricp_connections_timeout_total{pool="rest-read"}` при низкой доле 503 — короткие всплески, при высокой —
+    перегрузка: соседи шлют больше, чем 5 одновременных чтений.
   - периодический SQL-отчёт по `inbound_message`: FAILED, SKIPPED, BUFFERED старше часа, RETRY, давность последнего PROCESSED
     как признак зависшего планировщика.
 
@@ -971,7 +1023,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 уровня сервера, базы или роли на выделенной тестовой базе (`postgresql.conf`, `ALTER DATABASE/ROLE … SET`) уронят эту
 проверку, а переменные таймаутов `DB_*` не по умолчанию на агенте — проверку пула (раздел 1.2). `RestReadTimeoutTest` (Ш41, PR #25) ждёт 503 раньше `lock_timeout` 5 с —
 `API_READ_TIMEOUT_SECONDS` от 5 на агенте его уронит; `DB_CONNECTION_TIMEOUT_MS` не по умолчанию уронит
-`PoolConnectionWaitTest`, `RestPoolWaitTest` и `IngestPoolWaitTest` (Ш64). `OneCQueueOrderTest` (Ш1b, PR #26) создаёт в тестовой базе схему
+`PoolConnectionWaitTest`, `RestPoolWaitTest` и `IngestPoolWaitTest` (Ш64), `DB_REST_*` не по умолчанию — `RestPoolWaitTest`
+и `HungDatabaseRestReadTest` (Ш69; последнему нужен Docker: он ставит на паузу свой контейнер PostgreSQL, с
+`TEST_POSTGRES_URL` он падает). `OneCQueueOrderTest` (Ш1b, PR #26) создаёт в тестовой базе схему
 `order_probe`, функцию и триггер на `inbound_message`: на выделенной базе роли нужны CREATE на базу и TRIGGER на таблицу, а
 после оборванного прогона схема остаётся и следующий падает на `create schema` — убрать `drop schema if exists order_probe
 cascade` (исправление самого теста — план, 3.11). Решение 7 PR #1: CI контура пока не уведомляем.
@@ -985,6 +1039,10 @@ cascade` (исправление самого теста — план, 3.11). Р
 | `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `5s`, `30s`, `1min` (Ш4) | можно не задавать; если задавать — только с единицей PostgreSQL (`ms`, `s`, `min`): число без неё — миллисекунды; `0` — без ограничения |
 | `DB_SOCKET_TIMEOUT_SECONDS` | `60` (Ш4) | можно не задавать; целые секунды, больше `DB_STATEMENT_TIMEOUT` |
 | `DB_CONNECTION_TIMEOUT_MS` | `2000` (Ш64) | можно не задавать; миллисекунды (`spring.datasource.hikari.connection-timeout`, единица HikariCP — мс), больше 1000 (проверка живости соединения `validation-timeout` — 1000 мс, должна быть меньше; HikariCP сам этого не проверяет) и не меньше 250 (минимум HikariCP); `0` — ожидание без предела (HikariCP подставляет `Integer.MAX_VALUE`), не задавать; то же время, округлённое до секунды, HikariCP ставит глобальным таймаутом входа JDBC (`DriverManager.setLoginTimeout`), он касается и соединения миграций, если пул открылся раньше него; через это время при недоступной базе REST отвечает 503, приём встаёт на паузу; держать меньше `API_READ_TIMEOUT_SECONDS` и `DB_LOCK_TIMEOUT`; на агенте сборки не задавать |
+| `DB_REST_POOL_SIZE` | `5` (Ш69) | можно не задавать; соединений в пуле REST-чтений; всего к базе от экземпляра — 10 + это число |
+| `DB_REST_CONNECTION_TIMEOUT_MS` | `2000` (Ш69) | можно не задавать; миллисекунды ожидания соединения пула REST, через них при всплеске REST отвечает 503; не меньше 250 и больше 1000 (проверка соединения пула — 1000 мс); на агенте сборки не задавать |
+| `DB_REST_SOCKET_TIMEOUT_SECONDS` | `5` (Ш69) | можно не задавать; целые секунды, больше `API_READ_TIMEOUT_SECONDS` (иначе WARN при старте) и не меньше `API_READ_TIMEOUT_SECONDS` + `DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS`; через это время REST отвечает 503 при зависшей базе; на агенте сборки не задавать |
+| `DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS` | `2` (Ш69) | можно не задавать; целые секунды ожидания отправки отмены запроса драйвером (`cancelSignalTimeout` pgjdbc, умолчание драйвера 10 с) |
 | `API_READ_TIMEOUT_SECONDS` | `3` (Ш41, PR #25) | можно не задавать; целые секунды, не меньше 1, меньше `DB_LOCK_TIMEOUT` (иначе WARN при старте) и меньше таймаута клиента Договоров (О8); на агенте сборки не задавать — `RestReadTimeoutTest` ждёт 503 быстрее 5 с |
 | `RABBITMQ_HOST` | `localhost` | обязательна |
 | `RABBITMQ_PORT` | `5672` | `5671` при TLS: иначе TLS уйдёт на 5672 |

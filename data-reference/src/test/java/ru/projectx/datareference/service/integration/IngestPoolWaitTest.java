@@ -7,10 +7,12 @@ import java.sql.SQLException;
 import java.time.Duration;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.ParseFailure;
 import ru.projectx.datareference.service.ParseFailures;
@@ -44,6 +46,15 @@ class IngestPoolWaitTest {
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    /**
+     * Проверка базы и разбор идут в потоках задач по расписанию, без HTTP-запроса. Spring кладёт в поток теста
+     * HTTP-запрос-заглушку, и без сброса чтение «только чтение» ушло бы в пул REST-чтений, а не в пул приложения.
+     */
+    @BeforeEach
+    void outsideHttpRequest() {
+        RequestContextHolder.resetRequestAttributes();
+    }
 
     @Test
     void noConnectionFromPool_storageCheckAnswersUnavailableWithinSeconds() throws SQLException {
