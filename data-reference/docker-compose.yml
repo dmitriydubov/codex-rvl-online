@@ -1,6 +1,9 @@
 # Локальный контур для запуска сервиса вне тестов (тесты поднимают своё через Testcontainers).
 #
-# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1, а не всей сети.
+# Пароли здесь известны всем, поэтому порты по умолчанию открыты только на 127.0.0.1, а не всей
+# сети. Чтобы к сервису и базе ходили с других машин (например, тестировщик из Postman),
+# задайте в .env SERVICE_BIND_ADDRESS=0.0.0.0 и/или POSTGRES_BIND_ADDRESS=0.0.0.0; тогда
+# смените пароль базы и откройте порты в брандмауэре. Брокер и актуатор остаются на 127.0.0.1.
 # Переменные сервиса и аргументы сборки — из .env (шаблон .env.example), без него действуют
 # умолчания application.yml и Dockerfile.
 #
@@ -46,7 +49,7 @@ services:
       POSTGRES_USER: data_reference
       POSTGRES_PASSWORD: data_reference
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -105,7 +108,7 @@ services:
       # Тот же порт, что опубликован ниже.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
       # Актуатор (health, prometheus).
       - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
     depends_on:
@@ -126,7 +129,7 @@ services:
       RABBITMQ_LISTENER_AUTO_STARTUP: "false"
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
       # Актуатор; порт — умолчание application.yml.
       - "127.0.0.1:8081:8081"
     depends_on:
