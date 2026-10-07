@@ -7,10 +7,11 @@ Gradle-сборка в своём каталоге; корневой сборк�
   REST-чтение справочников для сервисов Заявок и Договоров. Java 21, Spring Boot 4.0, PostgreSQL.
   Охраняется gauntlet (`module=data-reference` в `gauntlet/config/gauntlet.properties`). Его правила и
   предметная область — в `data-reference/CLAUDE.md`: прочитай перед задачей в `data-reference`.
-- `contract-service/` — сервис Договоров, он же бэкенд ЛК застрахованного. Кода пока нет, только
-  документы; под gauntlet подключается, когда появится его сборка. Его правила будут в
-  `contract-service/CLAUDE.md`.
-- `project_files/` — ТЗ, схемы и структуры данных контура: источник бизнес-правил.
+- `contract-service/` — сервис Договоров, он же бэкенд ЛК застрахованного. Каталога пока нет: код
+  появится с его каркасом, под gauntlet подключается, когда появится его сборка. Его правила будут в
+  `contract-service/CLAUDE.md`, документы лежат в `project_files/contract-service/`.
+- `project_files/` — ТЗ, схемы и структуры данных контура: источник бизнес-правил. Разложен по сервисам:
+  `common/`, `data-reference/`, `contract-service/` (см. `project_files/README.md`).
 
 Сервис Заявок (он же сервис HR), BFF и фронтенд — у других разработчиков, в своих репозиториях.
 
