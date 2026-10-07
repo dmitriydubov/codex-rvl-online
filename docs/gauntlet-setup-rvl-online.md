@@ -294,7 +294,7 @@ exit 0
        `gauntlet/README.md`.
   - Публичный репозиторий не рассматривать: в `project_files/` ПДн и внутренние адреса (раздел 8).
 - **Что guard не защищает.** Решать в админ-окружении, с кейсами в `selftest.py`.
-  - `contract-service/CLAUDE.md` (сейчас это правила data-reference), будущий `data-reference/CLAUDE.md` и любые
+  - `data-reference/CLAUDE.md` (правила data-reference), будущий `contract-service/CLAUDE.md` и любые
     `.github/workflows/*.yml`, кроме `gauntlet.yml`, агент может править через Edit и Bash. Новый workflow из ветки агента
     исполнится в Actions до ревью человека.
   - Запись в GitHub через MCP-инструменты (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`,
@@ -370,7 +370,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 6. **Координатор подписывается на PR шага** (`subscribe_pr_activity`), следит за CI и Grok, после мержа владельца делает
    проверку: сверяет код с описанием PR, прогоняет `gauntletFast` на `main`, разбирает остатки, записывает итог в план
    (карточка «Сделано», реестр, 1.2), архивирует сессию. Комментарии и Javadoc в тронутых файлах — простым языком по
-   `contract-service/CLAUDE.md`; шапки фич правило не затрагивает.
+   `data-reference/CLAUDE.md`; шапки фич правило не затрагивает.
 
 ---
 
@@ -798,7 +798,7 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     полиса и GUID из живой 1С — похоже на реальные данные. Тестовые фикстуры скопировали из ТЗ-1 и ТЗ-2 номер полиса и
     реквизиты договора.
   - Во внешнем контуре лежат внутренние хосты, IP и домен компании: PDF `project_files/` (в том числе `ordering/`) и
-    `contract-service/CLAUDE.md` (хост и логин тестового брокера).
+    `data-reference/CLAUDE.md` (хост и логин тестового брокера).
   - Решения человека:
     1. запросить у 1С синтетический пример ТЗ-01 и заменить оба PDF;
     2. фикстуры — на синтетику (план, Ш2);
@@ -999,9 +999,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Проверено.** Сборка модуля без них зелёная. Проверка шла в копии без этих каталогов, без `CLAUDE_CODE_REMOTE`, с Maven
   Central вместо Nexus: `./gradlew build -PpublicRepositories=false`, 155 тестов, 0 падений, 0 пропусков. Портал плагинов,
   git-зависимости и прямые URL сборке не нужны. PIT, Cucumber, ArchUnit, JaCoCo, Checkstyle и PMD в контуре не скачиваются.
-- **Правила data-reference.** В контуре единственный источник контракта 1С — правила из `contract-service/CLAUDE.md` (их
-  переносят в `data-reference/CLAUDE.md`, решение 2 PR #1). Нужно решить, переносится ли этот файл: сейчас «Рабочий контур» в
-  `gauntlet/CLAUDE.md` запрещает только корневой.
+- **Правила data-reference.** Правила и контракт 1С лежат в `data-reference/CLAUDE.md` (перенесены из
+  `contract-service/CLAUDE.md` 2026-10-07, решение владельца «3) да»). В контур файл не переносится: в нём внутренние хосты
+  и следы внешней разработки; «Рабочий контур» в `gauntlet/CLAUDE.md` с этого дня запрещает любой `CLAUDE.md`, не только
+  корневой. При ручном копировании каталога модуля файл нужно исключить.
 
 **Проверить в Nexus до переноса.**
 1. 312 модулей из `docs/gauntlet-setup-rvl-online-nexus.txt`: 180 с jar, 132 только POM (родительские POM, маркер плагина Spring
