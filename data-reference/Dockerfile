@@ -85,7 +85,7 @@ COPY --from=layers --chown=app:app /workspace/extracted/snapshot-dependencies/ .
 COPY --from=layers --chown=app:app /workspace/extracted/application/ ./
 
 USER 10001:10001
-# 8080 — REST и пробы /livez и /readyz, 8081 — актуатор (health, prometheus).
+# 8080 — REST и пробы /livez и /readyz, 8081 — актуатор (health, info, prometheus).
 EXPOSE 8080 8081
 
 # Память JVM считается от лимита контейнера. При нехватке памяти процесс завершается,

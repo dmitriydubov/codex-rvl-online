@@ -676,8 +676,9 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 - **Gradle 8.14.3 запускается на JVM 8–24.** Тулчейн Java 21 без плагина-резолвера: на машине сборки нужен JDK 21.
 - **Dockerfile.**
   - Требует BuildKit (`RUN --mount`).
-  - В режиме `JAR_SOURCE=host` маска `data-reference-*.jar` при нескольких совпадениях молча берёт последний по алфавиту
-    (воспроизведено на 0.1.0/0.9.0/0.10.0). Перед сборкой — `clean bootJar`.
+  - Оба этапа (`JAR_SOURCE=build` и `host`) берут jar по точному имени `data-reference-<version>.jar`, где версия читается
+    из `gradle.properties`: jar прежней версии в `build/libs` не попадёт в образ, а нет jar текущей версии — сборка падает.
+    При `JAR_SOURCE=host` перед сборкой образа — `./gradlew bootJar` с тем же `gradle.properties`.
 - **Теги закреплены** (Ш6, PR #26): `eclipse-temurin:21.0.12.1_1-jdk/-jre`, `rabbitmq:4.1.2-alpine`,
   `rabbitmq:4.1.2-management-alpine` (Erlang 27.3.4.2 — как у брокера контура, Р16). Обновлять вручную: Temurin — отдельным
   шагом на каждое квартальное обновление JDK, RabbitMQ — вслед за брокером 1С. Плавающий `rabbitmq:4.1-alpine` — уже 4.1.8,
@@ -1035,6 +1036,23 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 `order_probe`, функцию и триггер на `inbound_message`: на выделенной базе роли нужны CREATE на базу и TRIGGER на таблицу, а
 после оборванного прогона схема остаётся и следующий падает на `create schema` — убрать `drop schema if exists order_probe
 cascade` (исправление самого теста — план, 3.11). Решение 7 PR #1: CI контура пока не уведомляем.
+
+**Версия сервиса.** Номер — по Semantic Versioning 2.0.0, правила MAJOR/MINOR/PATCH и история — в
+`data-reference/CHANGELOG.md` (уходит в контур вместе с модулем, как и `data-reference/README.md`).
+- Где задаётся: `data-reference/gradle.properties`, строка `version=` — единственное место. От неё — имя jar
+  `data-reference-<version>.jar` (оба этапа Dockerfile читают версию оттуда же), `Implementation-Version` манифеста и
+  `META-INF/build-info.properties` (`springBoot { buildInfo { excludes = ['time'] } }` в `build.gradle`, без времени сборки: с ним задача никогда
+  не up-to-date и тесты перезапускаются на каждой сборке — Spring Boot Gradle plugin 4.0, «Integrating with Actuator»).
+- Где видна: `GET /actuator/info` на порту управления (`MANAGEMENT_PORT`, 8081) — `build.version`, рядом `artifact`, `name`,
+  `group`; переменных окружения, сведений о Java, процессе и машине там нет (`management.info.env/java/os/process.enabled`
+  по умолчанию `false`, проверено тестом `ManagementPortTest`). Строка старта журнала — «Starting DataReferenceApplication
+  v<version>» при запуске из jar или образа (под `bootRun` версии в ней нет: она берётся из манифеста jar). Метки образа
+  (версия, время сборки, ревизия) ставит CI контура.
+- Как выпускается: релизный коммит меняет `version=` на выпускаемую (`1.0.0-rc.2`, `1.0.0`, `1.0.1` …) и переносит раздел
+  «Не выпущено» CHANGELOG в раздел версии с датой; на этот коммит ставится тег `vX.Y.Z` или `vX.Y.Z-rc.N`; следующий коммит
+  ставит версию разработки `-SNAPSHOT` и оставляет пустой «Не выпущено». После кандидата `X.Y.Z-rc.N` версия разработки —
+  `X.Y.Z-SNAPSHOT` (следующим выйдет `X.Y.Z-rc.N+1` или сам `X.Y.Z`), после выпуска `X.Y.Z` — `X.Y.(Z+1)-SNAPSHOT`. Пока
+  версия не поднята до `-SNAPSHOT`, сборки нового кода получают тот же номер, что и выпущенная.
 
 **Переменные окружения сервиса.**
 

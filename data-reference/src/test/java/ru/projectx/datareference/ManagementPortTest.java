@@ -3,17 +3,23 @@ package ru.projectx.datareference;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import ru.projectx.datareference.support.IntegrationTest;
@@ -28,7 +34,15 @@ import ru.projectx.datareference.support.IntegrationTest;
  * вовсе, и такой тест ничего бы не проверил.
  */
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@TestPropertySource(properties = ManagementPortTest.INFO_PROPERTY_FROM_ENVIRONMENT)
 class ManagementPortTest {
+
+    /**
+     * Свойство {@code info.*}, как если бы его задало окружение развёртывания: info не показывает и его, потому что
+     * свойства окружения в info не публикуются.
+     */
+    static final String INFO_PROPERTY_FROM_ENVIRONMENT = "info.contour=test-contour";
+    private static final String MODULE_NAME = "data-reference";
 
     private static final int OK = 200;
     private static final int NOT_FOUND = 404;
@@ -81,12 +95,48 @@ class ManagementPortTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/actuator", "/actuator/health", "/actuator/health/liveness", "/actuator/prometheus"})
+    @ValueSource(strings = {
+        "/actuator", "/actuator/health", "/actuator/health/liveness", "/actuator/prometheus", "/actuator/info"})
     void apiPort_doesNotServeActuator(String path) throws IOException, InterruptedException {
         assertThat(get(apiPort, path).statusCode()).isEqualTo(NOT_FOUND);
     }
 
-    /** Наружу и на порту актуатора открыты только health и prometheus: открыть остальное — одна строка конфигурации. */
+    /**
+     * Сопровождение видит, какая версия установлена: та, что записана в сборке модуля. Версия берётся из того же
+     * файла, что и у сборки, поэтому тест не правится при каждом выпуске.
+     */
+    @Test
+    void managementPort_showsServiceVersion() throws IOException, InterruptedException {
+        HttpResponse<String> info = get(managementPort, "/actuator/info");
+
+        assertThat(info.statusCode()).isEqualTo(OK);
+        assertThat(json.readTree(info.body()).path("build").path("version").asString())
+                .isEqualTo(buildProperty("version"));
+    }
+
+    /** Сведения о сборке называют этот модуль: группу из его сборки и его имя. */
+    @Test
+    void managementPort_infoNamesThisModule() throws IOException, InterruptedException {
+        JsonNode build = json.readTree(get(managementPort, "/actuator/info").body()).path("build");
+
+        assertThat(build.path("group").asString()).isEqualTo(buildProperty("group"));
+        assertThat(build.path("artifact").asString()).isEqualTo(MODULE_NAME);
+        assertThat(build.path("name").asString()).isEqualTo(MODULE_NAME);
+    }
+
+    /**
+     * В info — только сведения о сборке: ни переменных окружения и свойств (там адреса и пароли), даже заданных
+     * с префиксом {@code info.}, ни сведений о Java, процессе и машине. Время сборки не публикуется: с ним каждая сборка давала бы другой jar.
+     */
+    @Test
+    void managementPort_infoShowsBuildFactsOnly() throws IOException, InterruptedException {
+        JsonNode info = json.readTree(get(managementPort, "/actuator/info").body());
+
+        assertThat(info.propertyNames()).containsExactly("build");
+        assertThat(info.path("build").propertyNames()).containsExactlyInAnyOrder("artifact", "name", "group", "version");
+    }
+
+    /** Наружу и на порту актуатора открыты только health, info и prometheus: открыть остальное — одна строка конфигурации. */
     @Test
     void managementPort_doesNotExposeOtherEndpoints() throws IOException, InterruptedException {
         assertThat(get(managementPort, "/actuator/env").statusCode()).isEqualTo(NOT_FOUND);
@@ -118,6 +168,14 @@ class ManagementPortTest {
                 .contains("# TYPE onec_inbound_backlog_staleness_seconds gauge")
                 .contains("# HELP onec_inbound_messages Сырые сообщения 1С по потоку и статусу")
                 .contains("hikaricp_connections");
+    }
+
+    private static String buildProperty(String name) throws IOException {
+        Properties build = new Properties();
+        try (Reader file = Files.newBufferedReader(Path.of("gradle.properties"), StandardCharsets.UTF_8)) {
+            build.load(file);
+        }
+        return build.getProperty(name);
     }
 
     private void assertUp(HttpResponse<String> probe) {
