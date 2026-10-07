@@ -1,0 +1,133 @@
+# История изменений data-reference
+
+Здесь записаны заметные изменения сервиса по версиям, новые сверху. Формат — [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
+номера версий — по [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html):
+
+- **MAJOR** — ломается контракт REST `/internal/v1`, контракт очередей 1С:УСК или эксплуатация: удалена или переименована
+  переменная окружения, появилась обязательная переменная без умолчания, миграция базы без обратной совместимости.
+- **MINOR** — новая возможность без поломки, в том числе новая переменная с умолчанием и миграция, которая только добавляет.
+- **PATCH** — исправление без новых возможностей.
+
+Рубрики версии: Добавлено, Изменено, Устарело, Удалено, Исправлено, Безопасность и Перенос — что нужно сделать на контуре
+при установке версии.
+
+## [Не выпущено]
+
+## [1.0.0-rc.1] - 2026-10-07
+
+Первая версия с номером: кандидат в выпуск 1.0.0.
+
+### Добавлено
+
+- Приём справочников и полисов из 1С:УСК: 11 очередей RabbitMQ, 10 потоков данных — полисы, договоры страхования (из них
+  сохраняются только ДМС), контрагенты-юрлица (ЛПУ и страхователи), МКБ-10, договоры с ЛПУ, страховые программы, виды
+  обращения, адреса и регионы ЛПУ, прейскуранты (пакеты строк и финальное сообщение — две очереди), услуги контрагентов.
+  Сообщение подтверждается брокеру только после записи в базу; повторная доставка не дублирует запись. Разбор идёт по
+  порядку приёма внутри потока, с повторами после временных отказов базы. Сообщение, пришедшее раньше своей родительской
+  записи, ждёт её до `ONEC_PARENT_WAIT_TIMEOUT`. Тело, которое база не примет никогда, уходит в карантин. Пока база
+  недоступна, приём стоит на паузе и сам возобновляется.
+- REST-чтение справочников для сервисов Заявок и Договоров, `GET /internal/v1/…`, ответы в JSON с полями в snake_case:
+  - `/lpu?contract_external_id=` — каталог ЛПУ, доступных застрахованным договора страхования;
+  - `/lpu/{id}` — карточка ЛПУ с прайсовым договором;
+  - `/lpu/{id}/services?need_prices=` — услуги прайсового договора по видам обращения РВЛ, с ценами или без;
+  - `/services/{id}/price?date_from=&date_to=` — стоимость услуги за период проживания;
+  - `/mkb10?query=&limit=` и `/mkb10?codes=` — подсказка по МКБ-10 и перечень кодов разом;
+  - `/policies/search?contract_external_id=&query=&limit=` — подсказка по части ФИО или номера среди действующих полисов договора;
+  - `/policies/{id}`, `/policies?external_id=`, `/policies?number=&contract_external_id=` — полис целиком;
+  - `/policies/{id}/contract-view`, `/policies/contract-view?external_id=` — полис для сервиса Договоров, без
+    персональных данных;
+  - `/insurance-contracts/{id}`, `/insurance-contracts?external_id=` — договор страхования со страхователем;
+  - `/programs/{id}` — страховая программа с перечнем услуг.
+
+  Ошибки — в едином формате; недоступная или не ответившая вовремя база — 503, потребитель повторяет запрос.
+- Кэш справочных ответов в памяти процесса (Spring Cache, Caffeine): срок жизни `REFERENCE_CACHE_TTL`, предел
+  `REFERENCE_CACHE_MAXIMUM_SIZE` ответов на кэш. Сообщение 1С сразу сбрасывает зависящие от него ответы. Полисы
+  не кэшируются.
+- Хранение и стирание персональных данных по сроку: тела сообщений с полисами и договорами страхования и тела в карантине
+  стираются через 30 суток после приёма; ФИО, дата рождения и почта застрахованного стираются из полиса через
+  `POLICY_PERSONAL_DATA_GRACE` после окончания срока или перевода в архив. Обезличенный полис отдаётся с
+  `personal_data_erased: true`.
+- Метрики Prometheus и health на порту управления: `/actuator/prometheus`, `/actuator/health` с компонентами `db` и
+  `onecIngest`, пробы `/actuator/health/liveness` и `/readiness`; на порту API — короткие пробы `/livez` и `/readyz`.
+- Версия сервиса в `/actuator/info` (`build.version`) и в строке старта журнала при запуске из jar или образа.
+
+### Безопасность
+
+- У паролей базы и брокера нет умолчаний: пароль из репозитория не подойдёт ни к одной базе.
+- Персональные данные не пишутся в журнал, метрики, health и тексты ошибок; журнал — в формате JSON (ECS).
+- Порт управления отделён от порта API: на порту API `/actuator/*` отвечает 404.
+- При включённом TLS к брокеру (`RABBITMQ_SSL_ENABLED=true`) сертификат и имя хоста проверяются, пока это не выключено явно.
+
+### Перенос
+
+- **Переменные окружения.** Обязательные, без умолчания: `DB_PASSWORD`, `RABBITMQ_PASSWORD`. Остальные необязательны,
+  умолчания ведут на локальный контур из `docker-compose.yml` или заданы под рабочий режим:
+
+  | Переменная | Умолчание |
+  |---|---|
+  | `DB_URL` | `jdbc:postgresql://localhost:5432/data_reference?logServerErrorDetail=false` |
+  | `DB_USERNAME` | `data_reference` |
+  | `DB_CONNECTION_TIMEOUT_MS` | `2000` |
+  | `DB_SOCKET_TIMEOUT_SECONDS` | `60` |
+  | `DB_LOCK_TIMEOUT` | `5s` |
+  | `DB_STATEMENT_TIMEOUT` | `30s` |
+  | `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `1min` |
+  | `DB_REST_POOL_SIZE` | `5` |
+  | `DB_REST_CONNECTION_TIMEOUT_MS` | `2000` |
+  | `DB_REST_SOCKET_TIMEOUT_SECONDS` | `5` |
+  | `DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS` | `2` |
+  | `API_READ_TIMEOUT_SECONDS` | `3` |
+  | `RABBITMQ_HOST` | `localhost` |
+  | `RABBITMQ_PORT` | `5672` |
+  | `RABBITMQ_VHOST` | `/` |
+  | `RABBITMQ_USERNAME` | `data_reference` |
+  | `RABBITMQ_SSL_ENABLED` | `false` |
+  | `RABBITMQ_SSL_VALIDATE_CERTIFICATE` | `true` |
+  | `RABBITMQ_SSL_VERIFY_HOSTNAME` | `true` |
+  | `RABBITMQ_LISTENER_AUTO_STARTUP` | `true` |
+  | `ONEC_QUEUE_POLICIES` | `1c-usk_to_rvl-online_policies` |
+  | `ONEC_QUEUE_INSURANCE_CONTRACTS` | `1c-usk_to_rvl-online_contracts-changes` |
+  | `ONEC_QUEUE_CONTRAGENTS` | `1c-usk_to_rvl-online_contragents-ul-changes` |
+  | `ONEC_QUEUE_MKB10` | `1c-usk_to_rvl-online_mkb10-changes` |
+  | `ONEC_QUEUE_LPU_CONTRACTS` | `1c-usk_to_rvl-online_contragents-contracts-changes` |
+  | `ONEC_QUEUE_PROGRAMS` | `1c-usk_to_rvl-online_programms-changes` |
+  | `ONEC_QUEUE_APPEAL_TYPES` | `1c-usk_to_rvl-online_types-treatments-changes` |
+  | `ONEC_QUEUE_LPU_CONTACTS` | `1c-usk_to_rvl-online_contact-information-changes` |
+  | `ONEC_QUEUE_PRICE_LISTS` | `1c-usk_to_rvl-online_pricelists-contragents-changes` |
+  | `ONEC_QUEUE_PRICE_LISTS_FINAL` | `1c-usk_to_rvl-online_pricelists-contragents-changes-final` |
+  | `ONEC_QUEUE_CONTRAGENT_SERVICES` | `1c-usk_to_rvl-online_contragents-services-changes` |
+  | `ONEC_PARENT_WAIT_TIMEOUT` | `24h` |
+  | `POLICY_PERSONAL_DATA_GRACE` | `30d` |
+  | `REFERENCE_CACHE_TTL` | `10m` |
+  | `REFERENCE_CACHE_MAXIMUM_SIZE` | `1000` |
+  | `MANAGEMENT_PORT` | `8081` |
+
+  Таймауты PostgreSQL (`DB_LOCK_TIMEOUT` и соседние) задаются с единицей: число без неё читается как миллисекунды. Имена
+  очередей сверяются со списком брокера контура: при включённых слушателях неверное или повторённое имя роняет старт.
+  Подробности каждой переменной — в комментариях `src/main/resources/application.yml` и в `.env.example`.
+- **База.** Миграции Liquibase 001–019 (`src/main/resources/db/changelog/`) выполняются при старте под пользователем
+  приложения отдельным соединением, без таймаутов пула. Пользователю нужны права DDL на схему и CREATE на базу для
+  расширения `pg_trgm` (миграция 011), либо расширение заранее ставит администратор базы.
+- **Соединения к базе.** На экземпляр — 10 (пул приёма и разбора) плюс `DB_REST_POOL_SIZE` (пул REST-чтений), по умолчанию
+  15; на время старта ещё одно соединение миграций.
+- **Выкатка.** Одна реплика, стратегия Recreate, без перекрытия версий: порядок разбора держится на одном потребителе,
+  а кэш ответов живёт в памяти процесса. `terminationGracePeriodSeconds` больше 30 с.
+- **Порты и эндпоинты.** 8080 — REST `/internal/v1` и пробы `/livez`, `/readyz` (только статус); его открывают сервисам
+  Заявок и Договоров. `MANAGEMENT_PORT` (8081) — `/actuator/health` (с компонентами), `/actuator/info`,
+  `/actuator/prometheus`; его открывают только мониторингу. Своей авторизации у ручек нет, защита — сетевая политика.
+- **Журналы прокси.** ФИО и номер полиса едут в строке запроса GET (`/internal/v1/policies/search?query=`,
+  `/internal/v1/policies?number=`): в ingress и mesh строку запроса у `/internal/v1/policies*` маскировать, в access-лог
+  Tomcat не включать `%r` и `%q`.
+- **Метрики и оповещения.** Приём и разбор: `onec_ingest_deliveries_total{stream,queue,outcome}`, `onec_ingest_paused`,
+  `onec_ingest_pauses_total`, `onec_inbound_transitions_total{stream,status}`, `onec_inbound_messages{stream,status}`,
+  `onec_inbound_pending_oldest_age_seconds{stream}`, `onec_inbound_parent_wait_expired_total{stream}`,
+  `onec_price_transfers_stuck`, `onec_inbound_backlog_staleness_seconds` — давность снимка, по которому считаются
+  `onec_inbound_messages` и `onec_inbound_pending_oldest_age_seconds`. Сроки персональных данных: `onec_retention_overdue_payloads`,
+  `onec_retention_overdue_quarantine_bodies`, `policies_retention_overdue_personal_data`. Пулы соединений —
+  `hikaricp_*` с меткой `pool`: `application` (приём и разбор) и `rest-read` (REST-чтения). Кэш ответов — `cache_gets_total`, `cache_puts_total`, `cache_evictions_total`, `cache_size` с меткой
+  `cache`. Предлагаемые оповещения:
+  `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`;
+  `increase(onec_inbound_parent_wait_expired_total[1h]) > 0`; `policies_retention_overdue_personal_data > 0` дольше часа;
+  доля ответов 503 на `/internal/v1/` выше 5 % за 10 минут. Пороги настраиваются на контуре.
+- **Образ.** `Dockerfile` модуля, BuildKit обязателен. Базовые образы `eclipse-temurin:21.0.12.1_1-jdk` и `-jre`;
+  сертификаты корпоративного центра кладутся в `certs/` перед сборкой.

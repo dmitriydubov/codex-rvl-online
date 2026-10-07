@@ -32,6 +32,19 @@ tasks.named('jar') {
     enabled = false
 }
 
+/*
+ * META-INF/build-info.properties: по нему /actuator/info показывает версию сервиса. Строка старта
+ * в журнале берёт версию из манифеста jar. Время сборки не пишется: с ним задача никогда не считается
+ * выполненной, тесты и проверки перезапускаются на каждой сборке, а два прогона одного кода дают разные
+ * jar. Время сборки образа ставит в его метки CI. (Spring Boot Gradle plugin 4.0, «Integrating with
+ * Actuator».)
+ */
+springBoot {
+    buildInfo {
+        excludes = ['time']
+    }
+}
+
 java {
     // Стек зафиксирован на Java 21 (LTS).
     toolchain {
@@ -117,8 +130,8 @@ dependencies {
     // Проверка @ConfigurationProperties на старте: неверная конфигурация обязана
     // ронять приложение при развёртывании, а не в первом же сообщении из очереди.
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    // Пробы Kubernetes: /actuator/health/liveness и /readiness. Наружу открыт только
-    // health, остальные ручки актуатора не публикуются (management в application.yml).
+    // Пробы Kubernetes: /actuator/health/liveness и /readiness. На порту актуатора открыты только
+    // health, info и prometheus, остальные ручки не публикуются (management в application.yml).
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // Метрики приёма и разбора для Prometheus: /actuator/prometheus. Экспорт настраивает модуль
     // spring-boot-micrometer-metrics, который уже приходит с актуатором, — он включается, как только
