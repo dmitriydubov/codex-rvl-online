@@ -3,24 +3,20 @@ package ru.projectx.datareference.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionOperations;
-import org.yaml.snakeyaml.Yaml;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.MigrationSql;
 
 /**
  * Таблица полисов после введения срока хранения персональных данных. Полисам, которые лежали в архиве до обновления,
@@ -111,20 +107,8 @@ class PolicyPersonalDataStorageTest {
     }
 
     /** Операторы заполнения ровно тем текстом, что лежит в миграции. */
-    @SuppressWarnings("unchecked")
     private static List<String> fillSql() {
-        try (InputStream changelog = new ClassPathResource("db/changelog/019-policy-personal-data-retention.yaml")
-                .getInputStream()) {
-            Map<String, Object> root = new Yaml().load(changelog);
-            return ((List<Map<String, Object>>) root.get("databaseChangeLog")).stream()
-                    .map(entry -> (Map<String, Object>) entry.get("changeSet"))
-                    .filter(changeSet -> "019-policy-archived-at-fill".equals(changeSet.get("id")))
-                    .flatMap(changeSet -> ((List<Map<String, Map<String, String>>>) changeSet.get("changes")).stream())
-                    .map(change -> change.get("sql").get("sql"))
-                    .toList();
-        }
-        catch (IOException unreadable) {
-            throw new IllegalStateException("миграция заполнения не читается", unreadable);
-        }
+        return MigrationSql.statementsOf("db/changelog/019-policy-personal-data-retention.yaml",
+                "019-policy-archived-at-fill");
     }
 }
