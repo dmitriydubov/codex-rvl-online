@@ -144,7 +144,9 @@ www.jacoco.org
   `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`, `DB_SOCKET_TIMEOUT_SECONDS` к тому же дошли
   бы до тестов: значение, отличное от умолчания, уронит `DatabaseTimeoutsTest` (Ш4) — `PostgresTestcontainer` подменяет
   только адрес и учётные данные, а тест сверяет умолчания `application.yml`. То же для `API_READ_TIMEOUT_SECONDS` (Ш41,
-  PR #25): `RestReadTimeoutTest` ждёт 503 раньше `lock_timeout` 5 с, и значение 5 и больше его уронит.
+  PR #25): `RestReadTimeoutTest` ждёт 503 раньше `lock_timeout` 5 с, и значение 5 и больше его уронит. И для
+  `DB_CONNECTION_TIMEOUT_MS` (Ш64): `PoolConnectionWaitTest` сверяет умолчание 2000, `RestPoolWaitTest` и
+  `IngestPoolWaitTest` ждут отказа пула за 2–5 с.
 - `RABBITMQ_SSL_ENABLED`: `bootRun` и приёмка пошли бы по TLS.
 
 `BASH_MAX_TIMEOUT_MS` можно задать, если нужны команды дольше 10 минут. Полный `mutationGate -Pgauntlet.scope=all` до Ш3
@@ -568,8 +570,12 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
   - **REST-чтения.** С PR #25 (Ш41+Ш26) у чтений свой лимит — `@RestReadTransaction`, 3 с (`API_READ_TIMEOUT_SECONDS`),
     превышение — 503 `SERVICE_UNAVAILABLE`. Ловушки: лимит действует только на транзакцию, которую метод начинает сам;
     Hibernate передаёт остаток в `Statement.setQueryTimeout` целыми секундами — остаток меньше 0,5 с даёт 0, то есть без
-    JDBC-таймаута (держат только `lock_timeout` и `statement_timeout`; Ш41a); ожидание соединения пула — Hikari
-    connectionTimeout 30 с, поэтому при исчерпанном пуле 503 придёт не раньше 30 с; лимит должен быть меньше
+    JDBC-таймаута (держат только `lock_timeout` и `statement_timeout`; Ш41a); лимит начинает действовать только после
+    того, как пул выдал соединение, а ожидание соединения ограничивает свой таймаут пула
+    (`spring.datasource.hikari.connection-timeout`, `DB_CONNECTION_TIMEOUT_MS`, 2 с с Ш64; до Ш64 — умолчание HikariCP
+    30 с): при недоступной базе или занятом пуле 503 приходит через 2 с, при занятом пуле с последующим чтением — не
+    позже 2 с + лимит чтения; проверка живости соединения перед выдачей (`validation-timeout`, 1 с) меньше ожидания
+    соединения, как требует README HikariCP 7.0.2; лимит должен быть меньше
     `lock_timeout` (иначе WARN при старте: под чужой блокировкой REST не отказывает первым); ленивая догрузка табличных
     частей полиса в `@Service` (R-05) при таймауте даёт 500, а не 503 — Spring переводит исключения Hibernate только у
     прокси `@Repository` (дефект, Ш41a). Без лимита (вложенный вызов) чтение ограничено лишь сессионными таймаутами пула:
@@ -591,7 +597,10 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
     - прочее (08xxx, 55P03, 57014, неизвестное) — недоступность базы: сообщение возвращается без ack, все потребители 1С
       встают на паузу (WARN «приём из 1С:УСК приостановлен до восстановления базы…», `onec_ingest_paused=1`, health
       `onecIngest` DOWN), раз в `storage-check-interval` (10 с) сервис проверяет базу и сам возобновляет приём (INFO
-      «база снова отвечает… приём из 1С:УСК возобновлён»); `outcome="storage_outage"`.
+      «база снова отвечает… приём из 1С:УСК возобновлён»); `outcome="storage_outage"`. При недоступной базе отказ
+      записи и проверка приходят через ожидание соединения пула (2 с, `DB_CONNECTION_TIMEOUT_MS`, Ш64), то есть
+      проверка укладывается в паузу между проверками; разбор по расписанию получает тот же отказ как временный
+      (RETRY по лестнице повторов).
   - Ведущий UTF-8 BOM снимается до разбора конверта (`OneCDelivery`) и сообщение принимается как обычно.
   - До Ш31 WARN «не сохранено» бывает и при сбое ack уже сохранённого сообщения (закрытый канал: `IllegalStateException`
     прокси `CachingConnectionFactory`) — данные не теряются, сообщение вернётся при закрытии канала и пройдёт дублем.
@@ -957,7 +966,8 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 соединения миграций `lock_timeout`, `statement_timeout` и `idle_in_transaction_session_timeout`, равные 0: таймауты
 уровня сервера, базы или роли на выделенной тестовой базе (`postgresql.conf`, `ALTER DATABASE/ROLE … SET`) уронят эту
 проверку, а переменные таймаутов `DB_*` не по умолчанию на агенте — проверку пула (раздел 1.2). `RestReadTimeoutTest` (Ш41, PR #25) ждёт 503 раньше `lock_timeout` 5 с —
-`API_READ_TIMEOUT_SECONDS` от 5 на агенте его уронит. `OneCQueueOrderTest` (Ш1b, PR #26) создаёт в тестовой базе схему
+`API_READ_TIMEOUT_SECONDS` от 5 на агенте его уронит; `DB_CONNECTION_TIMEOUT_MS` не по умолчанию уронит
+`PoolConnectionWaitTest`, `RestPoolWaitTest` и `IngestPoolWaitTest` (Ш64). `OneCQueueOrderTest` (Ш1b, PR #26) создаёт в тестовой базе схему
 `order_probe`, функцию и триггер на `inbound_message`: на выделенной базе роли нужны CREATE на базу и TRIGGER на таблицу, а
 после оборванного прогона схема остаётся и следующий падает на `create schema` — убрать `drop schema if exists order_probe
 cascade` (исправление самого теста — план, 3.11). Решение 7 PR #1: CI контура пока не уведомляем.
@@ -970,6 +980,7 @@ cascade` (исправление самого теста — план, 3.11). Р
 | `DB_USERNAME`, `DB_PASSWORD` | логин локального контура; у пароля умолчания нет (Ш5) | обязательны, пароль — секрет развёртывания; без него — `password authentication failed` на миграциях |
 | `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `5s`, `30s`, `1min` (Ш4) | можно не задавать; если задавать — только с единицей PostgreSQL (`ms`, `s`, `min`): число без неё — миллисекунды; `0` — без ограничения |
 | `DB_SOCKET_TIMEOUT_SECONDS` | `60` (Ш4) | можно не задавать; целые секунды, больше `DB_STATEMENT_TIMEOUT` |
+| `DB_CONNECTION_TIMEOUT_MS` | `2000` (Ш64) | можно не задавать; миллисекунды (`spring.datasource.hikari.connection-timeout`, единица HikariCP — мс), больше 1000 (проверка живости соединения `validation-timeout` — 1000 мс, должна быть меньше) и не меньше 250 (минимум HikariCP); через это время при недоступной базе REST отвечает 503, приём встаёт на паузу; держать меньше `API_READ_TIMEOUT_SECONDS` и `DB_LOCK_TIMEOUT`; на агенте сборки не задавать |
 | `API_READ_TIMEOUT_SECONDS` | `3` (Ш41, PR #25) | можно не задавать; целые секунды, не меньше 1, меньше `DB_LOCK_TIMEOUT` (иначе WARN при старте) и меньше таймаута клиента Договоров (О8); на агенте сборки не задавать — `RestReadTimeoutTest` ждёт 503 быстрее 5 с |
 | `RABBITMQ_HOST` | `localhost` | обязательна |
 | `RABBITMQ_PORT` | `5672` | `5671` при TLS: иначе TLS уйдёт на 5672 |
