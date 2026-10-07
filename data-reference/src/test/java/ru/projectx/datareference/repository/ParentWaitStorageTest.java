@@ -2,24 +2,19 @@ package ru.projectx.datareference.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.yaml.snakeyaml.Yaml;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -31,6 +26,7 @@ import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.MigrationSql;
 import ru.projectx.datareference.support.TestJdbc;
 
 /**
@@ -237,18 +233,7 @@ class ParentWaitStorageTest {
 
     /** Операторы заполнения ровно тем текстом, что лежит в миграции. */
     private static List<String> fillSql() {
-        try (InputStream changelog = new ClassPathResource("db/changelog/018-parent-wait.yaml").getInputStream()) {
-            Map<String, Object> root = new Yaml().load(changelog);
-            return ((List<Map<String, Object>>) root.get("databaseChangeLog")).stream()
-                    .map(entry -> (Map<String, Object>) entry.get("changeSet"))
-                    .filter(changeSet -> "018-foreign-reference-fill".equals(changeSet.get("id")))
-                    .flatMap(changeSet -> ((List<Map<String, Map<String, String>>>) changeSet.get("changes")).stream())
-                    .map(change -> change.get("sql").get("sql"))
-                    .toList();
-        }
-        catch (IOException unreadable) {
-            throw new IllegalStateException("миграция заполнения не читается", unreadable);
-        }
+        return MigrationSql.statementsOf("db/changelog/018-parent-wait.yaml", "018-foreign-reference-fill");
     }
 
     private void remember(UUID externalId, String kind) {
