@@ -18,6 +18,9 @@ import ru.projectx.datareference.entity.OneCStream;
  * <p>Дальше их разбирает штатный планировщик, поэтому справочники получаются тем же путём, что из
  * 1С, а не записью прямо в их таблицы. Разбор идёт по возрастанию {@code received_at}, и сообщение
  * получает момент приёма по порядку шагов «Дано»: родитель, присланный раньше, раньше и разбирается.
+ * Моменты берутся с часов стенда, как у сервиса, а не из {@code now()} базы, но не раньше последнего принятого
+ * сообщения: сценарий может остановить часы на моменте раньше уже принятых сообщений, а порядок шагов должен остаться
+ * порядком приёма.
  * Сообщения, опубликованные в брокер приёмки ({@link OneCBroker}), кладёт в сырьё сам приём; здесь они только
  * учитываются, чтобы шаг разбора знал, каких исходов ждать.
  */
@@ -28,7 +31,8 @@ public class OneCInbox {
     private static final String RECEIVE = """
             insert into inbound_message (message_id, stream, source_queue, payload, status, attempt, received_at)
             values (:messageId, :stream, :queue, cast(:payload as jsonb), 'NEW', 0,
-                    now() + make_interval(secs => :order))
+                    greatest(cast(:now as timestamptz) + make_interval(secs => :order),
+                             (select max(received_at) + interval '1 second' from inbound_message)))
             """;
     private static final String STATUSES = "select status from inbound_message order by received_at";
     private static final String TRANSFER_STATUSES = """
@@ -41,7 +45,7 @@ public class OneCInbox {
             from inbound_message where message_id = :messageId
             """;
     private static final String RETRY_DUE = """
-            update inbound_message set next_retry_at = now() - interval '1 second' where status = 'RETRY'
+            update inbound_message set next_retry_at = cast(:now as timestamptz) - interval '1 second' where status = 'RETRY'
             """;
     private static final String RETURN_TO_PARSING = """
             update inbound_message set status = 'NEW', next_retry_at = null, last_error = null, processed_at = null
@@ -52,7 +56,8 @@ public class OneCInbox {
             where correlation_id = :cid
             """;
     private static final String AGE = """
-            update inbound_message set received_at = now() - cast(:age as interval) where message_id = :messageId
+            update inbound_message set received_at = cast(:now as timestamptz) - cast(:age as interval)
+            where message_id = :messageId
             """;
 
     private static final String AGE_ALL = """
@@ -69,11 +74,13 @@ public class OneCInbox {
             """;
 
     private final JdbcClient jdbc;
+    private final StandClock clock;
     private final List<String> expectedStatuses = new ArrayList<>();
     private final List<OneCMessage> received = new ArrayList<>();
 
-    public OneCInbox(JdbcClient jdbc) {
+    public OneCInbox(JdbcClient jdbc, StandClock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     public void receive(OneCMessage message) {
@@ -83,6 +90,7 @@ public class OneCInbox {
                 .param("stream", message.stream().name())
                 .param("queue", message.queue())
                 .param("payload", message.envelope())
+                .param("now", clock.moment())
                 .param("order", expectedStatuses.size())
                 .update();
     }
@@ -129,10 +137,10 @@ public class OneCInbox {
 
     /**
      * Срок повтора наступил у всех сообщений, отложенных до повтора: часы стенда не остановлены, а ждать лестницу
-     * повторов нельзя, поэтому срок переносится в прошлое.
+     * повторов нельзя, поэтому срок переносится в прошлое по часам стенда.
      */
     public void retryDueNow() {
-        if (jdbc.sql(RETRY_DUE).update() == 0) {
+        if (jdbc.sql(RETRY_DUE).param("now", clock.moment()).update() == 0) {
             throw new IllegalStateException("в сырье нет сообщений, отложенных до повтора");
         }
     }
@@ -191,11 +199,12 @@ public class OneCInbox {
     }
 
     /**
-     * Отодвигает момент приёма последнего сообщения в прошлое на {@code age}: часы стенда не остановлены, а ждать
-     * срок хранения нельзя.
+     * Ставит момент приёма последнего сообщения на {@code age} раньше времени часов стенда — тех же, по которым сервис
+     * считает срок: часы стенда не остановлены, а ждать срок хранения нельзя.
      */
     public void ageLast(Duration age) {
         int aged = jdbc.sql(AGE)
+                .param("now", clock.moment())
                 .param("age", age.toSeconds() + " seconds")
                 .param("messageId", received.getLast().messageId())
                 .update();

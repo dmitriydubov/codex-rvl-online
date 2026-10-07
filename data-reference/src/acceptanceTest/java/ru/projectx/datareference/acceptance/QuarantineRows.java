@@ -20,12 +20,17 @@ public class QuarantineRows {
             """;
     private static final String COUNT = "select count(*) from quarantine";
     private static final String CONTAINS = "select exists(select 1 from quarantine where message_id = :messageId)";
-    private static final String AGE = "update quarantine set received_at = now() - cast(:age as interval) where message_id = :messageId";
+    private static final String AGE = """
+            update quarantine set received_at = cast(:now as timestamptz) - cast(:age as interval)
+             where message_id = :messageId
+            """;
 
     private final JdbcClient jdbc;
+    private final StandClock clock;
 
-    public QuarantineRows(JdbcClient jdbc) {
+    public QuarantineRows(JdbcClient jdbc, StandClock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     public List<Row> rowsOf(UUID messageId) {
@@ -44,9 +49,13 @@ public class QuarantineRows {
         return jdbc.sql(COUNT).query(Long.class).single();
     }
 
-    /** Отодвигает момент приёма записи в прошлое на {@code age}: часы стенда не остановлены, а ждать сутки нельзя. */
+    /**
+     * Ставит момент приёма записи на {@code age} раньше времени часов стенда — тех же, по которым сервис считает срок
+     * хранения: часы стенда не остановлены, а ждать сутки нельзя.
+     */
     public void age(UUID messageId, Duration age) {
         int updated = jdbc.sql(AGE)
+                .param("now", clock.moment())
                 .param("age", age.toSeconds() + " seconds")
                 .param("messageId", messageId)
                 .update();
