@@ -47,10 +47,17 @@ final class StandClock extends Clock {
     /**
      * Идущие часы, у которых «сегодня» по Москве — {@code today}, а время суток — настоящее. Сдвиг считается по
      * календарю Москвы, а не числом суток по 24 часа: смещение зоны менялось, и для прошлых дат оно другое.
+     * Перенесённые часы сразу проверяются тем же путём, которым сервис считает «сегодня» (вид часов в зоне Москвы):
+     * ошибка сдвига иначе прошла бы молча на любой дате, далёкой от дат в сценариях.
      */
     static StandClock runningOn(LocalDate today) {
         ZonedDateTime now = ZonedDateTime.now(MOSCOW);
-        return new StandClock(Duration.between(now, now.with(today)));
+        StandClock clock = new StandClock(Duration.between(now, now.with(today)));
+        LocalDate shown = LocalDate.now(clock.withZone(MOSCOW));
+        if (!shown.equals(today)) {
+            throw new IllegalStateException("часы стенда показывают " + shown + " вместо " + today);
+        }
+        return clock;
     }
 
     void stopAt(Instant moment) {
