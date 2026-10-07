@@ -31,8 +31,6 @@ public final class RestReadRouting extends AbstractRoutingDataSource {
      */
     public RestReadRouting(DataSource application, DataSource restRead) {
         setTargetDataSources(Map.of(Pool.APPLICATION, application, Pool.REST_READ, restRead));
-        setDefaultTargetDataSource(application);
-        setLenientFallback(false);
         afterPropertiesSet();
     }
 
