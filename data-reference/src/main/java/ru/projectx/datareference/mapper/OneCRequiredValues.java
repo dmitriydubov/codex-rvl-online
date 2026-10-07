@@ -20,16 +20,24 @@ public final class OneCRequiredValues {
     private OneCRequiredValues() {
     }
 
-    /** @throws OneCFieldException если поля нет или оно не целое число JSON в пределах {@code int} */
+    /**
+     * Целое число поля. Дробь проверяется раньше предела, как у необязательных целых полей: дробь за пределом
+     * {@code int} — тоже «не является целым числом».
+     *
+     * @throws OneCFieldException если поля нет, оно не число JSON, записано дробью (в том числе {@code 2.0}) или не
+     *                            помещается в {@code int}
+     */
     public static int integer(JsonNode data, String field) {
-        JsonNode value = requirePresent(data, field);
-        if (value.isIntegralNumber() && value.canConvertToInt()) {
-            return value.intValue();
-        }
-        throw wrongType(field, "целым числом");
+        requirePresent(data, field);
+        return OneCInteger.read(data, field).orElseThrow(() -> wrongType(field, "целым числом"));
     }
 
-    /** @throws OneCFieldException если поля нет, оно не целое число JSON или оно меньше нуля */
+    /**
+     * Целое число поля не меньше нуля. Предел {@code int} проверяется раньше знака: огромное отрицательное число
+     * отклоняется как «больше допустимого».
+     *
+     * @throws OneCFieldException если поля нет, оно не целое число JSON в пределах {@code int} или оно меньше нуля
+     */
     public static int nonNegativeInteger(JsonNode data, String field) {
         int value = integer(data, field);
         if (value < 0) {

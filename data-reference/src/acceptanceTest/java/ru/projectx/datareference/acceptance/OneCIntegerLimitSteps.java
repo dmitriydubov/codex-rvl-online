@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ru.Дано;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -9,7 +10,8 @@ import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Шаги «1С:УСК прислала …» о целочисленных полях справочников и передачи прайса, в которых число больше допустимого.
+ * Шаги «1С:УСК прислала …» о целочисленных полях справочников и передачи прайса, в которых число больше допустимого,
+ * в том числе о номере строки пакета передачи на единицу за пределом целого.
  * Запись справочника строится из присланной сценарием раньше; ожидаемый исход разбора несёт само сообщение. Словари
  * закрытые: незнакомый поток или поле роняет шаг.
  */
@@ -46,5 +48,11 @@ public class OneCIntegerLimitSteps {
     public void finalMessageWithCounterSent(String messageId, String cid, String service, String field, String record) {
         inbox.receive(OneCPriceTransferMessages.finalMessageWithCounter(UUID.fromString(messageId), UUID.fromString(cid),
                 service, field, OneCMoneyLimitMessages.recorded(field, record)));
+    }
+
+    @Дано("1С:УСК прислала пакет {string} передачи прайса {string} по услуге {string} из одной строки, где поле {string} — число на единицу больше {bigdecimal}")
+    public void priceBatchPastIntegerLimitSent(String messageId, String cid, String service, String field, BigDecimal limit) {
+        inbox.receive(OneCMoneyScaleMessages.priceBatch(UUID.fromString(messageId), UUID.fromString(cid), service, field,
+                limit.add(BigDecimal.ONE)));
     }
 }

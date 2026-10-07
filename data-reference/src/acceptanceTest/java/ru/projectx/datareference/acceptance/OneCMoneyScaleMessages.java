@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,6 +28,8 @@ final class OneCMoneyScaleMessages {
     private static final Map<String, String> TRANSFER_PRICE_ROW = Map.of(
             "начало", "2026-01-01", "окончание", "3000-01-01", "цена", "6000.00", "цена со скидкой", "нет");
     private static final List<String> PRICE_FIELDS = List.of("price", "priceWithDiscount");
+    /** Поля строки пакета передачи, которые шаг подменяет числом: деньги и номер строки. */
+    private static final List<String> BATCH_FIELDS = Stream.concat(PRICE_FIELDS.stream(), Stream.of("rowNumber")).toList();
 
     /** Строка программы с процентом сооплаты в пределах от 0 до 100, но с третьим знаком после запятой. */
     private static final BigDecimal COPAYMENT_THIRD_DIGIT = new BigDecimal("10.251");
@@ -62,10 +65,13 @@ final class OneCMoneyScaleMessages {
         return transfer;
     }
 
-    /** Пакет передачи из одной строки с номером 1, где поле прислано числом с третьим знаком. Разбор его отклоняет. */
+    /** Пакет передачи из одной строки с номером 1, где поле подменено испорченным числом. Разбор его отклоняет. */
     static OneCMessage priceBatch(UUID messageId, UUID cid, String service, String field, BigDecimal value) {
+        if (!BATCH_FIELDS.contains(field)) {
+            throw new IllegalArgumentException("шаг не знает поля строки пакета передачи: " + field);
+        }
         ObjectNode data = JSON.createObjectNode().put("cid", cid.toString()).put("keyValue", service);
-        ObjectNode row = OneCServiceMessages.priceRow(1, TRANSFER_PRICE_ROW).put(priceField(field), value);
+        ObjectNode row = OneCServiceMessages.priceRow(1, TRANSFER_PRICE_ROW).put(field, value);
         data.putArray("recordSet").add(row);
         return new OneCMessage(OneCStream.PRICE_LISTS, PRICE_QUEUE, data, InboundStatus.FAILED, messageId);
     }

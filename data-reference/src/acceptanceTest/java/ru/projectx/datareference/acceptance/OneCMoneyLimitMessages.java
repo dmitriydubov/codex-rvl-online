@@ -24,6 +24,8 @@ final class OneCMoneyLimitMessages {
 
     /** Поля процента: у них колонка {@code numeric(5,2)}, у остальных денежных полей — {@code numeric(15,2)}. */
     private static final Set<String> PERCENT_FIELDS = Set.of("copayment", "percentCopayment");
+    /** Числовые поля строки услуги программы РВЛ: процент сооплаты и номер слоя. */
+    private static final Set<String> PROGRAM_FIELDS = Set.of("percentCopayment", "numberLayer");
     private static final Map<String, BigDecimal> AMOUNT_RECORDS = Map.of(
             "экспонента с огромным порядком", new BigDecimal("1e500"),
             "экспонента сразу за пределом", new BigDecimal("1E+13"),
@@ -45,10 +47,11 @@ final class OneCMoneyLimitMessages {
 
     /** Целочисленные поля: номера, уровни иерархии и счётчики передачи прайса. */
     private static final Set<String> INTEGER_FIELDS = Set.of(
-            "layerNumber", "rowNumber", "hierarchyLevels", "hierarchyLevel", "countMessages", "countRows");
+            "layerNumber", "numberLayer", "rowNumber", "hierarchyLevels", "hierarchyLevel", "countMessages", "countRows");
     private static final Map<String, BigDecimal> INTEGER_RECORDS = Map.of(
             "экспонента за пределом целого", new BigDecimal("1e10"),
             "отрицательное с экспонентой за пределом целого", new BigDecimal("-1e20"),
+            "дробное за пределом целого", new BigDecimal("10000000000.5"),
             "экспонента сразу за прежним пределом длины", new BigDecimal("1e1000"),
             "дробное в пределах целого", new BigDecimal("2.5"),
             "отрицательное дробное", new BigDecimal("-2.5"),
@@ -72,7 +75,7 @@ final class OneCMoneyLimitMessages {
 
     /** Та же программа под новым наименованием; поле строки услуги — число в заданной записи. Разбор её отклоняет. */
     static OneCMessage program(OneCMessage program, String field, String record) {
-        if (!PERCENT_FIELDS.contains(field)) {
+        if (!PROGRAM_FIELDS.contains(field)) {
             throw new IllegalArgumentException("шаг не знает поля строки услуги программы: " + field);
         }
         ObjectNode data = OneCProgramTermsMessages.renamed(program);

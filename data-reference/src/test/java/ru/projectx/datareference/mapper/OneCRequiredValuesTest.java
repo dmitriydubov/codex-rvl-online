@@ -30,11 +30,26 @@ class OneCRequiredValuesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"\"7\"", "7.5", "true", "3000000000", "{}"})
+    @ValueSource(strings = {"\"7\"", "7.5", "2.0", "10000000000.5", "true", "{}"})
     void integerOfAnotherType_isRejectedWithoutValue(String value) {
         assertThatThrownBy(() -> OneCRequiredValues.integer(node("{\"layer\":" + value + "}"), "layer"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле layer не является целым числом");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2147483648", "-2147483649", "10000000000", "123456789012345678901234567890"})
+    void integerBeyondInt_isRejectedAsTooLargeWithoutValue(String value) {
+        assertThatThrownBy(() -> OneCRequiredValues.integer(node("{\"layer\":" + value + "}"), "layer"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layer больше допустимого");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2147483647", "-2147483648"})
+    void integerAtIntLimit_isRead(String value) {
+        assertThat(OneCRequiredValues.integer(node("{\"layer\":" + value + "}"), "layer"))
+                .isEqualTo(Integer.parseInt(value));
     }
 
     @Test
@@ -106,6 +121,13 @@ class OneCRequiredValuesTest {
         assertThatThrownBy(() -> OneCRequiredValues.nonNegativeInteger(node("{\"layer\":\"1\"}"), "layer"))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле layer не является целым числом");
+    }
+
+    @Test
+    void negativeIntegerBeyondInt_isRejectedAsTooLargeBeforeTheSign() {
+        assertThatThrownBy(() -> OneCRequiredValues.nonNegativeInteger(node("{\"layer\":-10000000000}"), "layer"))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле layer больше допустимого");
     }
 
     @ParameterizedTest
