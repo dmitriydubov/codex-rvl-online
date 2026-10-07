@@ -17,6 +17,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Страхователь связан так же: им может быть физическое лицо, а в справочник страхователей попадают
  * только юридические лица. Внешний ключ превратил бы такой договор в отказ применения.
+ *
+ * <p>Договор действует в день, который попадает в его срок, включая первый и последний день, пока он не в архиве.
+ * Пустая дата окончания означает бессрочный договор.
  */
 @Entity
 @Table(name = "insurance_contracts")
@@ -74,6 +77,15 @@ public class InsuranceContract extends OneCEntity {
             @Nullable LocalDate endDate,
             @Nullable UUID externalInsurerId,
             boolean notActive) {
+    }
+
+    /** Действует ли договор в этот календарный день. */
+    public boolean isActiveOn(LocalDate day) {
+        return !isArchive() && covers(day);
+    }
+
+    private boolean covers(LocalDate day) {
+        return !beginDate.isAfter(day) && (endDate == null || !endDate.isBefore(day));
     }
 
     public String number() {

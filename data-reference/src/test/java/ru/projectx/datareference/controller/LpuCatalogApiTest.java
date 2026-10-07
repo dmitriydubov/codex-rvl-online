@@ -36,7 +36,7 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Каталог ЛПУ по договору (R-01), карточка ЛПУ (R-02) и услуги с ценами (R-03) — через
+ * Каталог ЛПУ по договору страхования, карточка ЛПУ и его услуги с ценами — через
  * настоящий стек MVC поверх настоящей базы. Часы остановлены на 14.03.2026: «сегодня»
  * для правила дат — этот день.
  *
@@ -130,7 +130,7 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.skipped[0].reason").isEqualTo("AMBIGUOUS_PRICE_CONTRACT");
     }
 
-    /** Логика A: полис с истёкшим сроком, с условием без доступности или по неизвестной программе учреждений не даёт. */
+    /** Полис с истёкшим сроком, с условием без доступности или по неизвестной программе учреждений не даёт. */
     @Test
     void catalog_isEmptyWithoutActiveRvlPolicies_andNeedsAnActiveContract() {
         Lpu lpu = saveLpu("Сосновый бор", false);
@@ -158,6 +158,46 @@ class LpuCatalogApiTest {
         MvcTestResult noKey = mvc.get().uri(BASE + "/lpu").exchange();
         assertThat(noKey).hasStatus(400);
         assertThat(noKey).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("contract_external_id");
+    }
+
+    @Test
+    void catalog_contractOutOfItsTerm_isNotFound_likeArchived() {
+        UUID expired = UUID.randomUUID();
+        insuranceContractRepository.save(InsuranceContract.create(expired,
+                new InsuranceContract.Details("ДМС-2025/010", TODAY.minusYears(1), TODAY.minusDays(1), null, false), NOW));
+        UUID notStarted = UUID.randomUUID();
+        insuranceContractRepository.save(InsuranceContract.create(notStarted,
+                new InsuranceContract.Details("ДМС-2026/011", TODAY.plusDays(1), null, null, false), NOW));
+
+        for (UUID contract : List.of(expired, notStarted)) {
+            MvcTestResult result = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", contract).exchange();
+            assertThat(result).hasStatus(404);
+            assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("INSURANCE_CONTRACT_NOT_FOUND");
+        }
+    }
+
+    /** Строка условий обслуживания, которая начнётся завтра, учреждений не даёт; строка без даты начала — даёт. */
+    @Test
+    void catalog_countsServiceLineFromItsBeginDate_andEmptyBeginDateDoesNotLimitIt() {
+        Lpu lpu = saveLpu("Сосновый бор", false);
+        saveContract(lpu, "M-1", null, false, TODAY.minusYears(1), null);
+        saveProgram(List.of(row(lpu, RVL_SKL_EXT)));
+        savePolicyWithServiceLineFrom(TODAY.plusDays(1));
+
+        MvcTestResult notYet = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
+        assertThat(notYet).hasStatusOk();
+        assertThat(notYet).bodyJson().extractingPath("$.items").asArray().isEmpty();
+
+        databaseCleaner.clear();
+        referenceData();
+        Lpu sameLpu = saveLpu("Сосновый бор", false);
+        saveContract(sameLpu, "M-1", null, false, TODAY.minusYears(1), null);
+        saveProgram(List.of(row(sameLpu, RVL_SKL_EXT)));
+        savePolicyWithServiceLineFrom(null);
+
+        MvcTestResult unbounded = mvc.get().uri(BASE + "/lpu?contract_external_id={c}", CONTRACT_EXT).exchange();
+        assertThat(unbounded).hasStatusOk();
+        assertThat(unbounded).bodyJson().extractingPath("$.items[*].name").asArray().containsExactly("Сосновый бор");
     }
 
     @Test
@@ -341,6 +381,18 @@ class LpuCatalogApiTest {
                 new BigDecimal("150000.00"), true);
         var service = new PolicyServiceLine.Row(programExternalId, 1, NO_COPAYMENT, beginDate, endDate,
                 serviceAvailable);
+        policyRepository.save(Policy.create(UUID.randomUUID(),
+                new Policy.Snapshot(details, List.of(program), List.of(service)), NOW));
+    }
+
+    /** Действующий полис, у строки условий которого своя дата начала, а окончания нет. */
+    private void savePolicyWithServiceLineFrom(@Nullable LocalDate lineBegin) {
+        LocalDate begin = TODAY.minusMonths(1);
+        var details = new Policy.Details(CONTRACT_EXT, "0002-" + UUID.randomUUID().toString().substring(0, 6),
+                "Петров", "Пётр", null, LocalDate.of(1985, 3, 14), "Мужской", null, begin, null, true, false);
+        var program = new PolicyProgram.Row(PROGRAM_EXT, begin, null, null, null, null, null,
+                new BigDecimal("150000.00"), true);
+        var service = new PolicyServiceLine.Row(PROGRAM_EXT, 1, NO_COPAYMENT, lineBegin, null, true);
         policyRepository.save(Policy.create(UUID.randomUUID(),
                 new Policy.Snapshot(details, List.of(program), List.of(service)), NOW));
     }

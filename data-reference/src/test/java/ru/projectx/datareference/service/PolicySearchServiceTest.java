@@ -60,9 +60,6 @@ class PolicySearchServiceTest {
     @Mock
     private InsuranceContractRepository insuranceContracts;
 
-    @Mock
-    private InsuranceContract contract;
-
     private PolicySearchService service;
 
     @BeforeEach
@@ -217,7 +214,7 @@ class PolicySearchServiceTest {
 
     @Test
     void unknownOrArchivedContract_isNotFound_withoutSearch() {
-        when(insuranceContracts.findByExternalIdAndArchiveFalse(CONTRACT)).thenReturn(Optional.empty());
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.search(CONTRACT, "иванов", null))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,
@@ -226,13 +223,25 @@ class PolicySearchServiceTest {
         verify(policies, never()).findRankedByNumber(any(), anyString(), anyString(), anyString());
     }
 
+    @Test
+    void contractOutOfItsTerm_isNotFound_withoutSearch() {
+        InsuranceContract expired = InsuranceContract.create(CONTRACT,
+                new InsuranceContract.Details("ДМС-0001", TODAY.minusYears(1), TODAY.minusDays(1), null, false), NOW);
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.of(expired));
+
+        assertThatThrownBy(() -> service.search(CONTRACT, "иванов", null))
+                .isInstanceOfSatisfying(ReferenceNotFoundException.class,
+                        notFound -> assertThat(notFound.code()).isEqualTo("INSURANCE_CONTRACT_NOT_FOUND"));
+        verify(policies, never()).findRankedByNames(any(), anyList());
+    }
+
     private PolicySearchService serviceWith(ReferenceApiProperties api) {
         var calendar = new ReferenceCalendar(Clock.fixed(NOW, ZoneOffset.UTC), api);
-        return new PolicySearchService(new PolicySearchLookup(policies, insuranceContracts, calendar), api);
+        return new PolicySearchService(new PolicySearchLookup(policies, new ActiveInsuranceContracts(insuranceContracts), calendar), api);
     }
 
     private void knownContract() {
-        when(insuranceContracts.findByExternalIdAndArchiveFalse(CONTRACT)).thenReturn(Optional.of(contract));
+        when(insuranceContracts.findByExternalId(CONTRACT)).thenReturn(Optional.of(ReadFixtures.contract(CONTRACT, null)));
     }
 
     private static Policy policy(String lastName) {

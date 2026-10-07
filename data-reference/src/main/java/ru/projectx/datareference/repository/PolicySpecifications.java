@@ -17,15 +17,15 @@ import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 
 /**
- * Условия поиска полисов (R-04) на Criteria API: число токенов ФИО заранее неизвестно,
- * и статическим запросом их не выразить. Нативного SQL здесь нет намеренно —
- * запрос читает и аналитик, а он знает HQL, не диалект PostgreSQL.
+ * Условия отбора полисов на Criteria API. Поиск для подсказки кадровику собирается на ходу, потому что число слов
+ * ФИО заранее неизвестно. Нативного SQL здесь нет намеренно: запрос должен читаться без знания диалекта PostgreSQL.
  *
- * <p>{@link #activeRvlPoliciesOf} — базовая логика A из ТЗ на API: полис договора,
- * действующий на {@code today}, у которого есть действующее условие обслуживания
- * по программе из справочника. Связь с программой логическая, по GUID, поэтому она
- * записана равенством {@code external_id}, а не связью сущностей; и именно это
- * равенство — фильтр «только РВЛ»: в {@code programs} лежат только программы РВЛ.
+ * <p>Здесь же единственное место правила «действует сегодня» для полиса и для строки условий обслуживания. Его
+ * используют и поиск полисов, и отбор программ для каталога учреждений. Полис действует, если он не в архиве и
+ * сегодня попадает в его срок. Строка условий действует, если она доступна, сегодня попадает в её срок и её
+ * программа есть в справочнике и не в архиве. Границы срока входят в него; пустая дата начала или окончания срок
+ * с этой стороны не ограничивает. Связь строки с программой логическая, по GUID 1С, и это равенство служит фильтром
+ * «только восстановительное лечение»: в справочнике программ лежат только такие программы.
  *
  * <p>Символ экранирования в {@code like} — {@code !}; экранирует вызывающий сервис.
  */
@@ -38,13 +38,32 @@ public final class PolicySpecifications {
     private PolicySpecifications() {
     }
 
+    /** Действующие полисы договора, у которых есть действующая строка условий по программе из справочника. */
     public static Specification<Policy> activeRvlPoliciesOf(UUID contractExternalId, LocalDate today) {
         return (policy, query, cb) -> cb.and(
+                activePolicyOf(cb, policy, contractExternalId, today),
+                cb.exists(rvlServiceLine(policy, requireQuery(query), cb, today)));
+    }
+
+    /** Полис договора {@code contractExternalId}, который действует в день {@code today}. */
+    static Predicate activePolicyOf(CriteriaBuilder cb, Path<Policy> policy, UUID contractExternalId, LocalDate today) {
+        return cb.and(
                 cb.equal(policy.get("externalContractId"), contractExternalId),
                 cb.isFalse(policy.<Boolean>get("archive")),
                 cb.lessThanOrEqualTo(policy.<LocalDate>get("beginDate"), today),
-                openOrAfter(cb, policy.get("endDate"), today),
-                cb.exists(rvlServiceLine(policy, requireQuery(query), cb, today)));
+                openOrAfter(cb, policy.get("endDate"), today));
+    }
+
+    /** Строка условий, которая действует в день {@code today}, по программе {@code program} из справочника. */
+    static Predicate activeRvlServiceLine(
+            CriteriaBuilder cb, Path<PolicyServiceLine> line, Path<Program> program, LocalDate today) {
+
+        return cb.and(
+                cb.isTrue(line.<Boolean>get("availability")),
+                openOrBefore(cb, line.get("beginDate"), today),
+                openOrAfter(cb, line.get("endDate"), today),
+                cb.equal(program.get("externalId"), line.get("externalProgramId")),
+                cb.isFalse(program.<Boolean>get("archive")));
     }
 
     /** Номер: {@code pattern} — уже экранированная подстрока в нижнем регистре, с {@code %} по краям. */
@@ -83,10 +102,11 @@ public final class PolicySpecifications {
         Root<Program> program = lines.from(Program.class);
         return lines.select(line.get("id")).where(
                 cb.equal(line.get("policy"), policy),
-                cb.isTrue(line.<Boolean>get("availability")),
-                openOrAfter(cb, line.get("endDate"), today),
-                cb.equal(program.get("externalId"), line.get("externalProgramId")),
-                cb.isFalse(program.<Boolean>get("archive")));
+                activeRvlServiceLine(cb, line, program, today));
+    }
+
+    private static Predicate openOrBefore(CriteriaBuilder cb, Path<LocalDate> date, LocalDate today) {
+        return cb.or(cb.isNull(date), cb.lessThanOrEqualTo(date, today));
     }
 
     private static Predicate openOrAfter(CriteriaBuilder cb, Path<LocalDate> date, LocalDate today) {

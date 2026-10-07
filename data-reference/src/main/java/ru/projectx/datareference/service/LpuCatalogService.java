@@ -14,8 +14,6 @@ import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
@@ -23,9 +21,10 @@ import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 /**
  * Каталог ЛПУ (лечебно-профилактических учреждений) для личного кабинета кадровика по договору страхования.
  *
- * <p>Отбор идёт так. Действующие полисы договора дают программы восстановительного лечения; перечни этих программ
- * дают учреждения, но только строками с видом обращения РВЛ. Дальше по каждому учреждению выбирается прайсовый
- * договор, одним запросом на всех. Учреждение без действующего договора в каталог не попадает. Учреждение с
+ * <p>Договор страхования должен действовать сегодня, иначе ответ «не найден». Отбор идёт так. Действующие полисы
+ * договора дают программы восстановительного лечения; перечни этих программ дают учреждения, но только строками
+ * с видом обращения РВЛ. Дальше по каждому учреждению выбирается прайсовый договор, одним запросом на всех.
+ * Учреждение без действующего договора в каталог не попадает. Учреждение с
  * неоднозначным прайсовым договором уходит в {@code skipped} и в журнал: одна кривая строка в 1С не должна класть
  * каталог целиком для всех пользователей договора. В точечных ручках (карточка, услуги) то же — отказ {@code 409}
  * или {@code 422}: там ответ по одному ЛПУ, и подменить его нечем.
@@ -38,7 +37,7 @@ public class LpuCatalogService implements LpuCatalogReads {
 
     private static final Logger log = LoggerFactory.getLogger(LpuCatalogService.class);
 
-    private final InsuranceContractRepository insuranceContracts;
+    private final ActiveInsuranceContracts activeContracts;
     private final PolicyRepository policies;
     private final LpuRepository lpus;
     private final PriceContractResolver priceContracts;
@@ -46,14 +45,14 @@ public class LpuCatalogService implements LpuCatalogReads {
     private final ReferenceCalendar calendar;
 
     public LpuCatalogService(
-            InsuranceContractRepository insuranceContracts,
+            ActiveInsuranceContracts activeContracts,
             PolicyRepository policies,
             LpuRepository lpus,
             PriceContractResolver priceContracts,
             RvlAppealTypes rvlAppealTypes,
             ReferenceCalendar calendar) {
 
-        this.insuranceContracts = insuranceContracts;
+        this.activeContracts = activeContracts;
         this.policies = policies;
         this.lpus = lpus;
         this.priceContracts = priceContracts;
@@ -65,9 +64,8 @@ public class LpuCatalogService implements LpuCatalogReads {
     @Cacheable(cacheNames = ReferenceCaches.LPU_CATALOG, keyGenerator = ReferenceCaches.TODAY_KEY)
     @RestReadTransaction
     public LpuCatalogResponse catalog(UUID contractExternalId) {
-        insuranceContracts.findByExternalIdAndArchiveFalse(contractExternalId)
-                .orElseThrow(() -> ReferenceNotFoundException.insuranceContractByExternalId(contractExternalId));
         LocalDate today = calendar.today();
+        activeContracts.requireActive(contractExternalId, today);
         List<Lpu> candidates = rvlLpuOf(contractExternalId, today);
         Map<UUID, Resolution> priceContractByLpu =
                 priceContracts.resolveAll(candidates.stream().map(Lpu::id).toList(), today);

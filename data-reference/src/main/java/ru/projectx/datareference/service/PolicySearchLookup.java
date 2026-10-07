@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service;
 
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -7,8 +8,6 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.entity.Policy;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
 
@@ -22,7 +21,7 @@ import ru.projectx.datareference.repository.PolicyScope;
  * Иначе при недоступной базе запрос с неверным параметром получил бы 503, и вызывающий повторял бы запрос,
  * который не пройдёт никогда.
  *
- * <p>Договор должен быть известен и не в архиве, иначе ответ «не найдено». Если в строке есть цифры, ищется
+ * <p>Договор должен действовать сегодня, иначе ответ «не найдено». Если в строке есть цифры, ищется
  * номер. Иначе строка режется на слова, и каждое слово должно быть началом фамилии, имени или отчества.
  * Отбор, порядок и предел выдачи делает один запрос в базе
  * ({@link ru.projectx.datareference.repository.PolicySearchRepository}).
@@ -35,23 +34,23 @@ class PolicySearchLookup {
     static final String WORD_SEPARATOR = " ";
 
     private final PolicyRepository policies;
-    private final InsuranceContractRepository insuranceContracts;
+    private final ActiveInsuranceContracts activeContracts;
     private final ReferenceCalendar calendar;
 
     PolicySearchLookup(
-            PolicyRepository policies, InsuranceContractRepository insuranceContracts, ReferenceCalendar calendar) {
+            PolicyRepository policies, ActiveInsuranceContracts activeContracts, ReferenceCalendar calendar) {
 
         this.policies = policies;
-        this.insuranceContracts = insuranceContracts;
+        this.activeContracts = activeContracts;
         this.calendar = calendar;
     }
 
     /** Полисы договора по нормализованной строке: слова разделены одним пробелом, буквы в нижнем регистре. */
     @RestReadTransaction
     public PolicySearchResponse search(UUID contractExternalId, String query, int limit) {
-        insuranceContracts.findByExternalIdAndArchiveFalse(contractExternalId)
-                .orElseThrow(() -> ReferenceNotFoundException.insuranceContractByExternalId(contractExternalId));
-        PolicyScope scope = new PolicyScope(contractExternalId, calendar.today(), limit);
+        LocalDate today = calendar.today();
+        activeContracts.requireActive(contractExternalId, today);
+        PolicyScope scope = new PolicyScope(contractExternalId, today, limit);
 
         List<Policy> ranked = DIGIT.matcher(query).find() ? byNumber(scope, query) : byNames(scope, query);
         return PolicySearchResponse.of(ranked);
