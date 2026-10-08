@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app.name }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.app.name }}
+data:
+  SERVER_PORT: "{{ .Values.app.port }}"
+  MANAGEMENT_PORT: "{{ .Values.app.managementPort }}"
+
+  DB_URL: "jdbc:postgresql://{{ .Values.postgres.host }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}?logServerErrorDetail=false"
+  DB_USERNAME: "{{ .Values.postgres.username }}"
+
+  RABBITMQ_HOST: "{{ .Values.rabbitmq.host }}"
+  RABBITMQ_PORT: "{{ .Values.rabbitmq.port }}"
+  RABBITMQ_VHOST: "{{ .Values.rabbitmq.virtualHost }}"
+  RABBITMQ_USERNAME: "{{ .Values.rabbitmq.username }}"
+  RABBITMQ_LISTENER_AUTO_STARTUP: "{{ .Values.rabbitmq.listenerAutoStartup }}"
+  RABBITMQ_SSL_ENABLED: "{{ .Values.rabbitmq.ssl.enabled }}"
+  {{- if .Values.rabbitmq.ssl.enabled }}
+  RABBITMQ_SSL_VALIDATE_CERTIFICATE: "{{ .Values.rabbitmq.ssl.validateCertificate }}"
+  RABBITMQ_SSL_VERIFY_HOSTNAME: "{{ .Values.rabbitmq.ssl.verifyHostname }}"
+  SPRING_RABBITMQ_SSL_BUNDLE: "rabbitmq"
+  SPRING_SSL_BUNDLE_PEM_RABBITMQ_TRUSTSTORE_CERTIFICATE: "file:/etc/ssl/rabbitmq/{{ .Values.rabbitmq.ssl.caFile }}"
+  {{- end }}
+
+  LOGGING_LEVEL_ROOT: "{{ .Values.logging.root }}"

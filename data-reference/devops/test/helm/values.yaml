@@ -1,0 +1,65 @@
+namespace: rvl-test
+
+REGISTRY_URL: ""
+TAG: v1
+IMAGE_PULL_POLICY: IfNotPresent
+
+RESTART_POLICY: Always
+REPLICA: 1
+TERMINATION_GRACE_PERIOD: 45
+
+R_INIT_DELAY: 60
+R_PERIOD: 10
+L_INIT_DELAY: 120
+L_PERIOD: 30
+
+app:
+  name: data-reference
+  image: data-reference
+  port: 8080
+  managementPort: 8081
+
+service:
+  type: ClusterIP
+
+postgres:
+  host: s00-0000-rvl9.sogaz.ru
+  port: 5432
+  database: data_reference_bd
+  username: data_reference_user
+  password: ""
+
+rabbitmq:
+  host: s00-0000-rt14.sogaz.ru
+  port: 5671
+  virtualHost: /
+  username: rvl-online
+  password: ""
+  listenerAutoStartup: true
+  ssl:
+    enabled: true
+    caConfigMap: rabbitmq-ca
+    caFile: ca.pem
+    validateCertificate: true
+    verifyHostname: true
+
+logging:
+  root: INFO
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  path: /data-reference
+  host: "s00-0000-rvl8.sogaz.ru"
+  tlsSecretName: "hr-activity-tls"
+  resources:
+    - internal/v1/lpu
+    - internal/v1/insurance-contracts
