@@ -73,7 +73,7 @@ class InboxServiceTest {
                 .contains(firstReceipt);
     }
 
-    /** Время приёма берётся из бина {@link Clock}, а не из системных часов JVM. */
+    /** Время приёма берётся из бина {@link Clock}, а не из системных часов JVM, иначе тест не управлял бы им. */
     @Test
     void receivedAt_isTakenFromClock() {
         UUID messageId = UUID.randomUUID();

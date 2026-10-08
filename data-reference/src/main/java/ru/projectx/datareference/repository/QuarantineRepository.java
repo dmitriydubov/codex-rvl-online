@@ -14,12 +14,9 @@ import ru.projectx.datareference.entity.QuarantinedMessage;
 public interface QuarantineRepository extends JpaRepository<QuarantinedMessage, UUID> {
 
     /**
-     * Стирает тела не больше {@code limit} карантинных записей, принятых раньше {@code receivedBefore}, начиная
-     * с самых старых, и возвращает, сколько стёрто. Записи остаются, тела не читаются в память. Транзакцию
-     * открывает вызывающий, отдельную на каждую пачку.
-     *
-     * <p>SQL PostgreSQL, а не язык запросов JPA: у подзапроса там нет ограничения числа строк. Подходит частичный
-     * индекс по записям с телом.
+     * Стирает тела не больше {@code limit} самых старых карантинных записей, принятых раньше {@code receivedBefore};
+     * сами записи остаются. SQL PostgreSQL, потому что в языке запросов JPA у подзапроса нет ограничения числа строк.
+     * Транзакцию открывает вызывающий, отдельную на каждую пачку.
      */
     @Modifying
     @Query(nativeQuery = true, value = """

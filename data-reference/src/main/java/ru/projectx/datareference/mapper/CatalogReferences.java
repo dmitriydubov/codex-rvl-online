@@ -11,10 +11,8 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Ссылки потоков 1С на родительские записи справочника: санаторий, договор санатория, услугу. Каждая ссылка знает три
- * исхода: родитель есть, родитель признан не нашим, о родителе ещё ничего не известно.
- *
- * <p>Собраны в одном месте, чтобы поиск родителя и память о не наших записях у всех потоков были одними и теми же.
+ * Ссылки потоков 1С на родительские записи: санаторий, договор, услугу. Собраны в одном месте, чтобы поиск родителя
+ * и память о не наших записях у всех потоков были одинаковыми.
  */
 @Component
 class CatalogReferences {
@@ -48,7 +46,6 @@ class CatalogReferences {
                 outsideCatalog);
     }
 
-    /** Запоминает запись пропущенного сообщения как не нашу, см. {@link ForeignReferences#rememberIfSkipped}. */
     ImportResult rememberIfSkipped(ImportResult result, ParentKind kind, JsonNode data) {
         return foreign.rememberIfSkipped(result, kind, data);
     }

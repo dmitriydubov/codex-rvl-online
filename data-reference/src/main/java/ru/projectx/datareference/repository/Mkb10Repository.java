@@ -11,13 +11,9 @@ import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.Mkb10;
 
 /**
- * Upsert идёт по {@code external_id} — GUID объекта в 1С, а не по нашему первичному
- * ключу: другого устойчивого идентификатора у сообщения источника нет.
- *
- * <p>Поиск для R-07 отдаёт проекцию {@link Mkb10Row} с кодом родителя: родитель хранится
- * GUID'ом источника, и разрешается он здесь, одним соединением, а не по строке.
- * Символ экранирования в {@code like} — {@code !}: он не спорит ни с HQL, ни с SQL,
- * а искомую строку экранирует вызывающий сервис.
+ * Запись обновляется по {@code external_id}, GUID объекта в 1С. Поиск отдаёт {@link Mkb10Row}, где код родителя
+ * находится тем же соединением, а не запросом на строку. Символ экранирования в {@code like} — {@code !}: он не спорит
+ * ни с HQL, ни с SQL; экранирует вызывающий.
  */
 @Repository
 public interface Mkb10Repository extends JpaRepository<Mkb10, UUID> {
@@ -39,7 +35,7 @@ public interface Mkb10Repository extends JpaRepository<Mkb10, UUID> {
     @Query(ROWS + " where m.archive = false and lower(m.name) like :pattern escape '!' order by m.code")
     List<Mkb10Row> findActiveByNamePattern(String pattern, Limit limit);
 
-    /** Батч по перечню кодов: архивные отдаются — на них ссылаются старые заявки. */
+    /** Поиск по перечню кодов: архивные отдаются, потому что на них ссылаются старые заявки. */
     @Query(ROWS + " where upper(m.code) in :codes order by m.code")
     List<Mkb10Row> findByCodes(Collection<String> codes);
 }

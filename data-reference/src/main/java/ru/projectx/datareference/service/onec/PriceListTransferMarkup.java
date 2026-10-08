@@ -8,14 +8,9 @@ import ru.projectx.datareference.mapper.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разметка сообщения передачи прайс-листа: к какой передаче оно относится, финальное ли оно и сколько в нём строк.
- *
- * <p>Разметка запоминается в самом сообщении, когда оно откладывается в буфер. По ней сборка находит остальные
- * части передачи и сверяет счётчики, не разбирая тела заново.
- *
- * @param cid        идентификатор передачи, общий для всех её сообщений
- * @param batchCount сколько пакетов строк обещает источник; есть только у финального сообщения
- * @param rowCount   у пакета — сколько строк в нём пришло, у финального — сколько строк во всей передаче
+ * Разметка части передачи прайса: передача, обещанное число пакетов (есть только у финального сообщения) и число
+ * строк в пакете или, у финального, во всей передаче. Она запоминается в сообщении при откладывании в буфер, чтобы
+ * сборка находила части и сверяла счётчики, не разбирая тела заново.
  */
 record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCount) {
 
@@ -25,13 +20,9 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
     private static final String RECORD_SET = "recordSet";
 
     /**
-     * Читает разметку из поля {@code data} сообщения.
+     * Финальное сообщение узнаётся по наличию счётчиков, а не по значению: ноль пакетов означает очистку прайса.
      *
-     * <p>Финальное сообщение узнаётся по наличию счётчиков, а не по их значению: ноль пакетов — легальный случай,
-     * он означает, что прайс по услуге очищается.
-     *
-     * @throws OneCFieldException если в сообщении нет идентификатора передачи, счётчик записан дробью или не помещается
-     *                            в {@code int}
+     * @throws OneCFieldException если нет идентификатора передачи или счётчик дробный либо не помещается в {@code int}
      */
     static PriceListTransferMarkup of(ObjectNode data) {
         UUID cid = cidOf(data);
@@ -42,8 +33,7 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
     }
 
     /**
-     * Идентификатор передачи, которой принадлежит сообщение. По нему передачу находят и тогда, когда остальная разметка
-     * сообщения не читается.
+     * По идентификатору передачу находят и тогда, когда остальная разметка сообщения не читается.
      *
      * @throws OneCFieldException если в сообщении нет идентификатора передачи
      */
@@ -51,7 +41,7 @@ record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCo
         return OneCValues.requiredUuid(data, CID);
     }
 
-    /** Дробь и число за пределами {@code int} отклоняются с именем поля; прочее значение счётчика читается как прежде. */
+    /** Дробь и число за пределами {@code int} отклоняются с именем поля, прочее читается через {@code asInt}. */
     private static int counter(ObjectNode data, String field) {
         return OneCValues.integer(data, field).orElseGet(() -> data.path(field).asInt());
     }

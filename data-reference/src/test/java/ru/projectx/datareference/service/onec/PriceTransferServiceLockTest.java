@@ -99,7 +99,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
-    /** Исход записан, если есть хотя бы одна часть применённая, пропущенная или отклонённая. */
     /**
      * При отказе блокируется услуга, которую называют части передачи в буфере, — та же, что блокирует проверка
      * зависших передач, даже если отклоняемая часть называет другую.
@@ -135,6 +134,7 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
+    /** Исход передачи записан, если хотя бы одна её часть применена, пропущена или отклонена. */
     private void outcomeRecorded() {
         when(inbound.existsByCorrelationIdAndStatusIn(
                 CID, EnumSet.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED, InboundStatus.FAILED)))

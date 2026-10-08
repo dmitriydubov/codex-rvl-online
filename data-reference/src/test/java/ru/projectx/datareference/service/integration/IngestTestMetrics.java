@@ -15,7 +15,6 @@ final class IngestTestMetrics {
     private IngestTestMetrics() {
     }
 
-    /** Счётчики над данным реестром. */
     static OneCIngestMetrics on(MeterRegistry registry) {
         return new OneCIngestMetrics(registry, QUEUES);
     }

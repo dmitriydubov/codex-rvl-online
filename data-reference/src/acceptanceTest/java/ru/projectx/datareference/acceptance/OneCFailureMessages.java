@@ -47,19 +47,13 @@ final class OneCFailureMessages {
     private OneCFailureMessages() {
     }
 
-    /** Цифры реквизита заданной длины. */
     static String digits(int length) {
         return DIGITS.substring(0, length);
     }
 
     /**
-     * Контрагент с одним реквизитом, ИНН или КПП. Санаторий несёт вид деятельности РВЛ и при удаче разбирается
-     * в справочник санаториев, страхователь — в справочник страхователей с пропуском.
-     *
-     * @param sanatorium санаторий РВЛ или страхователь
-     * @param field      имя поля реквизита в контракте: «ИНН» или «КПП»
-     * @param value      значение поля, каким его присылает 1С:УСК
-     * @param expected   исход разбора этого сообщения
+     * Контрагент с одним реквизитом («ИНН» или «КПП»). Санаторий несёт вид деятельности РВЛ и при удаче попадает
+     * в справочник санаториев, страхователь попадает в справочник страхователей с пропуском.
      */
     static OneCMessage contragent(boolean sanatorium, String field, String value, InboundStatus expected) {
         ObjectNode data = JSON.createObjectNode()

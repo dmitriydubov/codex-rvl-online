@@ -9,12 +9,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 /**
- * Пул соединений сервиса с выключателем: в состоянии «база недоступна» каждый запрос соединения отказывает
- * ошибкой соединения с заданным SQLSTATE — так же, как пул HikariCP, когда базы нет (он бросает
- * {@code SQLTransientConnectionException} с кодом последней ошибки соединения). Остановить саму базу
- * сценарий не может: она одна на всю приёмку.
- *
- * <p>Это стенд, а не код сервиса: сервис видит обычный {@link DataSource}.
+ * Пул соединений сервиса с выключателем, потому что общую на всю приёмку базу остановить нельзя. В состоянии «база
+ * недоступна» каждое соединение отказывает так же, как HikariCP без базы: {@code SQLTransientConnectionException}
+ * с заданным SQLSTATE.
  */
 final class SwitchableDataSource extends DelegatingDataSource {
 
@@ -24,12 +21,10 @@ final class SwitchableDataSource extends DelegatingDataSource {
         super(pool);
     }
 
-    /** С этого момента каждое соединение отказывает с {@code sqlState}. */
     void failConnectionsWith(String sqlState) {
         failingSqlState = sqlState;
     }
 
-    /** База снова принимает соединения. */
     void restore() {
         failingSqlState = null;
     }

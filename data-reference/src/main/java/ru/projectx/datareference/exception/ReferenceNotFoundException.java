@@ -4,12 +4,9 @@ import java.io.Serial;
 import java.util.UUID;
 
 /**
- * Запрошенной записи справочника нет, и сервис отвечает 404. Остальные отказы чтения справочников —
- * это неверный запрос, ошибка данных в 1С или сбой.
- *
- * <p>Код ошибки называет справочник ({@code PROGRAM_NOT_FOUND}, а не общий {@code NOT_FOUND}). Так
- * принято в контрактах соседних сервисов, и по коду потребителю видно, какой из идентификаторов в его
- * данных не сошёлся.
+ * Запрошенной записи справочника нет, и сервис отвечает 404. Код ошибки называет справочник, например
+ * {@code PROGRAM_NOT_FOUND}, а не общий {@code NOT_FOUND}: так принято в контрактах соседних сервисов,
+ * и потребителю видно, какой из его идентификаторов не сошёлся.
  */
 public final class ReferenceNotFoundException extends RuntimeException {
 
@@ -78,7 +75,7 @@ public final class ReferenceNotFoundException extends RuntimeException {
         return Missing.INSURANCE_CONTRACT_BY_EXTERNAL_ID.notFound(externalId);
     }
 
-    /** ЛПУ нет либо оно в архиве: для каталога это одно и то же, учреждения нет. */
+    /** Лечебного учреждения нет или оно в архиве: для каталога это одно и то же. */
     public static ReferenceNotFoundException lpu(UUID id) {
         return Missing.LPU.notFound(id);
     }

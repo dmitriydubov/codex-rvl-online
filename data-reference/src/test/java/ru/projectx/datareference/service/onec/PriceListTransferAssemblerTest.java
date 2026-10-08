@@ -44,12 +44,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Защищает сборку прайс-листа, который приходит частями: каждое сообщение откладывается в буфер с разметкой
- * передачи, а прайс применяется только когда передача собралась целиком.
- *
- * <p>Здесь проверяется то, что сборщик делает сам: какую разметку получает отложенное сообщение, какой набор
- * строк уходит в применение прайса и что сохраняется после исхода. Само решение о готовности передачи
- * проверяет {@link PriceListTransferStatusTest}, а путь целиком на настоящей базе — {@link PriceListTransferTest}.
+ * Защищает то, что сборщик прайса, приходящего частями, делает сам: разметку отложенной части, набор строк для
+ * применения прайса и то, что сохраняется после исхода. Решение о готовности передачи проверяет
+ * {@link PriceListTransferStatusTest}, а путь целиком на настоящей базе — {@link PriceListTransferTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class PriceListTransferAssemblerTest {
@@ -483,7 +480,6 @@ class PriceListTransferAssemblerTest {
         }
     }
 
-    /** Сколько переходов в статус посчитано по потоку прайсов. */
     private double transitions(InboundStatus status) {
         return meters.get(InboundTransitionMetrics.TRANSITIONS)
                 .tag("stream", OneCStream.PRICE_LISTS.name()).tag("status", status.name()).counter().count();

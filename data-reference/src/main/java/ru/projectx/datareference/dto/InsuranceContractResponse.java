@@ -7,17 +7,9 @@ import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Insurer;
 
 /**
- * Договор страхования страхователя для {@code GET /internal/v1/insurance-contracts} —
- * «номер, external_id, наименование организации» из ТЗ сервиса Договоров, а с R-08
- * ещё ИНН и КПП страхователя. Читается по нашему {@code id} в пути либо
- * по {@code external_id} параметром.
- *
- * <p>Наименований у организации в 1С два — краткое и полное, — и какое из них ТЗ имеет
- * в виду под «наименованием», не сказано. Отдаются оба. Страхователь может отсутствовать
- * в справочнике (ТЗ-2: им бывает физлицо, которого в {@code insurers} нет) — тогда
- * {@code insurer} пуст, а договор всё равно наш.
- *
- * @param endDate {@code null} — открытая дата источника
+ * Договор страхования для сервиса Договоров вместе со страхователем. У страхователя отдаются оба наименования
+ * из 1С, краткое и полное, потому что в ТЗ не сказано, какое из них нужно. Страхователем бывает физическое лицо,
+ * которого нет в справочнике страхователей, поэтому {@code insurer} может быть пуст.
  */
 public record InsuranceContractResponse(
         UUID id,
@@ -35,7 +27,7 @@ public record InsuranceContractResponse(
                 insurer == null ? null : Organization.of(insurer));
     }
 
-    /** Страхователь — организация из ТЗ-3 с {@code thisIsLPU = false}. */
+    /** Страхователь: организация из справочника контрагентов 1С, которая не является ЛПУ. */
     public record Organization(
             UUID id,
             UUID externalId,

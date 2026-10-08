@@ -7,9 +7,8 @@ import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.entity.PersonalDataCutoff;
 
 /**
- * Срок хранения персональных данных в полисах: запас после окончания срока действия или перевода в архив и
- * календарный день сервиса, по которому полис действует. Одна граница на момент нужна и разбору полиса, и проходу
- * стирания, и метрике, поэтому считается она в одном месте.
+ * Срок хранения персональных данных в полисах после окончания или перевода в архив. Граница нужна разбору полиса,
+ * стиранию и метрике, поэтому считается в одном месте.
  */
 @Component
 public class PolicyPersonalDataTerm {
@@ -22,7 +21,6 @@ public class PolicyPersonalDataTerm {
         this.api = api;
     }
 
-    /** Граница хранения на момент {@code now}. */
     public PersonalDataCutoff cutoffAt(Instant now) {
         return PersonalDataCutoff.at(now, properties.policyPersonalDataGrace(), api.zone());
     }

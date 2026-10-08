@@ -17,16 +17,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбирает адрес и регион санатория из потока контактной информации 1С:УСК. Тем же потоком
- * идут телефоны и почта всех контрагентов 1С, поэтому фильтров два: сообщение должно относиться
- * к санаторию из справочника, а из его строк нужны только действительные адреса. Контакты контрагента,
- * признанного не нашим, пропускаются, а контакты контрагента, который ещё не пришёл, ждут его.
- *
- * <p>Адрес замещается целиком. Если подходящих строк в сообщении нет, адрес и регион очищаются:
- * прежние значения показывали бы в каталоге адрес, которого в 1С уже нет, и узнать об этом было бы
- * неоткуда.
- *
- * <p>Версий у сообщений нет, поэтому действует последнее полученное.
+ * Разбирает адрес и регион санатория из потока контактов всех контрагентов 1С:УСК. Адрес замещается целиком,
+ * и без подходящих строк очищается: иначе каталог показывал бы адрес, которого в 1С уже нет.
  */
 @Component
 public class LpuContactMapper implements StreamMapper {
@@ -58,7 +50,7 @@ public class LpuContactMapper implements StreamMapper {
         return sanatoriums.applyIfKnown(contragentOf(data), sanatorium -> replaceAddress(sanatorium, data));
     }
 
-    /** Запись, которую меняет сообщение, — сам контрагент: адрес лежит в его строке справочника. */
+    /** Сообщение меняет самого контрагента, потому что адрес лежит в его строке справочника. */
     @Override
     public Optional<UUID> recordOf(ObjectNode data) {
         return Optional.of(contragentOf(data));
@@ -101,9 +93,8 @@ public class LpuContactMapper implements StreamMapper {
     }
 
     /**
-     * Порядок предпочтения видов адреса задан настройкой. Адрес вида, которого в списке нет, тоже
-     * подходит, но проигрывает любому названному: какой-то адрес лучше пустой карточки санатория. Среди
-     * равных выигрывает строка с меньшим номером.
+     * Порядок видов адреса задан настройкой. Вид не из списка тоже подходит, но проигрывает любому названному: какой-то
+     * адрес лучше пустой карточки. Среди равных выигрывает строка с меньшим номером.
      */
     private Optional<JsonNode> selectAddress(ObjectNode data) {
         List<String> priority = contract.addressKindPriority();
@@ -114,7 +105,6 @@ public class LpuContactMapper implements StreamMapper {
                         .thenComparingInt(row -> row.path("rowNumber").asInt(Integer.MAX_VALUE)));
     }
 
-    /** Строка-адрес, которую 1С не пометила недействительной. */
     private boolean isValidAddressRow(JsonNode row) {
         return contract.addressRecordType().equals(row.path("type").asString(null))
                 && !OneCValues.flag(row, "notValid");

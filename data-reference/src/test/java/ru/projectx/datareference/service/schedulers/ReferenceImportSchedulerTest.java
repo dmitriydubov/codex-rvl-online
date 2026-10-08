@@ -19,16 +19,9 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Проход шедулера: что он забирает и как классифицирует отказ.
- *
- * <p>Проход вызывается напрямую, а не через расписание: тест, ждущий срабатывания
- * таймера, плавает и в итоге его отключают. По расписанию тот же метод вызывает Spring.
- *
- * <p>Утверждения — только о строках, которые тест создал сам, и только по их
- * идентификаторам. Ни {@code findAll()}, ни {@code count()}: шедулер по устройству
- * забирает <b>всё</b> дозревшее сырьё, а не только положенное этим тестом, и проверка
- * состояния всей таблицы падала бы от любой соседней строки — сообщая при этом не о том,
- * что сломан разбор, а о том, что в базе кто-то ещё.
+ * Проход планировщика на настоящей базе. Он вызывается напрямую, потому что тест, ждущий таймера, плавает. Проверяются
+ * только строки, созданные тестом, по их идентификаторам: проход забирает всё дозревшее сырьё, и проверка всей таблицы
+ * падала бы от соседних строк.
  */
 @IntegrationTest
 class ReferenceImportSchedulerTest {
@@ -76,10 +69,8 @@ class ReferenceImportSchedulerTest {
     }
 
     /**
-     * Разобранное второй раз не разбирается. Проверяется это на самой выборке шедулера,
-     * а не на числе строк справочника: upsert идемпотентен, и повторное применение
-     * по счётчику неотличимо от его отсутствия — тест прошёл бы, даже если бы строку
-     * забирали каждый проход.
+     * Разобранное второй раз не разбирается. Проверяется сама выборка, а не число строк справочника: повторное
+     * применение идемпотентно, и по счётчику его не отличить от отсутствия.
      */
     @Test
     void processedMessages_areNotPickedUpAgain() {
@@ -107,7 +98,6 @@ class ReferenceImportSchedulerTest {
         assertThat(failed.outcome().lastError()).contains("code");
     }
 
-    /** Один битый экземпляр не должен останавливать разбор всей пачки. */
     @Test
     void brokenMessage_doesNotStopTheRest() {
         UUID brokenId = store("{\"id\":\"a4f1c2d3-0000-4000-8000-000000000005\",\"name\":\"Без кода\"}");
@@ -120,7 +110,6 @@ class ReferenceImportSchedulerTest {
         assertThat(mkb10Repository.findByExternalId(SHIGELLOSIS)).isPresent();
     }
 
-    /** @return message-id сохранённой строки сырья — по нему тест и проверяет исход */
     private UUID store(String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.MKB10, QUEUE, envelope(data));

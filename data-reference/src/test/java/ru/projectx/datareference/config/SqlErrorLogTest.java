@@ -23,15 +23,9 @@ import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
 /**
- * Текст SQL-ошибки не попадает в журнал: PostgreSQL кладёт в него Detail и Where со значениями
- * отвергнутой строки или тела, а через те же пути записи идут полисы с персональными данными.
- *
- * <p>Ошибки даёт настоящая база, на месте ПДн — синтетическое значение. Первая — при разборе:
- * на время теста на справочник МКБ-10 ставится CHECK, который отвергает один код. Вторая —
- * при записи сырья: тело, которое не принимает jsonb. Журнал проверяется весь, что бы и кто бы
- * в него ни написал: Hibernate, драйвер, Spring или сам сервис. Тип отказа и SQLSTATE в журнале
- * остаются, иначе сбой нечем было бы диагностировать. Значений нет и в причине отказа в строке
- * сырья, и в тексте исключения драйвера: драйверу запрещено дописывать в него подробности сервера.
+ * PostgreSQL кладёт в текст ошибки значения отвергнутой строки, а через те же пути идут полисы с персональными
+ * данными. Тест на настоящей базе проверяет, что в журнале, причине отказа и исключении драйвера значений нет,
+ * а тип отказа и SQLSTATE для диагностики остаются.
  */
 @IntegrationTest
 @ExtendWith(OutputCaptureExtension.class)
@@ -40,10 +34,7 @@ class SqlErrorLogTest {
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
     private static final String CONSTRAINT = "ck_test_sql_error_log";
     private static final String REJECTED_CODE = "Z99.9";
-    /**
-     * Синтетическое значение на месте ПДн. Короткое намеренно: Where PostgreSQL показывает
-     * тело не целиком, а последние десятки символов перед ошибкой.
-     */
+    /** Синтетическое значение на месте персональных данных. Короткое, потому что Where показывает лишь хвост тела. */
     private static final String PERSONAL_DATA = "Ксения Тестовна";
     private static final String REJECTION = "база данных отклонила запись: DataIntegrityViolationException, SQLSTATE 23514";
 
@@ -79,8 +70,8 @@ class SqlErrorLogTest {
     }
 
     /**
-     * Нарушение CHECK при разборе: PostgreSQL печатает отвергнутую строку целиком (Detail). Повтор дал бы то же
-     * самое, поэтому сообщение отклоняется окончательно; причина и журнал называют тип и SQLSTATE, но не строку.
+     * PostgreSQL печатает строку, нарушившую CHECK, целиком. Повтор дал бы то же самое, поэтому сообщение
+     * отклоняется окончательно, а причина и журнал называют тип и SQLSTATE, но не строку.
      */
     @Test
     void rejectedRow_leavesOnlyFailureTypeAndSqlStateInLogAndReason(CapturedOutput log) {
@@ -98,9 +89,8 @@ class SqlErrorLogTest {
     }
 
     /**
-     * Тело, которое jsonb не принимает ({@code \u0000} в строке), при записи сырья: PostgreSQL
-     * печатает в Where тело до места ошибки — со всем, что в нём стояло раньше. Драйвер этих подробностей
-     * в текст исключения не берёт, поэтому значения нет ни в исключении, ни в журнале, а код ошибки остаётся.
+     * Для тела, которое jsonb не принимает, PostgreSQL печатает в Where тело до места ошибки.
+     * Драйвер эти подробности в текст исключения не берёт, поэтому значения нет ни в исключении, ни в журнале.
      */
     @Test
     void rejectedPayload_leavesNoPayloadTextInExceptionOrLog(CapturedOutput log) {
@@ -117,14 +107,13 @@ class SqlErrorLogTest {
                 .doesNotContain("JSON data");
     }
 
-    /** @return message-id строки сырья — по нему тест находит её исход */
+    /** Возвращает message-id строки сырья: по нему тест находит её исход. */
     private UUID store(String data) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, OneCStream.MKB10, QUEUE, envelope(data));
         return messageId;
     }
 
-    /** Причина отказа в строке сырья. */
     private String lastErrorOf(UUID messageId) {
         return inboundMessageRepository.findById(messageId).orElseThrow().outcome().lastError();
     }

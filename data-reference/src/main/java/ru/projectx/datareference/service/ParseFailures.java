@@ -4,13 +4,9 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;
 
 /**
- * Решает, что делать с сообщением 1С:УСК, разбор которого закончился ошибкой: повторить позже или сразу
- * отклонить.
- *
- * <p>Повторяется только временный отказ базы. Какой отказ временный, решает {@link DatabaseOutages}, тот же
- * класс, по которому REST отвечает 503: перечень временных отказов один на весь сервис. Всё остальное при
- * повторе даст тот же отказ. Это сообщение, которое нарушает контракт, значение, которое база не принимает,
- * и ошибка в коде разбора. Такое сообщение отклоняется сразу и ждёт, пока его разберёт дежурный.
+ * Решает, повторить разбор сообщения 1С:УСК позже или сразу отклонить. Повторяется только временный отказ базы
+ * по тому же перечню, по которому REST отвечает 503; нарушение контракта, значение, которое база не принимает,
+ * и ошибка кода разбора отклоняются сразу и ждут дежурного.
  */
 @Component
 public class ParseFailures {
@@ -21,12 +17,6 @@ public class ParseFailures {
         this.outages = outages;
     }
 
-    /**
-     * Классифицирует ошибку разбора и составляет причину для строки сырья.
-     *
-     * @param failure ошибка, с которой закончилась попытка разбора
-     * @return временный отказ базы или постоянная ошибка
-     */
     public ParseFailure classify(RuntimeException failure) {
         return outages.recognize(failure)
                 .<ParseFailure>map(ParseFailures::temporary)
@@ -46,10 +36,7 @@ public class ParseFailures {
                 outage.type(), outage.sqlState());
     }
 
-    /**
-     * Текст своей ошибки разбора называет поле, но не значение, и становится причиной как есть. У прочих ошибок
-     * текст чужой, поэтому в причину идёт только тип.
-     */
+    /** Своя ошибка разбора называет поле без значения и идёт в причину как есть; у чужой берётся только тип. */
     private static ParseFailure permanent(RuntimeException failure) {
         String type = failure.getClass().getSimpleName();
         String reason = failure instanceof OneCFieldException own

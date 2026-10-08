@@ -9,8 +9,6 @@ import ru.projectx.datareference.entity.OneCStream;
 /**
  * Сообщение 1С, отклонённое потому, что его родитель не пришёл за срок ожидания: что нужно журналу и метрике.
  *
- * @param stream   поток сообщения
- * @param parent   родитель, которого сообщение не дождалось
  * @param transfer идентификатор передачи прайса, частью которой было сообщение; пусто у остальных потоков
  */
 public record ExpiredParentWait(OneCStream stream, AwaitedParent parent, @Nullable UUID transfer) {

@@ -23,9 +23,9 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
 /**
- * Проверка таймаутов при старте: у соединения пула — значения из настройки, у соединения
- * миграций — ноль. Расхождение — WARN с параметром и обоими значениями, без адресов и ПДн;
- * старт не прерывается.
+ * Проверка таймаутов при старте: у соединения пула значения из настройки, у соединения миграций ноль. Расхождение
+ * пишется в журнал предупреждением с параметром и обоими значениями, без адресов и персональных данных, а старт
+ * не прерывается.
  */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class DatabaseTimeoutsCheckTest {

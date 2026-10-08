@@ -8,11 +8,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
 /**
- * Часы с остановленной стрелкой: время в тестах — не источник случайности.
- *
- * <p>{@code @Primary}, а не подмена бина по имени: инъекция {@link Clock} идёт по типу,
- * и приоритетный кандидат её выигрывает — включать переопределение определений бинов
- * ради этого не нужно.
+ * Часы с остановленной стрелкой, чтобы время в тестах не было источником случайности. {@code @Primary} выигрывает
+ * инъекцию по типу, поэтому включать переопределение бинов не нужно.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class FixedClockConfig {

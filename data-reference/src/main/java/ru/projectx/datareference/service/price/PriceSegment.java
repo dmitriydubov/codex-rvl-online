@@ -4,23 +4,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 
-/**
- * Отрезок расчёта: подряд идущие ночи с {@code from} включительно до {@code to} не включительно, которые все
- * оплачиваются по одной строке прайса.
- */
+/** Подряд идущие ночи от {@code from} включительно до {@code to} не включительно, оплачиваемые по одной строке. */
 public record PriceSegment(LocalDate from, LocalDate to, PriceLine line) {
 
-    /** Ночи отрезка считаются по тому же правилу, что ночи периода проживания: день {@code to} не оплачивается. */
     public int nights() {
         return Math.toIntExact(new StayPeriod(from, to).nights());
     }
 
-    /** Сумма по цене без скидки. Копейки сохраняются: цена умножается на целое число ночей. */
     public BigDecimal amount() {
         return forNights(line.price());
     }
 
-    /** Сумма по цене со скидкой; её нет, если у строки прайса нет цены со скидкой. */
     public Optional<BigDecimal> amountWithDiscount() {
         return Optional.ofNullable(line.priceWithDiscount()).map(this::forNights);
     }

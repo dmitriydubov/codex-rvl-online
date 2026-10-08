@@ -1,10 +1,8 @@
 package ru.projectx.datareference.service;
 
 /**
- * Шаблоны {@code like} из строки поиска (R-04, R-07). Знаки шаблона в самой строке — {@code %}
- * и {@code _} — ищутся как есть: перед ними ставится символ экранирования {@code !}, тот же,
- * что в {@code escape '!'} запросов репозиториев. В ФИО, номерах и кодах МКБ-10 его не бывает,
- * но и он сам экранируется — иначе строка с ним сломала бы шаблон.
+ * Строит шаблоны {@code like} для поиска полисов и МКБ-10, в которых {@code %} и {@code _} из строки ищутся как есть.
+ * Экранирует их символ {@code !}, тот же, что в {@code escape '!'} запросов репозиториев; сам он тоже экранируется.
  */
 final class LikePatterns {
 
@@ -19,12 +17,10 @@ final class LikePatterns {
         return value.replace(ESCAPE, ESCAPE + ESCAPE).replace(ANY, ESCAPE + ANY).replace(ONE, ESCAPE + ONE);
     }
 
-    /** Значение — начало строки. */
     static String prefix(String value) {
         return escaped(value) + ANY;
     }
 
-    /** Значение — где угодно в строке. */
     static String substring(String value) {
         return ANY + escaped(value) + ANY;
     }

@@ -4,12 +4,12 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.dto.Mkb10Response;
 
-/** Чтение МКБ-10 для R-07 — то, что нужно контроллеру справочника и ничего больше. */
+/** Чтение справочника МКБ-10 для его контроллера. */
 public interface Mkb10Reads {
 
-    /** Подсказка по коду или наименованию; {@code limit} не задан — умолчание из конфигурации. */
+    /** Без {@code limit} берётся предел выдачи из конфигурации. */
     Mkb10Response search(String query, @Nullable Integer limit);
 
-    /** Раскрыть перечень кодов разом, вместе с архивными. */
+    /** Архивные коды перечня тоже отдаются. */
     Mkb10Response byCodes(List<String> codes);
 }

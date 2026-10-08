@@ -32,11 +32,9 @@ import ru.projectx.datareference.config.RestReadDataSource;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Всплеск запросов соседа: одновременно больше запросов, чем у Дата-референса соединений с базой во всех пулах,
- * и каждый, получив ответ, сразу шлёт следующий — пока сценарий не остановит нагрузку. Все ответы запоминаются.
- *
- * <p>Нагрузка считается начавшейся, когда она заняла весь пул REST-чтений и следующие запросы ждут соединения: это
- * видно по счётчикам самого пула, без расчёта на время.
+ * Всплеск запросов соседа: одновременно больше запросов, чем соединений во всех пулах сервиса, и каждый после ответа
+ * сразу шлёт следующий. Начало нагрузки видно по счётчикам пула REST-чтений, а не по времени: пул занят целиком,
+ * и следующие запросы ждут соединения.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -80,7 +78,6 @@ public class RestReadLoad {
         await().atMost(SATURATION_TIMEOUT).until(this::restReadPoolSaturated);
     }
 
-    /** Путь, который нагружается. */
     public String path() {
         return path.orElseThrow(() -> new IllegalStateException("сценарий не запускал нагрузку"));
     }
@@ -105,7 +102,6 @@ public class RestReadLoad {
         }
     }
 
-    /** Ответы на все запросы нагрузки. */
     public List<Answer> answers() {
         return List.copyOf(answers);
     }
@@ -134,12 +130,7 @@ public class RestReadLoad {
         return new Answer(response.statusCode(), json.readTree(response.body()).at(ERROR_CODE).asString(""));
     }
 
-    /**
-     * Ответ на запрос нагрузки.
-     *
-     * @param status    код HTTP
-     * @param errorCode {@code error.code} тела ответа или пустая строка, если его нет
-     */
+    /** Ответ на запрос нагрузки; {@code errorCode} пустой, если в теле нет {@code error.code}. */
     public record Answer(int status, String errorCode) {
     }
 }

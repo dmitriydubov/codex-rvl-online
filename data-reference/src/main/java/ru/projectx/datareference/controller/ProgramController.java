@@ -16,7 +16,7 @@ public class ProgramController {
         this.programs = programs;
     }
 
-    /** R-09: программа с перечнем услуг, как в ТЗ сервиса Договоров. */
+    /** Программа с перечнем услуг в том виде, который ждёт сервис Договоров. */
     @GetMapping("/programs/{id}")
     public ProgramResponse program(@PathVariable UUID id) {
         return programs.byId(id);

@@ -10,11 +10,8 @@ import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
 
 /**
- * Полис для сервиса Договоров, выбранный из базы сразу строкой без ПДн ({@link PolicyContractRow}):
- * персональные данные застрахованного не попадают ни в ответ, ни в память сервиса. Кэша нет: полис —
- * не справочник, и сервис Договоров читает его в момент выпуска, когда важна свежесть.
- *
- * <p>Транзакция {@code readOnly} — на весь класс: здесь только чтение.
+ * Полис для сервиса Договоров, выбранный из базы строкой без персональных данных, чтобы они не попали ни в ответ,
+ * ни в память сервиса. Кэша нет: Договоры читают полис в момент выпуска, и важна свежесть.
  */
 @Service
 @RestReadTransaction
@@ -36,7 +33,6 @@ public class PolicyContractViewService implements PolicyContractViews {
         return view(externalId, policies::findContractViewByExternalId, ReferenceNotFoundException::policyByExternalId);
     }
 
-    /** Строка по ключу — в тело ответа; нет строки — отказ, который называет этот ключ. */
     private static PolicyContractView view(
             UUID key,
             Function<UUID, Optional<PolicyContractRow>> find,

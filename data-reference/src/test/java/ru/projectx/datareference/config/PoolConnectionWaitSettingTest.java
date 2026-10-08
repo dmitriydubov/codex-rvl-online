@@ -12,16 +12,15 @@ import org.springframework.boot.test.context.assertj.AssertableApplicationContex
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
- * Ожидание соединения из пула и проверка живости соединения — как их читает пул из настоящего
- * {@code application.yml}: умолчания и переменная окружения, которой эксплуатация меняет ожидание.
- *
- * <p>Пул собирается без базы: до первого запроса соединения он к ней не подключается.
+ * Проверяет, как пул читает из настоящего {@code application.yml} ожидание соединения и проверку живости:
+ * умолчания и переменную окружения, которой эксплуатация меняет ожидание. Базы не нужно: пул подключается
+ * к ней только при первом запросе соединения.
  */
 class PoolConnectionWaitSettingTest {
 
     private static final Duration DEFAULT_CONNECTION_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration VALIDATION_TIMEOUT = Duration.ofSeconds(1);
-    /** Значение переменной окружения, отличное от умолчания, чтобы было видно, откуда пул его взял. */
+    /** Отличается от умолчания, чтобы было видно, откуда пул взял значение. */
     private static final Duration OVERRIDDEN_CONNECTION_TIMEOUT = Duration.ofMillis(3500);
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()

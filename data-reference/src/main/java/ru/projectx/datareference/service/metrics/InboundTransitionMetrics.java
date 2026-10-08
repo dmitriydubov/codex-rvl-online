@@ -16,27 +16,16 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
 /**
- * Счётчик переходов статусов сырых сообщений 1С при разборе: сколько сообщений каждого потока разобрано, пропущено,
- * отложено в буфер передачи, поставлено ждать родителя, назначено на повтор и ушло в отказ.
- *
- * <p>Переход считается только после фиксации транзакции, в которой он записан. Статус ставится внутри транзакции
- * разбора, и она ещё может откатиться — например, если база отказала на самом коммите. Тогда сообщение остаётся в
- * прежнем статусе и разбирается снова, а преждевременно посчитанный «разобрано» врал бы. Вне транзакции переход
- * считается сразу: записывать его тогда некому, кроме вызывающего, и откатываться нечему. Считается каждый статус,
- * записанный в зафиксированной транзакции, а не только последний: сообщение прайса, которое собрало свою передачу,
- * в одной транзакции попадает и в {@code BUFFERED}, и в итоговый статус передачи.
- *
- * <p>Метки — поток и новый статус, как они названы в таблице сырья. Идентификатор сообщения в метки не идёт. Ряды
- * заводятся при создании нулями на каждый поток и каждый статус, в который переводит разбор: нулевой ряд есть с
- * самого старта, и правило оповещения видит первое же увеличение. Поэтому {@link #record} в реестр не обращается и
- * транзакцию разбора уронить не может — только увеличивает готовый счётчик.
+ * Счётчик переходов сырых сообщений 1С в статусы разбора по потокам. Переход считается после фиксации транзакции,
+ * потому что откат вернёт сообщению прежний статус. Ряды заводятся нулями заранее: оповещение видит первое
+ * увеличение, а {@link #record} не обращается к реестру и не может уронить разбор.
  */
 @Component
 public class InboundTransitionMetrics {
 
     public static final String TRANSITIONS = "onec.inbound.transitions";
 
-    /** Статусы, в которые сообщение переводит разбор. {@code NEW} ставит приём, его считают счётчики приёма. */
+    /** {@code NEW} ставит приём, и его считают счётчики приёма. */
     private static final List<InboundStatus> TARGET_STATUSES = List.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED,
             InboundStatus.BUFFERED, InboundStatus.AWAITING_PARENT, InboundStatus.RETRY, InboundStatus.FAILED);
 
@@ -49,8 +38,8 @@ public class InboundTransitionMetrics {
     }
 
     /**
-     * Считает переход сообщения в статус, который у него сейчас, — после фиксации текущей транзакции. Статус, в
-     * который разбор не переводит, не считается.
+     * Считает текущий статус сообщения после фиксации или сразу, если транзакции нет. Каждый записанный статус
+     * считается отдельно: часть прайса, собравшая передачу, попадает и в {@code BUFFERED}, и в итоговый статус.
      */
     public void record(InboundMessage message) {
         Optional.ofNullable(counters.get(new SeriesKey(message.receipt().stream(), message.outcome().status())))
@@ -65,7 +54,6 @@ public class InboundTransitionMetrics {
         TransactionSynchronizationManager.registerSynchronization(new IncrementAfterCommit(counter));
     }
 
-    /** Ряд счётчика: поток и статус. */
     private record SeriesKey(OneCStream stream, InboundStatus status) {
 
         Counter register(MeterRegistry registry) {
@@ -77,7 +65,6 @@ public class InboundTransitionMetrics {
         }
     }
 
-    /** Отложенное увеличение счётчика: только если транзакция зафиксирована. */
     private record IncrementAfterCommit(Counter counter) implements TransactionSynchronization {
 
         @Override

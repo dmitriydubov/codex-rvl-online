@@ -34,7 +34,6 @@ public class ServiceJournal {
         events.stop();
     }
 
-    /** Записи, собранные с начала сценария. */
     List<ILoggingEvent> events() {
         return List.copyOf(events.list);
     }

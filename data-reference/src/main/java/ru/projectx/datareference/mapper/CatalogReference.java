@@ -8,15 +8,9 @@ import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ParentKind;
 
 /**
- * Общий фильтр потоков 1С: сообщение применяется, только если запись, на которую оно ссылается, уже есть в
- * справочнике. Так хранятся данные только наших санаториев: услуги только по известным договорам, цены только по
- * известным услугам, адреса только известных санаториев.
- *
- * <p>Записи нет — исходов два. Запись признана не нашей: сообщение пропускается, и причина называет GUID ссылки.
- * О записи сервис ничего не знает: она ещё не пришла, и сообщение ждёт её, потому что 1С присылает справочники
- * многими очередями сразу и в произвольном порядке.
- *
- * @param <R> запись справочника, на которую ссылается сообщение
+ * Сообщение 1С применяется, только если запись, на которую оно ссылается, уже есть в справочнике: так хранятся данные
+ * только наших санаториев. Ссылка на запись, признанную не нашей, пропускается, а на неизвестную ждёт её, потому что
+ * 1С присылает справочники многими очередями сразу и в произвольном порядке.
  */
 final class CatalogReference<R> {
 
@@ -25,12 +19,7 @@ final class CatalogReference<R> {
     private final ForeignReferences foreign;
     private final String outsideCatalog;
 
-    /**
-     * @param finder         поиск записи по GUID 1С, обычно {@code findByExternalId} репозитория
-     * @param kind           вид записи, на которую ссылается сообщение
-     * @param foreign        записи, признанные не нашими
-     * @param outsideCatalog начало причины пропуска, к нему дописывается GUID ссылки
-     */
+    /** @param outsideCatalog начало причины пропуска, к нему дописывается GUID ссылки */
     CatalogReference(Function<UUID, Optional<R>> finder, ParentKind kind, ForeignReferences foreign,
                      String outsideCatalog) {
         this.finder = finder;
@@ -39,7 +28,6 @@ final class CatalogReference<R> {
         this.outsideCatalog = outsideCatalog;
     }
 
-    /** Выполняет шаг разбора для записи с GUID 1С {@code referenceId}, пропускает сообщение или ставит его ждать. */
     ImportResult applyIfKnown(UUID referenceId, Function<R, ImportResult> step) {
         return applyIfKnown(referenceId, step, () -> ImportResult.skipped(outsideCatalog + referenceId));
     }

@@ -18,9 +18,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Пул REST-чтений получает только транзакцию «только чтение», начатую при обработке HTTP-запроса. Приём из очередей
- * и задачи по расписанию идут в пул приложения, даже когда их транзакция только читает: Spring Data открывает такую
- * транзакцию на каждый вызов репозитория вне своей транзакции.
+ * Пул REST-чтений получает только транзакцию «только чтение» внутри HTTP-запроса. Spring Data открывает такую
+ * транзакцию на каждый вызов репозитория, поэтому приём из очередей и задачи по расписанию идут в пул приложения.
  */
 @ExtendWith(MockitoExtension.class)
 class RestReadRoutingTest {
@@ -77,7 +76,7 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(applicationConnection);
     }
 
-    /** Вызов вне транзакции Spring — например, прямое чтение через JDBC из потока планировщика. */
+    /** Например, прямое чтение через JDBC из потока планировщика. */
     @Test
     void callOutsideTransactionAndHttpRequest_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);

@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Флаг паузы приёма в метриках: читается из паузы при каждом снятии значения. */
+/** Защищает флаг паузы приёма в метриках: он читается из состояния паузы при каждом снятии значения. */
 class OneCIngestPauseGaugeTest {
 
     private static final OneCConsumerPause.Paused PAUSED = new OneCConsumerPause.Paused(

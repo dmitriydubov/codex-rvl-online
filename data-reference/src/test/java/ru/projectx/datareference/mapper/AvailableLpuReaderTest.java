@@ -27,10 +27,8 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Защищает чтение перечня учреждений страховой программы. Строка остаётся, только когда её
- * санаторий есть в справочнике и указан тип покрытия; отброшенные строки считаются порознь по
- * причине, потому что лечатся эти причины по-разному. Санатории всего перечня читаются одним
- * запросом, а не по строке.
+ * Защищает чтение перечня учреждений страховой программы. Строка остаётся, только если санаторий есть в справочнике
+ * и указан тип покрытия; отброшенные строки считаются по причинам порознь, потому что лечатся причины по-разному.
  */
 class AvailableLpuReaderTest {
 
@@ -113,7 +111,6 @@ class AvailableLpuReaderTest {
         assertThat(row.percentCopayment()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
-    /** Строка, которая была бы сохранена, без обязательного условия отклоняет всё сообщение. */
     @ParameterizedTest
     @ValueSource(strings = {"numberLayer", "directAttachment", "percentCopayment"})
     void storedRowWithoutRequiredTerm_rejectsTheMessage(String field) {
@@ -142,7 +139,7 @@ class AvailableLpuReaderTest {
         assertThat(read.withoutCoverage()).isEqualTo(1);
     }
 
-    /** Тип покрытия у строки ровно один: строка с обеими частями не сохраняется рисковой, а считается строкой без типа. */
+    /** Тип покрытия у строки ровно один, поэтому строка с обеими частями считается строкой без типа. */
     @Test
     void rowWithRiskAndDeposit_isDroppedAsRowWithoutCoverage() {
         ObjectNode both = row(SANATORIUM, "r").put("d", true);
@@ -156,7 +153,6 @@ class AvailableLpuReaderTest {
         assertThat(read.unknownSanatorium()).isZero();
     }
 
-    /** Слой и сооплата сохраняемой строки за пределом отклоняют всё сообщение. */
     @ParameterizedTest
     @CsvSource({
             "numberLayer, -1, поле numberLayer отрицательное",
@@ -172,7 +168,6 @@ class AvailableLpuReaderTest {
                 .hasMessage(reason);
     }
 
-    /** Предельные значения допустимы: слой 0 и сооплата 100. */
     @Test
     void zeroLayerAndFullCopayment_areReadAsSent() {
         ObjectNode data = program(row(SANATORIUM, "r").put("numberLayer", 0).put("percentCopayment", 100));

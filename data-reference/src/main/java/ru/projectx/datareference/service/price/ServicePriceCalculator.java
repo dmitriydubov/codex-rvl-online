@@ -11,17 +11,9 @@ import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 
 /**
- * Считает стоимость услуги за период по строкам её прайса.
- *
- * <p>Каждая строка прайса обрезается по периоду и становится отрезком: ночи, которые оплачиваются по ней. Если два
- * отрезка пересекаются, на одни сутки действуют две строки прайса. Это ошибка данных: выбирать наугад нельзя, и
- * расчёт отказывает с перечнем таких строк. Если между отрезками или по краям периода остались сутки без строки,
- * расчёт тоже отказывает, с перечнем непокрытых интервалов: половина суммы хуже честного отказа. Если в периоде
- * есть и то и другое, отказ — из-за двух строк на одни сутки. Две соседние строки с одинаковой ценой остаются
- * разными отрезками.
- *
- * <p>Расчёт идёт по границам строк, а не по суткам, поэтому его стоимость зависит от числа строк прайса, а не от
- * длины периода.
+ * Считает стоимость услуги за период по границам строк прайса, а не по суткам. Две строки на одни сутки дают отказ
+ * с перечнем строк, потому что выбирать наугад нельзя, и этот отказ важнее отказа за непокрытые сутки. Частичная
+ * сумма не отдаётся: она хуже честного отказа.
  */
 public final class ServicePriceCalculator {
 
@@ -35,7 +27,7 @@ public final class ServicePriceCalculator {
     private ServicePriceCalculator() {
     }
 
-    /** Строки прайса могут быть любыми строками услуги: те, что на период не приходятся, расчёт пропускает. */
+    /** Строки, которые на период не приходятся, пропускаются. */
     public static PriceBreakdown calculate(UUID serviceId, StayPeriod period, List<PriceLine> lines) {
         List<PriceSegment> segments = lines.stream()
                 .map(line -> segmentWithin(period, line))
@@ -47,14 +39,13 @@ public final class ServicePriceCalculator {
         return new PriceBreakdown(segments);
     }
 
-    /** Ночи периода, которые оплачиваются по этой строке; пусто, если строка на период не приходится. */
     private static Optional<PriceSegment> segmentWithin(StayPeriod period, PriceLine line) {
         LocalDate from = line.validFrom().isAfter(period.checkIn()) ? line.validFrom() : period.checkIn();
         LocalDate to = endWithin(period, line);
         return from.isBefore(to) ? Optional.of(new PriceSegment(from, to, line)) : Optional.empty();
     }
 
-    /** День, в который кончается последняя ночь строки в периоде: строка действует по {@code validTo} включительно. */
+    /** Строка действует по {@code validTo} включительно, поэтому её последняя ночь кончается на следующий день. */
     private static LocalDate endWithin(StayPeriod period, PriceLine line) {
         return Optional.ofNullable(line.validTo())
                 .map(lastDay -> lastDay.plusDays(1))
@@ -83,10 +74,7 @@ public final class ServicePriceCalculator {
         return first.from().isBefore(second.to()) && second.from().isBefore(first.to());
     }
 
-    /**
-     * Отрезки здесь уже не пересекаются и идут по порядку. Непокрытые сутки — между началом периода и первым
-     * отрезком, между концом каждого отрезка и началом следующего и между последним отрезком и выездом.
-     */
+    /** Отрезки здесь уже не пересекаются и упорядочены, поэтому пробел ищется между соседями и по краям периода. */
     private static void requireNoGap(UUID serviceId, StayPeriod period, List<PriceSegment> segments) {
         List<LocalDate> gapStarts = Stream.concat(Stream.of(period.checkIn()), segments.stream().map(PriceSegment::to))
                 .toList();

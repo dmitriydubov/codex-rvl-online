@@ -7,23 +7,15 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
 /**
- * Сборка пула REST-чтений по образцу пула приложения.
- *
- * <p>Пул REST-чтений связывается с теми же свойствами {@code spring.datasource.hikari.*}, что и пул приложения, — так
- * же, как Spring Boot настраивает сам пул приложения. Поэтому у обоих одни параметры драйвера (в том числе таймауты
- * сеанса PostgreSQL), проверка соединений и остальные настройки пула, и новая настройка пула приложения сразу
- * достаётся и REST-чтениям. Адрес и учётные данные берутся у готового пула приложения: Spring Boot мог взять их не из
- * свойств, а из окружения (так подключаются тесты).
- *
- * <p>Поверх свои у пула REST-чтений имя, размер, ожидание соединения, сетевой тайм-аут чтения и ожидание отправки
- * отмены запроса. Параметры драйвера у пула свои, отдельным набором: сетевой тайм-аут REST-чтений не достаётся разбору.
+ * Сборка пула REST-чтений по образцу пула приложения: те же свойства {@code spring.datasource.hikari.*}, а адрес и
+ * учётные данные берутся у готового пула, потому что Boot мог взять их из окружения, как в тестах. Свои у пула только
+ * имя, размер, ожидание соединения и параметры драйвера, чтобы короткий тайм-аут не достался разбору.
  */
 public final class RestReadPools {
 
     /** Имя пула в журнале HikariCP и в метке {@code pool} его метрик. */
     public static final String POOL_NAME = "rest-read";
 
-    /** Свойства пула приложения в конфигурации Spring Boot. */
     private static final String APPLICATION_POOL_PROPERTIES = "spring.datasource.hikari";
 
     /** Сетевой тайм-аут чтения драйвера PostgreSQL, в секундах. */
@@ -35,14 +27,7 @@ public final class RestReadPools {
     private RestReadPools() {
     }
 
-    /**
-     * Пул REST-чтений. Он ещё не открыт: соединения появятся при первом REST-чтении.
-     *
-     * @param application пул приложения с уже заданными настройками
-     * @param environment конфигурация приложения со свойствами пула приложения
-     * @param settings    свои настройки пула REST-чтений
-     * @return новый пул
-     */
+    /** Новый пул ещё не открыт: соединения появятся при первом REST-чтении. */
     public static HikariDataSource restReadPool(
             HikariDataSource application, Environment environment, RestReadPoolProperties settings) {
 

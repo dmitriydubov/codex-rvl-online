@@ -8,9 +8,8 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ReferenceCaches;
 
 /**
- * Ключ кэша для ответов «действующие на сегодня»: сегодняшний день контура, затем аргументы метода. Ответ
- * вчерашнего дня по новому ключу не находится, и в полночь по Москве ответ считается заново, не дожидаясь
- * конца срока жизни.
+ * Ключ кэша для ответов «действующие на сегодня»: сегодняшний день контура, затем аргументы метода. Так в полночь
+ * по Москве ответ считается заново, не дожидаясь конца срока жизни кэша.
  */
 @Component(ReferenceCaches.TODAY_KEY)
 public class TodayKeyGenerator implements KeyGenerator {

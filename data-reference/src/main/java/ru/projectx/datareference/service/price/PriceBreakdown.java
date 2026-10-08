@@ -5,10 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Стоимость услуги за период, разбитая на отрезки по строкам прайса, и итоги по ним.
- *
- * <p>Итог по цене со скидкой есть, только когда цена со скидкой есть у каждого отрезка: складывать скидочные цены
- * с обычными в одном итоге нельзя. Тогда же основной для сооплаты считается сумма со скидкой.
+ * Стоимость услуги за период по отрезкам прайса с итогами. Итог со скидкой есть, только если скидочная цена есть
+ * у каждого отрезка: складывать скидочные цены с обычными в одном итоге нельзя.
  */
 public record PriceBreakdown(List<PriceSegment> segments) {
 
@@ -33,7 +31,6 @@ public record PriceBreakdown(List<PriceSegment> segments) {
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
-    /** Цена со скидкой есть у каждого отрезка. */
     public boolean discountedThroughout() {
         return segments.stream().allMatch(segment -> segment.amountWithDiscount().isPresent());
     }

@@ -19,9 +19,9 @@ public interface AppealTypeRepository extends JpaRepository<AppealType, UUID> {
     Optional<AppealType> findByExternalId(UUID externalId);
 
     /**
-     * Действующие виды обращения по наименованиям без учёта регистра и краевых пробелов —
-     * так R-01 и R-03 находят виды обращения РВЛ. {@code names} уже в нижнем регистре
-     * и без краевых пробелов: нормализует вызывающий, здесь только колонка.
+     * Действующие виды обращения по наименованиям без учёта регистра и краевых пробелов: так каталог учреждений и
+     * перечень услуг находят виды обращения РВЛ. Вызывающий уже нормализовал {@code names}, здесь приводится только
+     * колонка.
      */
     @Query("select a from AppealType a where a.archive = false and lower(trim(a.name)) in :names")
     List<AppealType> findActiveByNormalizedNameIn(Collection<String> names);

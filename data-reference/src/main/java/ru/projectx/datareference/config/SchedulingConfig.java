@@ -8,17 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 /**
- * Включает работу по расписанию и даёт ей пул потоков.
- *
- * <p>Расписания можно выключить свойством {@code projectx.scheduling.enabled=false}. Это нужно тестам:
- * проход, проснувшийся посреди чужого теста, поменял бы статусы, которые тест проверяет, поэтому тесты
- * вызывают проходы сами. В работающем сервисе свойство не задаётся, и расписания включены.
- *
- * <p>Пул — обычный планировщик Spring с фиксированным числом потоков, размер берётся из
- * {@code spring.task.scheduling.pool.size}. Свой бин нужен потому, что при включённых виртуальных потоках
- * Boot по умолчанию ставит планировщик, который все задачи с паузой между проходами выполняет на одном
- * потоке. У сервиса таких задач пять: три прохода по расписанию, проверка базы, пока приём из 1С
- * стоит на паузе, и обновление метрик очереди разбора; зависшая одна останавливала бы остальные.
+ * Включает работу по расписанию с отдельным пулом потоков. Тесты выключают её свойством
+ * {@code projectx.scheduling.enabled=false} и вызывают проходы сами, чтобы проход не менял статусы посреди теста.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnBooleanProperty(name = "projectx.scheduling.enabled", matchIfMissing = true)
@@ -26,9 +17,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 public class SchedulingConfig {
 
     /**
-     * Имя {@code taskScheduler} — то, под которым Spring ищет планировщик для расписаний, если их
-     * несколько; сборщик Boot переносит в пул размер, префикс имён потоков и правила остановки из
-     * {@code spring.task.scheduling.*}.
+     * Свой планировщик нужен, потому что при виртуальных потоках Boot ставит однопоточный, и одна зависшая из пяти
+     * задач с паузой останавливала бы остальные. Размер берётся из {@code spring.task.scheduling.pool.size}, а имя
+     * {@code taskScheduler} Spring ищет, когда планировщиков несколько.
      */
     @Bean
     public ThreadPoolTaskScheduler taskScheduler(ThreadPoolTaskSchedulerBuilder builder) {

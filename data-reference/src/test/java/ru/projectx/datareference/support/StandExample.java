@@ -17,14 +17,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Пример запроса и ответа стенда из {@code src/test/resources/stand/examples}. Те же файлы
- * читает разработчик сервиса Договоров: формат описан в {@code stand/README.md}.
- *
- * <p>Примеры идут по порядку имён файлов, и порядок значим: пример, который выдаёт
- * {@code id}, стоит раньше того, что им пользуется (см. {@link StandPlaceholders}).
- *
- * @param name имя файла — им пример и называется в отчёте теста
- * @param text файл как есть: по нему ищутся плейсхолдеры
+ * Пример запроса и ответа стенда из {@code src/test/resources/stand/examples}; те же файлы читает разработчик сервиса
+ * Договоров. Примеры идут по порядку имён файлов, и порядок значим: пример, выдающий {@code id}, стоит раньше того,
+ * что им пользуется ({@link StandPlaceholders}).
  */
 public record StandExample(String name, String text, JsonNode root) {
 
@@ -79,9 +74,8 @@ public record StandExample(String name, String text, JsonNode root) {
     }
 
     /**
-     * Таблица, которую на время запроса держит под ACCESS EXCLUSIVE другой сеанс
-     * (раздел {@code condition.locked_table}): так пример показывает 503 при базе,
-     * не ответившей вовремя. У остальных примеров условия нет.
+     * Таблица, которую на время запроса другой сеанс держит под ACCESS EXCLUSIVE ({@code condition.locked_table}):
+     * так пример показывает 503 при базе, не ответившей вовремя.
      */
     public Optional<String> lockedTable() {
         JsonNode table = root.path("condition").path("locked_table");

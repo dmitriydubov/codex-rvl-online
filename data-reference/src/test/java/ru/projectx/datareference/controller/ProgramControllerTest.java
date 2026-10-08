@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.service.ProgramReads;
 
-/** Чтение программы по нашему {@code id} (R-09). */
+/** Ручка программы читает её по нашему {@code id} и отдаёт найденное сервисом. */
 @ExtendWith(MockitoExtension.class)
 class ProgramControllerTest {
 

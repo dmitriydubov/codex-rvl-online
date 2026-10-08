@@ -11,12 +11,8 @@ import org.springframework.boot.context.properties.bind.validation.BindValidatio
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
- * Верхние пределы строки поиска и перечня кодов МКБ-10 в настройках REST-чтения: умолчания, привязка из
- * свойств и значения, которые не пускают сервис в работу.
- *
- * <p>Привязка настоящая, Boot-овская, но без приложения, базы и брокера: контекст из одной записи настроек
- * и двух её обязательных свойств. Неверный предел обязан уронить запуск, а не отказывать потом каждому
- * запросу.
+ * Защищает пределы строки поиска, перечня кодов МКБ-10 и периода расчёта в настройках REST-чтения.
+ * Неверный предел обязан уронить запуск, а не отказывать потом каждому запросу.
  */
 class ReferenceApiPropertiesTest {
 
@@ -37,14 +33,14 @@ class ReferenceApiPropertiesTest {
         });
     }
 
-    /** Предел длины периода расчёта стоимости по умолчанию — год с високосным запасом, 366 ночей. */
+    /** По умолчанию — год с високосным запасом. */
     @Test
     void stayLimit_defaultsTo366Nights() {
         context.run(started -> assertThat(started.getBean(ReferenceApiProperties.class).price().maxNights())
                 .isEqualTo(DEFAULT_MAX_NIGHTS));
     }
 
-    /** Предел длины периода читается из своего свойства: опечатка в имени молча оставила бы умолчание. */
+    /** Опечатка в имени свойства молча оставила бы умолчание. */
     @Test
     void stayLimit_isBoundFromItsProperty() {
         context.withPropertyValues("projectx.api.price.max-nights=21")
@@ -61,14 +57,13 @@ class ReferenceApiPropertiesTest {
                         .rootCause().hasMessageContaining("price.maxNights"));
     }
 
-    /** Предел в одну ночь допустим: это наименьший период расчёта. */
     @Test
     void oneNightStayLimit_isAccepted() {
         context.withPropertyValues("projectx.api.price.max-nights=1")
                 .run(started -> assertThat(started).hasNotFailed());
     }
 
-    /** Каждый предел читается из своего свойства: опечатка в имени молча оставила бы умолчание. */
+    /** Опечатка в имени свойства молча оставила бы умолчание. */
     @Test
     void inputLimits_areBoundFromTheirProperties() {
         context.withPropertyValues("projectx.api.search.max-query-length=60",
@@ -82,8 +77,8 @@ class ReferenceApiPropertiesTest {
     }
 
     /**
-     * С нулевым пределом сервис отклонял бы любую строку поиска или любой перечень кодов. Поэтому такое
-     * значение не пускает сервис в работу, а отказ называет раздел и предел.
+     * С нулевым пределом сервис отклонял бы любую строку поиска или любой перечень кодов,
+     * поэтому такое значение не пускает сервис в работу.
      */
     @ParameterizedTest
     @CsvSource({"search,max-query-length,maxQueryLength", "mkb10,max-query-length,maxQueryLength",
@@ -95,10 +90,7 @@ class ReferenceApiPropertiesTest {
                         .rootCause().hasMessageContaining(section + "." + component));
     }
 
-    /**
-     * Верхний предел длины ниже нижнего не пропустил бы ни одной строки поиска. Такая пара тоже не пускает
-     * сервис в работу, и отказ называет раздел и нарушенное правило.
-     */
+    /** Верхний предел длины ниже нижнего не пропустил бы ни одной строки поиска, поэтому роняет запуск. */
     @ParameterizedTest
     @ValueSource(strings = {"search", "mkb10"})
     void maxQueryLengthBelowMinimum_failsStartup(String section) {
@@ -108,7 +100,6 @@ class ReferenceApiPropertiesTest {
                         .rootCause().hasMessageContaining(section + ".queryLengthRangeConsistent"));
     }
 
-    /** Равные пределы допустимы: строка ровно этой длины проходит обе проверки. */
     @ParameterizedTest
     @ValueSource(strings = {"search", "mkb10"})
     void maxQueryLengthEqualToMinimum_isAccepted(String section) {

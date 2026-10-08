@@ -8,15 +8,8 @@ import java.util.function.Function;
 import ru.projectx.datareference.entity.OneCStream;
 
 /**
- * Разбор потока 1С, который ведёт справочник по GUID 1С: сообщение создаёт запись или заменяет её
- * реквизиты последним полученным снимком.
- *
- * <p>Наследник решает, принимать ли сообщение и как из него получается снимок, а создание или обновление
- * записи с моментом по часам сервиса берёт отсюда. Поиск, создание, применение снимка и сохранение
- * передаются функциями, как в {@link SnapshotUpsert}.
- *
- * @param <E> запись справочника
- * @param <S> разобранные реквизиты сообщения
+ * Разбор потока 1С, который ведёт справочник по GUID 1С. Наследник решает, принимать ли сообщение и как получить
+ * из него снимок, а запись создаётся или обновляется через {@link SnapshotUpsert} по часам сервиса.
  */
 abstract class CatalogStreamMapper<E, S> implements StreamMapper {
 
@@ -24,14 +17,6 @@ abstract class CatalogStreamMapper<E, S> implements StreamMapper {
     private final SnapshotUpsert<E, S> upsert;
     private final Clock clock;
 
-    /**
-     * @param stream поток 1С, сообщения которого разбирает наследник
-     * @param finder поиск записи по GUID 1С, обычно {@code findByExternalId} репозитория
-     * @param creation новая запись из первого снимка
-     * @param refresh применение нового снимка к известной записи
-     * @param store сохранение записи, обычно {@code save} репозитория
-     * @param clock часы, по которым ставится момент создания и изменения записи
-     */
     CatalogStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, SnapshotUpsert.Creation<E, S> creation,
                         SnapshotUpsert.Refresh<E, S> refresh, Consumer<E> store, Clock clock) {
         this.stream = stream;
@@ -44,7 +29,6 @@ abstract class CatalogStreamMapper<E, S> implements StreamMapper {
         return stream;
     }
 
-    /** Создаёт или обновляет запись с GUID 1С {@code externalId} и сохраняет её. */
     protected final ImportResult upsert(UUID externalId, S snapshot) {
         return upsert.apply(externalId, snapshot, clock.instant());
     }

@@ -25,10 +25,9 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 
 /**
- * Временный отказ базы распознаётся и тогда, когда исключение пришло сырым из Hibernate — с ленивой
- * догрузки в сервисе, мимо репозитория. Без этого отмена оператора по таймауту на догрузке программ
- * полиса уходила бы как внутренняя ошибка, которую сервис Заявок не повторяет. Переводчик — тот же
- * класс Spring, которым переводят исключения прокси репозиториев, поэтому тест проверяет настоящий перевод.
+ * Временный отказ базы распознаётся и тогда, когда исключение пришло сырым из Hibernate с ленивой догрузки, мимо
+ * репозитория: иначе отмена по таймауту ушла бы как внутренняя ошибка, которую сервис Заявок не повторяет. Переводчик —
+ * тот же класс Spring, что у прокси репозиториев, поэтому тест проверяет настоящий перевод.
  */
 class DatabaseOutagesTest {
 
@@ -124,7 +123,6 @@ class DatabaseOutagesTest {
         assertThat(described).hasValue(new DatabaseOutages.Outage("DataIntegrityViolationException", "23514"));
     }
 
-    /** Временный отказ описывается так же, как его распознаёт {@code recognize}. */
     @Test
     void temporaryFailure_isDescribedLikeItIsRecognized() {
         var lost = new JDBCConnectionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE));
@@ -162,7 +160,6 @@ class DatabaseOutagesTest {
                 .hasValue(new DatabaseOutages.Outage("JpaSystemException", "нет"));
     }
 
-    /** Уже переведённое исключение Spring описывается своим типом. */
     @Test
     void springDataAccessFailure_isDescribedByItsOwnType() {
         assertThat(outages.describe(new DataIntegrityViolationException(TEXT)))
@@ -170,9 +167,9 @@ class DatabaseOutagesTest {
     }
 
     /**
-     * Сеанс, закрытый сервером по простою открытой транзакции (25P03), — временный отказ: пул заменит
-     * соединение, и та же операция пройдёт. Перевод даёт общий {@code JpaSystemException}, поэтому отказ
-     * узнаётся по коду. Так REST отвечает 503, а разбор сообщения 1С:УСК идёт на повтор.
+     * Сеанс, закрытый сервером по простою открытой транзакции (25P03), — временный отказ: пул заменит соединение, и
+     * та же операция пройдёт. Перевод даёт общий {@code JpaSystemException}, поэтому отказ узнаётся по коду: REST
+     * отвечает 503, а разбор сообщения 1С:УСК идёт на повтор.
      */
     @Test
     void sessionClosedForIdleTransaction_isTemporary_recognizedBySqlState() {

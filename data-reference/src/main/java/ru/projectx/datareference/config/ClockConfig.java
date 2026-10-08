@@ -5,20 +5,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Источник времени для всего сервиса.
- *
- * <p>Везде, где нужно «сейчас», инъецируется этот {@link Clock}, а не вызывается
- * {@code Instant.now()}. Ради тестов: подменив бин на {@link Clock#fixed}, они
- * проверяют сроки и пороги без {@code Thread.sleep}.
- *
- * <p>По той же причине в сущностях нет {@code @CreationTimestamp} и
- * {@code @UpdateTimestamp}: аннотации Hibernate этот бин не видят и штампуют момент
- * из системных часов JVM в обход Spring.
+ * Единый источник времени сервиса. Его внедряют вместо вызова {@code Instant.now()}, чтобы тесты подменяли часы на
+ * {@link Clock#fixed}. По той же причине в сущностях нет {@code @CreationTimestamp} и {@code @UpdateTimestamp}:
+ * Hibernate ставит их по системным часам JVM мимо этого бина.
  */
 @Configuration(proxyBeanMethods = false)
 public class ClockConfig {
 
-    /** UTC, а не системная зона: контейнер и разработческая машина живут в разных поясах. */
+    /** UTC, а не системная зона: контейнер и машина разработчика живут в разных поясах. */
     @Bean
     public Clock clock() {
         return Clock.systemUTC();

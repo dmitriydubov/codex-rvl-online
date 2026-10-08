@@ -17,9 +17,9 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Счёт переходов статусов с настоящим менеджером транзакций и PostgreSQL: переход считается при фиксации, откат
- * его не считает, а запись временной ошибки в своей транзакции ({@code REQUIRES_NEW}) считается при фиксации своей
- * транзакции, даже если внешняя потом откатилась. Синхронизацию без базы проверяет {@code InboundTransitionMetricsTest}.
+ * Счёт переходов статусов с настоящим менеджером транзакций и PostgreSQL: переход считается при фиксации, откат его
+ * не считает. Временная ошибка пишется в своей транзакции ({@code REQUIRES_NEW}) и считается при её фиксации, даже если
+ * внешняя транзакция потом откатилась.
  */
 @IntegrationTest
 class InboundTransitionCommitTest {

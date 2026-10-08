@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.service.InsuranceContractReads;
 
-/** Чтение договора страхования (R-08): по нашему {@code id}, по {@code external_id} и запрос без ключа. */
+/** Ручки договора страхования выбирают сервис чтения по ключу: {@code id}, {@code external_id} или отказ без ключа. */
 @ExtendWith(MockitoExtension.class)
 class InsuranceContractControllerTest {
 

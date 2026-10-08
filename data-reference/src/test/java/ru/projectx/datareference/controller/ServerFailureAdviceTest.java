@@ -30,13 +30,9 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 
 /**
- * Сбой сервиса уходит потребителю в едином формате с верным статусом, а в журнал попадает без текста
- * чужого исключения. Это защищает две вещи сразу. Сервисы Заявок и Договоров повторяют запрос только
- * при 503, поэтому временный отказ базы нельзя выдать за внутреннюю ошибку. Текст исключения базы может
- * нести значения строки с персональными данными, поэтому он не должен попасть ни в ответ, ни в журнал.
- *
- * <p>Стек MVC настоящий: заглушка-контроллер бросает исключение, обработчик решает статус и код.
- * Фильтр {@code X-Request-Id} подключён, чтобы {@code request_id} в теле сверялся с заголовком.
+ * Сервисы Заявок и Договоров повторяют запрос только при 503, поэтому временный отказ базы нельзя выдать
+ * за внутреннюю ошибку. Текст исключения базы может нести персональные данные, поэтому он не попадает
+ * ни в ответ, ни в журнал.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class ServerFailureAdviceTest {
@@ -54,10 +50,8 @@ class ServerFailureAdviceTest {
     }
 
     /**
-     * Временный отказ базы: отказ соединения при входе в транзакцию, обрыв посреди запроса,
-     * таймауты оператора и транзакции, ожидание блокировки. Вызывающий может повторить запрос.
-     * Последние два — сырые исключения Hibernate, какими они приходят с ленивой догрузки в сервисе,
-     * мимо перевода репозитория.
+     * Временные отказы базы, после которых вызывающий может повторить запрос. Последние два — сырые исключения
+     * Hibernate, какими они приходят с ленивой догрузки в сервисе мимо перевода исключений репозитория.
      */
     static Stream<RuntimeException> databaseOutages() {
         return Stream.of(
@@ -100,7 +94,7 @@ class ServerFailureAdviceTest {
         assertThat(output).contains("WARN", "QueryTimeoutException", REQUEST_ID).doesNotContain(FOREIGN_TEXT);
     }
 
-    /** SQLSTATE драйвера отличает блокировку от отмены и от отказа соединения — без текста исключения. */
+    /** SQLSTATE драйвера отличает блокировку от отмены и от отказа соединения без текста исключения. */
     @Test
     void databaseOutage_logsDeepestSqlState(CapturedOutput output) {
         controller.failWith(new CannotAcquireLockException(FOREIGN_TEXT,
@@ -111,7 +105,7 @@ class ServerFailureAdviceTest {
         assertThat(output).contains("sqlstate=55P03").doesNotContain(FOREIGN_TEXT);
     }
 
-    /** При обрыве соединения драйвер кладёт SQLSTATE класса 08 поверх IOException — в журнале нужен именно он. */
+    /** При обрыве соединения драйвер кладёт SQLSTATE класса 08 поверх IOException, и в журнале нужен именно он. */
     @Test
     void connectionLoss_logsSqlStateOfDeepestSqlException_notOfRootIoException(CapturedOutput output) {
         controller.failWith(new DataAccessResourceFailureException(FOREIGN_TEXT,
@@ -157,9 +151,8 @@ class ServerFailureAdviceTest {
     }
 
     /**
-     * Непредвиденная ошибка попадает в журнал с уровнем ERROR, цепочкой причин с местом каждой и
-     * идентификатором запроса, но без текстов и без стека. Текст чужого исключения может нести значения
-     * строки с персональными данными, а стек печатает тот же текст у каждой причины.
+     * Непредвиденная ошибка попадает в журнал с цепочкой причин и идентификатором запроса, но без текстов
+     * и стека: текст чужого исключения может нести персональные данные, а стек повторяет его у каждой причины.
      */
     @Test
     void permanentFailure_isLoggedWithCauseChainAndRequestId_withoutForeignText(CapturedOutput output) {

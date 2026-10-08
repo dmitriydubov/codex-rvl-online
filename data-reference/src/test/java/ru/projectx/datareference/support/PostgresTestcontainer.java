@@ -8,24 +8,9 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * PostgreSQL для тестов. Настоящий, той же версии, что в контуре: часть поведения,
- * ради которого этот сервис существует, — уникальные ключи, {@code jsonb}, поведение
- * Liquibase — на встроенной базе либо работает иначе, либо не работает вовсе.
- *
- * <p>Обычно это контейнер Testcontainers. Если задан {@code TEST_POSTGRES_URL}, контейнер
- * не поднимается, а датасорс смотрит на внешнюю базу — для машин без Docker, см. {@link TestDatabase}.
- *
- * <p>В обоих случаях адрес и учётные данные приходят в контекст свойствами
- * {@code spring.datasource.*} — так же, как в контуре. {@code @ServiceConnection} здесь
- * намеренно нет: он отдаёт Liquibase собственные данные подключения к контейнеру, и тесты
- * не видели бы, с какими настройками соединения миграции идут на самом деле. А они
- * отличаются от пула приложения: см. {@code spring.liquibase} в {@code application.yml}.
- * Приёмка ({@code CucumberSpringConfiguration}) свой {@code @ServiceConnection} сохраняет:
- * она проверяет ответы сервиса, а не настройки соединений, и в контур не переносится.
- *
- * <p>Контейнер живёт как бин контекста, а не статическим полем теста: контексты Spring
- * кэшируются между тестовыми классами, и вместе с контекстом переиспользуется контейнер.
- * Схему в нём накатывает Liquibase на старте приложения — как и в проде.
+ * PostgreSQL той же версии, что в контуре: уникальные ключи, {@code jsonb} и Liquibase на встроенной базе ведут себя
+ * иначе. Адрес контейнера или внешней базы ({@link TestDatabase}) приходит свойствами {@code spring.datasource.*}, без
+ * {@code @ServiceConnection}, чтобы миграции шли со своими настройками соединения, как в контуре.
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class PostgresTestcontainer {
