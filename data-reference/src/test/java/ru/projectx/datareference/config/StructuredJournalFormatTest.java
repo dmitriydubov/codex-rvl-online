@@ -15,12 +15,9 @@ import ru.projectx.datareference.support.StructuredJournal;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Журнал сервиса пишется в формате Elastic Common Schema (ECS): каждая строка — объект JSON, и ключи MDC
- * становятся его полями.
- *
- * <p>Сборщик журналов контура разбирает записи по полям, а не по тексту. По полям {@code messageId},
- * {@code stream}, {@code queue} и {@code requestId} находится вся история сообщения 1С или запроса. Без
- * структурного формата ключи MDC в строку журнала не выводятся.
+ * Сборщик журналов контура разбирает записи по полям, поэтому журнал пишется в формате ECS (Elastic Common Schema).
+ * Без него ключи MDC вроде {@code messageId} и {@code requestId}, по которым находится история сообщения или
+ * запроса, в строку журнала не выводятся.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class StructuredJournalFormatTest {

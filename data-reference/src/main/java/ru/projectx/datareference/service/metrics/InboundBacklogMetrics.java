@@ -17,19 +17,9 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
 /**
- * Метрики накопления в таблице сырых сообщений 1С: сколько сообщений каждого потока ждут разбора, ждут частей
- * передачи, ждут родителя или ушли в отказ, как давно ждёт самое старое, сколько передач прайсов зависло, сколько
- * тел с персональными данными не стёрто в срок и у скольких полисов персональные данные пережили свой срок.
- *
- * <p>Значения берутся из снимка в памяти, а снимок обновляет задача по расписанию ({@link #refresh}). Запрашивать
- * базу при каждом скрейпе было бы хуже: скрейп ждал бы базу, а когда база недоступна — до её таймаутов, и
- * Prometheus терял бы вместе с этими метриками все остальные именно тогда, когда они нужнее всего. Цена — значения
- * отстают от базы не больше чем на интервал обновления; насколько, показывает {@value #STALENESS}. Если обновление
- * не удалось, остаётся прежний снимок, а отставание растёт. До первого чтения снимок пуст и помечен 1970 годом:
- * нули в это время — не данные, и отставание в десятки лет говорит об этом прямо.
- *
- * <p>Ряды заведены заранее на каждый поток и статус, а не только на те, где сейчас есть сообщения: пропавший ряд в
- * Prometheus неотличим от сломанного экспорта, а ноль — однозначен.
+ * Метрики накопления в таблице сырых сообщений 1С из снимка в памяти, который обновляет расписание: скрейп не ждёт
+ * недоступную базу. Отставание снимка видно отдельной метрикой; пустой снимок помечен 1970 годом. Ряды заведены
+ * на каждый поток и статус заранее, потому что пропавший ряд неотличим от сломанного экспорта.
  */
 @Component
 public class InboundBacklogMetrics implements MeterBinder {
@@ -42,7 +32,7 @@ public class InboundBacklogMetrics implements MeterBinder {
     static final String OVERDUE_POLICIES = "policies.retention.overdue.personal.data";
     static final String STALENESS = "onec.inbound.backlog.staleness";
 
-    /** Статусы, по которым заведены ряды: всё, что ещё не разобрано, и отказ, который ждёт человека. */
+    /** Всё, что ещё не разобрано, и отказ, который ждёт человека. */
     private static final List<InboundStatus> GAUGED_STATUSES =
             List.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.BUFFERED, InboundStatus.AWAITING_PARENT,
                     InboundStatus.FAILED);
@@ -59,10 +49,7 @@ public class InboundBacklogMetrics implements MeterBinder {
         this.backlog = InboundBacklog.empty(Instant.EPOCH);
     }
 
-    /**
-     * Перечитывает снимок из базы. Отказ базы не роняет задачу и не стирает прежний снимок: в журнал идёт тип
-     * исключения, а не его текст, — так же, как у остальных задач над таблицей сырья.
-     */
+    /** Отказ базы не роняет задачу и оставляет прежний снимок; в журнал идёт только тип исключения. */
     public void refresh() {
         try {
             backlog = reads.read();
@@ -113,7 +100,7 @@ public class InboundBacklogMetrics implements MeterBinder {
                 .register(registry);
     }
 
-    /** Возраст считается от часов сервиса в момент скрейпа, а не в момент снимка: давность растёт и между обновлениями. */
+    /** Возраст считается на момент скрейпа, а не снимка, чтобы давность росла и между обновлениями. */
     private double oldestPendingAge(OneCStream stream) {
         return backlog.oldestPending(stream).map(this::secondsSince).orElse(0.0);
     }

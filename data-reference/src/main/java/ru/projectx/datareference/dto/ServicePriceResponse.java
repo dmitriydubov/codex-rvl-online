@@ -6,14 +6,9 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Стоимость услуги ЛПУ за период проживания для сервиса Заявок: отрезки по строкам прайса и итог.
- *
- * <p>Период и отрезки задаются так же, как период проживания: {@code dateFrom} включительно, {@code dateTo} не
- * включительно, потому что день выезда не оплачивается. Суммы считаются по обеим ценам. Сумма со скидкой пуста
- * у отрезка, у строки прайса которого нет цены со скидкой, и у итога, если такой отрезок есть хотя бы один:
- * складывать скидочные цены с обычными в одном итоге нельзя.
- *
- * @param service услуга, стоимость которой посчитана
+ * Стоимость услуги ЛПУ за период проживания: отрезки по строкам прайса и итог. {@code dateTo} не входит в период,
+ * потому что день выезда не оплачивается. Сумма со скидкой пуста у отрезка без цены со скидкой и у итога, если
+ * такой отрезок есть: складывать скидочные цены с обычными в одном итоге нельзя.
  */
 public record ServicePriceResponse(
         NamedRef service, LocalDate dateFrom, LocalDate dateTo, List<Segment> segments, Total total) {
@@ -33,11 +28,6 @@ public record ServicePriceResponse(
             @Nullable BigDecimal amountWithDiscount) {
     }
 
-    /**
-     * Итог за период.
-     *
-     * @param basis по какой сумме считать сооплату: по сумме со скидкой, когда она есть, иначе по сумме без скидки
-     */
     public record Total(int nights, BigDecimal amount, @Nullable BigDecimal amountWithDiscount, Basis basis) {
     }
 

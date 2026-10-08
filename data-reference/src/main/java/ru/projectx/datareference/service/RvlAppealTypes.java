@@ -17,14 +17,9 @@ import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.repository.AppealTypeRepository;
 
 /**
- * Виды обращения РВЛ: наименования из конфигурации, найденные в справочнике
- * {@code appeal_types}. По ним R-01 отбирает строки перечня программы, а R-03 — услуги.
- *
- * <p>Отбор по наименованию хрупок: переименование или лишний пробел в 1С молча обнулят
- * выдачу. Отсюда три меры из ответа В-9: сравнение без учёта регистра и краевых пробелов,
- * список в конфигурации, а на старте сервиса — WARN, если хотя бы одно наименование
- * не нашлось. Кеша нет: справочник маленький, запрос дешёвый, а устаревший кеш здесь
- * стоил бы дороже запроса.
+ * Виды обращения РВЛ из конфигурации, найденные в справочнике по наименованию; по ним отбираются учреждения и услуги.
+ * Переименование в 1С молча обнулит выдачу, поэтому сравнение идёт без регистра и краевых пробелов, а на старте
+ * пишется WARN о ненайденных. Кэша нет: запрос дешёвый, а устаревший кэш обошёлся бы дороже.
  */
 @Component
 public class RvlAppealTypes {
@@ -39,7 +34,7 @@ public class RvlAppealTypes {
         this.api = api;
     }
 
-    /** Действующие виды обращения РВЛ по GUID 1С — ключу, которым на них ссылаются перечни и услуги. */
+    /** Ключ — GUID 1С, по которому на вид обращения ссылаются перечни программ и услуги. */
     public Map<UUID, AppealType> byExternalId() {
         return found().stream().collect(Collectors.toMap(AppealType::externalId, Function.identity()));
     }
@@ -48,7 +43,7 @@ public class RvlAppealTypes {
         return byExternalId().keySet();
     }
 
-    /** Наименования из конфигурации, которых в справочнике нет: по ним R-01 и R-03 отдадут пустую выдачу. */
+    /** Наименования из конфигурации, которых нет в справочнике: по ним каталог и услуги будут пусты. */
     public List<String> missing() {
         Set<String> present = found().stream().map(type -> normalize(type.name())).collect(Collectors.toSet());
         return api.rvlAppealTypes().stream().filter(name -> !present.contains(normalize(name))).toList();

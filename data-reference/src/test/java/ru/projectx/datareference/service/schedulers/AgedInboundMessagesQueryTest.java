@@ -29,12 +29,9 @@ import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
 /**
- * Запросы к сырым и карантинным сообщениям старше порога на настоящем PostgreSQL: стирание тел пачкой и
- * выборка зависших передач. Их условия — порядок, предел, группировка — проверяются только базой, unit-тесты
- * видят лишь параметры вызова.
- *
- * <p>Часы остановлены, поэтому «старое» сообщение кладётся через сервис, а время приёма отодвигается
- * запросом.
+ * Запросы к сырым и карантинным сообщениям старше порога на настоящем PostgreSQL: стирание тел пачкой и выборка
+ * зависших передач. Порядок, предел и группировку проверяет только база; часы остановлены, поэтому время приёма
+ * отодвигается запросом.
  */
 @IntegrationTest
 class AgedInboundMessagesQueryTest {
@@ -74,7 +71,6 @@ class AgedInboundMessagesQueryTest {
         databaseCleaner.clear();
     }
 
-    /** Пачка не больше предела, и первыми стираются самые старые тела. */
     @Test
     void forgetPayloads_erasesOldestRowsUpToLimit() {
         UUID oldest = store(OneCStream.POLICIES, Duration.ofDays(40));
@@ -103,8 +99,8 @@ class AgedInboundMessagesQueryTest {
     }
 
     /**
-     * Причина исхода полиса стирается вместе с телом: раньше в ней мог оказаться текст чужой ошибки со значениями
-     * полей. У справочного потока причина остаётся, как и тело: по ним сообщение переобрабатывают.
+     * Причина исхода полиса стирается вместе с телом: в старых строках в ней может быть текст чужой ошибки со
+     * значениями полей. У справочного потока причина остаётся, как и тело: по ним сообщение переобрабатывают.
      */
     @Test
     void forgetPayloads_erasesTheReasonTogetherWithTheBody() {
@@ -212,7 +208,6 @@ class AgedInboundMessagesQueryTest {
                 .extracting(BufferedTransfer::getCorrelationId).containsExactly(OLDER_TRANSFER);
     }
 
-    /** Разобранная передача больше не в буфере и зависшей не считается. */
     @Test
     void transfersBufferedLongerThan_ignoresRowsOutsideBuffer() {
         UUID processed = store(OneCStream.PRICE_LISTS, Duration.ofHours(5));
@@ -222,7 +217,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(agedMessages.transfersBufferedLongerThan(Duration.ofHours(1), 10)).isEmpty();
     }
 
-    /** Карантин: пачка не больше предела, первыми стираются самые старые тела, записи с причиной остаются. */
     @Test
     void forgetQuarantineBodies_erasesOldestBodiesUpToLimitAndKeepsRows() {
         UUID oldest = quarantine(Duration.ofDays(40));

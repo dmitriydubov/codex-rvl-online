@@ -10,12 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Защищает переходы сообщения 1С, которое ждёт родителя: начало ожидания, повторное ожидание, отказ по сроку и выход
- * из ожидания.
- *
- * <p>Момент начала ожидания отсчитывает срок. Если повторное ожидание сдвинет его, сообщение не уйдёт в отказ
- * никогда; если выход из ожидания его не сотрёт, отказ по другой причине потеряет тело по сроку хранения, как отказ по
- * сроку ожидания.
+ * Защищает переходы сообщения 1С, которое ждёт родителя. Если повторное ожидание сдвинет момент начала,
+ * сообщение не уйдёт в отказ никогда; если выход из ожидания его не сотрёт, отказ по другой причине
+ * потеряет тело по сроку хранения, как отказ по сроку ожидания.
  */
 class InboundMessageParentWaitTest {
 
@@ -52,8 +49,8 @@ class InboundMessageParentWaitTest {
     }
 
     /**
-     * Дежурный возвращает отклонённое по сроку сообщение в разбор обычным SQL, переводя строку в NEW; в сущности такого
-     * перехода нет, поэтому тест ставит статус так же, как его поставил бы SQL. Новое ожидание отсчитывает срок заново.
+     * Дежурный возвращает отклонённое сообщение в разбор SQL-запросом, а в сущности такого перехода нет,
+     * поэтому тест ставит статус так же. Новое ожидание отсчитывает срок заново.
      */
     @Test
     void waitingAfterManualReturnToParsing_startsTheWaitAnew() {
@@ -79,10 +76,7 @@ class InboundMessageParentWaitTest {
         assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
     }
 
-    /**
-     * Первая попытка после ручного возврата упала на временной ошибке базы. Повтор ждёт родителя заново: прежний срок
-     * отклонил бы сообщение в том же проходе.
-     */
+    /** После ручного возврата и временной ошибки ожидание идёт заново: старый срок сразу отклонил бы сообщение. */
     @Test
     void waitingAfterManualReturnAndRetry_startsTheWaitAnew() {
         InboundMessage message = returnedToParsingAfterExpiry();
@@ -155,7 +149,7 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).isEmpty();
     }
 
-    /** Отказ по другой причине ожидание стирает: по нему тело отказа стиралось бы как у отказа по сроку ожидания. */
+    /** Отказ по другой причине ожидание стирает: иначе тело отказа стиралось бы как у отказа по сроку ожидания. */
     @Test
     void failedForAnotherReason_forgetsTheWait() {
         InboundMessage message = waiting();
@@ -181,7 +175,7 @@ class InboundMessageParentWaitTest {
         return message;
     }
 
-    /** Отклонённое по сроку сообщение, которое дежурный вернул в разбор SQL-запросом, переводя строку в NEW. */
+    /** Сообщение, отклонённое по сроку и возвращённое дежурным в разбор SQL-запросом со статусом NEW. */
     private static InboundMessage returnedToParsingAfterExpiry() {
         InboundMessage message = waiting();
         message.markParentWaitExpired();

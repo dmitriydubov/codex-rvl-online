@@ -21,10 +21,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Всплеск REST-чтений при живой базе — не повод выводить экземпляр из работы: пока пул REST-чтений занят, здоровье
- * и готовность остаются в строю, а нехватку его соединений видно по метрикам пула с меткой {@code pool="rest-read"}.
- * Метрики пула приложения идут с меткой {@code pool="application"}, и оповещение о нехватке соединений для приёма и
- * разбора смотрит только на неё.
+ * Всплеск REST-чтений при живой базе — не повод выводить экземпляр из работы, поэтому здоровье и готовность
+ * остаются в строю. Нехватку соединений видно по метрикам с меткой {@code pool}, и оповещение о приёме и разборе
+ * смотрит только на {@code pool="application"}.
  */
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class RestReadPoolHealthTest {

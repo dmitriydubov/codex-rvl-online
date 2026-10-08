@@ -27,14 +27,9 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Чтение программ и договоров страхования через REST и единый формат ошибки. Запросы проходят через
- * настоящий стек MVC (фильтры, конвертеры, обработчик ошибок) поверх настоящей базы. Клиент к стеку —
- * {@link MockMvcTester} из {@code TestSupportConfig}.
- *
- * <p>Проверяется то, на что опираются соседние сервисы: имена полей в snake_case, оба идентификатора
- * в каждом ответе, формат ошибки и сквозной {@code X-Request-Id}. Полисы проверяет
- * {@code PolicyApiTest}, справочник диагнозов МКБ-10 — {@code Mkb10ApiTest}. Названия, номера договоров
- * и реквизиты страхователя здесь вымышленные.
+ * Проверяет то, на что опираются соседние сервисы при чтении программ и договоров страхования: поля в snake_case,
+ * оба идентификатора в ответе, формат ошибки и сквозной {@code X-Request-Id}. Запросы идут через настоящий стек MVC
+ * поверх настоящей базы; названия, номера договоров и реквизиты страхователя вымышленные.
  */
 @IntegrationTest
 class ReferenceApiTest {
@@ -132,10 +127,7 @@ class ReferenceApiTest {
         assertThat(noKey).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
     }
 
-    /**
-     * Страхователь-физическое лицо в справочнике страхователей не значится. Договор всё равно отдаётся,
-     * только без страхователя.
-     */
+    /** Страхователя-физического лица в справочнике нет, но договор всё равно отдаётся, только без страхователя. */
     @Test
     void insuranceContract_withoutInsurerInReference_hasNullInsurer() {
         InsuranceContract contract = insuranceContractRepository.save(InsuranceContract.create(CONTRACT_EXT,
@@ -182,10 +174,7 @@ class ReferenceApiTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NOT_FOUND");
     }
 
-    /**
-     * Если вызывающий не прислал идентификатор запроса, его выдаёт сервис. Без идентификатора ошибку
-     * не найти в журнале.
-     */
+    /** Без идентификатора запроса ошибку не найти в журнале, поэтому, если вызывающий его не прислал, его выдаёт сервис. */
     @Test
     void requestId_isIssuedWhenCallerSendsNone() {
         MvcTestResult result = mvc.get().uri(BASE + "/policies/{id}", UUID.randomUUID()).exchange();

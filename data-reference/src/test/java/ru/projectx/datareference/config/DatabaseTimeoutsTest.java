@@ -21,11 +21,8 @@ import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Таймауты PostgreSQL: пулу приложения — да, миграциям — нет.
- *
- * <p>Значения — умолчания {@code application.yml}; переменные окружения из раздела
- * datasource в тестах не заданы. База и Liquibase подключаются свойствами, как в контуре
- * (см. {@code PostgresTestcontainer}), поэтому проверяется та же конфигурация, что уйдёт в прод.
+ * Таймауты PostgreSQL заданы пулу приложения, но не миграциям. Значения — умолчания {@code application.yml},
+ * а база подключается свойствами, как в контуре, поэтому проверяется та же конфигурация, что уйдёт в прод.
  */
 @IntegrationTest
 class DatabaseTimeoutsTest {
@@ -33,7 +30,7 @@ class DatabaseTimeoutsTest {
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     /** Срок, после которого запрос считается зависшим: lock_timeout с запасом на ответ сервера. */
     private static final Duration HANG_DEADLINE = LOCK_TIMEOUT.multipliedBy(3);
-    /** SQLSTATE lock_not_available — так PostgreSQL отменяет оператор по lock_timeout. */
+    /** SQLSTATE lock_not_available: так PostgreSQL отменяет оператор по lock_timeout. */
     private static final String LOCK_NOT_AVAILABLE = "55P03";
     private static final String DISABLED = "0";
 
@@ -63,8 +60,8 @@ class DatabaseTimeoutsTest {
     }
 
     /**
-     * Проверка таймаутов при старте читает то же, что {@code SHOW}, — в миллисекундах из {@code pg_settings};
-     * у пула это значения настройки, у миграций — нули.
+     * Проверка таймаутов при старте читает значения в миллисекундах из {@code pg_settings}, как {@code SHOW}:
+     * у пула это значения настройки, у миграций нули.
      */
     @Test
     void sessionSettings_readPoolValuesAndZeroForMigrations() {
@@ -93,8 +90,8 @@ class DatabaseTimeoutsTest {
     }
 
     /**
-     * Чужая транзакция держит таблицу сырья — как ручной SQL на живой базе. Запрос приложения
-     * отказывает по lock_timeout, а не висит, занимая единственный поток планировщиков.
+     * Чужая транзакция держит таблицу сырья, как ручной SQL на живой базе. Запрос приложения отказывает
+     * по lock_timeout, а не висит, занимая единственный поток планировщиков.
      */
     @Test
     void tableLockedByAnotherSession_queryFailsAfterLockTimeout() throws SQLException {

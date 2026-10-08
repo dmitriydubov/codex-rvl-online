@@ -18,9 +18,9 @@ import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
 
 /**
- * Полис для сервиса Договоров: строка без ПДн из репозитория переходит в ответ поле в поле, по {@code id}
- * и по {@code external_id}, а ненайденный полис — {@code POLICY_NOT_FOUND}, как у R-05. Значения полей
- * разные, а полис архивный: перепутанные поля или потерянный признак архива тест не пропустит.
+ * Полис для сервиса Договоров: строка без персональных данных переходит в ответ поле в поле по {@code id} и по
+ * {@code external_id}, а ненайденный полис даёт {@code POLICY_NOT_FOUND}. Значения полей разные, а полис архивный,
+ * поэтому перепутанные поля или потерянный признак архива тест заметит.
  */
 @ExtendWith(MockitoExtension.class)
 class PolicyContractViewServiceTest {

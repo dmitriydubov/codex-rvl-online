@@ -25,10 +25,9 @@ import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * У REST-чтений свой пул соединений. Когда его занял всплеск запросов, очередное чтение отвечает 503 через ожидание
- * соединения этого пула (2 с), а пул приёма и разбора остаётся свободным. И наоборот: занятый разбором пул
- * приложения REST-чтения не задевает. Лимит времени чтения ожидание соединения не ограничивает: он начинает
- * действовать только после того, как соединение получено.
+ * У REST-чтений свой пул соединений, чтобы всплеск запросов не отнимал соединения у приёма и разбора, и наоборот.
+ * Занятый пул отвечает 503 через ожидание соединения (2 с), а лимит времени чтения начинает действовать
+ * только после того, как соединение получено.
  */
 @IntegrationTest
 class RestPoolWaitTest {
@@ -95,9 +94,8 @@ class RestPoolWaitTest {
     }
 
     /**
-     * Поток планировщика или слушателя очереди: HTTP-запроса нет. Репозиторий вне транзакции открывает свою
-     * транзакцию «только чтение» (так Spring Data помечает свои чтения), и она идёт в пул приложения, а не в занятый
-     * пул REST-чтений.
+     * Без HTTP-запроса, как в потоке планировщика или слушателя очереди, репозиторий открывает свою транзакцию
+     * «только чтение», и она должна идти в пул приложения, а не в занятый пул REST-чтений.
      */
     @Test
     void restReadPoolExhausted_repositoryReadOutsideHttpRequestUsesApplicationPool() throws Exception {
@@ -111,7 +109,6 @@ class RestPoolWaitTest {
         }
     }
 
-    /** Явная транзакция «только чтение» вне HTTP-запроса — тоже пул приложения. */
     @Test
     void restReadPoolExhausted_readOnlyTransactionOutsideHttpRequestUsesApplicationPool() throws Exception {
         TransactionTemplate readOnly = new TransactionTemplate(transactions);
@@ -126,10 +123,7 @@ class RestPoolWaitTest {
         }
     }
 
-    /**
-     * Свой поток без HTTP-запроса. В потоке теста Spring держит HTTP-запрос-заглушку, поэтому чтение оттуда выглядело
-     * бы как REST-чтение.
-     */
+    /** В потоке теста Spring держит HTTP-запрос-заглушку, и чтение оттуда выглядело бы как REST-чтение. */
     private static <T> T outsideHttpRequest(Callable<T> read) throws Exception {
         try (ExecutorService thread = Executors.newSingleThreadExecutor()) {
             return thread.submit(read).get(LOCK_TIMEOUT.toSeconds(), TimeUnit.SECONDS);

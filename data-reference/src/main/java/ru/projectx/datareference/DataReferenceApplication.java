@@ -5,13 +5,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
- * Сервис справочных данных {@code data-reference}: принимает справочники и полисы из учётной системы
- * 1С:УСК и отдаёт их по REST сервисам Заявок и Договоров.
- *
- * <p>Единственный источник данных — 1С:УСК. Она публикует изменения в свой RabbitMQ, сервис их
- * вычитывает, складывает сырые сообщения у себя и по расписанию раскладывает по таблицам PostgreSQL:
- * санатории, договоры, программы, услуги, цены и полисы застрахованных. Расписания включает
- * {@link ru.projectx.datareference.config.SchedulingConfig}.
+ * Сервис справочных данных: принимает справочники и полисы из 1С:УСК через её RabbitMQ, хранит сырые сообщения,
+ * по расписанию раскладывает их по таблицам PostgreSQL и отдаёт по REST сервисам Заявок и Договоров.
+ * Расписания включает {@link ru.projectx.datareference.config.SchedulingConfig}.
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan

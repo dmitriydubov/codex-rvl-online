@@ -17,12 +17,9 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
 /**
- * Брокер 1С:УСК в сценарии: публикация сообщений в очереди контура и то, что о них помнит сценарий, —
- * какие сообщения и в какую очередь опубликованы, байт в байт.
- *
- * <p>Очереди в шагах названы потоками («договоры страхования», «полисы»); имя очереди берётся из той же
- * конфигурации, что читает сервис, поэтому сценарий публикует ровно туда, откуда сервис читает. Состояние
- * очереди (готовые к выдаче сообщения, потребители) спрашивается у брокера.
+ * Брокер 1С:УСК в сценарии: публикация в очереди контура и память о том, что и куда опубликовано, байт в байт.
+ * Имя очереди берётся из той же конфигурации, что читает сервис, поэтому сценарий публикует ровно туда, откуда
+ * сервис читает.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -47,13 +44,11 @@ public class OneCBroker {
         return queuesByStream.get(stream);
     }
 
-    /** Публикует тело как есть в очередь и запоминает его. */
     public void publish(String queue, UUID messageId, byte[] body) {
         rabbit.send(queue, new Message(body.clone(), new MessageProperties()));
         published.add(new Published(queue, messageId, body.clone()));
     }
 
-    /** Опубликованное тело сообщения, байт в байт. */
     public byte[] publishedBody(UUID messageId) {
         return published.stream()
                 .filter(message -> message.messageId().equals(messageId))

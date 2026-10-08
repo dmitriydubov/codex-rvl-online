@@ -10,13 +10,9 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 
 /**
- * Одна доставка из очереди 1С: сообщение, канал, по которому брокеру отвечают, и поток,
- * которому очередь принадлежит. Ответы брокеру — только два, и оба здесь, чтобы слушатель
- * говорил «подтвердить» и «вернуть», а не флагами {@code basicNack}.
- *
- * <p>Ведущая метка порядка байтов UTF-8 (BOM, байты EF BB BF) перед конвертом снимается: разбор конверта её
- * пропускает, а колонка {@code jsonb} сырья — нет, и без этого сообщение с BOM уходило бы в карантин как
- * нечитаемое. Метка — свойство редактора, а не сообщения, поэтому дефектом тела не считается.
+ * Одна доставка из очереди 1С с ответом брокеру: ответов ровно два, чтобы слушатель не собирал {@code basicNack} из
+ * флагов. Ведущая метка порядка байтов UTF-8 (BOM) снимается: колонка {@code jsonb} её не принимает, а дефектом тела
+ * она не является, это след редактора.
  */
 record OneCDelivery(OneCStream stream, Message message, Channel channel) {
 
@@ -48,7 +44,6 @@ record OneCDelivery(OneCStream stream, Message message, Channel channel) {
         return new RejectedMessage(messageId, stream, queue(), rawBody());
     }
 
-    /** Сообщение обработано, брокер его больше не отдаёт. */
     void acknowledge() throws IOException {
         channel.basicAck(deliveryTag(), false);
     }

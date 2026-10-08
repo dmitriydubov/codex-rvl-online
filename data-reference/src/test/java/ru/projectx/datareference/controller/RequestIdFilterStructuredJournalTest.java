@@ -18,8 +18,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import ru.projectx.datareference.support.StructuredJournal;
 
 /**
- * Запись журнала, сделанная во время REST-запроса, несёт его {@code requestId} отдельным полем. По нему
- * вызывающий сервис и дежурный находят в журнале всё, что случилось с запросом.
+ * Запись журнала во время REST-запроса несёт его {@code requestId} отдельным полем, по которому вызывающий
+ * сервис и дежурный находят в журнале всё, что случилось с запросом.
  */
 @ExtendWith(OutputCaptureExtension.class)
 class RequestIdFilterStructuredJournalTest {

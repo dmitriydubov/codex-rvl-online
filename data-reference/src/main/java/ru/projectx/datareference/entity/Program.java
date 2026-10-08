@@ -13,11 +13,8 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Страховая программа РВЛ вместе с перечнем учреждений, где по ней обслуживают.
- *
- * <p>Перечень приходит табличной частью сообщения и замещается целиком: 1С присылает актуальный
- * состав, а дописывание сохранило бы навсегда строки, которых в 1С уже нет. Строки принадлежат
- * программе: строка, выбывшая из перечня, удаляется из базы.
+ * Страховая программа РВЛ вместе с перечнем учреждений, где по ней обслуживают. Перечень замещается целиком,
+ * потому что 1С присылает актуальный состав, а дописывание навсегда сохранило бы строки, которых в 1С уже нет.
  */
 @Entity
 @Table(name = "programs")
@@ -38,10 +35,7 @@ public class Program extends OneCEntity {
     @Column(name = "type_programm")
     private String typeProgramm;
 
-    /*
-     * Коллекция не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
-     * полей сущности, а Hibernate при загрузке подменяет коллекцию своей реализацией.
-     */
+    // Не final: Hibernate при загрузке подменяет коллекцию своей, а Jakarta Persistence запрещает final у полей.
     @OneToMany(mappedBy = "program", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProgramLpu> availableLpu = new ArrayList<>();
 
@@ -74,7 +68,6 @@ public class Program extends OneCEntity {
         archiveCommon(now);
     }
 
-    /** Замещает перечень учреждений целиком: строки, которых нет в сообщении, удаляются. */
     public void replaceAvailableLpu(List<ProgramLpu.Row> rows, Instant now) {
         availableLpu.clear();
         for (ProgramLpu.Row row : rows) {

@@ -12,17 +12,9 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.OneCStream;
 
 /**
- * Сырьё 1С:УСК в сценарии: строки {@code inbound_message} со статусом {@code NEW}, какие оставил бы
- * приём из очереди.
- *
- * <p>Дальше их разбирает штатный планировщик, поэтому справочники получаются тем же путём, что из
- * 1С, а не записью прямо в их таблицы. Разбор идёт по возрастанию {@code received_at}, и сообщение
- * получает момент приёма по порядку шагов «Дано»: родитель, присланный раньше, раньше и разбирается.
- * Моменты берутся с часов стенда, как у сервиса, а не из {@code now()} базы, но не раньше последнего принятого
- * сообщения: сценарий может остановить часы на моменте раньше уже принятых сообщений, а порядок шагов должен остаться
- * порядком приёма.
- * Сообщения, опубликованные в брокер приёмки ({@link OneCBroker}), кладёт в сырьё сам приём; здесь они только
- * учитываются, чтобы шаг разбора знал, каких исходов ждать.
+ * Сырьё 1С:УСК в сценарии: строки {@code NEW}, какие оставил бы приём, чтобы справочники заполнял штатный разбор.
+ * Момент приёма идёт по порядку шагов «Дано» с часов стенда, но не раньше последнего принятого: часы могут стоять
+ * в прошлом, а порядок шагов должен остаться порядком разбора. Опубликованные в брокер сообщения здесь только учтены.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -110,12 +102,10 @@ public class OneCInbox {
         received.add(message);
     }
 
-    /** {@code message-id} всех строк сырья в порядке приёма. */
     public List<UUID> messageIdsInOrder() {
         return jdbc.sql(MESSAGE_IDS).query(UUID.class).list();
     }
 
-    /** Есть ли строка сырья у сообщения. */
     public boolean stored(UUID messageId) {
         return jdbc.sql(STORED).param("messageId", messageId).query(Boolean.class).single();
     }
@@ -125,7 +115,6 @@ public class OneCInbox {
         return row(received.getLast().messageId());
     }
 
-    /** Строка сырья сообщения с этим {@code message-id}. */
     public InboundRow row(UUID messageId) {
         return jdbc.sql(ROW)
                 .param("messageId", messageId)
@@ -174,7 +163,6 @@ public class OneCInbox {
         return new OneCMessage(message.stream(), message.queue(), message.data(), message.expected(), resent);
     }
 
-    /** Все присланные сообщения потока в порядке присылки. */
     public List<OneCMessage> receivedOf(OneCStream stream) {
         return received.stream().filter(message -> message.stream() == stream).toList();
     }
@@ -262,7 +250,6 @@ public class OneCInbox {
         return jdbc.sql(TRANSFER_STATUSES).param("cid", cid.toString()).query(String.class).list();
     }
 
-    /** Статусы всех строк сырья в порядке приёма. */
     public List<String> statuses() {
         return jdbc.sql(STATUSES).query(String.class).list();
     }

@@ -21,7 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Защищает разбор частей передачи прайса до блокировки строки услуги: части разбираются, только когда пришедшая часть
  * собирает передачу, и ни одна часть при этом не меняется. Часть, тело которой заранее не разобрать, остаётся сборке:
- * её отказ должен прозвучать там же, где и раньше.
+ * её отказ называет сборка, как и для любой другой части.
  */
 @ExtendWith(MockitoExtension.class)
 class PriceTransferPartsInAdvanceTest {
@@ -129,7 +129,7 @@ class PriceTransferPartsInAdvanceTest {
         return InboundMessage.receive(part.receipt(), part.payload());
     }
 
-    /** {@code data} — поле {@code data} конверта; без него тело стёрто, а не JSON-объект — тело не читается. */
+    /** Без {@code data} тело части считается стёртым, а данные не в виде JSON-объекта не читаются. */
     private static InboundMessage buffered(String data, Integer batchCount, int rowCount) {
         InboundMessage message = InboundMessage.receive(receipt(), data == null ? null : envelope(data));
         message.markBuffered(CID, batchCount, rowCount);

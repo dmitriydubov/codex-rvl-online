@@ -28,10 +28,9 @@ import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
- * Проверка зависших многочастных передач прайсов. Её единственный наблюдаемый результат — строка WARN
- * в журнале: строки сырья она не трогает. Поэтому журнал и проверяется, целиком, вместе с текстом: по этому
- * тексту зависшую передачу ищут глазами. В строке — идентификатор передачи, сколько она ждёт и сколько её
- * частей уже пришло; тел сообщений в ней нет.
+ * Проверка зависших передач прайсов строки сырья не трогает, её единственный результат — предупреждение в журнале.
+ * Поэтому журнал проверяется целиком, с текстом, по которому передачу ищут глазами: идентификатор, сколько она ждёт
+ * и сколько частей пришло, без тел сообщений.
  */
 @ExtendWith(MockitoExtension.class)
 class StuckTransferAlertTest {
@@ -143,7 +142,6 @@ class StuckTransferAlertTest {
         verify(closure).closeIfSuperseded(FOURTH_TRANSFER);
     }
 
-    /** Все зависшие закрыты — предупреждать не о чем. */
     @Test
     void allStuckTransfersClosed_nothingIsReported() {
         when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD))

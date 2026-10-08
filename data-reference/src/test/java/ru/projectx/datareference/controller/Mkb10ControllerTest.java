@@ -21,8 +21,8 @@ import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.service.Mkb10Reads;
 
 /**
- * Ручка МКБ-10 выбирает режим по ключу запроса: подсказка по строке или раскрытие перечня кодов. Запрос без
- * ключа и запрос с ключами обоих режимов сразу отклоняются ошибкой вызывающего, и сервис чтения не вызывается.
+ * Ручка МКБ-10 выбирает режим по ключу запроса: подсказка по строке или раскрытие перечня кодов.
+ * Запрос без ключа или с ключами обоих режимов — ошибка вызывающего, и сервис чтения не вызывается.
  */
 @ExtendWith(MockitoExtension.class)
 class Mkb10ControllerTest {
@@ -83,9 +83,8 @@ class Mkb10ControllerTest {
     }
 
     /**
-     * Строка поиска и перечень кодов — два разных режима. Запрос с обоими ключами отклоняется целиком, а не
-     * уходит внутренней ошибкой из-за двух равных по точности ручек. Пустой {@code codes} тоже считается
-     * переданным ключом, а недопустимый {@code limit} не проверяется: режим не выбран.
+     * Запрос с обоими ключами отклоняется целиком, а не уходит внутренней ошибкой из-за двух равных по точности ручек.
+     * Пустой {@code codes} тоже считается ключом, а недопустимый {@code limit} не проверяется: режим не выбран.
      */
     @ParameterizedTest
     @ValueSource(strings = {"?query=I25&codes=I25.1,Q06", "?query=I25&codes=", "?query=I25&codes=I25.1&limit=0"})
@@ -110,7 +109,6 @@ class Mkb10ControllerTest {
         assertThat(result).bodyJson().extractingPath("$.items[*].code").asArray().containsExactly("Q06");
     }
 
-    /** {@code limit} у перечня кодов не используется и не делает запрос подсказкой. */
     @Test
     void byCodesWithLimit_isStillLookupByCodes() {
         when(mkb10.byCodes(List.of("I25.1"))).thenReturn(codes("I25.1"));

@@ -101,7 +101,6 @@ class PriceTransferOrderTest {
         verify(finalizations).recordApplied(SERVICE, finalMessage.receipt().messageId());
     }
 
-    /** Услуга вне справочника: прайс не применён, и последней такая передача не становится. */
     @Test
     void skippedReplacement_doesNotBecomeTheLast() {
         when(finalizations.lockByService(SERVICE)).thenReturn(Optional.empty());

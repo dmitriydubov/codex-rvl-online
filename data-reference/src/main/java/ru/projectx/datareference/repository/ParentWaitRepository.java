@@ -11,11 +11,8 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 
 /**
- * Сообщения 1С, которые ждут родителя, в таблице {@code inbound_message}: те, что не дождались за срок, и те, что
- * устарели, потому что применилось более новое сообщение той же записи.
- *
- * <p>Статус записан в запросах значением, а не параметром: так PostgreSQL видит частичные индексы по ожидающим
- * сообщениям.
+ * Сообщения 1С, которые ждут родителя: не дождавшиеся за срок и устаревшие из-за более нового сообщения той же записи.
+ * Статус записан в запросах значением, а не параметром, чтобы PostgreSQL видел частичные индексы.
  */
 @Repository
 public interface ParentWaitRepository extends org.springframework.data.repository.Repository<InboundMessage, UUID> {

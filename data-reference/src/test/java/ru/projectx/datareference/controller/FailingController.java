@@ -8,9 +8,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
- * Заглушка-контроллер для тестов обработчиков ошибок: бросает то исключение, которое задал тест, и даёт
- * ручки, на которых Spring сам отказывает по параметру, методу или формату ответа. Ручки объявлены так
- * же, как настоящие: только GET и только JSON.
+ * Заглушка-контроллер для тестов обработчиков ошибок: бросает заданное тестом исключение и даёт ручки,
+ * на которых Spring сам отказывает. Ручки объявлены как настоящие: только GET и только JSON.
  */
 @RestController
 class FailingController {

@@ -6,14 +6,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.projectx.datareference.service.DatabaseOutages;
 
 /**
- * Стек MVC для unit-теста контроллера без контекста Spring и без базы: контроллер с подменёнными
- * сервисами и настоящие обработчики ошибок REST.
- *
- * <p>Здесь проверяется маршрутизация (путь, параметры, выбор обработчика) и то, что контроллер отдаёт
- * найденное сервисом. UUID из пути и параметров читаются тем же строгим правилом, что и в приложении:
- * его подключает {@link UuidParameters}. Имена полей JSON в snake_case здесь не проверяются, потому что
- * сборка без контекста не берёт настроек Jackson из Spring Boot. Их проверяют API-тесты на полном
- * контексте.
+ * Стек MVC для unit-теста контроллера без контекста Spring и базы: маршрутизация и то, что контроллер отдаёт
+ * найденное сервисом. Имена полей в snake_case здесь не проверяются, потому что без контекста настройки Jackson
+ * из Spring Boot не берутся; их проверяют API-тесты на полном контексте.
  */
 final class StandaloneMvc {
 
@@ -28,8 +23,8 @@ final class StandaloneMvc {
     }
 
     /**
-     * Стек для тестов самих обработчиков ошибок: один контроллер, обработчики в заданном тестом порядке
-     * регистрации и фильтр {@code X-Request-Id}, чтобы идентификатор в теле ошибки сверялся с заголовком.
+     * Стек для тестов обработчиков ошибок в заданном порядке регистрации. Фильтр {@code X-Request-Id}
+     * подключён, чтобы идентификатор в теле ошибки сверялся с заголовком.
      */
     static MockMvcTester withRequestId(Object controller, Object... errorAdvices) {
         return MockMvcTester.create(MockMvcBuilders.standaloneSetup(controller)

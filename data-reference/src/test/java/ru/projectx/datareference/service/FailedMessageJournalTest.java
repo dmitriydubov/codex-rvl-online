@@ -33,10 +33,9 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 /**
- * Окончательный отказ сообщения 1С:УСК виден в журнале записью уровня ERROR: по ней дежурный узнаёт, что
- * сообщение больше не повторят и его нужно разобрать вручную. В записи — {@code message-id}, поток, номер
- * неудачной попытки, тип ошибки и SQLSTATE. Причины из строки сырья там нет: журнал уходит из сервиса целиком,
- * и в нём остаются только идентификаторы и коды.
+ * Окончательный отказ сообщения 1С:УСК пишется в журнал записью ERROR: по ней дежурный узнаёт, что сообщение больше
+ * не повторят и его нужно разобрать вручную. В записи только идентификаторы и коды (message-id, поток, номер попытки,
+ * тип ошибки, SQLSTATE), без текста из строки сырья, потому что журнал уходит из сервиса целиком.
  */
 @ExtendWith(MockitoExtension.class)
 class FailedMessageJournalTest {
@@ -108,7 +107,6 @@ class FailedMessageJournalTest {
         });
     }
 
-    /** Временный отказ, у которого повторы ещё есть, — не окончательный: записи ERROR нет. */
     @Test
     void temporaryFailureWithRetriesLeft_isNotAnError() {
         existing();

@@ -19,23 +19,9 @@ import org.springframework.test.web.servlet.client.ExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
- * Сервис Договоров в роли потребителя: настоящие HTTP-запросы к запущенному Дата-референсу
- * ({@code RANDOM_PORT}) и то, что потребитель помнит между шагами сценария, —
- * последний ответ и id, полученный на шаге «Дано».
- *
- * <p>Клиент — {@code RestTestClient.bindToServer(ClientHttpRequestFactory)} из spring-test: автонастройка Boot
- * для него ({@code spring-boot-resttestclient}) — отдельный модуль, которого нет
- * на classpath и в Nexus контура.
- *
- * <p>Запросы уходят через {@link HttpClient} из JDK по HTTP/1.1. Он выбран потому, что сценарии отказа
- * по методу отправляют PATCH, а клиент на {@code HttpURLConnection} этот метод не умеет.
- *
- * <p>{@code {id}} в пути раскрывается как переменная URI-шаблона {@code RestTestClient},
- * а не заменой строки. Таймауты заданы явно: зависший запрос иначе держал бы весь прогон
- * приёмки до таймаута CI, не называя сценарий.
- *
- * <p>Мониторинг ходит тем же клиентом, но на порт актуатора ({@code local.management.port}): на порту API
- * актуатора нет. Его ответ — тоже последний ответ, и проверяют его те же шаги.
+ * Сервис Договоров в роли потребителя: настоящие HTTP-запросы к Дата-референсу и память сценария между шагами.
+ * Клиент собран вручную (автонастройки Boot для него нет в Nexus контура) поверх JDK {@link HttpClient}: сценарии
+ * шлют PATCH, а {@code HttpURLConnection} его не умеет. Явные таймауты не дают зависшему запросу держать прогон.
  */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -69,7 +55,7 @@ public class ContractsService {
         return exchange(HttpMethod.GET, path, headers -> { });
     }
 
-    /** Запрос мониторинга или Kubernetes к актуатору — на его порт. */
+    /** Мониторинг ходит на порт актуатора: на порту API актуатора нет. */
     public ServiceResponse monitor(String path) {
         requireAbsolutePath(path);
         return remember(monitoringClient.get().uri(path).exchange().returnResult());

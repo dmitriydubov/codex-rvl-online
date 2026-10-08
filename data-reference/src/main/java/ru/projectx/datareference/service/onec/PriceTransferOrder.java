@@ -11,11 +11,9 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 
 /**
- * Порядок передач прайса по услуге: цены меняет только передача, финальное сообщение которой принято не раньше
- * финала последней применённой, и после применения последней становится она.
- *
- * <p>Методы работают в транзакции вызывающего и первым делом блокируют строку услуги до её конца. Сборка передачи и
- * закрытие зависших передач поэтому решают за одну услугу по очереди и не применяют старую передачу поверх новой.
+ * Порядок передач прайса по услуге: цены меняет только передача, финал которой принят не раньше финала применённой.
+ * Методы первым делом блокируют строку услуги до конца транзакции вызывающего, поэтому сборка и закрытие зависших
+ * передач решают за одну услугу по очереди и не применяют старую передачу поверх новой.
  */
 @Component
 public class PriceTransferOrder {
@@ -28,11 +26,7 @@ public class PriceTransferOrder {
         this.inbound = inbound;
     }
 
-    /**
-     * Замещает прайс, если по услуге не применена более новая передача; иначе пропуск с причиной и прайс не трогается.
-     *
-     * @param replacement замещение прайса услуги этой передачей
-     */
+    /** Замещает прайс, если по услуге не применена более новая передача; иначе пропуск с причиной. */
     ImportResult applyInOrder(UUID service, InboundMessage finalMessage, Supplier<ImportResult> replacement) {
         return lockApplied(service)
                 .filter(applied -> applied.isNewerThan(finalMessage.receipt().receivedAt()))

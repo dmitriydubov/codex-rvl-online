@@ -59,14 +59,9 @@ import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 
 /**
- * Проход шедулера разбора без базы: что он берёт, кому отдаёт и как классифицирует отказ.
- * Разбор и запись исхода — у соседей, поэтому они подменены; на настоящей базе тот же проход
- * проверяет {@link ReferenceImportSchedulerTest}.
- *
- * <p>Журнал проверяется целиком: исход каждого сообщения виден в нём строкой, а запись о временной ошибке
- * обязана нести тип отказа и SQLSTATE и не нести его текста — через этот путь идут и полисы, а текст ошибки вставки
- * печатает параметры запроса. На время разбора сообщения в MDC лежат его {@code message-id} и поток, под
- * теми же именами, что при приёме из брокера.
+ * Проход планировщика разбора без базы: что он берёт, кому отдаёт и как классифицирует отказ. Запись о временной ошибке
+ * несёт тип и SQLSTATE без текста, потому что текст ошибки вставки печатает параметры с данными полисов. На время
+ * разбора в MDC лежат {@code message-id} и поток под теми же именами, что при приёме из брокера.
  */
 @ExtendWith(MockitoExtension.class)
 class ReferenceImportPassTest {
@@ -355,7 +350,6 @@ class ReferenceImportPassTest {
         order.verify(overdueParentWaits).rejectAndReport();
     }
 
-    /** Один отказ не останавливает пачку: следующее сообщение разбирается как обычно. */
     @Test
     void failedMessage_doesNotStopThePass() {
         InboundMessage broken = received();

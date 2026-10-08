@@ -20,28 +20,9 @@ import ru.projectx.datareference.config.RestReadPoolProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 
 /**
- * Проверка действующих таймаутов сеанса PostgreSQL при старте. На соединении пула
- * {@code lock_timeout}, {@code statement_timeout}
- * и {@code idle_in_transaction_session_timeout} должны совпасть с настройкой
- * ({@link DatabaseSessionTimeouts}), на соединении миграций — быть нулём.
- *
- * <p>Расхождение не роняет старт: сервис должен подняться, даже если инфраструктура настроена
- * не так, как он ждёт, и показать проблему в журнале. По каждому параметру пишется WARN с именем
- * соединения, параметром и обоими значениями; адресов, учётных данных и персональных данных (ПДн)
- * в записи нет. Так видны обе ловушки настройки: пулер, молча выбросивший {@code options}, и
- * таймаут на роли или базе, который достаётся и миграциям.
- *
- * <p>Проверка — наблюдение, а не условие старта: не прочиталось соединение (сбой базы, права
- * на {@code pg_settings}) — WARN с типом исключения, без его текста; Liquibase в контексте нет
- * (миграции в контуре идут отдельно) — WARN, что соединение миграций не проверено. Заодно —
- * WARN, если лимит REST-чтения не меньше включённого {@code lock_timeout}: тогда под чужой
- * блокировкой REST не отказывает первым ({@code lock_timeout} 0 — ожидание блокировок без предела,
- * и первым отказывает как раз лимит чтения). И WARN, если сетевой тайм-аут пула REST-чтений меньше лимита чтения
- * вместе с ожиданием отправки отмены: тогда медленное чтение обрывается вместе с соединением раньше, чем его
- * отменит база.
- *
- * <p>{@link ApplicationRunner}: Spring Boot вызывает его после старта контекста и до готовности
- * принимать трафик — миграции к этому моменту прошли, их соединение открыто заново.
+ * При старте сверяет таймауты сеанса PostgreSQL с настройкой: на пуле они должны совпасть, у миграций быть нулём.
+ * Расхождение и сбой чтения не роняют старт, а пишутся в журнал WARN без адресов и учётных данных: сервис должен
+ * подняться и показать проблему. Заодно предупреждает о лимите REST-чтения, который не успеет отказать первым.
  */
 @Component
 public class DatabaseTimeoutsCheck implements ApplicationRunner {
@@ -95,7 +76,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         warnIfDiffers(POOL, parameter, expected.get(), actual);
     }
 
-    /** Граница системы: сбой чтения — WARN с типом исключения (текст несёт SQL), проверка идёт дальше. */
+    /** Сбой чтения пишется только типом исключения, потому что текст несёт SQL; проверка идёт дальше. */
     private Optional<Map<String, Duration>> read(String connection, DataSource source) {
         try {
             return Optional.of(connections.sessionSettings().durations(source, parameters));
@@ -145,11 +126,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         }
     }
 
-    /**
-     * Откуда читать: чтение параметров сеанса, пул приложения и Liquibase — если он есть в контексте.
-     *
-     * @param liquibase провайдер, а не бин: при {@code spring.liquibase.enabled=false} бина нет
-     */
+    /** Источники проверки; Liquibase берётся провайдером, потому что при выключенных миграциях его бина нет. */
     @Component
     public record Connections(
             SessionSettingsRepository sessionSettings, DataSource pool, ObjectProvider<SpringLiquibase> liquibase) {

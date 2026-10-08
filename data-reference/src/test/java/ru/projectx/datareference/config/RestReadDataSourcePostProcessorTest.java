@@ -9,10 +9,7 @@ import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.core.Ordered;
 import org.springframework.mock.env.MockEnvironment;
 
-/**
- * Пул, который собрал Spring Boot, становится пулом приложения внутри источника соединений с отдельным пулом
- * REST-чтений. Остальные бины не трогаются.
- */
+/** Пул, который собрал Spring Boot, становится пулом приложения внутри источника соединений с пулом REST-чтений. */
 class RestReadDataSourcePostProcessorTest {
 
     private static final RestReadPoolProperties SETTINGS =

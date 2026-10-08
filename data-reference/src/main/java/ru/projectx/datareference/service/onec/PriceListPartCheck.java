@@ -28,8 +28,7 @@ final class PriceListPartCheck {
     /**
      * Часть уже отклонённой или пропущенной передачи не проверяется: она разделяет исход передачи.
      *
-     * @param messageId сообщение, которое проверяется
-     * @param parts     сообщения передачи, которые уже есть в сырье; среди них может быть и проверяемое
+     * @param parts сообщения передачи, которые уже есть в сырье; среди них может быть и проверяемое
      * @throws OneCFieldException с причиной для этой части
      */
     void check(UUID messageId, PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {

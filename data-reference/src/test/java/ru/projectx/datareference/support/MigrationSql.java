@@ -8,13 +8,9 @@ import org.springframework.core.io.ClassPathResource;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * Операторы {@code sql} набора изменений ровно тем текстом, что лежит в миграции Liquibase.
- * Тесты заполнения выполняют сам текст миграции, а не его копию, поэтому правка миграции
- * сразу проверяется тестом.
- *
- * <p>Changelog разбирается как дерево YAML с проверкой типа каждого узла: если миграция
- * устроена не так, как ожидает тест, он падает с понятным сообщением, а не где-то дальше
- * на приведении типа.
+ * Операторы {@code sql} набора изменений ровно тем текстом, что лежит в миграции Liquibase, чтобы тесты заполнения
+ * выполняли саму миграцию, а не её копию. Узлы YAML проверяются по типу: миграция неожиданного вида роняет тест
+ * с понятным сообщением.
  */
 public final class MigrationSql {
 
@@ -22,11 +18,8 @@ public final class MigrationSql {
     }
 
     /**
-     * Тексты операторов {@code sql} из раздела {@code changes} набора изменений в порядке миграции.
-     *
-     * @param changelog путь к changelog в classpath, например {@code db/changelog/017-….yaml}
-     * @param changeSetId идентификатор набора изменений
-     * @throws IllegalStateException если в миграции нет такого набора или он устроен иначе
+     * Тексты операторов {@code sql} из раздела {@code changes} в порядке миграции, например из
+     * {@code db/changelog/017-….yaml}. Если набора нет или он устроен иначе, бросает {@code IllegalStateException}.
      */
     public static List<String> statementsOf(String changelog, String changeSetId) {
         List<String> statements = sequence(field(read(changelog), "databaseChangeLog")).stream()

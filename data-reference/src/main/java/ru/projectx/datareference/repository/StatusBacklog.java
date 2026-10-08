@@ -10,15 +10,11 @@ import ru.projectx.datareference.entity.OneCStream;
  */
 public interface StatusBacklog {
 
-    /** Поток 1С. */
     OneCStream getStream();
 
-    /** Статус сообщений. */
     InboundStatus getStatus();
 
-    /** Сколько сообщений потока в этом статусе. */
     long getMessages();
 
-    /** Когда принято самое давнее сообщение потока в этом статусе. */
     Instant getOldestReceivedAt();
 }

@@ -6,7 +6,7 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.LpuRepository;
 
-/** ЛПУ точечных ручек (R-02, R-03): в архиве для каталога равносильно отсутствующему (ТЗ на API, R-02). */
+/** Ищет лечебное учреждение (ЛПУ) для карточки и услуг; учреждение в архиве считается отсутствующим. */
 @Component
 public class ActiveLpus {
 

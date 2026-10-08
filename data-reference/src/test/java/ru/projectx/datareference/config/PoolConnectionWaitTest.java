@@ -17,10 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Ожидание соединения из пула: при недоступной базе пул отказывает за секунды, а не за умолчание HikariCP
- * в 30 секунд. Сами значения настройки проверяет {@link PoolConnectionWaitSettingTest} без базы.
- *
- * <p>Значения — умолчания {@code application.yml}: переменные окружения пула в тестах не заданы.
+ * При недоступной базе пул отказывает за секунды, а не за умолчание HikariCP в 30 секунд.
+ * Значения настройки без базы проверяет {@link PoolConnectionWaitSettingTest}.
  */
 @IntegrationTest
 class PoolConnectionWaitTest {
@@ -35,9 +33,8 @@ class PoolConnectionWaitTest {
     private DataSource dataSource;
 
     /**
-     * Пул с настройками приложения, но адресом, на котором сервер не слушает, — как остановленная база.
-     * Отказ приходит не раньше ожидания соединения (пул пытается подключиться всё это время) и раньше
-     * {@code lock_timeout}, с кодом «нет соединения» от драйвера.
+     * Адрес, на котором сервер не слушает, — как остановленная база. Пул пытается подключиться всё время ожидания,
+     * поэтому отказ приходит не раньше него, но раньше {@code lock_timeout}.
      */
     @Test
     void serverNotListening_poolRefusesAfterConnectionTimeout() throws SQLException, IOException {
@@ -53,7 +50,7 @@ class PoolConnectionWaitTest {
         }
     }
 
-    /** Копия настроек пула приложения с другим адресом; без попытки подключиться при создании пула. */
+    /** Копия настроек пула приложения с другим адресом, без попытки подключиться при создании пула. */
     private HikariConfig configTo(String jdbcUrl) throws SQLException {
         HikariConfig config = new HikariConfig();
         dataSource.unwrap(HikariDataSource.class).copyStateTo(config);

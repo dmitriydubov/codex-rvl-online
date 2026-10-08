@@ -6,9 +6,9 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 
 /**
- * Карточка ЛПУ (R-02): то же, что в каталоге, плюс адрес и прайсовый договор с его
- * сроками. Полей {@code booking_limit_days} и {@code short_description} из ТЗ здесь
- * нет: у них нет источника в потоках 1С, а поле без источника в контракт не попадает (В-8).
+ * Карточка ЛПУ: данные каталога, адрес и прайсовый договор с его сроками. Полей {@code booking_limit_days}
+ * и {@code short_description} из ТЗ здесь нет: у них нет источника в потоках 1С, а поле без источника
+ * в контракт не попадает.
  */
 public record LpuCardResponse(
         UUID id,

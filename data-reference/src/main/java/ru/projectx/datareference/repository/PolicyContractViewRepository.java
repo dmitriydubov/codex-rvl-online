@@ -6,14 +6,9 @@ import org.springframework.data.repository.Repository;
 import ru.projectx.datareference.entity.Policy;
 
 /**
- * Полисы для чтения без персональных данных — только строкой {@link PolicyContractRow}, а не сущностью.
- *
- * <p>Отдельный от {@link PolicyRepository} и узкий намеренно: у него нет метода, который вернул бы
- * {@link Policy} с ФИО, датой рождения и почтой. Тип ответа — проекция DTO: запрос выбирает только свойства,
- * названные компонентами записи, и колонки ПДн из базы не читаются вовсе.
- *
- * <p>{@code ContractView} в именах методов — описательная часть между {@code find} и {@code By}: так
- * запрос не спутать с зарезервированным {@code findById} репозиториев Spring Data.
+ * Полисы без персональных данных, только строкой {@link PolicyContractRow}. Отдельный от {@link PolicyRepository}
+ * намеренно: у него нет метода, который вернул бы {@link Policy} с ФИО и почтой. {@code ContractView} в именах методов
+ * не даёт спутать их с {@code findById} Spring Data.
  */
 public interface PolicyContractViewRepository extends Repository<Policy, UUID> {
 

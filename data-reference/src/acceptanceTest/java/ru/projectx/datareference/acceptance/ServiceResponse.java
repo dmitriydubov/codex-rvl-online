@@ -10,14 +10,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.MissingNode;
 
 /**
- * Ответ Дата-референса, каким его видит сервис Договоров: статус, заголовки, тело JSON и размер тела
- * в байтах. Пустое тело (ответ на HEAD и OPTIONS) и тело не в JSON (страница ошибки самого сервера до
- * сервиса) читаются как {@code MissingNode}: у такого ответа нет полей, а его тип проверяет отдельный шаг.
- *
- * <p>Поле тела задаётся путём, как в сценариях: имена через точку, индекс массива
- * в квадратных скобках ({@code programs[0].program.id}). Путь переводится в JSON Pointer
- * ({@code /programs/0/program/id}), и отсутствующее поле даёт {@code MissingNode},
- * а не {@code null}: «поля нет» и «поле пусто» остаются разными исходами.
+ * Ответ Дата-референса, каким его видит сервис Договоров. Пустое тело и тело не в JSON читаются как
+ * {@code MissingNode}, а тип такого ответа проверяет отдельный шаг. Отсутствующее поле тоже даёт {@code MissingNode},
+ * а не {@code null}, чтобы «поля нет» и «поле пусто» оставались разными исходами.
  */
 record ServiceResponse(int status, HttpHeaders headers, JsonNode body, int bodyBytes) {
 

@@ -86,9 +86,8 @@ class ReferenceImportSchedulerStructuredJournalTest {
     }
 
     /**
-     * Текст временного отказа в журнал не попадает ни строкой, ни разобранным исключением: рабочий формат
-     * журнала выводит приложенное к записи исключение полями {@code error.message} и {@code error.stack_trace},
-     * а текст ошибки вставки печатает значения полей.
+     * Текст временного отказа не попадает в журнал ни строкой, ни приложенным исключением: рабочий формат выводит его
+     * полями {@code error.message} и {@code error.stack_trace}, а текст ошибки вставки печатает значения полей.
      */
     @Test
     void temporaryFailure_carriesMessageIdAndStreamButNoFailureText(CapturedOutput output) {

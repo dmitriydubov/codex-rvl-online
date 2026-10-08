@@ -36,12 +36,9 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Каталог ЛПУ по договору страхования, карточка ЛПУ и его услуги с ценами — через
- * настоящий стек MVC поверх настоящей базы. Часы остановлены на 14.03.2026: «сегодня»
- * для правила дат — этот день.
- *
- * <p>Виды обращения РВЛ в справочнике записаны не так, как в конфигурации, — с лишними
- * пробелами и в другом регистре: так проверяется, что сравнение их переживает.
+ * Проверяет каталог ЛПУ (лечебно-профилактических учреждений) по договору страхования, карточку ЛПУ и услуги
+ * с ценами через настоящий стек MVC и базу. «Сегодня» — 14.03.2026. Виды обращения РВЛ в справочнике записаны
+ * с лишними пробелами и в другом регистре, чтобы проверить, что сравнение это переживает.
  */
 @IntegrationTest
 class LpuCatalogApiTest {
@@ -176,7 +173,6 @@ class LpuCatalogApiTest {
         }
     }
 
-    /** Строка условий обслуживания, которая начнётся завтра, учреждений не даёт. */
     @Test
     void catalog_serviceLineStartingTomorrow_givesNoLpu() {
         lpuOfProgramWithServiceLineFrom(TODAY.plusDays(1));
@@ -187,7 +183,6 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.items").asArray().isEmpty();
     }
 
-    /** Первый день срока строки условий уже входит в срок. */
     @Test
     void catalog_serviceLineStartingToday_givesLpu() {
         lpuOfProgramWithServiceLineFrom(TODAY);
@@ -198,7 +193,6 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.items[*].name").asArray().containsExactly("Сосновый бор");
     }
 
-    /** Строка условий без даты начала срок с этой стороны не ограничивает. */
     @Test
     void catalog_serviceLineWithoutBeginDate_givesLpu() {
         lpuOfProgramWithServiceLineFrom(null);
@@ -394,7 +388,7 @@ class LpuCatalogApiTest {
                 new Policy.Snapshot(details, List.of(program), List.of(service)), NOW));
     }
 
-    /** Учреждение с действующим договором в перечне программы и действующий полис, чья строка условий начинается с {@code lineBegin}. */
+    /** Учреждение программы и действующий полис, чья строка условий начинается с {@code lineBegin}. */
     private void lpuOfProgramWithServiceLineFrom(@Nullable LocalDate lineBegin) {
         Lpu lpu = saveLpu("Сосновый бор", false);
         saveContract(lpu, "M-1", null, false, TODAY.minusYears(1), null);
@@ -402,7 +396,6 @@ class LpuCatalogApiTest {
         savePolicyWithServiceLineFrom(lineBegin);
     }
 
-    /** Действующий полис, у строки условий которого своя дата начала, а окончания нет. */
     private void savePolicyWithServiceLineFrom(@Nullable LocalDate lineBegin) {
         LocalDate begin = TODAY.minusMonths(1);
         var details = new Policy.Details(CONTRACT_EXT, "0002-" + UUID.randomUUID().toString().substring(0, 6),

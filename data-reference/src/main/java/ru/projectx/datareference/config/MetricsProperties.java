@@ -6,15 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * Настройки метрик сервиса.
- *
- * @param backlogRefreshInterval пауза между обновлениями метрик очереди разбора сырых сообщений 1С: столько,
- *                не больше, они отстают от базы. Каждое обновление — четыре подсчёта по частичным индексам, без
- *                выборки строк. Первое обновление — сразу после старта. Нулевая или отрицательная пауза не
- *                пускает сервис в работу
- */
+/** Настройки метрик сервиса. */
 @Validated
 @ConfigurationProperties("projectx.metrics")
-public record MetricsProperties(@DefaultValue("30s") @DurationMin(millis = 1) Duration backlogRefreshInterval) {
+public record MetricsProperties(
+        // Как часто обновляются метрики очереди разбора сырых сообщений: на столько они могут отставать от базы.
+        // Обновление — четыре подсчёта по частичным индексам без выборки строк, первое идёт сразу после старта.
+        @DefaultValue("30s") @DurationMin(millis = 1) Duration backlogRefreshInterval) {
 }

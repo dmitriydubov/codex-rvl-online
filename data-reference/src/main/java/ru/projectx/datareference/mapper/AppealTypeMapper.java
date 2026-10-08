@@ -11,13 +11,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.AppealTypeRepository;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает справочник видов обращения за медицинской помощью из 1С:УСК (ТЗ-7): амбулаторная помощь,
- * стационар, восстановительное лечение и другие.
- *
- * <p>Справочник принимается целиком, без фильтра. Каждое сообщение создаёт вид обращения или заменяет
- * его реквизиты: версий у сообщений нет, и действует последнее полученное.
- */
+/** Разбирает справочник видов обращения за медицинской помощью из 1С:УСК целиком, без фильтра. */
 @Component
 public class AppealTypeMapper extends UnfilteredStreamMapper<AppealType, AppealType.Details> {
 

@@ -24,13 +24,9 @@ public class TestSupportConfig {
     }
 
     /**
-     * Клиент к стеку MVC поверх контекста приложения — то, что давала бы
-     * {@code @AutoConfigureMockMvc}, будь модуль {@code spring-boot-webmvc-test}
-     * доступен в Nexus контура. Сам {@link MockMvcTester} — часть {@code spring-test},
-     * и без Boot он теряет одно: фильтры из контекста сами не подключаются.
-     * Поэтому они добавляются здесь, все и в порядке {@code @Order}, как их
-     * зарегистрировал бы контейнер сервлетов. Иначе тест на {@code X-Request-Id}
-     * проверял бы фильтр, которого в цепочке нет.
+     * Клиент к стеку MVC поверх контекста вместо {@code @AutoConfigureMockMvc}, модуль которого недоступен
+     * в Nexus контура. Без Boot фильтры из контекста сами не подключаются, поэтому они добавляются здесь в порядке
+     * {@code @Order}: иначе тест на {@code X-Request-Id} проверял бы фильтр, которого нет в цепочке.
      */
     @Bean
     public MockMvcTester mockMvcTester(WebApplicationContext context, List<Filter> filters) {

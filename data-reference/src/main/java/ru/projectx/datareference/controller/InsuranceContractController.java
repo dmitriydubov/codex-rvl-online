@@ -9,8 +9,8 @@ import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.InsuranceContractReads;
 
 /**
- * Договор страхования со страхователем (R-08) — по нашему {@code id} или по {@code external_id}.
- * Запрос без ключа — «нет параметра», а не «не найдено», как и у полисов.
+ * Договор страхования со страхователем (R-08) по нашему {@code id} или по {@code external_id}. Запрос без ключа
+ * получает отказ «нет параметра», а не «не найдено», как и у полисов.
  */
 @InternalApi
 public class InsuranceContractController {
@@ -21,7 +21,6 @@ public class InsuranceContractController {
         this.insuranceContracts = insuranceContracts;
     }
 
-    /** R-08: договор страхования со страхователем. */
     @GetMapping("/insurance-contracts/{id}")
     public InsuranceContractResponse insuranceContract(@PathVariable UUID id) {
         return insuranceContracts.byId(id);

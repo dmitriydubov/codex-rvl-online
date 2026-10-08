@@ -1,40 +1,22 @@
-# Образ сервиса data-reference для Kubernetes.
-#
-# Сначала получаем jar, затем раскладываем его по слоям Spring Boot: библиотеки лежат
-# в нижнем слое, код сервиса — в верхнем, и после правки кода меняется только верхний.
-#
-# Откуда взять jar, задаёт JAR_SOURCE:
-#   build — собрать внутри образа (так собирает CI). Нужна сеть до Nexus и дистрибутива Gradle;
-#           вне контура задайте PUBLIC_REPOSITORIES=true, чтобы брать зависимости из Maven Central
-#           (переменные, по которым сборка сама выбирает репозитории, внутрь docker build не попадают).
-#   host  — взять собранный на машине: ./gradlew bootJar && docker build --build-arg JAR_SOURCE=host .
-#           Подходит, когда у контейнера нет сети.
-#
-# Строки «# syntax=» нет нарочно: с ней BuildKit скачивал бы фронтенд с Docker Hub.
-#
-# В сети без выхода наружу базовые образы и Gradle берутся из зеркала Nexus (compose читает
-# эти аргументы из .env, шаблон — .env.example):
-#   docker build --build-arg JDK_IMAGE=<зеркало>/eclipse-temurin:21.0.12.1_1-jdk \
-#                --build-arg JRE_IMAGE=<зеркало>/eclipse-temurin:21.0.12.1_1-jre \
-#                --build-arg GRADLE_DISTRIBUTION_URL=<зеркало>/gradle-8.14.3-bin.zip .
-#
-# Сертификаты корпоративного центра сертификации кладутся в certs/: без них JVM не доверяет
-# Nexus при сборке и брокеру 1С:УСК при работе. В слои образа они не попадают.
-#
-# Тесты здесь не запускаются: им нужен Docker, их прогоняет CI до сборки образа.
+# Образ сервиса для Kubernetes. Jar раскладывается по слоям Spring Boot, поэтому после правки кода меняется только
+# верхний слой. Строки «# syntax=» нет нарочно: с ней BuildKit скачивал бы фронтенд с Docker Hub.
+# Способы сборки, зеркала образов и сертификаты описаны в README модуля.
 
 # Точная версия JDK, чтобы через месяц тот же Dockerfile собрал тот же Java.
 ARG JDK_IMAGE=eclipse-temurin:21.0.12.1_1-jdk
 ARG JRE_IMAGE=eclipse-temurin:21.0.12.1_1-jre
+# build — собрать jar внутри образа, host — взять собранный на машине, когда у сборки нет сети.
 ARG JAR_SOURCE=build
 
 # ---------- 1a. Jar из исходников ----------
 FROM ${JDK_IMAGE} AS build
 WORKDIR /workspace
 
-# false — зависимости из Nexus контура, true — из Maven Central.
+# false — зависимости из Nexus контура, true — из Maven Central. Аргумент нужен, потому что переменные окружения,
+# по которым сборка сама выбирает репозитории, внутрь docker build не попадают.
 ARG PUBLIC_REPOSITORIES=false
 
+# Корпоративный центр сертификации из certs/: без него сборка не доверяет Nexus. В слои образа он не попадает.
 RUN --mount=type=bind,source=certs,target=/certs sh /certs/import-ca.sh /certs
 
 # Сначала только файлы сборки: пока они не менялись, скачанные зависимости берутся из кэша слоя.
@@ -52,6 +34,7 @@ RUN if [ -n "${GRADLE_DISTRIBUTION_URL}" ]; then \
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon --console=plain --quiet -PpublicRepositories=${PUBLIC_REPOSITORIES} dependencies
 
+# Тесты здесь не запускаются: им нужен Docker, их прогоняет CI до сборки образа.
 # Jar берётся по точному имени с текущей версией: нет такого файла — сборка падает.
 COPY src src
 RUN --mount=type=cache,target=/root/.gradle \
@@ -73,6 +56,7 @@ RUN java -Djarmode=tools -jar application.jar extract --layers --destination ext
 # ---------- 3. Образ для запуска ----------
 FROM ${JRE_IMAGE}
 
+# Тот же центр сертификации: без него сервис не доверяет брокеру 1С:УСК.
 RUN --mount=type=bind,source=certs,target=/certs sh /certs/import-ca.sh /certs
 
 # Числовой id пользователя: runAsNonRoot в Kubernetes проверяет число, а не имя.

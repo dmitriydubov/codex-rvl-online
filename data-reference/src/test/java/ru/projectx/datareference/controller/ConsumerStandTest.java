@@ -34,15 +34,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Стенд потребителя для сервиса Договоров ({@code docker-compose.yml}, профиль {@code stand})
- * на тех же файлах, что и сам стенд: закладка сырья {@code stand/seed.sql} и примеры
- * запросов {@code stand/examples}.
- *
- * <p>Путь данных — как на стенде: сырьё ложится в {@code inbound_message} со статусом NEW,
- * разбирает его штатный проход планировщика, ответы идут через настоящий стек MVC.
- * Пример, разошедшийся с ответом сервиса хоть одним полем, роняет тест — так примеры
- * остаются контрактом, а не устаревшей документацией: изменение кода, меняющее ответ,
- * правит и пример.
+ * Проверяет стенд потребителя для сервиса Договоров на его же файлах: {@code stand/seed.sql} и {@code stand/examples}.
+ * Пример, разошедшийся с ответом сервиса хоть одним полем, роняет тест: так примеры остаются контрактом,
+ * а не устаревшей документацией.
  */
 @IntegrationTest
 class ConsumerStandTest {
@@ -69,7 +63,7 @@ class ConsumerStandTest {
             "10-policy-contract-view.json",
             "11-policy-contract-view-not-found.json",
             "12-service-unavailable.json");
-    /** Таблицы, которые пример стенда может держать под блокировкой: значение из файла в SQL идёт только отсюда. */
+    /** Таблицы, которые пример может держать под блокировкой: имя таблицы в SQL берётся только отсюда, не из файла. */
     private static final Set<String> LOCKABLE_TABLES = Set.of("policies", "insurance_contracts", "programs");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
@@ -98,9 +92,8 @@ class ConsumerStandTest {
     }
 
     /**
-     * Страхователь в потоке контрагентов записывается пропуском с причиной, а не ошибкой. Так в базе видно,
-     * что контрагент пришёл, но санаторием не оказался, а не что санатория не присылали. Строка в таблице
-     * {@code insurers} при этом создаётся.
+     * Страхователь в потоке контрагентов записывается пропуском с причиной, а не ошибкой: так видно,
+     * что контрагент пришёл, но санаторием не оказался. Строка в {@code insurers} при этом создаётся.
      */
     @Test
     void seed_isImportedByScheduler() {
@@ -129,10 +122,7 @@ class ConsumerStandTest {
                 .noneMatch(message -> message.outcome().status() == InboundStatus.NEW);
     }
 
-    /**
-     * Набор примеров закреплён поимённо: пропавший или переименованный пример иначе
-     * просто перестал бы проверяться, а стенд — показывать то, что обещано Договорам.
-     */
+    /** Набор закреплён поимённо: пропавший или переименованный пример иначе просто перестал бы проверяться. */
     @Test
     void examples_coverTheConsumerContract() {
         assertThat(StandExample.loadAll())
@@ -141,9 +131,8 @@ class ConsumerStandTest {
     }
 
     /**
-     * Пример без запроса или без ответа сравнивать не с чем: отсутствующее тело сошлось бы
-     * с пустым ответом. Раздел {@code placeholders} — описание для читателя, и оно обязано
-     * быть полным.
+     * Пример без запроса или ответа сравнивать не с чем: отсутствующее тело сошлось бы с пустым ответом.
+     * Раздел {@code placeholders} — описание для читателя, и оно обязано быть полным.
      */
     @Test
     void examples_areComplete() {
@@ -182,7 +171,7 @@ class ConsumerStandTest {
     }
 
     /**
-     * Условие примера держит другой сеанс: блокировка взята до запроса и снимается откатом
+     * Условие примера держит другой сеанс базы: блокировка взята до запроса и снимается откатом
      * сразу после ответа, чтобы следующие примеры шли по доступной базе.
      */
     private MvcTestResult exchangeUnderCondition(StandExample example, StandPlaceholders placeholders)

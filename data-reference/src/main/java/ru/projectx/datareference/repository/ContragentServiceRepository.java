@@ -19,9 +19,8 @@ public interface ContragentServiceRepository extends JpaRepository<ContragentSer
     Optional<ContragentService> findByExternalId(UUID externalId);
 
     /**
-     * Услуги прайсового договора по видам обращения РВЛ (R-03), по наименованию.
-     * Услуга без вида обращения под фильтр не подходит и не показывается
-     * (ТЗ на API, вопрос 7).
+     * Действующие услуги прайсового договора по видам обращения РВЛ, по наименованию. Услуга без вида обращения не
+     * показывается (ТЗ на API, вопрос 7).
      */
     @Query("""
             select service from ContragentService service

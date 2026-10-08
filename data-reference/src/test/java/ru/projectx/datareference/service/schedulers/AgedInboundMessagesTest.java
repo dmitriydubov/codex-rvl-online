@@ -19,9 +19,8 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
 /**
- * Порог давности превращается в момент по часам сервиса: «старше тридцати суток» значит принято раньше, чем
- * «сейчас минус тридцать суток». Сами запросы к базе проверяет {@link AgedInboundMessagesQueryTest}; здесь —
- * с каким моментом и каким пределом их зовут.
+ * Порог давности превращается в момент по часам сервиса: «старше тридцати суток» значит принято раньше, чем «сейчас
+ * минус тридцать суток». Сами запросы проверяет {@link AgedInboundMessagesQueryTest}, здесь только момент и предел.
  */
 @ExtendWith(MockitoExtension.class)
 class AgedInboundMessagesTest {

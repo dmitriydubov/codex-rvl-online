@@ -9,10 +9,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 /**
- * Действующие параметры времени сеанса PostgreSQL на соединении из данного {@link DataSource}:
- * {@code pg_settings.setting} в миллисекундах (у {@code lock_timeout}, {@code statement_timeout}
- * и {@code idle_in_transaction_session_timeout} единица — {@code ms}). Только чтение: база
- * и роли не меняются. Параметр без единицы {@code ms} в ответ не попадает.
+ * Действующие на соединении из {@link DataSource} параметры времени сеанса PostgreSQL, такие как {@code lock_timeout} и
+ * {@code statement_timeout}. Только чтение; параметр с единицей не {@code ms} в ответ не попадает.
  */
 @Repository
 public class SessionSettingsRepository {

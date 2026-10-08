@@ -1,7 +1,6 @@
 /*
- * Плагин мутаций PIT нужен только внешнему набору проверок (см. settings.gradle) и опубликован
- * только на портале плагинов Gradle. Поэтому он объявлен здесь, а не в plugins {}:
- * без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
+ * Плагин мутаций PIT нужен только внешнему набору проверок и есть только на портале плагинов Gradle. Поэтому он
+ * объявлен здесь, а не в plugins {}: без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
  */
 buildscript {
     if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
@@ -22,22 +21,16 @@ plugins {
 description = 'РВЛ ОНЛАЙН — сервис справочных данных: справочники и полисы из 1С:УСК для сервисов Заявок и Договоров'
 
 /*
- * Артефакт сервиса один — исполняемый jar от bootJar. Обычный jar (classifier plain)
- * плагин Spring Boot иначе кладёт рядом, в тот же build/libs, на каждом build и assemble,
- * и тому, кто забирает артефакт оттуда (CI, ручное копирование, этап host в Dockerfile),
- * приходится угадывать, какой из двух брать. Задача jar не нужна ни образу, ни тестам:
- * они берут классы из каталогов сборки.
+ * Артефакт сервиса один — исполняемый jar от bootJar. Иначе рядом в build/libs ложится ещё обычный jar, и CI,
+ * этап host в Dockerfile и ручное копирование гадают, какой брать. Образу и тестам задача jar не нужна.
  */
 tasks.named('jar') {
     enabled = false
 }
 
 /*
- * META-INF/build-info.properties: по нему /actuator/info показывает версию сервиса. Строка старта
- * в журнале берёт версию из манифеста jar. Время сборки не пишется: с ним задача никогда не считается
- * выполненной, тесты и проверки перезапускаются на каждой сборке, а два прогона одного кода дают разные
- * jar. Время сборки образа ставит в его метки CI. (Spring Boot Gradle plugin 4.0, «Integrating with
- * Actuator».)
+ * По сведениям о сборке /actuator/info показывает версию сервиса. Время сборки не пишется: с ним задача никогда
+ * не считается выполненной, тесты перезапускаются на каждой сборке, а два прогона одного кода дают разные jar.
  */
 springBoot {
     buildInfo {
@@ -62,24 +55,16 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 /*
- * Отдельная конфигурация под одну задачу: собрать путь к jar-у Mockito, чтобы отдать
- * его JVM как -javaagent. transitive = false, потому что агентом должен быть ровно
- * один файл — asPath ниже склеивает список через разделитель пути, и второй артефакт
- * молча превратил бы аргумент в мусор.
+ * Конфигурация только для пути к jar-у Mockito, который JVM получает как -javaagent. transitive = false: asPath
+ * склеивает все файлы конфигурации, и второй артефакт молча испортил бы аргумент.
  */
 configurations {
     mockitoAgent
 }
 
 /*
- * Unit- и интеграционные тесты (задача test) исполняются на тех же версиях библиотек, что
- * и сервис. Без этого тестовые зависимости поднимают общие с продом: assertj-core требует
- * byte-buddy 1.18.3, и Gradle выбирал его для тестов, а Hibernate в проде работает на 1.17.8
- * из BOM. Здесь версии всего, что есть в runtimeClasspath, берутся из его результата
- * строго (strictly) и побеждают более высокие требования тестовых библиотек. Своей версии
- * сборка не задаёт — источник по-прежнему BOM. Приёмка внешнего набора проверок разрешает свой
- * classpath отдельно и под это правило не попадает. (Gradle 8.14.3,
- * Configuration.shouldResolveConsistentlyWith, incubating с 6.8.)
+ * Тесты исполняются на тех же версиях библиотек, что и сервис. Иначе тестовые зависимости поднимают общие с продом:
+ * assertj-core требует byte-buddy новее, чем Hibernate получает из BOM. Своих версий сборка не задаёт.
  */
 configurations.testRuntimeClasspath.shouldResolveConsistentlyWith(configurations.runtimeClasspath)
 
@@ -100,13 +85,8 @@ tasks.withType(Test).configureEach {
 
 dependencies {
     /*
-     * Версии зависимостей — только здесь, и только через BOM: в объявлениях ниже
-     * координаты пишутся без версий. Плагин Spring Boot управление версиями сам
-     * не включает, поэтому платформа подключается явно; io.spring.dependency-management
-     * для той же задачи не нужен — Gradle умеет BOM'ы нативно.
-     *
-     * compileOnly и annotationProcessor не наследуют implementation, поэтому платформа
-     * добавляется в каждую конфигурацию отдельно.
+     * Версии — только из BOM Spring Boot, координаты ниже без версий. Плагин Spring Boot BOM сам не подключает,
+     * а compileOnly и annotationProcessor не наследуют implementation, поэтому платформа добавлена в каждую.
      */
     ['implementation', 'compileOnly', 'annotationProcessor',
      'testCompileOnly', 'testAnnotationProcessor', 'mockitoAgent'].each { configuration ->
@@ -115,15 +95,11 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    // Boot 4 вынес LiquibaseAutoConfiguration из общего autoconfigure в свой модуль
-    // (тот же паттерн, что и с DataSourceAutoConfiguration → spring-boot-jdbc):
-    // просто liquibase-core на classpath автоконфигурацию больше не включает.
+    // Миграции на старте запускает только этот стартер: в Boot 4 автоконфигурация Liquibase живёт в своём модуле,
+    // и одного liquibase-core на classpath для неё мало.
     implementation 'org.springframework.boot:spring-boot-starter-liquibase'
-    // REST-чтение справочников для сервисов Заявок и Договоров. В Boot 4 стартер MVC
-    // называется webmvc, а starter-web объявлен устаревшим — но по POM это один и тот же
-    // набор модулей: starter-jackson, starter-tomcat, http-converter, spring-boot-webmvc.
-    // Nexus контура отдаёт только starter-web; отсюда выбор. Появится в Nexus
-    // starter-webmvc — заменить координаты, код не меняется.
+    // REST для сервисов Заявок и Договоров. В Boot 4 starter-web устарел, но по составу совпадает со starter-webmvc,
+    // а Nexus контура отдаёт только его. Появится в Nexus starter-webmvc — заменить координаты, код не меняется.
     implementation 'org.springframework.boot:spring-boot-starter-web'
     // Приём сообщений из брокера 1С:УСК — единственного брокера, с которым говорит сервис.
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
@@ -148,10 +124,8 @@ dependencies {
     implementation 'tools.jackson.core:jackson-databind'
     runtimeOnly 'org.postgresql:postgresql'
 
-    // MockMvcTester и его AssertJ-проверки живут в spring-test, который приходит
-    // с этим стартером. Boot-овский starter-webmvc-test не подключён: он тянет
-    // starter-webmvc и ещё два модуля, которых в Nexus контура нет, а из полезного
-    // давал только @AutoConfigureMockMvc — его заменяет бин в TestSupportConfig.
+    // MockMvcTester приходит в spring-test с этим стартером. starter-webmvc-test не подключён: его зависимостей
+    // нет в Nexus контура, а единственное полезное из него, @AutoConfigureMockMvc, заменяет бин в TestSupportConfig.
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
@@ -162,11 +136,8 @@ dependencies {
 }
 
 /*
- * Внешний набор проверок — проверки качества, приёмочные тесты на Cucumber (src/acceptanceTest,
- * набор исходников создаёт сам набор) и мутационное тестирование. Подключается только
- * во внешней сборке с публичными репозиториями (условие — в settings.gradle); ./gradlew build
- * он не меняет, все проверки — отдельные задачи набора. Без каталога набора рядом с модулем
- * сборка о нём не знает.
+ * Внешний набор проверок качества, приёмочных и мутационных тестов подключается только во внешней сборке
+ * с публичными репозиториями. ./gradlew build он не меняет: все его проверки — отдельные задачи.
  */
 if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
     apply plugin: 'info.solidsoft.pitest'

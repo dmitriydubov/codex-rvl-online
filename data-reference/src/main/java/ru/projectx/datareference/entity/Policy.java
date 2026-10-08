@@ -14,32 +14,15 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Полис застрахованного — из потока полисов 1С. Отдельной сущности «застрахованное лицо»
- * в контракте нет: полис и есть застрахованный в рамках договора страхования.
- *
- * <p><b>Здесь лежат персональные данные (ПДн) застрахованного</b>: ФИО, дата рождения, почта. Они не попадают
- * в журнал ни значением, ни в тексте исключения. Хранятся они, пока полис действует, и ещё запас после окончания
- * срока или перевода в архив; потом стираются ({@link #erasePersonalDataBeyond}), а строка полиса с реквизитами
- * остаётся: на неё ссылается сервис Договоров. Новое сообщение 1С приносит ПДн снова.
- *
- * <p>Родственники — это <b>отдельные полисы</b>, а не члены семьи внутри одного:
- * связи «чей это родственник» в контракте нет вообще, и поля в описании потока тоже нет.
- * Паспортных данных этот поток не приносит — описание потока прямо говорит, что структура их потока
- * не определена, поэтому таблицы для них здесь нет.
- *
- * <p>Обе табличные части <b>замещаются целиком</b>: сообщение всегда несёт полный состав
- * строк, и строка, пропавшая из сообщения, обязана пропасть из базы. Слить старые
- * с новыми значило бы накапливать программы, которых у человека уже нет.
+ * Полис застрахованного из 1С; отдельного застрахованного лица в контракте нет, родственники приходят своими полисами.
+ * ФИО, дата рождения и почта — персональные данные: в журнал они не попадают и стираются по сроку хранения, а строка
+ * полиса остаётся, потому что на неё ссылается сервис Договоров. Обе табличные части замещаются целиком.
  */
 @Entity
 @Table(name = "policies")
 public class Policy extends OneCEntity {
 
-    /**
-     * Договор страхования, по которому выдан полис. Логическая ссылка GUID'ом,
-     * без внешнего ключа: поток договоров страхования из 1С на контуре не создан,
-     * и требовать существования строки, которой неоткуда взяться, нельзя.
-     */
+    /** Договор страхования хранится GUID'ом без внешнего ключа: полис может прийти раньше своего договора. */
     @Column(name = "external_contract_id", nullable = false)
     private UUID externalContractId;
 
@@ -65,14 +48,14 @@ public class Policy extends OneCEntity {
     @Nullable
     private String gender;
 
-    /** Тот адрес, которым человек входит в личный кабинет. Может отсутствовать. */
+    /** Адрес, которым человек входит в личный кабинет. */
     @Nullable
     private String email;
 
     @Column(name = "begin_date", nullable = false)
     private LocalDate beginDate;
 
-    /** {@code null} — открытая дата источника, а не «полис без срока». */
+    /** Пусто означает открытую дату источника, а не «полис без срока». */
     @Nullable
     @Column(name = "end_date")
     private LocalDate endDate;
@@ -85,15 +68,11 @@ public class Policy extends OneCEntity {
     @Column(name = "archived_at")
     private Instant archivedAt;
 
-    /** Когда стёрты ПДн; пусто, пока они хранятся. */
     @Nullable
     @Column(name = "personal_data_erased_at")
     private Instant personalDataErasedAt;
 
-    /*
-     * Коллекции не final: спецификация Jakarta Persistence (раздел 2.1) запрещает final у сохраняемых
-     * полей сущности, а Hibernate при загрузке подменяет коллекцию своей реализацией.
-     */
+    // Не final: Hibernate при загрузке подменяет коллекции своими, а Jakarta Persistence запрещает final у полей.
     @OneToMany(mappedBy = "policy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PolicyProgram> programs = new ArrayList<>();
 
@@ -108,11 +87,7 @@ public class Policy extends OneCEntity {
         super(externalId, now);
     }
 
-    /**
-     * Новый полис из первого сообщения. Поля заполняет фабрика, а не конструктор: метод, который
-     * наследник может переопределить, из конструктора вызывать нельзя — наследник получил бы
-     * вызов раньше, чем инициализировались его собственные поля.
-     */
+    /** Поля заполняет фабрика, а не конструктор: конструктору нельзя вызывать переопределяемый метод заполнения. */
     public static Policy create(UUID externalId, Snapshot snapshot, Instant now) {
         Policy policy = new Policy(externalId, now);
         policy.applySnapshot(snapshot, now);
@@ -139,9 +114,8 @@ public class Policy extends OneCEntity {
     }
 
     /**
-     * Стирает ФИО, дату рождения и почту, если полис пережил границу хранения: срок действия кончился раньше её дня
-     * или полис переведён в архив не позже её момента. Реквизиты, пол и время обновления остаются: стирание — не
-     * сообщение 1С.
+     * Стирает ФИО, дату рождения и почту, если полис кончился или ушёл в архив раньше границы хранения. Время
+     * обновления не меняется, потому что стирание не сообщение 1С; новое сообщение принесёт эти данные снова.
      */
     public void erasePersonalDataBeyond(PersonalDataCutoff cutoff, Instant now) {
         if (endedBefore(cutoff.endedBefore()) || archivedBy(cutoff.archivedBy())) {
@@ -154,12 +128,11 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /** Стёрты ли ПДн полиса по сроку хранения. */
     public boolean personalDataErased() {
         return personalDataErasedAt != null;
     }
 
-    /** Момент перевода в архив остаётся прежним, пока полис в архиве: повторная присылка — не новый перевод. */
+    /** Повторная присылка пометки удаления не новый перевод в архив, поэтому момент перевода не сдвигается. */
     private @Nullable Instant archivedSince(boolean deleteMark, Instant now) {
         if (!deleteMark) {
             return null;
@@ -175,10 +148,6 @@ public class Policy extends OneCEntity {
         return archivedAt != null && !archivedAt.isAfter(moment);
     }
 
-    /**
-     * Обычный цикл, а не стрим: он наполняет коллекции сущности, то есть имеет побочный
-     * эффект по определению.
-     */
     private void replaceTableParts(Snapshot snapshot, Instant now) {
         programs.clear();
         for (PolicyProgram.Row row : snapshot.programs()) {
@@ -190,13 +159,7 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /**
-     * Разобранное сообщение 1С о полисе целиком: поля полиса и обе табличные части.
-     *
-     * <p>Одной записью, а не тремя аргументами, потому что применяются они только
-     * вместе — замещение табличных частей без обновления полиса оставило бы запись,
-     * у которой версия уже новая, а программы ещё старые.
-     */
+    /** Сообщение о полисе целиком: поля и табличные части применяются только вместе, чтобы не разойтись. */
     public record Snapshot(
             Details details,
             List<PolicyProgram.Row> programs,
@@ -208,10 +171,7 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /**
-     * Поля самого полиса в том виде, как их прислала 1С. Тот же набор отдаёт {@link #details()}; там пометка
-     * удаления — это признак архивности записи, а ФИО и дата рождения пусты, если ПДн стёрты по сроку хранения.
-     */
+    /** Поля самого полиса; в {@link #details()} ФИО и дата рождения пусты, если они стёрты по сроку хранения. */
     public record Details(
             UUID externalContractId,
             String number,
@@ -233,10 +193,7 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /**
-     * Поля полиса, как их применило последнее сообщение. Пометка удаления в ответе — это признак
-     * архивности записи: иначе, чем через сообщение, он у полиса не меняется.
-     */
+    /** Поля полиса, как их применило последнее сообщение; пометка удаления здесь равна признаку архивности. */
     public Details details() {
         return new Details(externalContractId, number, lastName, firstName, middleName, dateOfBirth, gender, email,
                 beginDate, endDate, availability, isArchive());

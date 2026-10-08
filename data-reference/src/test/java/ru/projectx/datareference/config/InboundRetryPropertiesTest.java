@@ -6,10 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Лестница повторов — чистая арифметика по списку задержек, и проверяется она без
- * контекста и без базы.
- */
+/** Защищает лестницу задержек между повторами разбора: ошибка в ней сдвинула бы все повторы на шаг. */
 class InboundRetryPropertiesTest {
 
     private final InboundRetryProperties properties = new InboundRetryProperties(
@@ -22,7 +19,7 @@ class InboundRetryPropertiesTest {
         assertThat(properties.delayBeforeAttempt(3)).contains(Duration.ofMinutes(30));
     }
 
-    /** Пусто означает «повторять больше нечем» — вызывающий переводит строку в отказ. */
+    /** Пусто означает «повторять больше нечем», и вызывающий переводит строку в отказ. */
     @Test
     void attemptBeyondLadder_hasNoDelay() {
         assertThat(properties.delayBeforeAttempt(4)).isEmpty();

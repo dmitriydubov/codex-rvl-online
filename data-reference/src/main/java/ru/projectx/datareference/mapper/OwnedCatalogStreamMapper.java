@@ -11,20 +11,9 @@ import ru.projectx.datareference.entity.ParentKind;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Разбор потока 1С, записи которого принадлежат другой записи справочника: договор принадлежит
- * санаторию, услуга принадлежит договору.
- *
- * <p>Владелец передаётся и при обновлении записи, потому что привязка может смениться: договор отделения,
- * например, переходит от головной организации к отделению. Наследник находит владельца и разбирает
- * реквизиты, а создание или обновление записи вместе с владельцем берёт отсюда: наследник сохраняет
- * запись только через {@link #upsertUnder}, чтобы владелец и реквизиты всегда приходили вместе.
- *
- * <p>Владельца может ещё не быть: тогда сообщение ждёт его. Сообщение, пропущенное наследником, запоминает свою запись
- * как не нашу: так её собственные дети пропускаются сразу, а не ждут её. Запись сообщения — поле {@code id}.
- *
- * @param <E> запись справочника
- * @param <P> запись-владелец
- * @param <D> разобранные реквизиты записи
+ * Разбор потока, записи которого принадлежат другой записи справочника, как договор санаторию. Владелец передаётся
+ * и при обновлении, потому что привязка может смениться. Пропущенная запись запоминается как не наша, чтобы её
+ * собственные записи пропускались сразу, а не ждали её.
  */
 abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, OwnedCatalogStreamMapper.Owned<P, D>> {
 
@@ -33,16 +22,7 @@ abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, 
     private final ParentKind kind;
     private final CatalogReferences references;
 
-    /**
-     * @param stream поток 1С, сообщения которого разбирает наследник
-     * @param finder поиск записи по GUID 1С, обычно {@code findByExternalId} репозитория
-     * @param creation новая запись, обычно фабрика {@code create} сущности
-     * @param refresh новые реквизиты и владелец известной записи, обычно {@code applySnapshot} сущности
-     * @param store сохранение записи, обычно {@code save} репозитория
-     * @param clock часы, по которым ставится момент создания и изменения записи
-     * @param kind вид записей потока, каким его называют их дети
-     * @param references ссылки на родительские записи и память о не наших
-     */
+    /** @param kind вид записей потока, каким его называют записи, которые на них ссылаются */
     OwnedCatalogStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, Creation<E, P, D> creation,
                              Refresh<E, P, D> refresh, Consumer<E> store, Clock clock, ParentKind kind,
                              CatalogReferences references) {
@@ -64,26 +44,22 @@ abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, 
         return OneCValues.uuid(data, RECORD_ID);
     }
 
-    /** Применяет сообщение, пропускает его или ставит ждать владельца. */
     protected abstract ImportResult decide(ObjectNode data);
 
-    /** Создаёт или обновляет запись с GUID 1С {@code externalId}, привязанную к владельцу {@code owner}. */
+    /** Единственный путь сохранения для наследника, чтобы владелец и реквизиты всегда приходили вместе. */
     protected final ImportResult upsertUnder(P owner, UUID externalId, D details) {
         return upsert(externalId, new Owned<>(owner, details));
     }
 
-    /** Владелец и реквизиты записи из одного сообщения. */
     record Owned<P, D>(P owner, D details) {
     }
 
-    /** Новая запись справочника, привязанная к владельцу. */
     @FunctionalInterface
     interface Creation<E, P, D> {
 
         E create(UUID externalId, P owner, D details, Instant now);
     }
 
-    /** Известная запись получает новые реквизиты и владельца. */
     @FunctionalInterface
     interface Refresh<E, P, D> {
 

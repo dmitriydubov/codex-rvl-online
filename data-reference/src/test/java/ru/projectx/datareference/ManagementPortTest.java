@@ -25,22 +25,15 @@ import tools.jackson.databind.json.JsonMapper;
 import ru.projectx.datareference.support.IntegrationTest;
 
 /**
- * Актуатор отвечает на своём порту, а не на порту API: сервисы, которым открыт REST, не видят ни состояния
- * компонентов, ни метрик. Пробы Kubernetes есть на обоих портах. На порту API — только короткие {@code /livez}
- * и {@code /readyz}: так проба проверяет тот же сервер, что принимает запросы соседей, и не проходит, когда
- * он не отвечает, а работает лишь порт актуатора.
- *
- * <p>Запросы — настоящим HTTP к запущенному серверу: в контексте без сервера порт актуатора не поднимается
- * вовсе, и такой тест ничего бы не проверил.
+ * Актуатор отвечает на своём порту, чтобы соседи с доступом к REST не видели состояния компонентов и метрик.
+ * На порту API только короткие {@code /livez} и {@code /readyz}: проба проверяет тот сервер, что принимает запросы.
+ * Запросы идут настоящим HTTP: без запущенного сервера порт актуатора не поднимается вовсе.
  */
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = ManagementPortTest.INFO_PROPERTY_FROM_ENVIRONMENT)
 class ManagementPortTest {
 
-    /**
-     * Свойство {@code info.*}, как если бы его задало окружение развёртывания: info не показывает и его, потому что
-     * свойства окружения в info не публикуются.
-     */
+    /** Свойство {@code info.*}, как от окружения развёртывания: свойства окружения в info не публикуются. */
     static final String INFO_PROPERTY_FROM_ENVIRONMENT = "info.contour=test-contour";
     private static final String MODULE_NAME = "data-reference";
 
@@ -83,7 +76,6 @@ class ManagementPortTest {
         assertThat(probe.propertyNames()).containsExactly("status");
     }
 
-    /** Состав health и его детали видит только тот, кому открыт порт актуатора. */
     @Test
     void managementPort_showsHealthComponents() throws IOException, InterruptedException {
         HttpResponse<String> health = get(managementPort, "/actuator/health");
@@ -101,10 +93,7 @@ class ManagementPortTest {
         assertThat(get(apiPort, path).statusCode()).isEqualTo(NOT_FOUND);
     }
 
-    /**
-     * Сопровождение видит, какая версия установлена: та, что записана в сборке модуля. Версия берётся из того же
-     * файла, что и у сборки, поэтому тест не правится при каждом выпуске.
-     */
+    /** Версия берётся из того же файла, что и у сборки, поэтому тест не правится при каждом выпуске. */
     @Test
     void managementPort_showsServiceVersion() throws IOException, InterruptedException {
         HttpResponse<String> info = get(managementPort, "/actuator/info");
@@ -114,7 +103,6 @@ class ManagementPortTest {
                 .isEqualTo(buildProperty("version"));
     }
 
-    /** Сведения о сборке называют этот модуль: группу из его сборки и его имя. */
     @Test
     void managementPort_infoNamesThisModule() throws IOException, InterruptedException {
         JsonNode build = json.readTree(get(managementPort, "/actuator/info").body()).path("build");
@@ -125,8 +113,8 @@ class ManagementPortTest {
     }
 
     /**
-     * В info — только сведения о сборке: ни переменных окружения и свойств (там адреса и пароли), даже заданных
-     * с префиксом {@code info.}, ни сведений о Java, процессе и машине. Время сборки не публикуется: с ним каждая сборка давала бы другой jar.
+     * В info нет ни свойств окружения (там адреса и пароли), ни сведений о Java, процессе и машине.
+     * Время сборки тоже не публикуется: с ним каждая сборка давала бы другой jar.
      */
     @Test
     void managementPort_infoShowsBuildFactsOnly() throws IOException, InterruptedException {
@@ -136,18 +124,16 @@ class ManagementPortTest {
         assertThat(info.path("build").propertyNames()).containsExactlyInAnyOrder("artifact", "name", "group", "version");
     }
 
-    /** Наружу и на порту актуатора открыты только health, info и prometheus: открыть остальное — одна строка конфигурации. */
+    /** Открыты только health, info и prometheus: открыть остальное — одна строка конфигурации. */
     @Test
     void managementPort_doesNotExposeOtherEndpoints() throws IOException, InterruptedException {
         assertThat(get(managementPort, "/actuator/env").statusCode()).isEqualTo(NOT_FOUND);
     }
 
     /**
-     * Prometheus забирает метрики приёма и разбора с той же ручки, что и метрики самого Spring Boot. Ряды
-     * приёма и разбора есть сразу после старта, ещё до первого сообщения: нулевой ряд для правил оповещения
-     * однозначнее отсутствующего. Ряд переходов взят у потока видов обращения: сообщения этого потока тесты
-     * не отклоняют. Метрика слушателей очередей Spring AMQP здесь не проверяется: в этом контексте
-     * брокера нет.
+     * Ряды приёма и разбора есть сразу после старта: нулевой ряд для правил оповещения однозначнее отсутствующего.
+     * Ряд переходов взят у потока видов обращения, сообщения которого тесты не отклоняют.
+     * Метрика слушателей очередей здесь не проверяется: в этом контексте брокера нет.
      */
     @Test
     void managementPort_exposesIngestAndParsingMetrics() throws IOException, InterruptedException {
