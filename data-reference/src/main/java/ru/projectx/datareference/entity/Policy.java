@@ -87,6 +87,7 @@ public class Policy extends OneCEntity {
         super(externalId, now);
     }
 
+    /** Поля заполняет фабрика, а не конструктор: конструктору нельзя вызывать переопределяемый метод заполнения. */
     public static Policy create(UUID externalId, Snapshot snapshot, Instant now) {
         Policy policy = new Policy(externalId, now);
         policy.applySnapshot(snapshot, now);

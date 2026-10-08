@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
-/** Настройки REST-чтения справочников; неверное значение не пускает сервис в работу. */
+/** Настройки REST-чтения справочников; значение, не прошедшее проверку, не пускает сервис в работу. */
 @Validated
 @ConfigurationProperties("projectx.api")
 public record ReferenceApiProperties(
@@ -19,13 +19,14 @@ public record ReferenceApiProperties(
         // День вычисляется раз на запрос и передаётся в SQL параметром, а не берётся из CURRENT_DATE.
         @DefaultValue("Europe/Moscow") ZoneId zone,
         // Виды обращения восстановительного лечения, по которым отбираются позиции размещения, без учёта регистра и
-        // крайних пробелов. Умолчания нет: переименование в 1С молча обнуляет выдачу, и список правят без выпуска.
+        // крайних пробелов. Список лежит в настройках, чтобы править его без выпуска. Умолчания нет: это значения
+        // справочника конкретного контура.
         @NotEmpty List<@NotBlank String> rvlAppealTypes,
         @Valid @DefaultValue Search search,
         @Valid @DefaultValue Mkb10 mkb10,
         @Valid @DefaultValue Price price,
-        // Сколько секунд REST-чтение ждёт базу до ответа 503. Применяет его аннотация транзакции чтения, а здесь он
-        // проверяется на старте: лимит должен быть меньше таймаута ожидания блокировки в базе.
+        // Сколько секунд REST-чтение ждёт базу до ответа 503. Лимит должен быть меньше lock_timeout: если это не так,
+        // сервис на старте пишет WARN, но запускается.
         @Min(1) int readTimeoutSeconds) {
 
     /**

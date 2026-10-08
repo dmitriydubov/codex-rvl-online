@@ -75,6 +75,8 @@ class PolicySearchRepositoryImpl implements PolicySearchRepository {
     }
 
     private static Predicate anyPrefix(CriteriaBuilder cb, Expression<String> name, List<String> prefixes) {
+        // Имя обрезается по краям только в ранге, отбор сравнивает его как хранится: если их выровнять,
+        // поиск начнёт находить другие полисы.
         Expression<String> normalized = PolicySpecifications.normalized(cb, cb.trim(name));
         return cb.or(prefixes.stream()
                 .map(prefix -> PolicySpecifications.like(cb, normalized, prefix))

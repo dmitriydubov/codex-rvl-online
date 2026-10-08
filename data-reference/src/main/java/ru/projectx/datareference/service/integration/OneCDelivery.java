@@ -43,7 +43,7 @@ record OneCDelivery(OneCStream stream, Message message, Channel channel) {
         return new RejectedMessage(messageId, stream, queue(), rawBody());
     }
 
-    /** Сообщение обработано, брокер его больше не отдаёт. */
+    /** Ответов брокеру ровно два, подтвердить и вернуть, чтобы слушатель не собирал {@code basicNack} из флагов. */
     void acknowledge() throws IOException {
         channel.basicAck(deliveryTag(), false);
     }
