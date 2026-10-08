@@ -66,7 +66,10 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 10. **Comments and Javadoc in plain language** (`data-reference/CLAUDE.md`, «Комментарии и Javadoc»;
    owner's rule of 2026-10-04): in every file the change touches, a reader in the company network -
    without the plan, the ТЗ or gauntlet - must understand what the thing is and why from the comment
-   alone. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
+   alone. Owner's rule of 2026-10-08: every comment and every Javadoc block is at most three lines of text,
+   explains why rather than what, and is absent where the logic is plain from the names - flag each longer
+   or restating comment with its place; details that need more room belong in the module README, section
+   «Почему так устроено», in plain human language. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
    dash chains, «см. раздел … в CLAUDE.md», restated code, edit history («после PR #25»). Old Javadoc in
    an untouched file is not a finding; old Javadoc in a touched file is. The same applies to comments in
    configuration files that go to the company network (`application.yml`, `Dockerfile`,
