@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class OneCEnvelopeParser {
 
+    // Из metadata читается только message-id: topic у части потоков 1С пуст, потому что поток задаёт очередь.
     private static final String METADATA = "metadata";
     private static final String MESSAGE_ID = "message-id";
     private static final String NO_MESSAGE_ID = "в metadata нет обязательного message-id";

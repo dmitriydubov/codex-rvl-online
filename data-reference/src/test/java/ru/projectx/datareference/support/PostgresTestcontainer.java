@@ -19,6 +19,8 @@ public class PostgresTestcontainer {
     /** Учётные данные внешней базы по умолчанию — те же, что у локального контура. */
     private static final String LOCAL_CREDENTIAL = "data_reference";
 
+    // Контейнер — бин контекста, а не статическое поле теста: живёт вместе с закэшированным контекстом Spring.
+    // Статическое поле остановилось бы после своего класса, а контекст продолжал бы ходить по старому адресу.
     @Bean
     @ConditionalOnExpression("'${" + TestDatabase.URL_PROPERTY + ":}'.isEmpty()")
     public PostgreSQLContainer postgresContainer() {

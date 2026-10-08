@@ -21,11 +21,13 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager(ReferenceCacheProperties properties, Clock clock) {
         CaffeineCacheManager manager = new CaffeineCacheManager();
+        // Кэшируемые методы не возвращают null и пустой Optional: такой результат кэш отвергнет исключением.
         manager.setAllowNullValues(false);
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(properties.ttl())
                 .maximumSize(properties.maximumSize())
                 .ticker(new ClockTicker(clock))
+                // Без статистики не считаются метрики попаданий и промахов кэша (cache_gets_total).
                 .recordStats());
         manager.setCacheNames(ReferenceCaches.ALL);
         return manager;
