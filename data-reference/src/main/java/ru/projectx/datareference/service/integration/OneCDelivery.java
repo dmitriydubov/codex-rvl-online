@@ -10,8 +10,9 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 
 /**
- * Одна доставка из очереди 1С: сообщение, канал для ответа брокеру и поток очереди. Ведущая метка порядка байтов UTF-8
- * (BOM) снимается: колонка {@code jsonb} её не принимает, а дефектом тела она не является, это след редактора.
+ * Одна доставка из очереди 1С с ответом брокеру: ответов ровно два, чтобы слушатель не собирал {@code basicNack} из
+ * флагов. Ведущая метка порядка байтов UTF-8 (BOM) снимается: колонка {@code jsonb} её не принимает, а дефектом тела
+ * она не является, это след редактора.
  */
 record OneCDelivery(OneCStream stream, Message message, Channel channel) {
 
@@ -43,7 +44,6 @@ record OneCDelivery(OneCStream stream, Message message, Channel channel) {
         return new RejectedMessage(messageId, stream, queue(), rawBody());
     }
 
-    /** Ответов брокеру ровно два, подтвердить и вернуть, чтобы слушатель не собирал {@code basicNack} из флагов. */
     void acknowledge() throws IOException {
         channel.basicAck(deliveryTag(), false);
     }
