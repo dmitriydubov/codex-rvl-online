@@ -66,7 +66,9 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 10. **No comments and no Javadoc** (owner's rule of 2026-10-12; module `CLAUDE.md`, «Комментарии и Javadoc»): flag
    every comment or Javadoc in Java, `application.yml`, `#`-comments of Liquibase changeSets, `build.gradle`,
    `settings.gradle`, `Dockerfile`, `docker-compose.yml` and stand scripts, except the listed exceptions (feature
-   headers, changeSet `comment:` fields, `#!` lines, `.env.example`, the commented-out «Nexus only» variant). A
+   headers, changeSet `comment:` fields, `#!` lines, `.env.example`, `.gitignore`, the header of the
+   `publicRepositories` switch in `settings.gradle` and the commented-out «Nexus only» variant; the comments on
+   wiring the external quality gates in `settings.gradle` and `build.gradle` are not exceptions). A
    non-obvious reason introduced by the change must be written to the module README, section «Почему так устроено»,
    in plain human language - flag a missing one. Flag plan or document codes and edit history in the README. A change
    that only removes comments must prove that code and values did not change (identical bytecode, YAML tree,
