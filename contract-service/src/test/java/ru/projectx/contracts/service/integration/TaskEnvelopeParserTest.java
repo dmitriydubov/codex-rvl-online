@@ -59,6 +59,29 @@ class TaskEnvelopeParserTest {
     }
 
     @Test
+    void nullCharacterOrUnpairedSurrogateAnywhereInTheBody_isUnusableEnvelope() {
+        String[] escapes = {"Тест\\u0000ова", "Тестова\\ud83d", "Тест\\ud83dова", "\\ude00Тестова", "Тест\\ude00ова"};
+
+        for (String escaped : escapes) {
+            byte[] inValue = TaskBodies.upserted().toJson().replace("Тестова", escaped).getBytes(StandardCharsets.UTF_8);
+            assertThatThrownBy(() -> parser.parse(inValue)).as(escaped).isInstanceOf(InboxEnvelopeException.class)
+                    .hasMessage("в теле символ, который база не хранит: нулевой или непарный суррогат");
+        }
+        byte[] inKey = TaskBodies.upserted().toJson().replace("\"address\"", "\"add\\u0000ress\"")
+                .getBytes(StandardCharsets.UTF_8);
+        assertThatThrownBy(() -> parser.parse(inKey)).isInstanceOf(InboxEnvelopeException.class)
+                .hasMessage("в теле символ, который база не хранит: нулевой или непарный суррогат");
+    }
+
+    @Test
+    void pairedSurrogate_isStorable() {
+        byte[] body = TaskBodies.upserted().toJson().replace("\"topic\":\"rvl.contract-task.upserted\"",
+                "\"topic\":\"задача \\ud83d\\ude00\"").getBytes(StandardCharsets.UTF_8);
+
+        assertThat(parser.parse(body).topic()).isEqualTo("задача \ud83d\ude00");
+    }
+
+    @Test
     void bodyWithoutMeta_isUnusableEnvelope() {
         assertThatThrownBy(() -> parser.parse("{\"data\":{}}".getBytes(StandardCharsets.UTF_8)))
                 .isInstanceOf(InboxEnvelopeException.class)

@@ -16,6 +16,10 @@ public class InboxEnvelopeException extends RuntimeException {
         return new InboxEnvelopeException("в конверте нет пригодного " + field);
     }
 
+    public static InboxEnvelopeException unstorableText() {
+        return new InboxEnvelopeException("в теле символ, который база не хранит: нулевой или непарный суррогат");
+    }
+
     public static InboxEnvelopeException unreadableBody(Throwable cause) {
         return new InboxEnvelopeException("тело не читается как JSON", cause);
     }

@@ -14,7 +14,9 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ShutdownSignalException;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -124,7 +126,6 @@ class TaskQueueListenerTest {
         });
     }
 
-
     @Test
     void interruptedPause_leavesMessageUnacknowledgedForTheBrokerToRequeue() throws IOException {
         String body = TaskBodies.upserted().toJson();
@@ -138,23 +139,52 @@ class TaskQueueListenerTest {
     }
 
     @Test
-    void bodyTheDatabaseNeverAccepts_isAcknowledgedLostAndLoggedWithoutTheBody() throws IOException {
-        String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body))
-                .willThrow(new IllegalStateException("Тестова", new SQLException("нулевой символ", "22P05")));
+    void bodyWithUnstorableText_isAcknowledgedLostAndLoggedWithoutTheBody() throws IOException {
+        String body = TaskBodies.upserted().toJson().replace("Тестова", "Тест\\u0000ова");
 
         listener.onMessage(message(body), channel);
 
         verify(channel).basicAck(7L, false);
-        verify(channel, never()).basicNack(7L, false, true);
+        verify(receiver, never()).receive(any(), anyString());
         verifyNoInteractions(pauses);
         assertThat(journal.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
             assertThat(event.getFormattedMessage())
-                    .contains("потеряно: база не принимает тело сообщения " + TaskBodies.MESSAGE_ID + ", SQLSTATE 22P05")
-                    .doesNotContain("Тестова");
+                    .contains("потеряно: в теле символ, который база не хранит: нулевой или непарный суррогат")
+                    .doesNotContain("Тест");
             assertThat(event.getThrowableProxy()).isNull();
         });
+    }
+
+    @Test
+    void closedChannelOnAcknowledge_isLoggedByTypeOnlyAndNothingIsThrown() throws IOException {
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body)).willReturn(ReceiptOutcome.STORED);
+        willThrow(new AlreadyClosedException(new ShutdownSignalException(false, false, null, channel)))
+                .given(channel).basicAck(7L, false);
+
+        listener.onMessage(message(body), channel);
+
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("не отправлен: com.rabbitmq.client.AlreadyClosedException");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void closedChannelOnReturn_isLoggedByTypeOnlyAndNothingIsThrown() throws IOException {
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("Тестова"));
+        given(pauses.hold(REQUEUE_DELAY)).willReturn(true);
+        willThrow(new AlreadyClosedException(new ShutdownSignalException(false, false, null, channel)))
+                .given(channel).basicNack(7L, false, true);
+
+        listener.onMessage(message(body), channel);
+
+        assertThat(journal.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN, Level.WARN);
+        assertThat(journal.list.get(1).getFormattedMessage())
+                .contains("не отправлен: com.rabbitmq.client.AlreadyClosedException").doesNotContain("Тестова");
     }
 
     @Test

@@ -28,7 +28,11 @@ public class TaskEnvelopeParser {
     }
 
     public InboxReceipt parse(byte[] body) {
-        JsonNode meta = root(body).path(META);
+        JsonNode root = root(body);
+        if (UnstorableText.present(root)) {
+            throw InboxEnvelopeException.unstorableText();
+        }
+        JsonNode meta = root.path(META);
         return new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID),
                 bounded(meta, TOPIC, TOPIC_MAX_LENGTH), bounded(meta, EVENT_TYPE, EVENT_TYPE_MAX_LENGTH), version(meta));
     }

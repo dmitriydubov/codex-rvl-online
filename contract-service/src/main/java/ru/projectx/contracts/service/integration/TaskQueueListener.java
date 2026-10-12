@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.integration;
 
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ShutdownSignalException;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.InboxLogContext;
+import ru.projectx.contracts.service.SqlStates;
 import ru.projectx.contracts.service.inbox.InboxReceiver;
 import ru.projectx.contracts.service.inbox.ReceiptOutcome;
 
@@ -38,7 +40,7 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
         try {
             receive(delivery);
         }
-        catch (IOException channelClosed) {
+        catch (IOException | ShutdownSignalException channelClosed) {
             log.warn("ответ брокеру по сообщению очереди {} не отправлен: {}",
                     delivery.queue(), channelClosed.getClass().getName());
         }
@@ -62,20 +64,18 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
             outcome = receiver.receive(receipt, delivery.payload());
         }
         catch (RuntimeException storageFailure) {
-            handle(delivery, receipt, InboxStorageFailure.of(storageFailure));
+            returnAfterPause(delivery, receipt, storageFailure);
             return;
         }
         log.debug("сообщение {} из очереди {}: {}", receipt.messageId(), delivery.queue(), outcome);
         delivery.acknowledge();
     }
 
-    private void handle(TaskDelivery delivery, InboxReceipt receipt, InboxStorageFailure failure) throws IOException {
-        if (failure.rejectedForever()) {
-            lose(delivery, "база не принимает тело сообщения " + receipt.messageId() + ", SQLSTATE " + failure.sqlState());
-            return;
-        }
+    private void returnAfterPause(TaskDelivery delivery, InboxReceipt receipt, RuntimeException storageFailure)
+            throws IOException {
         log.warn("сообщение {} не сохранено в журнал входящих, вернётся в очередь через {}: {}, SQLSTATE {}",
-                receipt.messageId(), properties.requeueDelay(), failure.failureType(), failure.sqlState());
+                receipt.messageId(), properties.requeueDelay(), storageFailure.getClass().getName(),
+                SqlStates.deepestOrNone(storageFailure));
         if (pauses.hold(properties.requeueDelay())) {
             delivery.returnToQueue();
         }
