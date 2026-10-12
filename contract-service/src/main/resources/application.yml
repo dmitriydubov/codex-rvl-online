@@ -15,6 +15,12 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
 
+  # Брокеров два, и у каждого свои бины (projectx.brokers). Автонастройка AMQP строит одно подключение из
+  # spring.rabbitmq.* и с двумя фабриками не поднимается, поэтому выключена: эти свойства здесь не действуют.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
+
   # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml.
   # У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой базе с таким же.
   # Если переменную забыли, запуск падает на миграциях с «password authentication failed».
@@ -102,8 +108,65 @@ management:
         add-additional-paths: true
       show-components: always
       show-details: always
+  health:
+    # Общий компонент rabbit показывал бы оба брокера под одним именем; вместо него компоненты internalBroker и
+    # onecBroker (projectx.brokers), их выключает management.health.brokers.enabled=false там, где брокеров нет.
+    rabbit:
+      enabled: false
 
 projectx:
+  # Два брокера RabbitMQ: межсервисный брокер контура (сервис Заявок) и брокер 1С:УСК. Умолчания адреса и логина
+  # ведут на локальные брокеры из docker-compose.yml. У паролей умолчаний нет по той же причине, что у базы.
+  brokers:
+    internal:
+      connection:
+        host: ${RABBITMQ_INTERNAL_HOST:localhost}
+        # Тестовый контур слушает 5671 (TLS), локальный брокер — 5672.
+        port: ${RABBITMQ_INTERNAL_PORT:5672}
+        virtual-host: ${RABBITMQ_INTERNAL_VHOST:/}
+        username: ${RABBITMQ_INTERNAL_USERNAME:contract_service}
+        # Пустое умолчание нарочно: без переменной проверка настроек останавливает старт с именем поля,
+        # а без умолчания в поле осталась бы строка плейсхолдера и отказ пришёл бы только от брокера.
+        password: ${RABBITMQ_INTERNAL_PASSWORD:}
+        # Без таймаута попытка соединиться с недоступным брокером висела бы минутами; столько же ждёт health.
+        connection-timeout: 10s
+        tls:
+          enabled: ${RABBITMQ_INTERNAL_SSL_ENABLED:false}
+          # Без проверки сертификата и имени хоста TLS шифрует канал, но не говорит, с кем он. Центр сертификации
+          # брокера кладётся в certs/ при сборке образа, а хост должен быть в сертификате брокера.
+          # На тестовом контуре сертификат самоподписанный, там проверку выключают явно.
+          validate-server-certificate: ${RABBITMQ_INTERNAL_SSL_VALIDATE_CERTIFICATE:true}
+          verify-hostname: ${RABBITMQ_INTERNAL_SSL_VERIFY_HOSTNAME:true}
+      # Включено по умолчанию: сервис, который молча не читает задачи, хуже упавшего.
+      # Выключают там, где очередей брокера нет, — например, в docker-compose.yml.
+      listener-auto-startup: ${RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP:true}
+      # Очереди заводит сервис Заявок, сервис Договоров их не объявляет. Имена — из документа контура,
+      # на новом контуре сверять со списком брокера. Умолчаний в коде нет: опечатка роняет запуск, а не выглядит как
+      # «сообщений нет». Имена должны быть разными, повтор роняет запуск.
+      queues:
+        task-changes: ${INTERNAL_QUEUE_TASK_CHANGES:rvl_requests_to_rvl_contracts_task-changes}
+        status-changes: ${INTERNAL_QUEUE_STATUS_CHANGES:rvl_contracts_to_rvl_requests_status-changes}
+    onec:
+      connection:
+        host: ${RABBITMQ_ONEC_HOST:localhost}
+        # Локальный брокер 1С из docker-compose.yml слушает 5673, чтобы не занимать порт межсервисного.
+        port: ${RABBITMQ_ONEC_PORT:5673}
+        virtual-host: ${RABBITMQ_ONEC_VHOST:/}
+        username: ${RABBITMQ_ONEC_USERNAME:contract_service}
+        password: ${RABBITMQ_ONEC_PASSWORD:}
+        connection-timeout: 10s
+        tls:
+          enabled: ${RABBITMQ_ONEC_SSL_ENABLED:false}
+          validate-server-certificate: ${RABBITMQ_ONEC_SSL_VALIDATE_CERTIFICATE:true}
+          verify-hostname: ${RABBITMQ_ONEC_SSL_VERIFY_HOSTNAME:true}
+      listener-auto-startup: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:true}
+      # Очереди заводит 1С:УСК: две независимые пары — договор КМ и полис ЛМ, в каждой запрос и ответ.
+      queues:
+        km-contract-submissions: ${ONEC_QUEUE_KM_CONTRACT_SUBMISSIONS:rvl_contracts_to_1c-usk_km-contract-changes}
+        km-contract-registrations: ${ONEC_QUEUE_KM_CONTRACT_REGISTRATIONS:1c-usk_to_rvl_contracts_km-contract-changes}
+        lm-policy-requests: ${ONEC_QUEUE_LM_POLICY_REQUESTS:rvl_contracts_to_1c-usk_lm-policy-changes}
+        lm-policy-issues: ${ONEC_QUEUE_LM_POLICY_ISSUES:1c-usk_to_rvl_contracts_lm-policy-changes}
+
   database:
     # Запись PostgreSQL (ms, s, min); число без единицы — миллисекунды, так что DB_STATEMENT_TIMEOUT=30 — это 30 мс.
     session-timeouts:
