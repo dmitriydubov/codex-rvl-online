@@ -142,7 +142,8 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   координатора, владелец утверждает мержем): запрет сужен до серверной части —
   `org.springframework.web.servlet..,org.springframework.web.bind..,org.springframework.web.filter..,jakarta.servlet..`;
   `archTest` в contract-service на `main` зелёный. Сессия К2a продолжает работу, её `architectureGate` красный до мержа и
-  слияния `main` в её ветку; координатор data-reference предупреждён.
+  слияния `main` в её ветку; координатор data-reference предупреждён. PR #150 координатора открыт 09:28 UTC; **ответ
+  владельца «1) да»** (~09:35 UTC) — сужение `forbidden.service` принято.
 - 2026-10-07, **PR #138 смержен владельцем 20:04 UTC** (`main` `8a287da`): документы Договоров перенесены в
   `project_files/contract-service/` (поручение владельца через PR #137 координатора data-reference). Проверка после
   мержа: 24 файла — перемещения через `git mv` без изменения содержимого, один побайтовый дубль «Точек интеграции РВЛ и
