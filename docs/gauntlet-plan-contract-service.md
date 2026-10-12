@@ -135,6 +135,14 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   механизмом resilience Spring Framework 7.0 на 503/таймаут и на 404 `POLICY_NOT_FOUND` только при поиске по
   `external_id`; развод портов compose (предложение: база 5433, брокеры 5674/15674 и 5675/15675, сервис 8082, актуатор
   8083); readiness без изменений; тесты на `MockRestServiceServer` по примерам стенда без ПДн.
+- 2026-10-12, **К2a: политика архитектуры блокировала `RestClient`** (триггер сессии 09:27 UTC). Пробел О11:
+  `forbidden.service=org.springframework.web..` в `gauntlet/config/contract-service/architecture.properties` запрещал
+  всему `service..`, включая `service.integration`, исходящий клиент `org.springframework.web.client` — а именно там по
+  РК1 (а) и `contract-service/CLAUDE.md` лежит адаптер к data-reference. Правка координатора в gauntlet-admin (PR
+  координатора, владелец утверждает мержем): запрет сужен до серверной части —
+  `org.springframework.web.servlet..,org.springframework.web.bind..,org.springframework.web.filter..,jakarta.servlet..`;
+  `archTest` в contract-service на `main` зелёный. Сессия К2a продолжает работу, её `architectureGate` красный до мержа и
+  слияния `main` в её ветку; координатор data-reference предупреждён.
 - 2026-10-07, **PR #138 смержен владельцем 20:04 UTC** (`main` `8a287da`): документы Договоров перенесены в
   `project_files/contract-service/` (поручение владельца через PR #137 координатора data-reference). Проверка после
   мержа: 24 файла — перемещения через `git mv` без изменения содержимого, один побайтовый дубль «Точек интеграции РВЛ и
