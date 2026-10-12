@@ -63,20 +63,14 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    say what the thing is in the domain, mixed levels of abstraction in one method, comments that
    explain bad code, a new integration path without idempotency, timeouts or limits, a cheaper or
    safer design the author did not consider.
-10. **Comments and Javadoc in plain language** (`data-reference/CLAUDE.md`, «Комментарии и Javadoc»;
-   owner's rule of 2026-10-04): in every file the change touches, a reader in the company network -
-   without the plan, the ТЗ or gauntlet - must understand what the thing is and why from the comment
-   alone. Owner's rule of 2026-10-08: every comment and every Javadoc block is at most three lines of text,
-   explains why rather than what, and is absent where the logic is plain from the names - flag each longer
-   or restating comment with its place; details that need more room belong in the module README, section
-   «Почему так устроено», in plain human language. Flag plan or document codes instead of domain words (R-05, ТЗ-5, Р24, Ш41, DR-10), telegraphic
-   dash chains, «см. раздел … в CLAUDE.md», restated code, edit history («после PR #25»). Old Javadoc in
-   an untouched file is not a finding; old Javadoc in a touched file is. The same applies to comments in
-   configuration files that go to the company network (`application.yml`, `Dockerfile`,
-   `docker-compose.yml`, Liquibase changeSets, `build.gradle`; owner's rule of 2026-10-06): one or two
-   sentences on why the value is what it is, no restated key or value, no document codes. A change that only
-   rewrites such comments must prove that values, keys and instructions did not change (YAML tree, `docker
-   compose config`, Dockerfile lines without comments) - flag a missing proof.
+10. **No comments and no Javadoc** (owner's rule of 2026-10-12; module `CLAUDE.md`, «Комментарии и Javadoc»): flag
+   every comment or Javadoc in Java, `application.yml`, `#`-comments of Liquibase changeSets, `build.gradle`,
+   `settings.gradle`, `Dockerfile`, `docker-compose.yml` and stand scripts, except the listed exceptions (feature
+   headers, changeSet `comment:` fields, `#!` lines, `.env.example`, the commented-out «Nexus only» variant). A
+   non-obvious reason introduced by the change must be written to the module README, section «Почему так устроено»,
+   in plain human language - flag a missing one. Flag plan or document codes and edit history in the README. A change
+   that only removes comments must prove that code and values did not change (identical bytecode, YAML tree,
+   `docker compose config`, Dockerfile lines without comments) - flag a missing proof.
 
 ## Output (exactly this shape)
 ```
