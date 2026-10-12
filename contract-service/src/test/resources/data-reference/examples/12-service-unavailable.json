@@ -1,0 +1,24 @@
+{
+  "description": "503 SERVICE_UNAVAILABLE: база не ответила вовремя — здесь потому, что другой сеанс держит таблицу полисов под ACCESS EXCLUSIVE (раздел condition). Запрос стоит повторить позже. На живом стенде воспроизводится так: в psql к базе стенда BEGIN; LOCK TABLE policies IN ACCESS EXCLUSIVE MODE; — затем запрос, затем ROLLBACK.",
+  "placeholders": {
+    "policy_id": "UUID, id полиса у data-reference; из примера 09"
+  },
+  "condition": { "locked_table": "policies" },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/policies/{policy_id}/contract-view",
+    "headers": { "X-Request-Id": "stand-12" }
+  },
+  "response": {
+    "status": 503,
+    "headers": { "X-Request-Id": "stand-12" },
+    "body": {
+      "error": {
+        "code": "SERVICE_UNAVAILABLE",
+        "message": "сервис временно недоступен, повторите запрос позже",
+        "details": [],
+        "request_id": "stand-12"
+      }
+    }
+  }
+}
