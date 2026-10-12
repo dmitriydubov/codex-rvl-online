@@ -1,7 +1,3 @@
-# Локальный контур вне тестов: база, брокер, сам сервис (профиль app) и стенд для соседних сервисов (профиль stand).
-# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Брокер — не брокер 1С:УСК, очередей 1С
-# в нём нет, и слушатели 1С по умолчанию выключены. Команды и настройка через .env — в README модуля.
-
 name: data-reference
 
 services:
@@ -24,17 +20,13 @@ services:
       retries: 10
 
   rabbitmq:
-    # Та же версия, что у брокера 1С:УСК.
     image: rabbitmq:4.1.2-management-alpine
     container_name: data-reference-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: data_reference
       RABBITMQ_DEFAULT_PASS: data_reference
     ports:
-      # Локально без TLS.
       - "127.0.0.1:5672:5672"
-      # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
-      # в рабочем контуре их заводит 1С:УСК.
       - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
@@ -44,14 +36,10 @@ services:
       timeout: 10s
       retries: 10
 
-  # Сервис из Dockerfile. В профиле, чтобы обычный up не собирал образ каждый раз.
-  # Внутри контейнера localhost — он сам, поэтому база и брокер указаны по именам сервисов.
   data-reference:
     profiles: [ app ]
     build: &data-reference-build
       context: .
-      # Без значений: compose передаёт только заданные в .env или окружении аргументы,
-      # остальные берут умолчания из Dockerfile. Запись ${ИМЯ:-умолчание} их бы перекрыла.
       args:
         - JAR_SOURCE
         - PUBLIC_REPOSITORIES
@@ -62,7 +50,6 @@ services:
     env_file:
       - path: .env
         required: false
-    # Пароли заданы явно: в application.yml умолчаний у них нет. У локального брокера нет TLS.
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/data_reference
       DB_PASSWORD: data_reference
@@ -70,11 +57,9 @@ services:
       RABBITMQ_PASSWORD: data_reference
       RABBITMQ_SSL_ENABLED: "false"
       RABBITMQ_LISTENER_AUTO_STARTUP: ${RABBITMQ_LISTENER_AUTO_STARTUP:-false}
-      # Тот же порт, что опубликован ниже.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     ports:
       - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
-      # Актуатор (health, info, prometheus).
       - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
     depends_on:
       postgres:
@@ -82,8 +67,6 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Сервис стенда: тот же образ, но без брокера и без .env, чтобы стенд
-  # не зависел от локальных настроек. Проверка брокера в health выключена, иначе был бы DOWN.
   data-reference-stand:
     profiles: [ stand ]
     build: *data-reference-build
@@ -95,14 +78,11 @@ services:
       MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
       - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
-      # Актуатор; порт — умолчание application.yml.
       - "127.0.0.1:8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
 
-  # Разовая закладка данных стенда: ждёт схему, которую создаёт сервис на старте, и кладёт
-  # seed.sql. Повторный запуск ничего не дублирует.
   stand-seed:
     profiles: [ stand ]
     image: postgres:16.10-alpine

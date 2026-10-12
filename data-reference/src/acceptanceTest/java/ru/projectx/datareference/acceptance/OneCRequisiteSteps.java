@@ -2,11 +2,6 @@ package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ru.Дано;
 
-/**
- * Шаги «1С:УСК прислала …» о составе ИНН и КПП контрагента. Сообщения ложатся в сырьё так, как их сохранил бы приём из
- * очереди, а разбирает их штатный проход планировщика (шаги {@link OneCSteps}); контрагент — слово из
- * {@link OneCFailureSteps#sanatorium(String)}.
- */
 public class OneCRequisiteSteps {
 
     private final OneCInbox inbox;

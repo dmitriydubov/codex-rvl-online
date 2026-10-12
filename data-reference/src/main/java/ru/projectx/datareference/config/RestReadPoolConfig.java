@@ -10,11 +10,6 @@ import org.springframework.boot.jdbc.health.DataSourceHealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Пул REST-чтений регистрируется бином, который никуда не внедряется: так контекст закрывает его раньше пула
- * приложения, а Boot публикует его метрики {@code hikaricp.*}. Здоровье базы проверяет только пул приложения: занятый
- * всплеском пул REST-чтений при живой базе не повод выводить экземпляр из работы и перекладывать нагрузку на соседей.
- */
 @Configuration(proxyBeanMethods = false)
 public class RestReadPoolConfig {
 

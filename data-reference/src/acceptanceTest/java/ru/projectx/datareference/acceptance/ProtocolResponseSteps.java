@@ -7,14 +7,8 @@ import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Проверки ответа на уровне HTTP: {@code Allow}, тип содержимого, пустое тело, отсутствие {@code X-Request-Id} у ответа
- * самого сервера. {@code Allow} сравнивается перечнем без учёта порядка, и лишний или повторённый метод проверку
- * проваливает; тип содержимого сравнивается без параметров вроде {@code charset}.
- */
 public class ProtocolResponseSteps {
 
-    /** Перечень методов в шаге: имена через запятую, пробелы вокруг запятой не значимы. */
     private static final Pattern METHOD_LIST = Pattern.compile("\\s*,\\s*");
 
     private final ContractsService contracts;

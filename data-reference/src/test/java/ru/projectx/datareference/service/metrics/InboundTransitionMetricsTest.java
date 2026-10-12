@@ -14,10 +14,6 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Переходы статусов разбора: метки потока и статуса, счёт только после фиксации транзакции. Транзакция здесь —
- * синхронизация Spring без базы: то же, что открывает {@code @Transactional}, и те же обратные вызовы.
- */
 class InboundTransitionMetricsTest {
 
     private static final Instant NOW = Instant.parse("2026-10-05T12:00:00Z");
@@ -55,7 +51,6 @@ class InboundTransitionMetricsTest {
         assertThat(transitions("POLICIES", "FAILED").count()).isEqualTo(1.0);
     }
 
-    /** Откат — это завершение без фиксации: обратного вызова afterCommit нет, и переход не считается. */
     @Test
     void transitionInRolledBackTransaction_isNotCounted() {
         TransactionSynchronizationManager.initSynchronization();
@@ -85,7 +80,6 @@ class InboundTransitionMetricsTest {
                 .filteredOn(counter -> counter.count() > 0).hasSize(2);
     }
 
-    /** Нулевые ряды с самого создания: на каждый поток и каждый статус, в который переводит разбор. */
     @Test
     void creation_registersZeroSeriesForEveryStreamAndTargetStatus() {
         assertThat(registry.find(InboundTransitionMetrics.TRANSITIONS).counters())
@@ -96,7 +90,6 @@ class InboundTransitionMetricsTest {
                 .containsOnly("PROCESSED", "SKIPPED", "BUFFERED", "AWAITING_PARENT", "RETRY", "FAILED");
     }
 
-    /** NEW ставит приём, а не разбор: такой «переход» не считается и нового ряда не заводит. */
     @Test
     void newStatus_isNotCounted() {
         metrics.record(message(OneCStream.MKB10));

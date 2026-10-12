@@ -31,11 +31,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.RestReadDataSource;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Всплеск запросов соседа: одновременно больше запросов, чем соединений во всех пулах сервиса, и каждый после ответа
- * сразу шлёт следующий. Начало нагрузки видно по счётчикам пула REST-чтений, а не по времени: пул занят целиком,
- * и следующие запросы ждут соединения.
- */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
 public class RestReadLoad {
@@ -65,7 +60,6 @@ public class RestReadLoad {
         this.port = port;
     }
 
-    /** Запускает нагрузку на {@code path} и ждёт, пока она займёт весь пул REST-чтений. */
     public void start(String path) {
         URI target = URI.create("http://localhost:" + port + path.replace(OBTAINED_ID, contracts.obtainedId()));
         ExecutorService requests = Executors.newVirtualThreadPerTaskExecutor();
@@ -82,7 +76,6 @@ public class RestReadLoad {
         return path.orElseThrow(() -> new IllegalStateException("сценарий не запускал нагрузку"));
     }
 
-    /** Останавливает нагрузку и ждёт ответов на все отправленные запросы. */
     public void stop() throws InterruptedException, ExecutionException, TimeoutException {
         running = false;
         ExecutorService requests = executor.orElseThrow(() -> new IllegalStateException("нагрузка не запущена"));
@@ -95,7 +88,6 @@ public class RestReadLoad {
         }
     }
 
-    /** Нагрузка, которую сценарий не остановил сам, останавливается в конце сценария. */
     public void stopIfRunning() throws InterruptedException, ExecutionException, TimeoutException {
         if (executor.isPresent()) {
             stop();
@@ -130,7 +122,6 @@ public class RestReadLoad {
         return new Answer(response.statusCode(), json.readTree(response.body()).at(ERROR_CODE).asString(""));
     }
 
-    /** Ответ на запрос нагрузки; {@code errorCode} пустой, если в теле нет {@code error.code}. */
     public record Answer(int status, String errorCode) {
     }
 }

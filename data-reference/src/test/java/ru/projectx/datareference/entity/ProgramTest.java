@@ -9,11 +9,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Поля шапки сообщения применяются к программе уже при создании. Программа, переставшая относиться к РВЛ,
- * получает новые поля и уходит в архив, даже если пометки удаления в сообщении нет. Перечень учреждений
- * замещается целиком и снаружи не меняется.
- */
 class ProgramTest {
 
     private static final UUID EXTERNAL_ID = UUID.fromString("2d3e4f5a-6b7c-4d8e-9fa0-000000000001");

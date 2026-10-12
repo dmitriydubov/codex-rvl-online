@@ -7,11 +7,6 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Сбрасывает целиком кэши, зависящие от потока разобранного сообщения 1С:УСК, после фиксации разбора: сброс внутри
- * транзакции дал бы чтению снова положить в кэш старые данные. Целиком, потому что по сообщению не узнать, каких
- * ответов оно касается. Чтение, совпавшее с фиксацией, может оставить старый ответ до конца срока жизни кэша.
- */
 @Component
 public class ReferenceCacheEviction {
 

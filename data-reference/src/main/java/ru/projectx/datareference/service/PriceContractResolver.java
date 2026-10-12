@@ -15,11 +15,6 @@ import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.repository.LpuContractRepository;
 
-/**
- * Выбирает прайсовый договор лечебно-профилактического учреждения (ЛПУ) по одному правилу для каталога, карточки,
- * услуг и расчёта стоимости. Сначала ищется действующее допсоглашение со своими ценами, без него главный договор;
- * несколько кандидатов дают неоднозначность. Главный договор и допсоглашения в 1С:УСК действуют одновременно.
- */
 @Component
 public class PriceContractResolver {
 
@@ -29,7 +24,6 @@ public class PriceContractResolver {
         this.lpuContracts = lpuContracts;
     }
 
-    /** Ответ по одному учреждению подменить нечем, поэтому неоднозначность даёт 409, а отсутствие договора 422. */
     public PriceContract resolve(UUID lpuId, LocalDate today) {
         return switch (resolveAll(List.of(lpuId), today).get(lpuId)) {
             case Resolution.Found found -> found.priceContract();
@@ -39,7 +33,6 @@ public class PriceContractResolver {
         };
     }
 
-    /** Исход по каждому учреждению одним запросом; что делать с неоднозначным или без договора, решает вызывающий. */
     public Map<UUID, Resolution> resolveAll(Collection<UUID> lpuIds, LocalDate today) {
         if (lpuIds.isEmpty()) {
             return Map.of();
@@ -71,17 +64,14 @@ public class PriceContractResolver {
         return contract.mainContractExternalId() == null;
     }
 
-    /** Исход выбора прайсового договора по одному учреждению. */
     public sealed interface Resolution {
 
         record Found(PriceContract priceContract) implements Resolution {
         }
 
-        /** Перечень кандидатов нужен, чтобы исправить данные на стороне 1С. */
         record Ambiguous(List<UUID> lpuContractIds) implements Resolution {
         }
 
-        /** Действующих договоров нет либо все они берут цены с главного, которого нет. */
         record None() implements Resolution {
         }
     }

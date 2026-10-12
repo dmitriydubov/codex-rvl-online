@@ -21,11 +21,6 @@ import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Защищает правило «новое не затирается старым» для сообщений, которые ждут родителя: применённое сообщение записи
- * закрывает её более старые ожидающие сообщения пропуском с причиной, которая называет запись и более новое
- * сообщение. Без этого старое сообщение, дождавшись родителя, затёрло бы применённое.
- */
 class SupersededParentWaitsTest {
 
     private static final UUID RECORD = UUID.fromString("5f14a8d2-c3e7-4b90-a1d6-9e2b7c4f0a83");

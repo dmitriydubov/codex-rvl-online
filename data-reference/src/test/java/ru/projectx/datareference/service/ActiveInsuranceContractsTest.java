@@ -18,10 +18,6 @@ import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 
-/**
- * По договору страхования, который не действует сегодня, каталог учреждений и поиск полисов отвечают «не найден»,
- * так же как по неизвестному договору: действующих полисов у такого договора нет, и показывать нечего.
- */
 @ExtendWith(MockitoExtension.class)
 class ActiveInsuranceContractsTest {
 

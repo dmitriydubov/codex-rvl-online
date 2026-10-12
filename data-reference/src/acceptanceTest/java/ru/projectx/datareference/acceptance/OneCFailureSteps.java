@@ -4,10 +4,6 @@ import io.cucumber.java.ParameterType;
 import io.cucumber.java.ru.Дано;
 import ru.projectx.datareference.entity.InboundStatus;
 
-/**
- * Шаги «1С:УСК прислала …» для сценариев отказа разбора. Реквизит ровно в предел приходит в пробелах по краям:
- * пробелы в длину не входят, и разбор его принимает. Реквизит на цифру длиннее приходит без пробелов и отклоняется.
- */
 public class OneCFailureSteps {
 
     private final OneCInbox inbox;
@@ -16,7 +12,6 @@ public class OneCFailureSteps {
         this.inbox = inbox;
     }
 
-    /** Санаторий РВЛ или страхователь: другой контрагент шаг не знает. */
     @ParameterType(name = "контрагент", value = "санаторий РВЛ|страхователя")
     public Boolean sanatorium(String contragent) {
         return "санаторий РВЛ".equals(contragent);

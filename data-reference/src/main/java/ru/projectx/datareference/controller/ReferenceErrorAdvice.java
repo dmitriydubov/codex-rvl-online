@@ -15,11 +15,6 @@ import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 
-/**
- * Отказы чтения справочника: нет записи — 404, данные 1С неоднозначны — 409 с конфликтующими записями или строками
- * прайса, данных не хватает — 422 с непокрытыми интервалами прайса. 409 и 422 — ошибки данных 1С, поэтому они идут
- * в журнал на WARN без персональных данных: по этим записям собирают очередь на исправление.
- */
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.REFERENCE)
 public class ReferenceErrorAdvice {

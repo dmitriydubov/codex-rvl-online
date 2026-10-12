@@ -20,11 +20,6 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
-/**
- * Ошибки вызывающего (400, 404, 405, 406) уходят в едином формате с понятным кодом и не пишутся в журнал как
- * ошибки сервиса. Тело всегда JSON: без явного типа содержимого Spring подбирал бы формат по {@code Accept},
- * не нашёл бы подходящего и отдал бы ответ без тела.
- */
 @ExtendWith(OutputCaptureExtension.class)
 class RequestErrorAdviceTest {
 
@@ -66,10 +61,6 @@ class RequestErrorAdviceTest {
         assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
     }
 
-    /**
-     * У чужого пути нет ручки с типом ответа, поэтому {@code Accept} без JSON до отказа не отсекается.
-     * Ответ всё равно уходит телом в едином формате, чтобы вызывающий видел код ошибки и {@code request_id}.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"text/xml", "application/xml", "text/plain"})
     void unknownPath_acceptingNoJson_isStillNotFound_withJsonBody(String accept, CapturedOutput output) {
@@ -97,7 +88,6 @@ class RequestErrorAdviceTest {
         assertThat(output).doesNotContain("ERROR");
     }
 
-    /** Отказ 405 называет методы, которые есть у ручки, а не только GET. HEAD и OPTIONS прилагаются к GET. */
     @Test
     void allowHeader_listsDeclaredMethods_addingHeadOnlyForGet() {
         FailingController controller = new FailingController();
@@ -110,7 +100,6 @@ class RequestErrorAdviceTest {
         assertThat(result.getResponse().getHeader(HttpHeaders.ALLOW)).isEqualTo("POST,PUT,OPTIONS");
     }
 
-    /** Если Spring не назвал методов ручки, заголовок называет только OPTIONS: на него сервис отвечает всегда. */
     @Test
     void allowHeader_withoutDeclaredMethods_namesOnlyOptions() {
         FailingController controller = new FailingController();
@@ -123,7 +112,6 @@ class RequestErrorAdviceTest {
         assertThat(result.getResponse().getHeader(HttpHeaders.ALLOW)).isEqualTo("OPTIONS");
     }
 
-    /** Неразбираемый {@code Accept} ({@code foo/}) Spring тоже считает неприемлемым, и ответ тот же. */
     @ParameterizedTest
     @ValueSource(strings = {"text/xml", "application/xml", "text/html", "foo/"})
     void unsupportedAccept_isNotAcceptable_withJsonBody_inUnifiedFormat(String accept, CapturedOutput output) {
@@ -136,10 +124,6 @@ class RequestErrorAdviceTest {
         assertThat(output).doesNotContain("ERROR");
     }
 
-    /**
-     * Сегодня у каждой ручки с условием на параметры есть запасная без условия, и по HTTP этот отказ не возникает.
-     * Если запасная пропадёт, ответ всё равно будет 400 с перечнем ожидаемых наборов параметров.
-     */
     @Test
     void unsatisfiedParameters_isValidationError_namingExpectedParameterSets() {
         FailingController controller = new FailingController();

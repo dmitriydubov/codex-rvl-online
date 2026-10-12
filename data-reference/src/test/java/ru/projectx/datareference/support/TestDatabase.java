@@ -1,10 +1,5 @@
 package ru.projectx.datareference.support;
 
-/**
- * Откуда тестам взять PostgreSQL: контейнер Testcontainers или отдельная внешняя база из {@code TEST_POSTGRES_URL}
- * (свойство {@value #URL_PROPERTY}), все таблицы которой тесты очищают. Без Docker и адреса тесты с базой падают,
- * а не пропускаются, потому что пропущенный тест выглядит в отчёте как проверенный.
- */
 public final class TestDatabase {
 
     public static final String URL_PROPERTY = "test.postgres.url";

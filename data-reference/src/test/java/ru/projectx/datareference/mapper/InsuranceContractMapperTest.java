@@ -30,10 +30,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор договоров страхования: принимаются только договоры с типом продукта ДМС из настроек,
- * а без настройки ни один. Страхователь выбирается по роли среди всех сторон договора. Данные вымышленные.
- */
 class InsuranceContractMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -166,7 +162,6 @@ class InsuranceContractMapperTest {
         return saved.getValue();
     }
 
-    /** Договор в том виде, в каком его присылает 1С, сокращённый до полей, которые читает маппер. */
     private static ObjectNode contract(String productType, ObjectNode... parties) {
         ObjectNode data = JSON.createObjectNode();
         data.put("contractId", CONTRACT.toString());

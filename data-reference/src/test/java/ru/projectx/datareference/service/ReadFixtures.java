@@ -18,7 +18,6 @@ import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.entity.Program;
 
-/** Синтетические записи справочников для unit-тестов сервисов чтения: те же фабрики, что у разбора 1С. */
 final class ReadFixtures {
 
     static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
@@ -44,7 +43,6 @@ final class ReadFixtures {
         return Lpu.create(externalId, new Lpu.Details("Санаторий", null, null, null, null, null, archived), NOW);
     }
 
-    /** Главный договор — без ссылки на главный; допсоглашение — со ссылкой и признаком «цены с главного». */
     static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId, boolean usePricesMainContract) {
         return LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details("Д-1", null,
                 mainContractExternalId, usePricesMainContract, false, BEGIN, null, false), NOW);

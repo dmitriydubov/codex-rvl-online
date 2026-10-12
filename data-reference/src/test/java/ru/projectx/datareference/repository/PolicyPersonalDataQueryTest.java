@@ -23,11 +23,6 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Проверяет на настоящем PostgreSQL подсчёт и стирание пачкой персональных данных полисов по сроку хранения:
- * ФИО, дата рождения и почта стираются, номер, пол и признак архива остаются. Условия, предел пачки и поведение
- * при одновременном разборе проверить может только база.
- */
 @IntegrationTest
 class PolicyPersonalDataQueryTest {
 
@@ -84,10 +79,6 @@ class PolicyPersonalDataQueryTest {
         assertThat(erase(1)).isZero();
     }
 
-    /**
-     * Пока стирание ждёт блокировку, разбор снимает полис с архива. PostgreSQL перепроверяет условие запроса
-     * на новой версии строки, поэтому полис уже не за границей хранения, и его данные остаются.
-     */
     @Test
     void policyReturnedToActionWhileErasureWaits_keepsItsPersonalData() throws Exception {
         UUID archived = store(FAR_END, true, ARCHIVED_BY.minusSeconds(60));

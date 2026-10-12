@@ -15,11 +15,6 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Отклоняет сообщения 1С, родитель которых не пришёл за срок ожидания; передача прайса отклоняется целиком. Срок
- * считается от начала ожидания, а не от приёма, иначе после простоя разбора ребёнок отклонялся бы раньше, чем разбор
- * дойдёт до родителя. Сообщение, родитель которого уже есть, не отклоняется: его применит ближайший разбор.
- */
 @Component
 public class ParentWaitExpiry {
 
@@ -39,12 +34,6 @@ public class ParentWaitExpiry {
         this.clock = clock;
     }
 
-    /**
-     * Берёт не больше пачки разбора. Отказ и счётчик переходов фиксируются одной транзакцией, а журнал пишет
-     * вызывающий после фиксации.
-     *
-     * @return отклонённые сообщения в порядке приёма
-     */
     @Transactional
     public List<ExpiredParentWait> expireOverdue() {
         Instant deadline = clock.instant().minus(properties.parentWaitTimeout());
@@ -60,10 +49,6 @@ public class ParentWaitExpiry {
         return overdue.stream().map(ExpiredParentWait::of).toList();
     }
 
-    /**
-     * Сообщение и остальные ждущие части его передачи. Части читаются в той же транзакции, поэтому часть, уже
-     * найденная выборкой, — тот же объект, и повторы снимает сравнение по ссылке.
-     */
     private Stream<InboundMessage> withTransferParts(InboundMessage message) {
         return Optional.ofNullable(message.transferPart().correlationId())
                 .map(inbound::findByCorrelationId)

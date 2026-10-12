@@ -14,11 +14,6 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Проход стирания и метрика спрашивают базу о полисах за одной и той же границей хранения: день окончания и момент
- * перевода в архив — «сейчас минус тридцать суток запаса», день — московский. Перепутанная граница или момент
- * стирания не совпадут с заглушкой, и подсчёт или стирание вернут ноль.
- */
 class ExpiredPolicyPersonalDataTest {
 
     private static final Instant NOW = Instant.parse("2026-03-02T21:30:00Z");

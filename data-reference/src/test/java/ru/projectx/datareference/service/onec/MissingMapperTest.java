@@ -16,11 +16,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Защищает правило, что поток без маппера пропускается с причиной, а не падает: это страхует момент, когда в перечень
- * потоков добавят новый, а маппер к нему забудут. Проверяется без контекста и базы, потому что сейчас маппер есть
- * у каждого потока и иначе случай не воспроизвести.
- */
 class MissingMapperTest {
 
     @Test

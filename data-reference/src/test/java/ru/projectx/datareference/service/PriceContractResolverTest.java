@@ -22,11 +22,6 @@ import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 
-/**
- * Выбор договора ЛПУ (лечебно-профилактического учреждения), по которому брать цены. Допсоглашение со своими ценами
- * важнее главного договора, а допсоглашение с ценами главного в отборе не участвует. Если подходят два договора,
- * выбор неоднозначен, и сервис отказывает.
- */
 @ExtendWith(MockitoExtension.class)
 class PriceContractResolverTest {
 
@@ -83,7 +78,6 @@ class PriceContractResolverTest {
                         ambiguous -> assertThat(ambiguous.lpuContractIds()).hasSize(2));
     }
 
-    /** Допсоглашение берёт цены с главного договора, а главного нет. Значит, договора с ценами нет. */
     @Test
     void onlySupplementWithMainPrices_isNone() {
         active(supplementWithMainPrices);

@@ -17,10 +17,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-/**
- * Пул REST-чтений получает только транзакцию «только чтение» внутри HTTP-запроса. Spring Data открывает такую
- * транзакцию на каждый вызов репозитория, поэтому приём из очередей и задачи по расписанию идут в пул приложения.
- */
 @ExtendWith(MockitoExtension.class)
 class RestReadRoutingTest {
 
@@ -58,7 +54,6 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(restReadConnection);
     }
 
-    /** Поток планировщика или слушателя очереди: HTTP-запроса нет, транзакция «только чтение». */
     @Test
     void schedulerOrListenerReadOnlyTransaction_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);
@@ -67,7 +62,6 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(applicationConnection);
     }
 
-    /** Так ходит проверка здоровья базы: запрос к актуатору без транзакции. */
     @Test
     void httpRequestWithoutReadOnlyTransaction_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);
@@ -76,7 +70,6 @@ class RestReadRoutingTest {
         assertThat(routing.getConnection()).isSameAs(applicationConnection);
     }
 
-    /** Например, прямое чтение через JDBC из потока планировщика. */
     @Test
     void callOutsideTransactionAndHttpRequest_goesToApplicationPool() throws SQLException {
         when(application.getConnection()).thenReturn(applicationConnection);

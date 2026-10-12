@@ -28,11 +28,6 @@ import ru.projectx.datareference.service.OneCMessageApplied;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает выбор пути для сообщения 1С: оно уходит обработчику только своего потока, иначе попало бы в чужой
- * справочник. Обработчик получает поле {@code data} конверта, а конверт, из которого его не достать, считается
- * нарушением контракта, а не временным сбоем: повтор дал бы то же самое.
- */
 @ExtendWith(MockitoExtension.class)
 class ReferenceImportDispatchTest {
 
@@ -71,7 +66,6 @@ class ReferenceImportDispatchTest {
         verify(events).publishEvent(new OneCMessageApplied(OneCStream.MKB10));
     }
 
-    /** Сообщение, которое ждёт родителя, в справочник ничего не записало, и кэши ответов сбрасывать незачем. */
     @Test
     void messageAwaitingItsParent_publishesNothing() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
@@ -100,7 +94,6 @@ class ReferenceImportDispatchTest {
         verify(events).publishEvent(new OneCMessageApplied(OneCStream.PRICE_LISTS));
     }
 
-    /** Отказ разбора события не публикует: транзакция откатывается, и сбрасывать кэши нечем. */
     @Test
     void failedMessage_publishesNoEvent() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
@@ -113,7 +106,6 @@ class ReferenceImportDispatchTest {
         verifyNoInteractions(events);
     }
 
-    /** Два пути для одного потока — ошибка сборки приложения: какой из них сработает, решал бы случай. */
     @Test
     void twoHandlersForOneStream_failAtStartup() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
@@ -127,7 +119,6 @@ class ReferenceImportDispatchTest {
         assertEnvelopeRejected(null, "тело сообщения стёрто по сроку хранения, разбирать нечего");
     }
 
-    /** Конверт разбирается до выбора обработчика: особый путь тоже не получает сообщение со стёртым телом. */
     @Test
     void erasedPayloadOfStreamWithOwnHandler_isRejectedBeforeItsHandler() {
         when(mkb10Mapper.stream()).thenReturn(OneCStream.MKB10);
@@ -150,10 +141,6 @@ class ReferenceImportDispatchTest {
         assertEnvelopeRejected("{\"data\":[1]}", "в конверте сообщения нет объекта data");
     }
 
-    /**
-     * Нечитаемое тело — нарушение контракта. Причина в цепочке называет тип исключения Jackson, но не его текст:
-     * Jackson цитирует кусок тела, а в теле полиса бывают персональные данные, которые вывел бы любой стек в журнале.
-     */
     @Test
     void bodyThatIsNotJson_isContractViolation_withoutQuotingTheBody() {
         ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events);

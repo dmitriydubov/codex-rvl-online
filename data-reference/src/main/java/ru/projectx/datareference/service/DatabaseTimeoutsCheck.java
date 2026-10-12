@@ -19,11 +19,6 @@ import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.config.RestReadPoolProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 
-/**
- * При старте сверяет таймауты сеанса PostgreSQL с настройкой: на пуле они должны совпасть, у миграций быть нулём.
- * Расхождение и сбой чтения не роняют старт, а пишутся в журнал WARN без адресов и учётных данных: сервис должен
- * подняться и показать проблему. Заодно предупреждает о лимите REST-чтения, который не успеет отказать первым.
- */
 @Component
 public class DatabaseTimeoutsCheck implements ApplicationRunner {
 
@@ -76,7 +71,6 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         warnIfDiffers(POOL, parameter, expected.get(), actual);
     }
 
-    /** Сбой чтения пишется только типом исключения, потому что текст несёт SQL; проверка идёт дальше. */
     private Optional<Map<String, Duration>> read(String connection, DataSource source) {
         try {
             return Optional.of(connections.sessionSettings().durations(source, parameters));
@@ -126,7 +120,6 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         }
     }
 
-    /** Источники проверки; Liquibase берётся провайдером, потому что при выключенных миграциях его бина нет. */
     @Component
     public record Connections(
             SessionSettingsRepository sessionSettings, DataSource pool, ObjectProvider<SpringLiquibase> liquibase) {

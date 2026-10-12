@@ -13,11 +13,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Сообщения прайса, программы и полиса, в которых денежное поле прислано с заданным числом знаков после запятой. Число
- * ложится в JSON ровно так, как записано: {@code 4100.550} остаётся с тремя знаками, последний из которых ноль. Словари
- * закрытые: незнакомое имя поля или слово роняет шаг. Все значения вымышлены.
- */
 final class OneCMoneyScaleMessages {
 
     static final BigDecimal ONE_THOUSANDTH = new BigDecimal("0.001");
@@ -28,15 +23,12 @@ final class OneCMoneyScaleMessages {
     private static final Map<String, String> TRANSFER_PRICE_ROW = Map.of(
             "начало", "2026-01-01", "окончание", "3000-01-01", "цена", "6000.00", "цена со скидкой", "нет");
     private static final List<String> PRICE_FIELDS = List.of("price", "priceWithDiscount");
-    /** Поля строки пакета передачи, которые шаг подменяет числом: деньги и номер строки. */
     private static final List<String> BATCH_FIELDS = Stream.concat(PRICE_FIELDS.stream(), Stream.of("rowNumber")).toList();
 
-    /** Строка программы с процентом сооплаты в пределах от 0 до 100, но с третьим знаком после запятой. */
     private static final BigDecimal COPAYMENT_THIRD_DIGIT = new BigDecimal("10.251");
 
     private static final String RENAMED_POLICY = "СТЕНД-0001, редакция 2";
     private static final String RESENT = "новая отправка ";
-    /** Поле строки программы полиса, которого нет в контракте полисов: разбор его не читает. */
     private static final String UNKNOWN_POLICY_FIELD = "bonusAmount";
     private static final Map<String, Function<ObjectNode, ObjectNode>> POLICY_ROWS = Map.of(
             "amount", OneCMoneyScaleMessages::policyProgram,
@@ -57,7 +49,6 @@ final class OneCMoneyScaleMessages {
     private OneCMoneyScaleMessages() {
     }
 
-    /** Полная передача прайса из одной строки, где поле прислано числом как есть. Разбор её применяет. */
     static List<OneCMessage> priceList(String service, String field, String number) {
         List<OneCMessage> transfer = OneCServiceMessages.priceList(service, List.of(BASE_PRICE_ROW));
         ObjectNode row = (ObjectNode) transfer.getFirst().data().withArray("recordSet").get(0);
@@ -65,7 +56,6 @@ final class OneCMoneyScaleMessages {
         return transfer;
     }
 
-    /** Пакет передачи из одной строки с номером 1, где поле подменено испорченным числом. Разбор его отклоняет. */
     static OneCMessage priceBatch(UUID messageId, UUID cid, String service, String field, BigDecimal value) {
         if (!BATCH_FIELDS.contains(field)) {
             throw new IllegalArgumentException("шаг не знает поля строки пакета передачи: " + field);
@@ -76,7 +66,6 @@ final class OneCMoneyScaleMessages {
         return new OneCMessage(OneCStream.PRICE_LISTS, PRICE_QUEUE, data, InboundStatus.FAILED, messageId);
     }
 
-    /** Та же программа под новым наименованием и с ещё одной строкой, которую разбор не сохраняет, с третьим знаком. */
     static OneCMessage programWithDroppedRow(OneCMessage program, String droppedRow) {
         ObjectNode data = OneCProgramTermsMessages.renamed(program);
         ObjectNode extra = OneCProgramTermsMessages.firstRow(data).deepCopy()
@@ -86,17 +75,12 @@ final class OneCMoneyScaleMessages {
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /** Та же программа без признака РВЛ; сооплата её строки — с третьим знаком. */
     static OneCMessage programWithoutRvl(OneCMessage program) {
         ObjectNode data = program.data().deepCopy().put("rvl", false);
         OneCProgramTermsMessages.firstRow(data).put("percentCopayment", COPAYMENT_THIRD_DIGIT);
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Тот же полис под прежним номером, поле — присланное число. Разбор его применяет. Это новая отправка из 1С:УСК, и
-     * у неё свой {@code message-id}, даже если число совпало с прежним и сообщение повторяет прежнее слово в слово.
-     */
     static OneCMessage policy(OneCMessage policy, String field, BigDecimal value) {
         OneCMessage resent = policyWith(policy.data().deepCopy(), policy, field, value, InboundStatus.PROCESSED);
         UUID messageId = UUID.nameUUIDFromBytes(
@@ -104,20 +88,17 @@ final class OneCMoneyScaleMessages {
         return new OneCMessage(resent.stream(), resent.queue(), resent.data(), resent.expected(), messageId);
     }
 
-    /** Тот же полис под новым номером, поле — число с третьим знаком. Разбор его отклоняет. */
     static OneCMessage renamedPolicy(OneCMessage policy, String field, BigDecimal value) {
         ObjectNode data = policy.data().deepCopy().put("number", RENAMED_POLICY);
         return policyWith(data, policy, field, value, InboundStatus.FAILED);
     }
 
-    /** Тот же полис под новым номером; у строки программы ещё поле, которого нет в контракте, с числом. Разбор его применяет. */
     static OneCMessage renamedPolicyWithUnknownField(OneCMessage policy, BigDecimal value) {
         ObjectNode data = policy.data().deepCopy().put("number", RENAMED_POLICY);
         policyProgram(data).put(UNKNOWN_POLICY_FIELD, value);
         return new OneCMessage(policy.stream(), policy.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /** Значение поля полиса с двумя знаками после запятой: процент франшизы — свой, остальные — сумма. */
     static BigDecimal twoDigits(String field) {
         return TWO_DIGITS.get(sumOrPercent(field));
     }

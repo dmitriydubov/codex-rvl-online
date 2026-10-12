@@ -15,11 +15,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Сообщения 1С:УСК справочников каталога лечебно-профилактических учреждений (ЛПУ) и МКБ-10 из таблиц шагов «Дано».
- * Не названные сценарием поля заполняются вымышленными постоянными значениями; строка перечня программы всегда несёт
- * тип покрытия, иначе разбор отбросил бы её и учреждение пропало бы из каталога не по правилу сценария.
- */
 final class OneCReferenceMessages {
 
     private static final String EXTERNAL_ID = "external_id";
@@ -35,7 +30,6 @@ final class OneCReferenceMessages {
     private static final String MAIN_CONTRACT = "главный договор";
     private static final String MAIN_CONTRACT_PRICES = "цены главного договора";
     private static final String SOB_EXPORT = "выгружать прейскуранты в СОБ";
-    /** Имя признака в дополнительных свойствах договора ЛПУ, как его называет контракт ТЗ-5. */
     private static final String SOB_EXPORT_PROPERTY = "Выгружать прейскуранты в систему бронирования";
 
     private static final String APPEAL_TYPES_QUEUE = "1c-usk_to_rvl-online_types-treatments-changes";
@@ -50,7 +44,6 @@ final class OneCReferenceMessages {
     private OneCReferenceMessages() {
     }
 
-    /** Вид обращения (ТЗ-7). Виды обращения РВЛ сервис узнаёт по наименованию из своих настроек. */
     static OneCMessage appealType(Map<String, String> table) {
         onlyKnown(table, EXTERNAL_ID, NAME);
         ObjectNode data = JSON.createObjectNode()
@@ -60,7 +53,6 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.APPEAL_TYPES, APPEAL_TYPES_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /** Код МКБ-10 (ТЗ-4). */
     static OneCMessage mkb10(Map<String, String> table) {
         onlyKnown(table, EXTERNAL_ID, "код", NAME);
         ObjectNode data = JSON.createObjectNode()
@@ -71,10 +63,6 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.MKB10, MKB10_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Код МКБ-10 (ТЗ-4) без наименования: поле {@code name} пустое, а оно обязательное. Разбор отклоняет такое
-     * сообщение окончательно.
-     */
     static OneCMessage mkb10WithoutName(Map<String, String> table) {
         onlyKnown(table, EXTERNAL_ID, "код");
         ObjectNode data = JSON.createObjectNode()
@@ -85,11 +73,6 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.MKB10, MKB10_QUEUE, data, InboundStatus.FAILED);
     }
 
-    /**
-     * Договор санатория (ТЗ-5); санаторий — владелец договора. Без строк «главный договор» и «цены главного договора»
-     * договор главный и со своими ценами. Строка «выгружать прейскуранты в СОБ» — признак договора из его
-     * дополнительных свойств, а не поле сообщения.
-     */
     static OneCMessage lpuContract(Map<String, String> table) {
         onlyKnown(table, EXTERNAL_ID, "номер", SANATORIUM, BRANCH, BEGIN, END, MAIN_CONTRACT, MAIN_CONTRACT_PRICES,
                 SOB_EXPORT, OneCMessages.MESSAGE_ID);
@@ -112,10 +95,6 @@ final class OneCReferenceMessages {
                 OneCMessages.fixedMessageId(table));
     }
 
-    /**
-     * Контактная информация санатория (ТЗ-8) с одним действительным адресом: представление адреса и регион. Вид
-     * адреса — фактический, номер строки — первый.
-     */
     static OneCMessage sanatoriumAddress(Map<String, String> table) {
         onlyKnown(table, SANATORIUM, "адрес", "регион");
         String sanatorium = required(table, SANATORIUM);
@@ -133,10 +112,6 @@ final class OneCReferenceMessages {
         return new OneCMessage(OneCStream.LPU_CONTACTS, CONTACTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Программа РВЛ с перечнем учреждений (ТЗ-6): строка перечня на каждую строку таблицы шага, в том же порядке.
-     * Столбец «слой» необязателен: без него у строки первый слой.
-     */
     static OneCMessage programWithLpuList(String externalId, List<Map<String, String>> lines) {
         ObjectNode data = JSON.createObjectNode()
                 .put("id", externalId)

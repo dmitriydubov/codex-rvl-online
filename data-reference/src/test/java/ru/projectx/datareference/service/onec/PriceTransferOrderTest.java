@@ -22,11 +22,6 @@ import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 
-/**
- * Защищает порядок передач прайса по услуге: цены меняет только передача, финал которой не старше финала уже
- * применённой, и после применения именно она становится последней. Без этого передача, собравшаяся позже, затёрла бы
- * более новые цены.
- */
 class PriceTransferOrderTest {
 
     private static final UUID SERVICE = UUID.fromString("2a6f0c3e-9b18-4d57-8e41-c5d2a7f9b063");
@@ -60,7 +55,6 @@ class PriceTransferOrderTest {
         verify(finalizations).recordApplied(SERVICE, finalMessage.receipt().messageId());
     }
 
-    /** Блокировка услуги берётся до замещения цен: иначе закрытие зависших передач решало бы одновременно. */
     @Test
     void serviceRowIsLocked_beforePricesAreReplaced() {
         appliedFinal(APPLIED_AT);
@@ -91,7 +85,6 @@ class PriceTransferOrderTest {
         verify(finalizations, never()).recordApplied(any(), any());
     }
 
-    /** Финалы приняты в один момент: применяется передача, собравшаяся позже. */
     @Test
     void transferFinalizedAtTheSameMoment_isApplied() {
         appliedFinal(APPLIED_AT);
@@ -127,7 +120,6 @@ class PriceTransferOrderTest {
         assertThat(order.lockApplied(SERVICE)).isEmpty();
     }
 
-    /** Строку сырья финала удержал внешний ключ; если её всё же нет, решать порядок не по чему. */
     @Test
     void missingFinalMessageOfAppliedTransfer_isAnError() {
         UUID finalId = UUID.randomUUID();

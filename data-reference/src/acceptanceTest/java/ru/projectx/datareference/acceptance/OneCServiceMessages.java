@@ -16,10 +16,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Сообщения 1С:УСК об услугах ЛПУ и их прайсах из таблиц шагов «Дано»; все значения вымышлены. Идентификатор передачи
- * прайса выводится из содержимого, как и {@code message-id}, чтобы повторный прогон клал те же строки.
- */
 final class OneCServiceMessages {
 
     private static final String SERVICES_QUEUE = "1c-usk_to_rvl-online_contragents-services-changes";
@@ -37,7 +33,6 @@ final class OneCServiceMessages {
     private OneCServiceMessages() {
     }
 
-    /** Услуга договора ЛПУ (ТЗ-10); вид обращения и пометка удаления — если сценарий их назвал. */
     static OneCMessage service(Map<String, String> table) {
         onlyKnown(table, "external_id", "договор", "наименование", "код", APPEAL_TYPE, DELETE_MARK,
                 OneCMessages.MESSAGE_ID);
@@ -52,7 +47,6 @@ final class OneCServiceMessages {
                 OneCMessages.fixedMessageId(table));
     }
 
-    /** Полная передача прайса по услуге (ТЗ-9): один пакет со всеми строками таблицы и финальное сообщение. */
     static List<OneCMessage> priceList(String serviceExternalId, List<Map<String, String>> rows) {
         ArrayNode recordSet = JSON.createArrayNode();
         for (Map<String, String> row : rows) {
@@ -73,7 +67,6 @@ final class OneCServiceMessages {
                 new OneCMessage(OneCStream.PRICE_LISTS, PRICE_FINAL_QUEUE, last, InboundStatus.PROCESSED));
     }
 
-    /** Строка прайса: «нет» в цене со скидкой значит, что поля в строке нет вовсе. */
     static ObjectNode priceRow(int rowNumber, Map<String, String> row) {
         onlyKnown(row, "начало", "окончание", "цена", "цена со скидкой");
         ObjectNode line = JSON.createObjectNode()

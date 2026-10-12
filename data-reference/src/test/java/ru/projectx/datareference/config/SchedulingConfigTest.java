@@ -15,11 +15,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 
-/**
- * С виртуальными потоками Boot по умолчанию выполнил бы все задачи по расписанию на одном общем потоке,
- * и разбор, повисший на чужой блокировке, остановил бы стирание персональных данных и проверку зависших передач.
- * Контекст собран из настоящего {@code application.yml}, где эти потоки включены.
- */
 class SchedulingConfigTest {
 
     private static final long WAIT_SECONDS = 10;
@@ -35,10 +30,6 @@ class SchedulingConfigTest {
                 .getScheduledThreadPoolExecutor().getCorePoolSize()).isGreaterThanOrEqualTo(3));
     }
 
-    /**
-     * Каждая из двух других задач обязана пройти дважды: первый проход мог случиться
-     * до того, как зависшая заняла поток, второй — уже нет.
-     */
     @Test
     void hungTask_doesNotStopTheOtherTwo() {
         CountDownLatch release = new CountDownLatch(1);
@@ -65,7 +56,6 @@ class SchedulingConfigTest {
                 .run(started -> assertThat(started.getBean(ScheduledTaskHolder.class).getScheduledTasks()).hasSize(1));
     }
 
-    /** Тесты зовут проходы сами, поэтому выключенные расписания не создают ни задач, ни потоков. */
     @Test
     void switchedOffSchedules_registerNoTaskAndNoPool() {
         context.withPropertyValues("projectx.scheduling.enabled=false")

@@ -32,11 +32,6 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Каталог учреждений по договору страхования: учреждения программ восстановительного лечения действующих полисов
- * по видам обращения РВЛ. Учреждение с прайсовым договором попадает в выдачу, с неоднозначным в {@code skipped},
- * без договора никуда, а по договору страхования, который сегодня не действует, ответ «не найден».
- */
 @ExtendWith(MockitoExtension.class)
 class LpuCatalogServiceTest {
 

@@ -9,14 +9,9 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Шаги «1С:УСК прислала …» о целочисленных полях справочников и передачи прайса с числом больше допустимого. Запись
- * строится из присланной сценарием раньше. Словари закрытые: незнакомый поток или поле роняет шаг.
- */
 public class OneCIntegerLimitSteps {
 
     private static final String RENAMED = "Стенд: новое наименование";
-    /** Поток по слову спецификации и единственное целочисленное поле записи этого потока. */
     private static final Map<String, OneCStream> STREAMS = Map.of(
             "МКБ-10", OneCStream.MKB10, "виды обращений", OneCStream.APPEAL_TYPES);
     private static final Map<OneCStream, String> LEVEL_FIELDS = Map.of(

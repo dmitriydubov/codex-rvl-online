@@ -8,10 +8,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * По записям из отказа 409 данные разбирают на стороне 1С, поэтому исключение хранит их в порядке,
- * в каком их нашёл сервис, и не даёт изменить перечень после создания.
- */
 class AmbiguousReferenceExceptionTest {
 
     private static final UUID FIRST = UUID.fromString("0a9e0000-0000-4000-8000-000000000001");

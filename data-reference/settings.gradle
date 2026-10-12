@@ -44,10 +44,6 @@ dependencyResolutionManagement {
  * }
  */
 
-/*
- * Внешний набор проверок качества подключается, только когда его каталог лежит рядом с модулем и репозитории
- * публичные: плагин мутаций PIT есть только на портале плагинов Gradle. В рабочий контур каталог не переносится.
- */
 gradle.ext.gauntletEnabled = file('../gauntlet/gauntlet.gradle').isFile() &&
         providers.gradleProperty('gauntlet').map { it.isEmpty() || it.toBoolean() }
                 .getOrElse(gradle.ext.has('publicRepositories') && gradle.ext.publicRepositories)

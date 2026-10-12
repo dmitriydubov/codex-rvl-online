@@ -1,0 +1,25 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 001-enums
+      author: contract-service
+      comment: >
+        Перечисления сервиса Договоров нативными типами PostgreSQL, как требует «Структура данных
+        (Сервис договоров)»: статусы договора КМ и полиса ЛМ, причина прекращения, роль стороны,
+        пол, тип документа, статус входящего сообщения.
+      changes:
+        - sql:
+            sql: >
+              CREATE TYPE contract_status AS ENUM
+                ('NEW', 'DRAFT_READY', 'ACCEPTED', 'INVOICE_ISSUED', 'PAID', 'SUBMITTED', 'ISSUED', 'ERROR', 'CANCELLED');
+              CREATE TYPE lm_policy_status AS ENUM ('NEW', 'SUBMITTED', 'ISSUED', 'ERROR', 'CANCELLED');
+              CREATE TYPE contract_cancel_reason AS ENUM ('REQUEST_CANCELLED', 'INSURED_REFUSED', 'EXPIRED', 'OTHER');
+              CREATE TYPE person_role AS ENUM ('POLICYHOLDER', 'INSURED');
+              CREATE TYPE gender AS ENUM ('MALE', 'FEMALE');
+              CREATE TYPE identity_doc_type AS ENUM ('RF_PASSPORT', 'BIRTH_CERTIFICATE', 'FOREIGN_PASSPORT', 'OTHER');
+              CREATE TYPE inbox_status AS ENUM ('NEW', 'PROCESSED', 'SKIPPED', 'FAILED');
+      rollback:
+        - sql:
+            sql: >
+              DROP TYPE inbox_status; DROP TYPE identity_doc_type; DROP TYPE gender; DROP TYPE person_role;
+              DROP TYPE contract_cancel_reason; DROP TYPE lm_policy_status; DROP TYPE contract_status;

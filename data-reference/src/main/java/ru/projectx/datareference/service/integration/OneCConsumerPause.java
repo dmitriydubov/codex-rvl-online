@@ -15,11 +15,6 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
-/**
- * Пауза приёма из 1С:УСК, пока база не принимает записи: потребители всех очередей останавливаются, сообщения ждут в
- * брокере на своих местах, и брокеру их не возвращают, чтобы не тратить ограниченные передоставки quorum-очереди. Когда
- * база отвечает, пауза запускает только те контейнеры, которые остановила сама.
- */
 @Component
 public class OneCConsumerPause {
 
@@ -29,7 +24,6 @@ public class OneCConsumerPause {
     private final IngestStorageProbe probe;
     private final Clock clock;
     private final OneCIngestMetrics metrics;
-    /** Монитор, под которым меняется состояние паузы: пауза и возобновление не пересекаются. */
     private final Object lifecycle = new Object();
     private volatile @Nullable PauseState state;
 
@@ -42,7 +36,6 @@ public class OneCConsumerPause {
         this.metrics = metrics;
     }
 
-    /** Останавливает работающих потребителей очередей 1С:УСК; во время паузы ничего не делает. */
     public void pause(StorageOutage outage) {
         synchronized (lifecycle) {
             if (state != null) {
@@ -59,7 +52,6 @@ public class OneCConsumerPause {
         }
     }
 
-    /** Проверяет базу и, если она снова принимает записи приёма, возвращает остановленных потребителей. */
     public void resumeIfStorageAvailable() {
         PauseState current = state;
         if (current == null) {
@@ -78,17 +70,11 @@ public class OneCConsumerPause {
         return Optional.ofNullable(state).map(PauseState::paused);
     }
 
-    /** {@code true}, когда приём не на паузе либо все остановки потребителей уже завершены. */
     public boolean consumersStopped() {
         PauseState current = state;
         return current == null || current.consumersStopped().isDone();
     }
 
-    /**
-     * Вызывается под монитором {@code lifecycle}: отказ с первого запущенного потребителя ждёт на нём конца запуска и
-     * ставит новую паузу, а не пропадает вместе со старой. Если пауза сменилась после проверки базы, ею займётся
-     * следующая проверка.
-     */
     private void resume(PauseState current) {
         if (!current.equals(state)) {
             return;
@@ -102,10 +88,6 @@ public class OneCConsumerPause {
         log.info("база снова отвечает: потребители {} запущены, приём из 1С:УСК возобновлён", current.paused().queues());
     }
 
-    /**
-     * Отказ запуска по причине брокера, например пропавшая очередь, не задерживает остальные очереди: контейнер
-     * остаётся остановленным, и ручка здоровья называет очередь без потребителя.
-     */
     private void startConsumer(String queue) {
         try {
             container(queue).start();
@@ -115,10 +97,6 @@ public class OneCConsumerPause {
         }
     }
 
-    /**
-     * Останавливаем из потока слушателя, поэтому только stop с обратным вызовом: синхронный stop() ждал бы конца
-     * обработки в этом же потоке. Отказ остановки одного контейнера считается её завершением, чтобы не заклинить всех.
-     */
     private void stopConsumer(String queue, CompletableFuture<Void> stopped) {
         try {
             container(queue).stop(() -> stopped.complete(null));
@@ -143,11 +121,9 @@ public class OneCConsumerPause {
                 .orElseThrow(() -> new IllegalStateException("нет контейнера слушателя очереди " + queue));
     }
 
-    /** Пауза приёма: первый отказ хранилища, момент остановки и очереди, потребителей которых остановила пауза. */
     public record Paused(StorageOutage outage, Instant since, Set<String> queues) {
     }
 
-    /** Пауза вместе с признаком, что все остановки контейнеров завершились. */
     private record PauseState(Paused paused, CompletableFuture<Void> consumersStopped) {
 
         static PauseState of(StorageOutage outage, Instant since, Map<String, CompletableFuture<Void>> stops) {

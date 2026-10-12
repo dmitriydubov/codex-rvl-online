@@ -14,10 +14,6 @@ import org.springframework.amqp.core.MessageProperties;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 
-/**
- * Тело доставки: ведущая метка порядка байтов UTF-8 снимается только в начале и только целиком, сырое тело
- * остаётся как прислал брокер — таким оно уходит в карантин.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCDeliveryTest {
 
@@ -45,7 +41,6 @@ class OneCDeliveryTest {
         assertThat(delivery(raw).body()).isEqualTo(raw);
     }
 
-    /** Метка не в начале — часть содержимого, а не метка: снимать её нельзя. */
     @Test
     void bomInsideBody_isKept() {
         byte[] raw = concat("{".getBytes(StandardCharsets.UTF_8), BOM);
@@ -53,7 +48,6 @@ class OneCDeliveryTest {
         assertThat(delivery(raw).body()).isEqualTo(raw);
     }
 
-    /** Тело ровно из трёх байт метки — метка без содержимого: конверту достаётся пустое тело, карантину — метка. */
     @Test
     void bodyOfExactlyBom_isEmptiedButKeptInRawBody() {
         OneCDelivery delivery = delivery(BOM.clone());
@@ -63,7 +57,6 @@ class OneCDeliveryTest {
         assertThat(delivery.rawBody()).isEqualTo(BOM);
     }
 
-    /** Два байта метки из трёх — не метка; тело короче метки тоже остаётся как есть. */
     @Test
     void incompleteBom_isKept() {
         byte[] twoBytes = {(byte) 0xEF, (byte) 0xBB};

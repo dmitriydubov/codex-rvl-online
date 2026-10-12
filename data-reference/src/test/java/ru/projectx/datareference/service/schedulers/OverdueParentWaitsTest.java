@@ -24,11 +24,6 @@ import ru.projectx.datareference.service.onec.ExpiredParentWait;
 import ru.projectx.datareference.service.onec.ParentWaitExpiry;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Журнал и метрика истёкших ожиданий родителя. При массовой выгрузке истекают тысячи сообщений, поэтому журнал получает
- * одну запись ERROR на поток за проход (передача прайса — одну со своим идентификатором), а счётчик считает каждое
- * сообщение. В записях нет ничего, кроме потока, чисел и GUID.
- */
 class OverdueParentWaitsTest {
 
     private static final int REPORT_LIMIT = 2;
@@ -74,7 +69,6 @@ class OverdueParentWaitsTest {
         assertThat(expired("LPU_CONTRACTS")).isEqualTo(3);
     }
 
-    /** Несколько сообщений одного родителя называют его в перечне один раз. */
     @Test
     void parentOfSeveralMessages_isListedOnce() {
         AwaitedParent parent = new AwaitedParent(ParentKind.CONTRAGENT, UUID.randomUUID());

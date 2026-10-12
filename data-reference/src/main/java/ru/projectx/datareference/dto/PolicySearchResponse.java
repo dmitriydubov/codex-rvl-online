@@ -5,10 +5,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.Policy;
 
-/**
- * Подсказка для поиска сотрудника по ФИО и номеру полиса. Даты рождения и почты здесь нет намеренно: почта
- * отдаётся только в полном полисе, а различать тёзок по дате рождения пока не решено.
- */
 public record PolicySearchResponse(List<Item> items) {
 
     public static PolicySearchResponse of(List<Policy> policies) {

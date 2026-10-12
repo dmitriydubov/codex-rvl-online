@@ -7,10 +7,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Следующее сообщение договора с санаторием замещает поля целиком, включая санаторий: договор отделения может
- * перейти к другому учреждению. Архивность приходит только из пометки удаления в 1С.
- */
 class LpuContractTest {
 
     private static final Instant CREATED = Instant.parse("2026-10-01T09:00:00Z");

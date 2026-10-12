@@ -6,10 +6,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Поля сообщения применяются к страхователю уже при создании. Удалённый в 1С страхователь остаётся архивной
- * записью, а не пропадает, и следующее сообщение заменяет реквизиты целиком, включая пустые.
- */
 class InsurerTest {
 
     private static final Instant CREATED = Instant.parse("2026-10-01T09:00:00Z");

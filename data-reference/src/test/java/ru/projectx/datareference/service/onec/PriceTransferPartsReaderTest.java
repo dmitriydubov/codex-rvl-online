@@ -17,7 +17,6 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
-/** Защищает чтение частей передачи заранее: читаются все сообщения передачи, в любом статусе, своей транзакцией. */
 @ExtendWith(MockitoExtension.class)
 class PriceTransferPartsReaderTest {
 
@@ -35,10 +34,6 @@ class PriceTransferPartsReaderTest {
         assertThat(new PriceTransferPartsReader(inbound).parts(CID)).containsExactly(part);
     }
 
-    /**
-     * Части читаются своей транзакцией только для чтения, которая завершается до их разбора: присоединись чтение к
-     * транзакции разбора, долгий разбор шёл бы внутри неё и упирался в предел её простоя.
-     */
     @Test
     void partsAreReadInTheirOwnReadOnlyTransaction() throws NoSuchMethodException {
         Transactional transaction = PriceTransferPartsReader.class.getMethod("parts", UUID.class)

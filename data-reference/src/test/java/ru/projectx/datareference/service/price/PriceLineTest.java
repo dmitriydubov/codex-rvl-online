@@ -12,7 +12,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.PriceListItem;
 
-/** Строка прайса для расчёта берётся из сохранённой строки как есть: сроки действия и обе цены. */
 class PriceLineTest {
 
     private static final LocalDate FROM = LocalDate.of(2026, 4, 1);

@@ -9,11 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 
-/**
- * Кэши ответов справочных ручек в памяти процесса (Caffeine). Набор кэшей постоянный: опечатка в имени роняет вызов,
- * а не создаёт новый кэш. Кэш срабатывает раньше транзакции чтения, поэтому ответ из кэша не берёт соединение из пула
- * и отдаётся, даже когда база не отвечает.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableCaching(order = Ordered.LOWEST_PRECEDENCE - 1)
 public class CacheConfig {
@@ -21,13 +16,11 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager(ReferenceCacheProperties properties, Clock clock) {
         CaffeineCacheManager manager = new CaffeineCacheManager();
-        // Кэшируемые методы не возвращают null и пустой Optional: такой результат кэш отвергнет исключением.
         manager.setAllowNullValues(false);
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(properties.ttl())
                 .maximumSize(properties.maximumSize())
                 .ticker(new ClockTicker(clock))
-                // Без статистики не считаются метрики попаданий и промахов кэша (cache_gets_total).
                 .recordStats());
         manager.setCacheNames(ReferenceCaches.ALL);
         return manager;

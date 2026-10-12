@@ -33,11 +33,6 @@ import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Защищает решение о судьбе сообщения 1С при приёме, успехе, пропуске и ошибке. После временной ошибки повтор идёт
- * через задержку из настроенного списка, а когда список исчерпан, сообщение получает отказ с номером попытки: без конца
- * повторов сломанное сообщение крутилось бы вечно, а при слишком коротком списке терялось бы после первого сбоя базы.
- */
 @ExtendWith(MockitoExtension.class)
 class InboundOutcomeRecordingTest {
 
@@ -104,10 +99,6 @@ class InboundOutcomeRecordingTest {
         assertThat(transitions()).containsExactly("AWAITING_PARENT");
     }
 
-    /**
-     * Отказ при пересмотре сообщения, которое ждало родителя, записывается как отказ нового: временный уходит на
-     * повтор, а не считается уже зафиксированным исходом.
-     */
     @Test
     void temporaryFailureOfAWaitingMessage_schedulesARetry() {
         InboundMessage message = existing();
@@ -176,7 +167,6 @@ class InboundOutcomeRecordingTest {
         assertThat(transitions()).containsExactly("FAILED");
     }
 
-    /** Поток, у которого отказ разделяют несколько сообщений, сам решает, кого он задевает; журнал — о причине. */
     @Test
     void permanentFailureInSharedScope_failsEveryMessageTheScopeNames_inOneRecording() {
         InboundMessage message = existing();
@@ -210,7 +200,6 @@ class InboundOutcomeRecordingTest {
         assertThat(transitions()).containsExactly("FAILED", "FAILED");
     }
 
-    /** Повтор не окончательный: соседей по отказу он не касается. */
     @Test
     void retryInSharedScope_touchesOnlyTheMessage() {
         existing();
@@ -223,7 +212,6 @@ class InboundOutcomeRecordingTest {
         assertThat(transitions()).containsExactly("RETRY");
     }
 
-    /** Отказ сообщения другого потока не задевает сообщения, о которых знает чужая область отказа. */
     @Test
     void permanentFailureOfOtherStream_isNotShared() {
         InboundMessage message = existing();
@@ -247,7 +235,6 @@ class InboundOutcomeRecordingTest {
         assertThat(service().transferParts(transfer)).isSameAs(parts);
     }
 
-    /** Статус части передачи ставит сборщик прайсов; сервис сохраняет строку и считает переход. */
     @Test
     void savedTransferPart_isStoredAndCounted() {
         InboundMessage part = InboundMessage.receive(
@@ -269,14 +256,12 @@ class InboundOutcomeRecordingTest {
                 .hasMessage("нет строки сырья для сообщения " + MESSAGE_ID);
     }
 
-    /** Посчитанные переходы потока сообщения, по одному на переход: здесь транзакции нет, счёт идёт сразу. */
     private List<String> transitions() {
         return meters.find(InboundTransitionMetrics.TRANSITIONS).tag("stream", "MKB10").counters().stream()
                 .flatMap(counter -> Collections.nCopies((int) counter.count(), counter.getId().getTag("status")).stream())
                 .toList();
     }
 
-    /** Исход строки сейчас: попытка откатилась, и строка такая же, как до неё. */
     private InboundOutcome unchanged() {
         return repository.findById(MESSAGE_ID).orElseThrow().outcome();
     }
@@ -288,7 +273,6 @@ class InboundOutcomeRecordingTest {
         return message;
     }
 
-    /** Область отказа потока MKB10: отклоняет сообщение и ещё одного соседа, ссылаясь на причину. */
     private static RejectionScope scopeFailing(InboundMessage sibling) {
         RejectionScope scope = mock(RejectionScope.class);
         when(scope.stream()).thenReturn(OneCStream.MKB10);

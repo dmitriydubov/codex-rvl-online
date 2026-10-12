@@ -3,11 +3,6 @@ package ru.projectx.datareference.service;
 import java.util.List;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
-/**
- * Пределы входа поиска в символах Юникода, а не единицах UTF-16. Верхние проверяются по присланному, до нормализации:
- * они защищают от объёма. Нижний проверяется после схлопывания пробелов, но до смены регистра. Причина называет
- * правило, а не значение, потому что в строке поиска может быть фамилия.
- */
 final class SearchInputLimits {
 
     private static final String QUERY = "query";

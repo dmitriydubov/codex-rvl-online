@@ -29,11 +29,6 @@ import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.MigrationSql;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Проверяет на настоящем PostgreSQL запросы над сообщениями, которые ждут родителя: повторный разбор,
- * отказ по сроку, вытеснение более новым сообщением и стирание тел. Всё это — условия запросов,
- * и проверить их может только база.
- */
 @IntegrationTest
 class ParentWaitStorageTest {
 
@@ -116,7 +111,6 @@ class ParentWaitStorageTest {
         assertThat(due()).containsExactly(contract);
     }
 
-    /** Передачу представляет её финальное сообщение: сборщик разбирает передачу целиком по одной её части. */
     @Test
     void waitingTransfer_isDueByItsFinalMessageOnly() {
         UUID service = UUID.randomUUID();
@@ -149,10 +143,6 @@ class ParentWaitStorageTest {
                 .containsExactly(earlier);
     }
 
-    /**
-     * По сроку хранения стирается только тело отказа по истечении ожидания, а тело отказа
-     * по другой причине и тело сообщения, которое ещё ждёт, остаются.
-     */
     @Test
     void retention_erasesTheBodyOfAnExpiredWaitOnly() {
         Instant received = NOW.minusSeconds(86_400 * 40L);
@@ -183,7 +173,6 @@ class ParentWaitStorageTest {
         assertThat(foreign.existsByExternalIdAndKind(PARENT, ParentKind.LPU_CONTRACT)).isFalse();
     }
 
-    /** Вручную возвращённое в разбор сообщение ждёт заново: старый момент начала отклонил бы его в том же проходе. */
     @Test
     void messageReturnedToParsing_startsWaitingAnew() {
         UUID messageId = row("NEW", OneCStream.LPU_CONTRACTS, NOW.minusSeconds(86_400), WAITING_SINCE);
@@ -195,10 +184,6 @@ class ParentWaitStorageTest {
         assertThat(message.outcome().status()).isEqualTo(InboundStatus.AWAITING_PARENT);
     }
 
-    /**
-     * Заполнение памяти при обновлении берёт только то, что известно наверняка: страхователей и санатории
-     * без вида деятельности РВЛ с телом в сырье, кроме ставших нашими и записанных не в канонической форме.
-     */
     @Test
     void fill_remembersInsurersAndSanatoriumsWithoutRvl_only() {
         UUID insurer = UUID.randomUUID();
@@ -228,7 +213,6 @@ class ParentWaitStorageTest {
                 reason);
     }
 
-    /** Операторы заполнения ровно тем текстом, что лежит в миграции. */
     private static List<String> fillSql() {
         return MigrationSql.statementsOf("db/changelog/018-parent-wait.yaml", "018-foreign-reference-fill");
     }

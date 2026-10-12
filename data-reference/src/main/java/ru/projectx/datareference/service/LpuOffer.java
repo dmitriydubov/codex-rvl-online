@@ -9,7 +9,6 @@ import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.Lpu;
 
-/** Что учреждение предлагает на {@code today}: прайсовый договор и его услуги по видам обращения РВЛ. */
 record LpuOffer(
         Lpu lpu,
         PriceContract priceContract,
@@ -17,7 +16,6 @@ record LpuOffer(
         List<ContragentService> services,
         LocalDate today) {
 
-    /** Услуги отобраны по этим видам обращения, поэтому вид найдётся у каждой. */
     AppealType appealTypeOf(ContragentService service) {
         return appealTypes.get(service.externalAppealTypeId());
     }

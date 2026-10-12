@@ -14,6 +14,7 @@ import org.springframework.core.annotation.AliasFor;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "management.health.brokers.enabled=false",
+        "projectx.reference.url=http://reference.test:8080/internal/v1",
         "projectx.brokers.internal.connection.password=no-broker",
         "projectx.brokers.onec.connection.password=no-broker",
         "projectx.brokers.internal.listener-auto-startup=false",

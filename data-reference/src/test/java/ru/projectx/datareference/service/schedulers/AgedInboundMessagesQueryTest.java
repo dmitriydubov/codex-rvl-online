@@ -28,11 +28,6 @@ import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Запросы к сырым и карантинным сообщениям старше порога на настоящем PostgreSQL: стирание тел пачкой и выборка
- * зависших передач. Порядок, предел и группировку проверяет только база; часы остановлены, поэтому время приёма
- * отодвигается запросом.
- */
 @IntegrationTest
 class AgedInboundMessagesQueryTest {
 
@@ -85,7 +80,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(payloadOf(old)).isNotNull();
     }
 
-    /** Тела ровно на границе срока, тела другого потока и уже стёртые в пачку не попадают и в счёт не идут. */
     @Test
     void forgetPayloads_skipsFreshOtherStreamAndErasedRows() {
         UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(30));
@@ -98,10 +92,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(payloadOf(reference)).isNotNull();
     }
 
-    /**
-     * Причина исхода полиса стирается вместе с телом: в старых строках в ней может быть текст чужой ошибки со
-     * значениями полей. У справочного потока причина остаётся, как и тело: по ним сообщение переобрабатывают.
-     */
     @Test
     void forgetPayloads_erasesTheReasonTogetherWithTheBody() {
         UUID policy = store(OneCStream.POLICIES, Duration.ofDays(40));
@@ -119,10 +109,6 @@ class AgedInboundMessagesQueryTest {
                 .isEqualTo("причина");
     }
 
-    /**
-     * Тело договора страхования стирается в любом статусе: страхователем бывает человек. Причина исхода, статус и
-     * число попыток остаются — это текст сервиса без значений полей.
-     */
     @Test
     void forgetPayloads_erasesInsuranceContractBodiesInEveryStatusAndKeepsTheOutcome() {
         List<UUID> contracts = Stream.of("NEW", "RETRY", "PROCESSED", "SKIPPED", "FAILED")
@@ -140,10 +126,6 @@ class AgedInboundMessagesQueryTest {
                 .containsExactly("NEW", "RETRY", "PROCESSED", "SKIPPED", "FAILED");
     }
 
-    /**
-     * Тело пропущенного сообщения стирается в любом потоке, причина пропуска остаётся. Тела справочных сообщений
-     * в остальных статусах не трогаются: по ним сообщение переобрабатывают.
-     */
     @Test
     void forgetPayloads_erasesSkippedBodiesOfEveryStreamAndKeepsOtherReferenceBodies() {
         UUID skipped = storeWithOutcome(OneCStream.MKB10, "SKIPPED");
@@ -158,7 +140,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(kept).allSatisfy(reference -> assertThat(payloadOf(reference)).isNotNull());
     }
 
-    /** Причина стирается только у полиса, в том числе у пропущенного; у пропущенного справочного она остаётся. */
     @Test
     void forgetPayloads_erasesTheReasonOfSkippedPolicyOnly() {
         UUID policy = storeWithOutcome(OneCStream.POLICIES, "SKIPPED");
@@ -170,7 +151,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(outcomeOf(reference).lastError()).isEqualTo(REASON);
     }
 
-    /** Подсчёт для метрики видит ровно те тела, которые сотрёт проход: ни больше, ни меньше. */
     @Test
     void countPayloadsToForget_matchesWhatTheErasePassErases() {
         Stream.of(OneCStream.POLICIES, OneCStream.INSURANCE_CONTRACTS).forEach(stream -> storeWithOutcome(stream, "FAILED"));
@@ -185,10 +165,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(inboundMessageRepository.countPayloadsToForgetReceivedBefore(receivedBefore)).isZero();
     }
 
-    /**
-     * По строке на передачу, с числом её частей и временем первой; самые давние первыми и не больше предела.
-     * Передача, начатая позже порога, не зависла, даже если у неё много частей.
-     */
     @Test
     void transfersBufferedLongerThan_groupsPartsAndOrdersByFirstPart() {
         buffer(OLD_TRANSFER, Duration.ofHours(3));
@@ -234,7 +210,6 @@ class AgedInboundMessagesQueryTest {
         assertThat(quarantineRepository.findById(fresh).orElseThrow().body()).isPresent();
     }
 
-    /** Тело с нулевым байтом, которое не приняли бы ни jsonb, ни text, в карантине лежит байт в байт. */
     @Test
     void quarantineBody_withZeroByte_isStoredByteForByte() {
         byte[] poisoned = {'{', '"', 'a', '"', ':', '"', 0, '"', '}'};
@@ -271,7 +246,6 @@ class AgedInboundMessagesQueryTest {
         return messageId;
     }
 
-    /** Строка старше срока хранения с заданным статусом, причиной исхода и двумя попытками. */
     private UUID storeWithOutcome(OneCStream stream, String status) {
         UUID messageId = store(stream, Duration.ofDays(40));
         testJdbc.update("update inbound_message set status = ?, last_error = ?, attempt = 2 where message_id = ?",

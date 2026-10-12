@@ -25,20 +25,14 @@ import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.repository.Mkb10Row;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Поиск по МКБ-10 до базы: выбор режима поиска, шаблон, пределы строки, выдачи и перечня кодов и раскрытие
- * перечня. Сам SQL проверяет Mkb10ApiTest на настоящей базе.
- */
 @ExtendWith(MockitoExtension.class)
 class Mkb10QueryServiceTest {
 
     private static final Limit DEFAULT_LIMIT = Limit.of(20);
     private static final int MAX_QUERY_LENGTH = 100;
     private static final int MAX_CODES = 100;
-    /** Пределы, которые не совпадают ни с одним другим пределом в настройках. */
     private static final int CONFIGURED_MAX_QUERY_LENGTH = 5;
     private static final int CONFIGURED_MAX_CODES = 3;
-    /** Эмодзи U+1F600: один символ, но в строке Java занимает две единицы UTF-16 (суррогатную пару). */
     private static final String OUTSIDE_BMP = Character.toString(0x1F600);
     private static final Mkb10Row Q06_0 = new Mkb10Row(UUID.fromString("6b1d0000-0000-4000-8000-000000000002"),
             UUID.fromString("6b1d0000-0000-4000-8000-000000000012"), "Q06.0", "Амиелия", 3, "Q06", false);
@@ -106,7 +100,6 @@ class Mkb10QueryServiceTest {
         verifyNoInteractions(mkb10);
     }
 
-    /** Нижний предел тоже считается в символах: два эмодзи — два символа, строка ищется. */
     @Test
     void twoCharactersOutsideBmp_areSearched() {
         String query = OUTSIDE_BMP.repeat(2);
@@ -115,7 +108,6 @@ class Mkb10QueryServiceTest {
         assertThat(service.search(query, null).items()).containsExactly(item(Q06_0));
     }
 
-    /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
     @Test
     void queryAtMaximumLength_isSearched() {
         String query = "ж".repeat(MAX_QUERY_LENGTH);
@@ -137,10 +129,6 @@ class Mkb10QueryServiceTest {
         verifyNoInteractions(mkb10);
     }
 
-    /**
-     * Длина считается в символах, а не в единицах UTF-16: строка ровно в предел символов ищется, хотя её последний
-     * символ лежит вне основной плоскости Юникода и по {@code length()} она на единицу длиннее предела.
-     */
     @Test
     void queryAtMaximumLength_withCharacterOutsideBmp_isSearched() {
         String query = "ж".repeat(MAX_QUERY_LENGTH - 1) + OUTSIDE_BMP;
@@ -150,7 +138,6 @@ class Mkb10QueryServiceTest {
         assertThat(service.search(query, null).items()).containsExactly(item(Q06_0));
     }
 
-    /** Длина проверяется первой: строка сверх предела отклоняется по полю query, даже когда неверен и limit. */
     @Test
     void queryLongerThanMaximum_withLimitOutOfBounds_isValidationErrorOnQuery() {
         String query = "ж".repeat(MAX_QUERY_LENGTH + 1);
@@ -161,10 +148,6 @@ class Mkb10QueryServiceTest {
         verifyNoInteractions(mkb10);
     }
 
-    /**
-     * Предел длины строки — своя настройка МКБ-10. В умолчаниях он равен пределу строки поиска полисов
-     * и максимуму выдачи МКБ-10, поэтому здесь он другой: строка ровно в него ищется, на букву длиннее — нет.
-     */
     @Test
     void queryLength_isLimitedByMkb10Setting() {
         Mkb10QueryService configured = new Mkb10QueryService(new Mkb10Lookup(mkb10),
@@ -180,7 +163,6 @@ class Mkb10QueryServiceTest {
                 });
     }
 
-    /** То же для числа кодов: в умолчаниях оно равно максимуму выдачи МКБ-10, здесь — нет. */
     @Test
     void codesCount_isLimitedByMkb10Setting() {
         Mkb10QueryService configured = new Mkb10QueryService(new Mkb10Lookup(mkb10),
@@ -195,7 +177,6 @@ class Mkb10QueryServiceTest {
                 });
     }
 
-    /** Повторы считаются: число кодов — по запросу как пришёл, а в базу уходят только разные коды. */
     @Test
     void codesAtMaximumCount_withRepeat_areLookedUp() {
         List<String> codes = Stream.concat(distinctCodes(MAX_CODES - 1).stream(), Stream.of("A00")).toList();
@@ -225,10 +206,6 @@ class Mkb10QueryServiceTest {
         assertThat(response.items()).containsExactly(item(Q06_0));
     }
 
-    /**
-     * Перечень через запятую делится на коды ещё до сервиса, поэтому запятая внутри кода значит, что параметр повторён
-     * и в одном из повторов стоит перечень. Такого кода нет, а молча искать его значит вернуть неполный ответ.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"A00,A01", ",", "A00, "})
     void codeWithComma_isValidationErrorOnCodes_namingRule(String code) {

@@ -5,11 +5,6 @@ import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 
-/**
- * Карточка ЛПУ: данные каталога, адрес и прайсовый договор с его сроками. Полей {@code booking_limit_days}
- * и {@code short_description} из ТЗ здесь нет: у них нет источника в потоках 1С, а поле без источника
- * в контракт не попадает.
- */
 public record LpuCardResponse(
         UUID id,
         UUID externalId,

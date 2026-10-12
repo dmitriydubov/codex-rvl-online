@@ -13,7 +13,6 @@ import org.springframework.scheduling.config.IntervalTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import ru.projectx.datareference.config.MetricsProperties;
 
-/** Обновление метрик очереди разбора — одна задача с паузой между проходами из настроек метрик, первая — сразу. */
 @ExtendWith(MockitoExtension.class)
 class InboundBacklogScheduleTest {
 

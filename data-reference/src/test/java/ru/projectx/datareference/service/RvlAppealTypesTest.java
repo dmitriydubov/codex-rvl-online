@@ -12,10 +12,6 @@ import ru.projectx.datareference.repository.AppealTypeRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Виды обращения РВЛ ищутся по наименованиям из конфигурации без учёта регистра и краевых пробелов, а ненайденные
- * называются поимённо: этот перечень сервис пишет в журнал на старте.
- */
 @IntegrationTest
 class RvlAppealTypesTest {
 

@@ -11,11 +11,6 @@ import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.price.ServicePriceCalculator;
 import ru.projectx.datareference.service.price.StayPeriod;
 
-/**
- * Стоимость услуги учреждения за период проживания для сервиса Заявок. Вход проверяется без транзакции, чтобы ошибка
- * вызывающего давала 400 и при недоступной базе; порядок дат проверяется раньше длины периода. Расчёт кэшируется
- * и по сегодняшнему дню, потому что от него зависит выбор прайсового договора.
- */
 @Service
 public class ServicePriceQueryService implements ServicePriceReads {
 

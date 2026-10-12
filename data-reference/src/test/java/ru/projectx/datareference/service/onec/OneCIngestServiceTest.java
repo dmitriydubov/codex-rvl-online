@@ -14,11 +14,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.InboxService;
 
-/**
- * Приём одного сообщения: отметка во входящих решает, сохранять ли сырьё. Общую транзакцию
- * этих двух записей unit-тест не видит — её проверяет {@link OneCIngestServiceTransactionTest}
- * на настоящей базе; здесь — порядок решения и исход для слушателя.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCIngestServiceTest {
 
@@ -42,7 +37,6 @@ class OneCIngestServiceTest {
         verify(inboundMessageService).store(MESSAGE_ID, OneCStream.MKB10, QUEUE, PAYLOAD);
     }
 
-    /** Дубль не сохраняется второй раз: сырьё под этим ключом уже лежит. */
     @Test
     void knownMessage_isNotStoredAgain() {
         when(inboxService.registerIfNew(MESSAGE_ID)).thenReturn(false);

@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
-/** Снимок очереди разбора: число сообщений по паре «поток, статус» и самое давнее из ждущих разбора. */
 class InboundBacklogTest {
 
     private static final Instant NOW = Instant.parse("2026-10-05T12:00:00Z");
@@ -33,7 +32,6 @@ class InboundBacklogTest {
         assertThat(backlog.messages(OneCStream.LPU_CONTACTS, InboundStatus.NEW)).isZero();
     }
 
-    /** Отказ и буфер — не очередь на разбор: их давность не делает поток отстающим. */
     @Test
     void oldestPending_isTheEarliestOfNewAndRetryOnly() {
         assertThat(backlog.oldestPending(OneCStream.POLICIES)).contains(OLDEST);
@@ -51,7 +49,6 @@ class InboundBacklogTest {
         assertThat(empty.takenAt()).isEqualTo(NOW);
     }
 
-    /** Снимок читают потоки скрейпа, поэтому список в нём неизменяем и не связан со списком, из которого собран. */
     @Test
     void statuses_areCopied() {
         List<InboundBacklog.StatusCount> source = new ArrayList<>();

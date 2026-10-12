@@ -8,10 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * REST принимает дату только в записи yyyy-mm-dd и только существующую. Нестрогое чтение приняло бы «2026-02-30»
- * как 28 февраля, а год со знаком дал бы период на тысячи лет, и стоимость посчиталась бы не за тот период.
- */
 class IsoDateEditorTest {
 
     private final IsoDateEditor editor = new IsoDateEditor();
@@ -31,7 +27,6 @@ class IsoDateEditorTest {
         assertThatIllegalArgumentException().isThrownBy(() -> editor.setAsText(text));
     }
 
-    /** Текст отказа может попасть в журнал, поэтому присланное значение в нём не повторяется. */
     @Test
     void rejection_doesNotRepeatTheValue() {
         assertThatIllegalArgumentException()
@@ -39,7 +34,6 @@ class IsoDateEditorTest {
                 .withMessageNotContaining("10.04.2026");
     }
 
-    /** Пустое значение означает «параметра нет», и обработчик отвечает 400 с текстом про обязательный параметр. */
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     void blankValue_isNoValue(String text) {

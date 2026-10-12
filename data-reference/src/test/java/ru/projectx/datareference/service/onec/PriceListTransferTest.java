@@ -24,12 +24,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает главное правило прайс-листов (ТЗ-9): прайс по услуге применяется только целиком.
- *
- * <p>Прайс по одной услуге приходит несколькими пакетами строк и одним финальным сообщением со счётчиками.
- * Если применить часть пакетов, в справочнике окажется неполный прайс, и никто об этом не узнает.
- */
 @IntegrationTest
 class PriceListTransferTest {
 
@@ -80,7 +74,6 @@ class PriceListTransferTest {
                 .formatted(SERVICE_ID, CONTRACT_ID));
     }
 
-    /** Пока не пришло финальное, применять нечего — части ждут в буфере. */
     @Test
     void batchWithoutFinalMessage_waitsInBuffer() {
         UUID batchId = importBatch(rows(1, "4999.95"));
@@ -103,7 +96,6 @@ class PriceListTransferTest {
                 .containsExactlyInAnyOrder(new BigDecimal("4999.95"), new BigDecimal("5999.00"));
     }
 
-    /** Собранная передача закрывает все свои сообщения разом, а не только последнее. */
     @Test
     void completeTransfer_marksEveryMessageProcessed() {
         importBatch(rows(1, "4999.95"));
@@ -114,11 +106,6 @@ class PriceListTransferTest {
                 .containsOnly(InboundStatus.PROCESSED);
     }
 
-    /**
-     * Порядок двух очередей не гарантирован: финальное может прийти раньше последнего
-     * пакета. Условие сборки проверяется на каждом сообщении, поэтому передача
-     * соберётся и в этом случае.
-     */
     @Test
     void finalMessageArrivingFirst_stillAssemblesTransfer() {
         importFinal(2, 2);
@@ -129,11 +116,6 @@ class PriceListTransferTest {
         assertThat(priceRepository.count()).isEqualTo(2);
     }
 
-    /**
-     * Счётчики не сошлись — вся передача в ошибку, прежний прайс не трогается.
-     * Применить неполный прайс значит записать заведомо неверные цены и не узнать
-     * об этом никогда.
-     */
     @Test
     void mismatchedCounters_failWholeTransferAndKeepPreviousPrices() {
         importBatch(rows(1, "4999.95"));
@@ -149,7 +131,6 @@ class PriceListTransferTest {
                 .contains("счётчики передачи");
     }
 
-    /** {@code countMessages = 0} — легальный случай: прайс по услуге очищается. */
     @Test
     void emptyTransfer_clearsPriceList() {
         importBatch(rows(1, "4999.95"));
@@ -161,7 +142,6 @@ class PriceListTransferTest {
         assertThat(priceRepository.count()).isZero();
     }
 
-    /** Прайс по услуге, которой ещё нет, применять некуда: собранная передача целиком ждёт услугу. */
     @Test
     void priceForServiceNotYetReceived_waitsForIt() {
         serviceRepository.deleteAll();
@@ -187,7 +167,6 @@ class PriceListTransferTest {
                 .formatted(CID, SERVICE_ID, countMessages, countRows));
     }
 
-    /** Очистка прайса приходит новой передачей — со своим {@code cid} и без пакетов. */
     private void importFinalOfNewTransfer(int countMessages, int countRows) {
         UUID emptyCid = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000d");
         importOne(OneCStream.PRICE_LISTS, FINAL_QUEUE, """

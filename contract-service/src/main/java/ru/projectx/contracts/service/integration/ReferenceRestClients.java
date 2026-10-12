@@ -24,7 +24,7 @@ final class ReferenceRestClients {
                 .requestFactory(requests)
                 .configureMessageConverters(
                         converters -> converters.withJsonConverter(new JacksonJsonHttpMessageConverter(json)))
-                .defaultStatusHandler(HttpStatusCode::isError, new ReferenceErrorHandler(new ReferenceErrorBodies(json)))
+                .defaultStatusHandler(HttpStatusCode::isError, new ReferenceErrorHandler(new ReferenceErrorCodes(json)))
                 .requestInitializer(ReferenceRestClients::traceRequest);
     }
 

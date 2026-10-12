@@ -8,10 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-/**
- * Защищает причины ожидания и отказа по сроку: дежурный находит по ним сообщения в сырье, а журнал их повторяет.
- * В причине только вид и GUID родителя, без значений из тела сообщения.
- */
 class AwaitedParentTest {
 
     private static final UUID PARENT = UUID.fromString("7b8c9d0e-1f2a-4b3c-8d4e-5f6a7b8c9d01");

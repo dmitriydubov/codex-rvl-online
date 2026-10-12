@@ -15,11 +15,6 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Три прохода по таблице сырья регистрируются с паузами и начальной задержкой из настроек. Регистратор настоящий, но
- * Spring не поднимается: проверяется то, что регистратору передано. Паузы разные, чтобы перепутанные настройки были
- * видны.
- */
 @ExtendWith(MockitoExtension.class)
 class ScheduledPassesTest {
 
@@ -70,10 +65,6 @@ class ScheduledPassesTest {
         verifyNoInteractions(importScheduler, retention);
     }
 
-    /**
-     * Задачи — с паузой между проходами, а не с постоянной частотой: долгий проход разбора не должен
-     * накладываться на следующий, иначе одно сообщение разбирали бы два прохода сразу.
-     */
     @Test
     void allThreePasses_areFixedDelayTasksOnly() {
         ScheduledTaskRegistrar registrar = configured();

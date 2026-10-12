@@ -9,10 +9,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Строка условий обслуживания хранит слой, процент сооплаты и период как пришли; ссылка на программу у неё
- * необязательна.
- */
 class PolicyServiceLineTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");

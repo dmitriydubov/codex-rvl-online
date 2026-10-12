@@ -6,10 +6,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.PriceListItem;
 
-/**
- * Строка прайса для расчёта стоимости: действует по {@code validTo} включительно, пустой {@code validTo} значит
- * бессрочно. Идентификатор нужен, чтобы две строки с одинаковыми датами и ценами не слились в одну.
- */
 public record PriceLine(
         UUID id,
         LocalDate validFrom,

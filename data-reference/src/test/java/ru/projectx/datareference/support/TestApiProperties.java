@@ -4,11 +4,6 @@ import java.time.ZoneId;
 import java.util.List;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 
-/**
- * Настройки REST-чтения для unit-тестов сервисов — те же значения, что умолчания
- * {@code application.yml} и записи {@link ReferenceApiProperties}: пределы, по которым
- * тест проверяет отказ, видны в одном месте.
- */
 public final class TestApiProperties {
 
     public static final ZoneId ZONE = ZoneId.of("Europe/Moscow");
@@ -32,23 +27,14 @@ public final class TestApiProperties {
         return withPriceMaxNights(MAX_NIGHTS);
     }
 
-    /** Умолчания, кроме предела длины периода расчёта стоимости в ночах. */
     public static ReferenceApiProperties withPriceMaxNights(int maxNights) {
         return properties(search(MAX_QUERY_LENGTH), mkb10(MAX_QUERY_LENGTH, MAX_CODES), maxNights);
     }
 
-    /**
-     * Умолчания, кроме верхнего предела длины строки поиска полисов. В умолчаниях этот предел равен пределу
-     * МКБ-10, и тест не отличил бы, какую из двух настроек читает поиск полисов; здесь их значения разные.
-     */
     public static ReferenceApiProperties withPolicySearchMaxQueryLength(int maxQueryLength) {
         return withSearchLimits(search(maxQueryLength), mkb10(MAX_QUERY_LENGTH, MAX_CODES));
     }
 
-    /**
-     * Умолчания, кроме верхних пределов МКБ-10: длины строки поиска и числа кодов в перечне. В умолчаниях оба
-     * равны максимуму выдачи МКБ-10 и пределу строки поиска полисов; здесь значения разные.
-     */
     public static ReferenceApiProperties withMkb10InputLimits(int maxQueryLength, int maxCodes) {
         return withSearchLimits(search(MAX_QUERY_LENGTH), mkb10(maxQueryLength, maxCodes));
     }

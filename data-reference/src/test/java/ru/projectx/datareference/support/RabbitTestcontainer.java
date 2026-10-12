@@ -16,18 +16,9 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/**
- * Настоящий RabbitMQ для тестов приёма: подтверждения, возврата в очередь и повторной доставки у мока нет. Адрес
- * подставляет {@link ServiceConnection}, а без Docker берётся внешний брокер ({@link TestBroker}). Очереди объявляет
- * тест, потому что в контуре их заводит 1С:УСК и сервис их не создаёт ({@code spring.rabbitmq.dynamic: false}).
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {
 
-    /**
-     * Та же версия, что у брокера 1С:УСК в контуре (RabbitMQ 4.1.2, Erlang 27.3.4.2): подтверждения и возврат в очередь
-     * проверяются на ней, а не на последней 4.1.x, которую принёс бы плавающий тег.
-     */
     private static final String IMAGE = "rabbitmq:4.1.2-alpine";
 
     @Bean
@@ -37,10 +28,6 @@ public class RabbitTestcontainer {
         return new RabbitMQContainer(IMAGE);
     }
 
-    /**
-     * Адрес в виде {@code amqp://user:password@host:port/vhost} — Boot разбирает из него
-     * и хост с портом, и учётные данные, и виртуальный хост.
-     */
     @Bean
     @ConditionalOnExpression("!'${" + TestBroker.URL_PROPERTY + ":}'.isEmpty()")
     public DynamicPropertyRegistrar externalBroker(Environment environment) {
@@ -48,19 +35,11 @@ public class RabbitTestcontainer {
         return registry -> registry.add("spring.rabbitmq.addresses", () -> url);
     }
 
-    /**
-     * {@code RabbitAdmin} объявляет очереди на первом же соединении — то есть раньше,
-     * чем потребители начнут к ним подключаться.
-     */
     @Bean
     public RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
         return new RabbitAdmin(connectionFactory);
     }
 
-    /**
-     * Все очереди контура перечислены намеренно: потребитель без своей очереди на брокере останавливается
-     * ({@code missing-queues-fatal: true}), поэтому новый поток без очереди тест не пропустит.
-     */
     @Bean
     public Declarables oneCQueues(OneCQueueProperties queues) {
         List<Declarable> declarations = Stream.of(

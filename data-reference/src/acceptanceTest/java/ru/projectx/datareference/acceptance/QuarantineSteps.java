@@ -14,15 +14,8 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.mapper.OneCGuid;
 import ru.projectx.datareference.service.schedulers.PersonalDataRetention;
 
-/**
- * Шаги о карантине сообщений 1С:УСК и его сроке хранения.
- *
- * <p>Срок хранения — настройка сервиса; сценарий закрепляет границу: запись на час старше срока стирается,
- * на час моложе — нет. Проход стирания — тот же, что стирает тела полисов, вызванный явно.
- */
 public class QuarantineSteps {
 
-    /** Запас на доставку через брокер и запись карантина; ожидание по условию, а не сон. */
     private static final Duration DELIVERY_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration HOUR = Duration.ofHours(1);
     private static final Map<String, UnaryOperator<Duration>> AGE_AROUND_TTL = Map.of(
@@ -44,10 +37,6 @@ public class QuarantineSteps {
         this.properties = properties;
     }
 
-    /**
-     * Причина сравнивается дословно: в ней ровно код SQLSTATE и нет текста ошибки базы. Запись появляется после
-     * доставки через брокер, поэтому шаг ждёт её, а не читает немедленно.
-     */
     @Тогда("сообщение {string} лежит в карантине очереди {string} с причиной {string}")
     public void quarantinedWithReason(String messageId, String stream, String reason) {
         await().atMost(DELIVERY_TIMEOUT).untilAsserted(

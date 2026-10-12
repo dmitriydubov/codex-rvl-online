@@ -4,11 +4,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Цепочка причин непредвиденной ошибки для журнала: тип и место каждой причины без текстов, в которых бывают SQL и
- * персональные данные. Обёртки Spring прячут настоящую причину, поэтому верхнего типа мало; цепочка обрезается на
- * десяти причинах, потому что может замкнуться в кольцо.
- */
 final class FailureTrace {
 
     private static final int MAX_CAUSES = 10;

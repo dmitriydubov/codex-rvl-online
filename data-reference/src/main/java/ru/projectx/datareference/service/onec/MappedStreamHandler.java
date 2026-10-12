@@ -3,17 +3,11 @@ package ru.projectx.datareference.service.onec;
 import java.util.UUID;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Обычный путь сообщения 1С: маппер потока разбирает его, а исход записывается в ту же строку сырья. Применённое или
- * пропущенное сообщение закрывает более старые сообщения той же записи, которые ещё ждут родителя, потому что в
- * справочнике действует последнее полученное.
- */
 class MappedStreamHandler implements StreamHandler {
 
     private static final String APPLIED = "применено";
@@ -36,7 +30,6 @@ class MappedStreamHandler implements StreamHandler {
         return mapper.stream();
     }
 
-    /** @throws OneCFieldException если сообщение нарушает контракт */
     @Override
     public ImportOutcome handle(InboundMessage message, ObjectNode data) {
         UUID messageId = message.receipt().messageId();

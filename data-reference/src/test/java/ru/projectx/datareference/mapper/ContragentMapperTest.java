@@ -32,11 +32,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор потока контрагентов: санаторий принимается только с видом деятельности «РВЛ», а санаторий без него
- * и страхователь запоминаются как не наши, чтобы их договоры и контакты пропускались сразу, а не ждали до отказа.
- * GUID вида «РВЛ» не в канонической форме останавливает старт, иначе все санатории молча ушли бы в пропуск.
- */
 class ContragentMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -172,10 +167,6 @@ class ContragentMapperTest {
         assertThat(known.inn()).isEqualTo("7700000000");
     }
 
-    /**
-     * ИНН и КПП хранятся в колонках на 12 и 9 символов, и более длинное значение — испорченное. Сообщение
-     * отклоняется с именем поля и пределом; пробелы по краям в длину не входят.
-     */
     @ParameterizedTest
     @CsvSource({"true, ИНН, 12", "true, КПП, 9", "false, ИНН, 12", "false, КПП, 9"})
     void requisiteLongerThanItsColumn_isContractViolation(boolean sanatorium, String field, int limit) {
@@ -215,10 +206,6 @@ class ContragentMapperTest {
         assertThat("ИНН".equals(field) ? insurer.inn() : insurer.kpp()).isEqualTo("7".repeat(limit));
     }
 
-    /**
-     * Отсутствующий реквизит хранится как отсутствующий, а не как пустая строка:
-     * иначе соседние сервисы получили бы «пустое значение» вместо «нет значения».
-     */
     @Test
     void sanatoriumWithoutOptionalDetails_storesThemAsAbsent() {
         when(lpuRepository.findByExternalId(CONTRAGENT)).thenReturn(Optional.empty());

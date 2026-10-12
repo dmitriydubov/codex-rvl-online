@@ -6,10 +6,6 @@ import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.orm.jpa.JpaSystemException;
 
-/**
- * Обёртки Spring прячут настоящую причину, поэтому запись об ошибке называет каждую причину в цепочке и её место.
- * Тексты исключений в неё не попадают: в них бывают SQL и персональные данные.
- */
 class FailureTraceTest {
 
     private static final String FOREIGN_TEXT = "Иванов Иван 1980-05-17";
@@ -38,7 +34,6 @@ class FailureTraceTest {
         assertThat(FailureTrace.of(failure)).isEqualTo("java.lang.IllegalStateException at место неизвестно");
     }
 
-    /** Цепочка причин может замкнуться в кольцо, и запись не должна расти без конца. */
     @Test
     void cyclicCauses_areCutAfterTenEntries() {
         IllegalStateException first = new IllegalStateException(FOREIGN_TEXT);

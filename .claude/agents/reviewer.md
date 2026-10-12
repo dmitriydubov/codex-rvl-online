@@ -69,7 +69,8 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    headers, changeSet `comment:` fields, `#!` lines, `.env.example`, `.gitignore`, the header of the
    `publicRepositories` switch in `settings.gradle` and the commented-out «Nexus only» variant; the comments on
    wiring the external quality gates in `settings.gradle` and `build.gradle` are not exceptions). A
-   non-obvious reason introduced by the change must be written to the module README, section «Почему так устроено»,
+   non-obvious reason introduced by the change must be written to the module README, section «Почему так устроено»
+   (a reason needed only by acceptance tests - to `src/acceptanceTest/README.md`, which never reaches the contour),
    in plain human language - flag a missing one. Flag plan or document codes and edit history in the README. A change
    that only removes comments must prove that code and values did not change (identical bytecode, YAML tree,
    `docker compose config`, Dockerfile lines without comments) - flag a missing proof.

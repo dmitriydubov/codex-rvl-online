@@ -13,16 +13,10 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Санаторий, где обслуживают по программе страхования, и условия обслуживания. Устойчивого ключа 1С у строки нет,
- * перечень замещается целиком, поэтому {@link OneCEntity} не наследуется. Вид обращения хранится GUID'ом, чтобы
- * строка не пропадала из-за справочника, который ещё не пришёл.
- */
 @Entity
 @Table(name = "program_lpu")
 public class ProgramLpu {
 
-    /** Часть покрытия: R означает рисковую, D депозитную; так её обозначает 1С. */
     public enum CoverageType {
         R, D
     }
@@ -66,7 +60,6 @@ public class ProgramLpu {
     private Instant createdAt;
 
     protected ProgramLpu() {
-        // JPA
     }
 
     private ProgramLpu(Program program, Row row, Instant now) {
@@ -87,7 +80,6 @@ public class ProgramLpu {
         return new ProgramLpu(program, row, now);
     }
 
-    /** Разобранная строка перечня санаториев программы: санаторий уже найден, часть покрытия определена. */
     public record Row(
             Lpu lpu,
             @Nullable UUID externalAppealTypeId,

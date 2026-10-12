@@ -7,10 +7,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Разбирает время в записи параметров PostgreSQL 16: целое число и необязательная единица с учётом регистра,
- * без единицы миллисекунды. Дробное значение PostgreSQL округляет, а здесь оно даёт пусто, чтобы не гадать.
- */
 final class PostgresDurations {
 
     private static final Pattern VALUE = Pattern.compile("(\\d+)\\s*(us|ms|s|min|h|d)?");

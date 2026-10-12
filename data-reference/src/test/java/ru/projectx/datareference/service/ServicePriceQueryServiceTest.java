@@ -21,10 +21,6 @@ import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Период проверяется до чтения базы: выезд не позже заезда и период длиннее предела ночей — ошибки вызывающего, и они
- * дают 400 даже при недоступной базе. Верный период уходит на чтение, а расчёт по строкам прайса идёт после транзакции.
- */
 @ExtendWith(MockitoExtension.class)
 class ServicePriceQueryServiceTest {
 
@@ -85,7 +81,6 @@ class ServicePriceQueryServiceTest {
         verifyNoInteractions(lookup);
     }
 
-    /** Ровно предел ночей — верный период: он уходит на чтение, а не отклоняется. */
     @Test
     void stayOfExactlyMaxNights_isReadFromDatabase() {
         ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
@@ -111,7 +106,6 @@ class ServicePriceQueryServiceTest {
         verifyNoInteractions(lookup);
     }
 
-    /** Период, в котором ночей больше, чем помещается в int, — тот же отказ по пределу, а не сбой подсчёта. */
     @Test
     void periodBeyondIntRange_isRefusedAsTooLong_withoutReadingDatabase() {
         ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());
@@ -124,7 +118,6 @@ class ServicePriceQueryServiceTest {
         verifyNoInteractions(lookup);
     }
 
-    /** Предел берётся из настройки, а не из числа в коде: и граница, и текст отказа следуют за ней. */
     @Test
     void configuredMaxNights_decidesBoundaryAndReason() {
         ServicePriceQueryService prices =
@@ -140,7 +133,6 @@ class ServicePriceQueryServiceTest {
                         assertThat(invalid.getMessage()).isEqualTo("не больше 30 ночей после date_from"));
     }
 
-    /** Выезд намного раньше заезда — по-прежнему ошибка порядка дат, а не длины: порядок проверяется первым. */
     @Test
     void longReversedStay_isRefusedForDateOrder() {
         ServicePriceQueryService prices = new ServicePriceQueryService(lookup, TestApiProperties.defaults());

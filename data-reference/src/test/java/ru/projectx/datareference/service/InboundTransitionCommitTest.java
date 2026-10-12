@@ -16,18 +16,12 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Счёт переходов статусов с настоящим менеджером транзакций и PostgreSQL: переход считается при фиксации, откат его
- * не считает. Временная ошибка пишется в своей транзакции ({@code REQUIRES_NEW}) и считается при её фиксации, даже если
- * внешняя транзакция потом откатилась.
- */
 @IntegrationTest
 class InboundTransitionCommitTest {
 
     private static final ParseFailure.Temporary TIMEOUT = new ParseFailure.Temporary(
             "временный отказ базы данных: QueryTimeoutException, SQLSTATE 57014", "QueryTimeoutException", "57014");
 
-    /** Исход только что сохранённого сообщения: таким разбор его прочитал до неудавшейся попытки. */
     private static final InboundOutcome NEW = new InboundOutcome(InboundStatus.NEW, 0, null, null, null, null);
 
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
@@ -72,7 +66,6 @@ class InboundTransitionCommitTest {
         assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(before);
     }
 
-    /** Временная ошибка пишется после отката разбора, в своей транзакции: её фиксация и считается. */
     @Test
     void temporaryFailureInItsOwnTransaction_isCountedDespiteOuterRollback() {
         UUID messageId = stored();

@@ -22,21 +22,14 @@ import ru.projectx.datareference.support.AmqpIntegrationTest;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.RunningListeners;
 
-/**
- * Защищает порядок приёма при временном отказе записи сырья на настоящих брокере и базе: потребители всех очередей
- * встают на паузу, а после восстановления сообщения записываются в порядке очереди. Версий у сообщений нет, поэтому
- * порядок записи обязан совпадать с порядком очереди, даже если первое сообщение записалось не с первой попытки.
- */
 @AmqpIntegrationTest
 class OneCQueueOrderTest {
 
     private static final int MESSAGES = 5;
 
-    /** Запас на пять доставок и остановку контейнеров. */
     private static final Duration PAUSE_TIMEOUT = Duration.ofSeconds(30);
     private static final Duration ALL_WRITTEN_TIMEOUT = Duration.ofSeconds(30);
 
-    /** Отдельная схема не попадает под очистку базы и удаляется после теста. */
     private static final String PROBE_SCHEMA = "create schema order_probe";
 
     private static final String ATTEMPTS = "create sequence order_probe.attempts";
@@ -47,11 +40,6 @@ class OneCQueueOrderTest {
                 message_id uuid not null
             )""";
 
-    /**
-     * Настоящий отказ базы: первая запись первого сообщения падает с 55P03, как блокировка дольше {@code lock_timeout},
-     * а протокол хранит только дошедшие до коммита записи. Счётчик попыток — последовательность, её {@code nextval} не
-     * откатывается; вложенный {@code if} вместо {@code and} нужен, потому что порядок вычисления условий SQL не задан.
-     */
     private static final String FAIL_FIRST_THEN_LOG = """
             create function order_probe.fail_first_then_log() returns trigger
             language plpgsql as $$
@@ -78,7 +66,6 @@ class OneCQueueOrderTest {
 
     private static final String FIRST_MESSAGE_ATTEMPTS = "select last_value from order_probe.attempts";
 
-    /** Попытки записи первого сообщения: отказ и удачная повторная. */
     private static final long FAILED_THEN_WRITTEN = 2;
 
     private static final String LOCK_NOT_AVAILABLE = "55P03";
@@ -109,13 +96,11 @@ class OneCQueueOrderTest {
         databaseCleaner.clear();
     }
 
-    /** Без работающих слушателей ожидание ниже кончилось бы таймаутом, не назвав причину. */
     @BeforeEach
     void listenersAreRunning() {
         RunningListeners.assertAllRunning(listeners);
     }
 
-    /** Потребители возвращаются и после провала теста: контекст общий с другими тестами приёма. */
     @AfterEach
     void removeProbeAndResume() {
         jdbc.sql(DROP_TRIGGER).update();
@@ -124,7 +109,6 @@ class OneCQueueOrderTest {
         pause.resumeIfStorageAvailable();
     }
 
-    /** Проверка доступности базы вызывается явно, потому что расписания в тестах выключены. */
     @Test
     void firstMessageWriteFails_consumersPauseAndQueueOrderIsKeptAfterResume() {
         List<UUID> queueOrder = Stream.generate(UUID::randomUUID).limit(MESSAGES).toList();

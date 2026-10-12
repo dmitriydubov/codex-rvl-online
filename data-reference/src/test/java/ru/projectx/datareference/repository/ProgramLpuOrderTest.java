@@ -20,11 +20,6 @@ import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Порядок строк перечня программы задаёт запрос, поэтому он проверяется на настоящем PostgreSQL. Строки сохранены
- * в обратном порядке, а следующий ключ ставит их наоборот: без проверяемого ключа порядок изменился бы,
- * а не совпал бы случайно.
- */
 @IntegrationTest
 class ProgramLpuOrderTest {
 
@@ -160,7 +155,6 @@ class ProgramLpuOrderTest {
                 ProgramLpu.CoverageType.R);
     }
 
-    /** Строка перечня с одинаковыми умолчаниями: тест меняет ровно тот ключ, который проверяет. */
     private record RowSpec(
             Lpu lpu,
             @Nullable UUID appealTypeId,

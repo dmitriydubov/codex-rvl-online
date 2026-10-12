@@ -13,16 +13,10 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Полис застрахованного из 1С; отдельного застрахованного лица в контракте нет, родственники приходят своими полисами.
- * ФИО, дата рождения и почта — персональные данные: в журнал они не попадают и стираются по сроку хранения, а строка
- * полиса остаётся, потому что на неё ссылается сервис Договоров. Обе табличные части замещаются целиком.
- */
 @Entity
 @Table(name = "policies")
 public class Policy extends OneCEntity {
 
-    /** Договор страхования хранится GUID'ом без внешнего ключа: полис может прийти раньше своего договора. */
     @Column(name = "external_contract_id", nullable = false)
     private UUID externalContractId;
 
@@ -48,14 +42,12 @@ public class Policy extends OneCEntity {
     @Nullable
     private String gender;
 
-    /** Адрес, которым человек входит в личный кабинет. */
     @Nullable
     private String email;
 
     @Column(name = "begin_date", nullable = false)
     private LocalDate beginDate;
 
-    /** Пусто означает открытую дату источника, а не «полис без срока». */
     @Nullable
     @Column(name = "end_date")
     private LocalDate endDate;
@@ -63,7 +55,6 @@ public class Policy extends OneCEntity {
     @Column(nullable = false)
     private boolean availability;
 
-    /** Когда сообщение 1С перевело полис в архив; пусто, пока полис не в архиве. Повторная присылка его не сдвигает. */
     @Nullable
     @Column(name = "archived_at")
     private Instant archivedAt;
@@ -72,7 +63,6 @@ public class Policy extends OneCEntity {
     @Column(name = "personal_data_erased_at")
     private Instant personalDataErasedAt;
 
-    // Не final: Hibernate при загрузке подменяет коллекции своими, а Jakarta Persistence запрещает final у полей.
     @OneToMany(mappedBy = "policy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PolicyProgram> programs = new ArrayList<>();
 
@@ -80,14 +70,12 @@ public class Policy extends OneCEntity {
     private List<PolicyServiceLine> serviceLines = new ArrayList<>();
 
     protected Policy() {
-        // JPA
     }
 
     private Policy(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Поля заполняет фабрика, а не конструктор: конструктору нельзя вызывать переопределяемый метод заполнения. */
     public static Policy create(UUID externalId, Snapshot snapshot, Instant now) {
         Policy policy = new Policy(externalId, now);
         policy.applySnapshot(snapshot, now);
@@ -113,10 +101,6 @@ public class Policy extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /**
-     * Стирает ФИО, дату рождения и почту, если полис кончился или ушёл в архив раньше границы хранения. Время
-     * обновления не меняется, потому что стирание не сообщение 1С; новое сообщение принесёт эти данные снова.
-     */
     public void erasePersonalDataBeyond(PersonalDataCutoff cutoff, Instant now) {
         if (endedBefore(cutoff.endedBefore()) || archivedBy(cutoff.archivedBy())) {
             this.lastName = null;
@@ -132,7 +116,6 @@ public class Policy extends OneCEntity {
         return personalDataErasedAt != null;
     }
 
-    /** Повторная присылка пометки удаления не новый перевод в архив, поэтому момент перевода не сдвигается. */
     private @Nullable Instant archivedSince(boolean deleteMark, Instant now) {
         if (!deleteMark) {
             return null;
@@ -159,7 +142,6 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /** Сообщение о полисе целиком: поля и табличные части применяются только вместе, чтобы не разойтись. */
     public record Snapshot(
             Details details,
             List<PolicyProgram.Row> programs,
@@ -171,7 +153,6 @@ public class Policy extends OneCEntity {
         }
     }
 
-    /** Поля самого полиса; в {@link #details()} ФИО и дата рождения пусты, если они стёрты по сроку хранения. */
     public record Details(
             UUID externalContractId,
             String number,
@@ -186,14 +167,12 @@ public class Policy extends OneCEntity {
             boolean availability,
             boolean deleteMark) {
 
-        /** Без ФИО, даты рождения, пола, почты и номера полиса: запись может случайно попасть в журнал. */
         @Override
         public String toString() {
             return "Details[externalContractId=" + externalContractId + "]";
         }
     }
 
-    /** Поля полиса, как их применило последнее сообщение; пометка удаления здесь равна признаку архивности. */
     public Details details() {
         return new Details(externalContractId, number, lastName, firstName, middleName, dateOfBirth, gender, email,
                 beginDate, endDate, availability, isArchive());

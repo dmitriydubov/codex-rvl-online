@@ -10,11 +10,6 @@ import ru.projectx.datareference.repository.QuarantineRepository;
 import ru.projectx.datareference.repository.StatusBacklog;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
-/**
- * Читает снимок очереди разбора запросами, которые только считают строки и не читают ни тела, ни персональные данные.
- * Пороги те же, что у задач хранения и тревоги о зависших передачах ({@link ImportProperties}). Одна транзакция
- * только для чтения делает снимок согласованным.
- */
 @Component
 public class InboundBacklogReads {
 

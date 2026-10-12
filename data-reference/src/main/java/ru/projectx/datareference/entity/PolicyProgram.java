@@ -13,11 +13,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Программа, подключённая застрахованному по полису (поток полисов, ТЗ-1). Лимит хранится как есть, а доплату
- * сервис не считает: контракт описывает сразу процент франшизы и превышение лимита и не объясняет, как они сочетаются.
- * Программа указана GUID'ом без ссылки, потому что программы не РВЛ в справочнике нет намеренно.
- */
 @Entity
 @Table(name = "policy_programs")
 public class PolicyProgram {
@@ -65,7 +60,6 @@ public class PolicyProgram {
     private Instant createdAt;
 
     protected PolicyProgram() {
-        // JPA
     }
 
     private PolicyProgram(Policy policy, Row row, Instant now) {
@@ -87,7 +81,6 @@ public class PolicyProgram {
         return new PolicyProgram(policy, row, now);
     }
 
-    /** Разобранная строка табличной части программ. */
     public record Row(
             UUID externalProgramId,
             LocalDate beginDate,

@@ -19,10 +19,6 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 
-/**
- * Договор страхования по {@code id} и по GUID 1С: страхователь подтягивается по GUID и может
- * отсутствовать (ТЗ-2) — тогда {@code insurer} пуст, а договор отдаётся.
- */
 @ExtendWith(MockitoExtension.class)
 class InsuranceContractQueryServiceTest {
 

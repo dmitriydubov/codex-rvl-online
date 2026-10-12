@@ -3,11 +3,6 @@ package ru.projectx.datareference.service;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;
 
-/**
- * Решает, повторить разбор сообщения 1С:УСК позже или сразу отклонить. Повторяется только временный отказ базы
- * по тому же перечню, по которому REST отвечает 503; нарушение контракта, значение, которое база не принимает,
- * и ошибка кода разбора отклоняются сразу и ждут дежурного.
- */
 @Component
 public class ParseFailures {
 
@@ -36,7 +31,6 @@ public class ParseFailures {
                 outage.type(), outage.sqlState());
     }
 
-    /** Своя ошибка разбора называет поле без значения и идёт в причину как есть; у чужой берётся только тип. */
     private static ParseFailure permanent(RuntimeException failure) {
         String type = failure.getClass().getSimpleName();
         String reason = failure instanceof OneCFieldException own

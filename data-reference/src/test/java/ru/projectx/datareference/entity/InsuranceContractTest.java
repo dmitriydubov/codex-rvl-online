@@ -9,10 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-/**
- * Защищает применение сообщения к договору страхования уже при создании и замену полей целиком, включая пустые.
- * Договор действует в дни своего срока включительно и только пока он не в архиве.
- */
 class InsuranceContractTest {
 
     private static final UUID EXTERNAL_ID = UUID.fromString("1c2d3e4f-5a6b-4c7d-8e9f-000000000001");

@@ -35,11 +35,6 @@ import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает замещение прейскуранта услуги собранной передачей: старые строки снимаются целиком, а пустая передача
- * очищает прейскурант. Строки разбираются до снятия старых цен, поэтому битая строка не трогает прежний прейскурант,
- * как и передача по не нашей или ещё не пришедшей услуге. Данные вымышленные.
- */
 class PriceListMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -168,7 +163,6 @@ class PriceListMapperTest {
         verify(repository, never()).saveAll(any());
     }
 
-    /** Проверка строки ещё до сборки передачи: те же правила, что при замещении, и ничего не пишется. */
     @Test
     void checkedRow_followsTheSameRulesAsReplacement_withoutTouchingPrices() {
         ObjectNode withoutPrice = row(1, "830");
@@ -210,7 +204,6 @@ class PriceListMapperTest {
         return saved.getValue();
     }
 
-    /** Собранная передача: GUID услуги и строки всех её сообщений. */
     private static ObjectNode transfer(ObjectNode... rows) {
         ObjectNode transfer = JSON.createObjectNode();
         transfer.put("keyValue", SERVICE.toString());

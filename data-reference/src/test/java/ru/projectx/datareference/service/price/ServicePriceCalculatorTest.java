@@ -10,11 +10,6 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 
-/**
- * Расчёт по суткам: каждые сутки периода должны попасть ровно в одну строку прайса. Две строки на одни сутки —
- * отказ с перечнем строк, сутки без строки — отказ с перечнем непокрытых интервалов, частичного расчёта нет.
- * Подряд идущие сутки одной строки — один отрезок, а смежные строки с одинаковой ценой — разные отрезки.
- */
 class ServicePriceCalculatorTest {
 
     private static final UUID SERVICE_ID = UUID.fromString("5e000000-0000-4000-8000-000000000001");
@@ -143,7 +138,6 @@ class ServicePriceCalculatorTest {
         assertThat(breakdown.segments()).containsExactly(new PriceSegment(APRIL_10, MAY_5, inside));
     }
 
-    /** Расчёт идёт по границам строк прайса, поэтому период на тысячи лет не перебирается по суткам. */
     @Test
     void periodOfThousandsOfYears_isPricedByLineBoundaries() {
         LocalDate checkOut = LocalDate.of(9999, 12, 31);

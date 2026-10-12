@@ -12,10 +12,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Собранная передача прайса для замещения: GUID услуги из финального сообщения и строки всех пакетов одним набором.
- * Строки сортируются по номеру, потому что после доставки двумя очередями другого источника порядка нет.
- */
 final class PriceListTransferRows {
 
     private static final String KEY_VALUE = "keyValue";
@@ -29,10 +25,6 @@ final class PriceListTransferRows {
         this.envelope = new StoredEnvelope(json);
     }
 
-    /**
-     * @param parsed тела частей, разобранные заранее; сырьё читается только для части, которой среди них нет
-     * @throws OneCFieldException если тело части стёрто или не читается, или у строки нет целого номера
-     */
     ObjectNode of(PriceListTransfer.Assembled transfer, ParsedTransferParts parsed) {
         ObjectNode assembled = json.createObjectNode();
         assembled.set(KEY_VALUE, dataOf(transfer.finalMessage(), parsed).path(KEY_VALUE));
@@ -45,7 +37,6 @@ final class PriceListTransferRows {
         return assembled;
     }
 
-    /** @throws OneCFieldException если в финальном сообщении нет GUID услуги */
     static UUID serviceOf(ObjectNode assembled) {
         return OneCValues.requiredUuid(assembled, KEY_VALUE);
     }

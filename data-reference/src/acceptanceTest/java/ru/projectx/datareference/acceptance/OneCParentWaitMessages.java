@@ -13,12 +13,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Сообщения 1С:УСК для сценариев о записи, пришедшей раньше своего родителя: контрагент без вида деятельности РВЛ,
- * контактная информация любого контрагента и пачка договоров санаториев, которых 1С:УСК не присылала.
- *
- * <p>Ожидаемый статус у таких сообщений не проверяет ни один шаг «разобрал»: исход проверяют шаги «Тогда».
- */
 final class OneCParentWaitMessages {
 
     private static final JsonMapper JSON = JsonMapper.shared();
@@ -32,7 +26,6 @@ final class OneCParentWaitMessages {
     private OneCParentWaitMessages() {
     }
 
-    /** Контрагент-ЛПУ (ТЗ-3), в видах деятельности которого нет РВЛ: сервис признаёт его не нашим. */
     static OneCMessage sanatoriumWithoutRvl(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование");
         ObjectNode data = JSON.createObjectNode()
@@ -44,10 +37,6 @@ final class OneCParentWaitMessages {
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.SKIPPED);
     }
 
-    /**
-     * Контактная информация контрагента (ТЗ-8): GUID контрагента в фильтре и в строке набора, одна строка —
-     * действительный фактический адрес с представлением и регионом.
-     */
     static OneCMessage contragentContacts(Map<String, String> table) {
         onlyKnown(table, OneCMessages.MESSAGE_ID, CONTRAGENT, "адрес", "регион");
         String contragent = required(table, CONTRAGENT);
@@ -66,10 +55,6 @@ final class OneCParentWaitMessages {
                 OneCMessages.fixedMessageId(table));
     }
 
-    /**
-     * {@code count} договоров ЛПУ (ТЗ-5) по порядку: у каждого свой GUID договора, свой номер и свой GUID санатория,
-     * которого 1С:УСК не присылала. GUID выводятся из номера договора, поэтому повторный прогон кладёт те же строки.
-     */
     static List<OneCMessage> contractsOfUnknownSanatoriums(int count) {
         return IntStream.rangeClosed(1, count).mapToObj(OneCParentWaitMessages::contractOfUnknownSanatorium).toList();
     }

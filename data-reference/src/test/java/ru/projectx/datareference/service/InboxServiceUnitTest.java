@@ -18,10 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.InboxEntry;
 import ru.projectx.datareference.repository.InboxRepository;
 
-/**
- * Решение «новое сообщение или повтор» без базы, с заглушкой журнала известных {@code message-id}. Что повтор
- * не перезаписывает строку и что гонку закрывает первичный ключ, проверяет {@link InboxServiceTest} на PostgreSQL.
- */
 @ExtendWith(MockitoExtension.class)
 class InboxServiceUnitTest {
 

@@ -8,10 +8,6 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ParentKind;
 
-/**
- * Защищает исход применения сообщения 1С. Пропуск без причины запрещён, иначе «данных нет» и «фильтр задан неверно»
- * выглядят в базе одинаково; ожидание без родителя запрещено, иначе разбор не знал бы, когда брать сообщение снова.
- */
 class ImportResultTest {
 
     private static final AwaitedParent CONTRAGENT =
@@ -52,7 +48,6 @@ class ImportResultTest {
                 .hasMessage("parent");
     }
 
-    /** Исходы сравниваются по смыслу: на этом держатся тесты разбора, сравнивающие исход с ожидаемым. */
     @Test
     void outcomes_areEqualByMeaning() {
         assertThat(ImportResult.applied()).isEqualTo(ImportResult.applied());

@@ -11,7 +11,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.AppealTypeRepository;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Разбирает справочник видов обращения за медицинской помощью из 1С:УСК целиком, без фильтра. */
 @Component
 public class AppealTypeMapper extends UnfilteredStreamMapper<AppealType, AppealType.Details> {
 

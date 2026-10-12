@@ -5,11 +5,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * В периоде проживания есть сутки без строки прайса услуги. Частичную сумму сервис не отдаёт, а отвечает 422
- * и перечисляет непокрытые интервалы. Исключение отдельное от отказа по договору ЛПУ (лечебно-профилактического
- * учреждения), потому что здесь виновата услуга, а не учреждение.
- */
 public final class PriceNotCoveredException extends ServicePriceListException {
 
     @Serial
@@ -28,7 +23,6 @@ public final class PriceNotCoveredException extends ServicePriceListException {
         return intervals;
     }
 
-    /** Непокрытые сутки подряд: с {@code dateFrom} включительно до {@code dateTo} не включительно, как период. */
     public record Interval(LocalDate dateFrom, LocalDate dateTo) {
     }
 }

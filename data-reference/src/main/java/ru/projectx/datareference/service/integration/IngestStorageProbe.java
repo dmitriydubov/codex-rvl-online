@@ -11,11 +11,6 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InboxRepository;
 import ru.projectx.datareference.service.SqlStates;
 
-/**
- * Проверка, принимает ли база записи приёма из 1С:УСК: короткой транзакцией ищет строку с нулевым GUID, которой не
- * бывает, в журнале входящих и сырье. Читаются именно таблицы приёма, чтобы проверка упиралась в те же блокировки, что
- * и запись, и потребители не возвращались, пока таблицы держит чужая долгая операция.
- */
 @Component
 public class IngestStorageProbe {
 
@@ -37,14 +32,12 @@ public class IngestStorageProbe {
         this.readOnly = template;
     }
 
-    /** {@code true}, если обе таблицы приёма прочитались; любой отказ чтения — база недоступна. */
     public boolean storageAvailable() {
         try {
             readOnly.executeWithoutResult(status -> touchIngestTables());
             return true;
         }
         catch (RuntimeException unavailable) {
-            // Тип и код, но не текст: текст ошибки базы может нести значения строк.
             log.info("таблицы приёма из 1С:УСК недоступны: {} SQLSTATE {}",
                     unavailable.getClass().getName(), SqlStates.deepestOrNone(unavailable));
             return false;

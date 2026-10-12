@@ -25,11 +25,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает обычный путь сообщения: исход маппера записывается в ту же строку сырья, иначе справочник и статус
- * сырья разойдутся. Сообщение без пришедшего родителя ждёт его вместе с записью, которую меняет, а применённое
- * или пропущенное сообщение закрывает более старые ожидающие той же записи, чтобы они его не затёрли.
- */
 @ExtendWith(MockitoExtension.class)
 class MappedStreamHandlerTest {
 
@@ -92,7 +87,6 @@ class MappedStreamHandlerTest {
         verifyNoInteractions(supersededWaits);
     }
 
-    /** Пропущенное более новое сообщение записи тоже решает за её старые ожидающие сообщения. */
     @Test
     void skippedMessageOfARecord_closesOlderWaitingMessagesOfThatRecord() {
         when(mapper.apply(data)).thenReturn(ImportResult.skipped("договор не нашего контрагента"));

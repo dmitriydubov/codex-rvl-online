@@ -14,10 +14,6 @@ import java.util.function.UnaryOperator;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.service.schedulers.StuckTransferAlert;
 
-/**
- * Шаги о передачах прайсов, которые ждут своих частей дольше порога зависания: давность, проверка зависших передач и
- * её предупреждение в журнале.
- */
 public class OneCStuckTransferSteps {
 
     private static final Duration HOUR = Duration.ofHours(1);
@@ -42,14 +38,12 @@ public class OneCStuckTransferSteps {
         this.journal = journal;
     }
 
-    /** Часы стенда не остановлены, а ждать порог нельзя: все присланные сообщения отодвигаются в прошлое. */
     @Дано("с момента приёма последнего сообщения прошло на час {word} порога зависания передач прайсов")
     public void messagesAgedAroundThreshold(String moreOrLess) {
         assertThat(AGE_AROUND_THRESHOLD).as("давность, которую умеет изображать шаг").containsKey(moreOrLess);
         inbox.ageAll(AGE_AROUND_THRESHOLD.get(moreOrLess).apply(properties.stuckTransferThreshold()));
     }
 
-    /** Тот же проход, что по расписанию; в сценарии расписания выключены. */
     @Когда("Дата-референс проверяет зависшие передачи прайсов")
     public void checkStuckTransfers() {
         eventsBeforeCheck = journal.events().size();

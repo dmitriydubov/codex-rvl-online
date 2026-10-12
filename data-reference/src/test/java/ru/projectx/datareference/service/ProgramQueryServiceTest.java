@@ -26,11 +26,6 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ProgramLpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 
-/**
- * Чтение программы страхования: перечень учреждений идёт в порядке упорядоченного запроса, а нет записи — 404 без
- * чтения перечня. Шапка и перечень читаются в одном снимке базы, иначе сообщение 1С, зафиксированное между запросами,
- * смешало бы в ответе и в кэше старую шапку с новым перечнем.
- */
 @ExtendWith(MockitoExtension.class)
 class ProgramQueryServiceTest {
 

@@ -19,11 +19,6 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.config.SchedulingConfig;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Три прохода по таблице сырья в пуле планировщика, собранном как в работе ({@link SchedulingConfig},
- * {@link ScheduledPasses}), без базы и брокера. Повисший разбор не должен останавливать стирание персональных данных
- * и проверку зависших передач: каждая из них проходит дважды, пока разбор висит.
- */
 class ScheduledPassesWiringTest {
 
     private static final long WAIT_MILLIS = 10_000;

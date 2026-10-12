@@ -7,10 +7,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Услуга санатория получает поля сообщения и договор уже при создании. Следующее сообщение может перенести
- * услугу на другой договор и заменяет её поля целиком; пометка удаления становится признаком архивности.
- */
 class ContragentServiceTest {
 
     private static final UUID EXTERNAL_ID = UUID.fromString("3e4f5a6b-7c8d-4e9f-a0b1-000000000001");

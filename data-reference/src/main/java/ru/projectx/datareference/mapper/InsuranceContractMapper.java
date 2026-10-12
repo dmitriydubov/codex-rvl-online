@@ -15,11 +15,6 @@ import ru.projectx.datareference.repository.InsuranceContractRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает договоры страхования из 1С:УСК и оставляет только договоры добровольного медицинского страхования (ДМС)
- * по типу продукта из настроек; без настройки пропускается всё, чтобы не сохранять чужие продукты. Страхователь ищется
- * по роли, потому что застрахованный, выгодоприобретатель и страхователь бывают разными лицами.
- */
 @Component
 public class InsuranceContractMapper extends CatalogStreamMapper<InsuranceContract, InsuranceContract.Details> {
 
@@ -62,7 +57,6 @@ public class InsuranceContractMapper extends CatalogStreamMapper<InsuranceContra
                 OneCValues.flag(data, "notActive"));
     }
 
-    /** Ролей у одной стороны может быть несколько, поэтому проверяется весь их список, а не первая роль. */
     private static Optional<UUID> insurerOf(JsonNode data) {
         return StreamSupport.stream(data.path("contragentList").spliterator(), false)
                 .filter(InsuranceContractMapper::isInsurer)

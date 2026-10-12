@@ -9,13 +9,8 @@ import io.cucumber.java.ru.Тогда;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-/**
- * Всплеск REST-чтений: соседи шлют одновременно больше запросов, чем у Дата-референса соединений с базой
- * ({@link RestReadLoad}).
- */
 public class RestReadLoadSteps {
 
-    /** Нагрузка останавливается раньше, чем снимается блокировка базы: её ответы получены под блокировкой. */
     private static final int BEFORE_LOCK_RELEASE = 20_000;
 
     private final RestReadLoad load;

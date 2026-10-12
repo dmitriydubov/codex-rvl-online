@@ -18,10 +18,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Карточка ЛПУ (лечебно-профилактического учреждения): действующее учреждение и его прайсовый договор
- * на сегодняшний день контура.
- */
 @ExtendWith(MockitoExtension.class)
 class LpuCardServiceTest {
 

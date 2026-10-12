@@ -20,11 +20,6 @@ import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 
-/**
- * Сервисы Заявок и Договоров разбирают код, текст и перечень записей, поэтому JSON отказов закреплён байт в байт.
- * 409 и 422 — ошибка данных в 1С, а не вызывающего: их пишут в журнал как WARN, и по этим записям собирают
- * очередь на исправление. Сборка без контекста, поэтому имена полей здесь в camelCase.
- */
 @ExtendWith(OutputCaptureExtension.class)
 class ReferenceErrorAdviceTest {
 

@@ -11,18 +11,12 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Счётчики приёма из 1С:УСК: исход каждой доставки и паузы приёма. Таймер слушателя Spring AMQP считает успехом и
- * потерю, и возврат, и паузу, поэтому исход называет код, который его выбрал. Ряды заводятся нулями на старте, чтобы
- * правило оповещения видело первую потерю как рост с нуля.
- */
 @Component
 class OneCIngestMetrics {
 
     static final String DELIVERIES = "onec.ingest.deliveries";
     static final String PAUSES = "onec.ingest.pauses";
 
-    /** Очередь неизвестна только у сообщения не из контейнера слушателя; метка не может быть пустой. */
     private static final String UNKNOWN_QUEUE = "unknown";
 
     private final MeterRegistry registry;
@@ -40,7 +34,6 @@ class OneCIngestMetrics {
                 .register(registry);
     }
 
-    /** Считает доставку с её исходом. Доставку не из очереди настроек — под своей очередью или {@code unknown}. */
     void record(OneCDelivery delivery, IngestOutcome outcome) {
         SeriesKey key = new SeriesKey(
                 delivery.stream(), Optional.ofNullable(delivery.queue()).orElse(UNKNOWN_QUEUE), outcome);
@@ -49,12 +42,10 @@ class OneCIngestMetrics {
                 .increment();
     }
 
-    /** Считает остановку потребителей всех очередей из-за недоступной базы. */
     void paused() {
         pauses.increment();
     }
 
-    /** Ряд счётчика доставок: поток, очередь и исход. */
     private record SeriesKey(OneCStream stream, String queue, IngestOutcome outcome) {
 
         Counter register(MeterRegistry registry) {

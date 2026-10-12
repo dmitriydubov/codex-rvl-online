@@ -25,11 +25,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Из каких потоков 1С:УСК собирается ответ каждого кэша, чтобы сообщение сбрасывало ровно зависящие от него кэши.
- * Лишний сброс сводит кэш на нет, потому что полисы приходят десятками тысяч, а пропущенный оставляет старый ответ.
- * Каталог зависит от полисов, хотя их в нём не видно: он строится по программам действующих полисов договора.
- */
 final class ReferenceCacheDependencies {
 
     private static final Map<String, Set<OneCStream>> STREAMS_BY_CACHE = Map.of(
@@ -49,7 +44,6 @@ final class ReferenceCacheDependencies {
     private ReferenceCacheDependencies() {
     }
 
-    /** Кэши, ответы которых собираются из таблиц этого потока. */
     static Set<String> cachesOf(OneCStream stream) {
         return STREAMS_BY_CACHE.entrySet().stream()
                 .filter(entry -> entry.getValue().contains(stream))

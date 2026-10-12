@@ -25,11 +25,6 @@ import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ImportOutcome;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
-/**
- * Проход по накопленным сырым сообщениям: разбор пачки дозревших, журнал исходов и запись отказов. Отказ записывается
- * здесь, потому что неудачная попытка откатывает транзакцию разбора. Тел и текстов чужих исключений в журнале нет:
- * этим путём идут полисы с персональными данными.
- */
 @Component
 public class ReferenceImportScheduler {
 
@@ -61,10 +56,6 @@ public class ReferenceImportScheduler {
         this.clock = clock;
     }
 
-    /**
-     * Просроченные ожидания родителя отклоняются после разбора: сообщение, родитель которого пришёл в этом проходе,
-     * срок уже не отклонит, и его возьмёт следующий проход.
-     */
     public void importPendingMessages() {
         List<InboundMessage> due = repository.findDueForImport(clock.instant(), Limit.of(properties.batchSize()));
         Map<OneCStream, UUID> heldStreams = new EnumMap<>(OneCStream.class);
@@ -74,10 +65,6 @@ public class ReferenceImportScheduler {
         overdueParentWaits.rejectAndReport();
     }
 
-    /**
-     * Поток, голова которого ушла на повтор, до конца прохода не разбирается: версий у сообщений 1С нет, и при повторе
-     * голова затёрла бы более новые данные. Между проходами то же правило держит выборка дозревших сообщений.
-     */
     private void importInStreamOrder(InboundMessage message, Map<OneCStream, UUID> heldStreams) {
         InboundReceipt receipt = message.receipt();
         Optional.ofNullable(heldStreams.get(receipt.stream())).ifPresentOrElse(
@@ -93,11 +80,6 @@ public class ReferenceImportScheduler {
                 .ifPresent(retry -> heldStreams.put(receipt.stream(), receipt.messageId()));
     }
 
-    /**
-     * В конце снимаются только ключи сообщения; остальные ключи MDC планировщик не трогает.
-     *
-     * @return статус, с которым сообщение осталось после отказа, или пусто, если разбор прошёл
-     */
     private Optional<InboundStatus> importOne(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
         MDC.put(OneCLogContext.MESSAGE_ID, receipt.messageId().toString());
@@ -111,10 +93,6 @@ public class ReferenceImportScheduler {
         }
     }
 
-    /**
-     * Исход сообщения запоминается до разбора: по нему сервис исходов отличит откаченную попытку от зафиксированной,
-     * о фиксации которой приложение не узнало.
-     */
     private Optional<InboundStatus> importAndClassify(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
         InboundOutcome beforeAttempt = message.outcome();
@@ -123,16 +101,10 @@ public class ReferenceImportScheduler {
             return Optional.empty();
         }
         catch (RuntimeException failure) {
-            // Граница прохода: любая ошибка разбора одного сообщения записывается его исходом, и проход идёт дальше.
             return Optional.of(recordFailure(receipt, beforeAttempt, failures.classify(failure)));
         }
     }
 
-    /**
-     * Окончательный отказ в журнал пишет сам сервис исходов: только он знает, кончились ли повторы.
-     *
-     * @return статус, с которым сообщение осталось
-     */
     private InboundStatus recordFailure(InboundReceipt receipt, InboundOutcome beforeAttempt, ParseFailure failure) {
         return switch (failure) {
             case ParseFailure.Temporary temporary -> {
@@ -145,10 +117,6 @@ public class ReferenceImportScheduler {
         };
     }
 
-    /**
-     * Причина пропуска и отказа пишется в журнал целиком: её составляют правила потоков, и в ней бывают только
-     * идентификаторы, счётчики и признаки справочников, а не данные застрахованных.
-     */
     private static void reportOutcome(InboundReceipt receipt, ImportOutcome outcome) {
         if (outcome.needsAttention()) {
             log.warn("сообщение {} потока {} {}", receipt.messageId(), receipt.stream(), outcome.summary());

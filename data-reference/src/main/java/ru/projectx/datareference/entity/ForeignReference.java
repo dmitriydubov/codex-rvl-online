@@ -9,11 +9,6 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Контрагент, договор санатория или услуга 1С:УСК, которые сервис признал не нашими. Без этой отметки сообщение,
- * которое на них ссылается, не отличить от сообщения, чей родитель ещё не пришёл: первое пропускается сразу,
- * второе ждёт. Строки пишут запросы репозитория, а сущность нужна, чтобы у репозитория был тип.
- */
 @Entity
 @Table(name = "foreign_reference")
 public class ForeignReference {
@@ -30,6 +25,5 @@ public class ForeignReference {
     private Instant recordedAt;
 
     protected ForeignReference() {
-        // JPA
     }
 }

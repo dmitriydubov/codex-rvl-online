@@ -8,10 +8,6 @@ import io.cucumber.java.ru.Тогда;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Шаги «1С:УСК прислала ту же программу …» об обязательных условиях и типе покрытия строки услуги программы РВЛ.
- * Отброшенные строки перечня видны только записью INFO со счётчиками по причинам, поэтому её проверяет отдельный шаг.
- */
 public class OneCProgramTermsSteps {
 
     private final OneCInbox inbox;

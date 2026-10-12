@@ -9,11 +9,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-/**
- * После границы хранения полис теряет ФИО, дату рождения и e-mail, а реквизиты, пол и признак архива остаются:
- * на строку полиса ссылается сервис Договоров. Момент перевода в архив сдвигает только настоящий перевод,
- * а не повторная присылка того же сообщения.
- */
 class PolicyPersonalDataTest {
 
     private static final Instant RECEIVED = Instant.parse("2026-03-01T09:00:00Z");

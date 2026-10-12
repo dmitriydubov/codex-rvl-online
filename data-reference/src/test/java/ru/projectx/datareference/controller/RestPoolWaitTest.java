@@ -24,18 +24,11 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * У REST-чтений свой пул соединений, чтобы всплеск запросов не отнимал соединения у приёма и разбора, и наоборот.
- * Занятый пул отвечает 503 через ожидание соединения (2 с), а лимит времени чтения начинает действовать
- * только после того, как соединение получено.
- */
 @IntegrationTest
 class RestPoolWaitTest {
 
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(2);
-    /** {@code lock_timeout} пула: занятый пул не должен отвечать медленнее чужой блокировки. */
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
-    /** Свободный пул отдаёт соединение сразу; секунда — запас на медленную машину сборки. */
     private static final Duration IMMEDIATELY = Duration.ofSeconds(1);
     private static final String UNKNOWN_ID = "f662d1c4-5b26-4248-8ba1-47954abd301b";
     private static final UUID UNKNOWN_MESSAGE = UUID.fromString(UNKNOWN_ID);
@@ -83,7 +76,6 @@ class RestPoolWaitTest {
         }
     }
 
-    /** Чтение доходит до базы: неизвестный полис — 404, а не 503 от занятого пула. */
     @Test
     void applicationPoolExhausted_restReadStillAnswers() throws SQLException {
         try (ExhaustedPool ignored = ExhaustedPool.of(dataSource)) {
@@ -93,10 +85,6 @@ class RestPoolWaitTest {
         }
     }
 
-    /**
-     * Без HTTP-запроса, как в потоке планировщика или слушателя очереди, репозиторий открывает свою транзакцию
-     * «только чтение», и она должна идти в пул приложения, а не в занятый пул REST-чтений.
-     */
     @Test
     void restReadPoolExhausted_repositoryReadOutsideHttpRequestUsesApplicationPool() throws Exception {
         try (ExhaustedPool ignored = ExhaustedPool.ofRestReads(dataSource)) {
@@ -123,7 +111,6 @@ class RestPoolWaitTest {
         }
     }
 
-    /** В потоке теста Spring держит HTTP-запрос-заглушку, и чтение оттуда выглядело бы как REST-чтение. */
     private static <T> T outsideHttpRequest(Callable<T> read) throws Exception {
         try (ExecutorService thread = Executors.newSingleThreadExecutor()) {
             return thread.submit(read).get(LOCK_TIMEOUT.toSeconds(), TimeUnit.SECONDS);

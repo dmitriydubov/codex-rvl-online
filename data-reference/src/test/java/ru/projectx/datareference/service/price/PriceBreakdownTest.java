@@ -7,10 +7,6 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Суммы отрезка и итога. Сумма по скидке есть у отрезка, только если у его строки прайса есть цена со скидкой, а у
- * итога — только если она есть у всех отрезков: складывать скидочные цены с обычными в одном итоге нельзя.
- */
 class PriceBreakdownTest {
 
     private static final LocalDate APRIL_10 = LocalDate.of(2026, 4, 10);

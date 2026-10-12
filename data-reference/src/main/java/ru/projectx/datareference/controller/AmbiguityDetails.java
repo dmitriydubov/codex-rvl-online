@@ -6,11 +6,6 @@ import java.util.function.Function;
 import ru.projectx.datareference.dto.ErrorResponse;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 
-/**
- * Перечень конфликтующих записей для ответа 409. Каждая запись становится элементом {@code details} того
- * вида, который соответствует коду ошибки: полис называется полем {@code policy_id}, договор ЛПУ
- * (лечебно-профилактического учреждения) называется полем {@code lpu_contract_id}.
- */
 final class AmbiguityDetails {
 
     private AmbiguityDetails() {

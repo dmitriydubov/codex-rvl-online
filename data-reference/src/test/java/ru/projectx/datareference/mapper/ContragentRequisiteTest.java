@@ -10,10 +10,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает формат реквизитов контрагента по правилам ФНС. Испорченный реквизит отклоняет сообщение,
- * а текст отказа называет поле и правило, но не значение.
- */
 class ContragentRequisiteTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -24,13 +20,11 @@ class ContragentRequisiteTest {
         assertThat(ContragentRequisite.INN.read(node("ИНН", inn))).contains(inn);
     }
 
-    /** Пробелы по краям отбрасываются до проверки, как у любой строки 1С. */
     @Test
     void innWithSurroundingSpaces_isReadTrimmed() {
         assertThat(ContragentRequisite.INN.read(node("ИНН", " 7701234567 "))).contains("7701234567");
     }
 
-    /** Полноширинная и арабско-индийская цифры — цифры для Unicode, но не для реквизита ФНС. */
     @ParameterizedTest
     @ValueSource(strings = {"77012345A7", "77012345Б7", "7701 234567", "7701-234567", "770123456７",
             "770123456٧"})
@@ -40,7 +34,6 @@ class ContragentRequisiteTest {
                 .hasMessage("поле ИНН содержит не только цифры");
     }
 
-    /** Длина проверяется раньше состава: у слишком длинного ИНН с буквой причина — длина. */
     @Test
     void innOverLimitWithLetter_isReportedAsTooLong() {
         assertThatThrownBy(() -> ContragentRequisite.INN.read(node("ИНН", "77012345678A9")))

@@ -7,10 +7,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Хвост прежнего исхода ломает разбор незаметно: время следующей попытки вернуло бы обработанное сообщение
- * в повторы, а старая ошибка запутала бы разбор инцидента. Поэтому тесты сравнивают исход перехода целиком.
- */
 class InboundMessageTransitionsTest {
 
     private static final UUID MESSAGE_ID = UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000aa");

@@ -14,10 +14,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает правила чтения значений из сообщений 1С:УСК: GUID, дат, строк, флагов, чисел и денег.
- * Неверно понятое значение не роняет обработку, а тихо оседает в базе, поэтому ошибки здесь самые дорогие.
- */
 class OneCValuesTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -55,19 +51,11 @@ class OneCValuesTest {
         assertThat(OneCValues.date(node("{\"beginDate\":\"0001-01-01\"}"), "beginDate")).isEmpty();
     }
 
-    /**
-     * Открытую дату нельзя сохранять как есть: договор действовал бы тысячу лет,
-     * а фильтр «действующие на сегодня» ничего бы не отсекал.
-     */
     @Test
     void openDate_isEmpty() {
         assertThat(OneCValues.date(node("{\"endDate\":\"3000-01-01\"}"), "endDate")).isEmpty();
     }
 
-    /**
-     * Это календарная дата договора, поэтому смещение отбрасывается, а не переводится в UTC:
-     * перевод сдвинул бы полночь со смещением +03:00 на предыдущий день.
-     */
     @Test
     void midnightWithOffset_keepsItsCalendarDate() {
         ObjectNode data = node("{\"beginDate\":\"2024-10-10T00:00:00+03:00\"}");
@@ -75,10 +63,6 @@ class OneCValuesTest {
         assertThat(OneCValues.date(data, "beginDate")).contains(LocalDate.of(2024, 10, 10));
     }
 
-    /**
-     * Момент без смещения, как в договорах страхования, не разбирается ни как {@code OffsetDateTime},
-     * ни как {@code LocalDate}. Без отдельной ветки разбора всё сообщение уходило бы в отказ без повторов.
-     */
     @Test
     void dateTimeWithoutOffset_isRead() {
         assertThat(OneCValues.date(node("{\"dateBeginISO\":\"2026-05-07T00:00:00\"}"), "dateBeginISO"))
@@ -97,10 +81,6 @@ class OneCValuesTest {
                 .contains(LocalDate.of(2024, 10, 10));
     }
 
-    /**
-     * Исключение разбора даты повторяет исходное значение, а это может быть дата рождения из полиса.
-     * Поэтому причина в цепочке называет только тип исключения, без его текста.
-     */
     @Test
     void unparsableDate_isContractViolationNamingFieldWithCauseTypeButNotValue() {
         assertThatThrownBy(() -> OneCValues.date(node("{\"beginDate\":\"10.10.2024\"}"), "beginDate"))
@@ -111,7 +91,6 @@ class OneCValuesTest {
                 .hasNoCause();
     }
 
-    /** Коды 1С приходят дополненными пробелами, поэтому предел длины считается после обрезки. */
     @Test
     void limitedText_withinLimitAfterTrimming_isRead() {
         assertThat(OneCValues.limitedText(node("{\"ИНН\":\" 770000000012 \"}"), "ИНН", 12))
@@ -136,7 +115,6 @@ class OneCValuesTest {
                 .isInstanceOf(OneCFieldException.class);
     }
 
-    /** Коды в 1С приходят дополненными пробелами до длины поля. */
     @Test
     void text_isTrimmed() {
         assertThat(OneCValues.text(node("{\"code\":\"A00   \"}"), "code")).contains("A00");
@@ -152,17 +130,12 @@ class OneCValuesTest {
         assertThat(OneCValues.flag(node("{}"), "deleteMark")).isFalse();
     }
 
-    /**
-     * Через двоичную дробь {@code double} цена 4999.95 стала бы 4999.9499999999998181,
-     * и расхождение дошло бы до расчёта доплаты. Поэтому деньги читаются из текста числа.
-     */
     @Test
     void amount_keepsExactDecimal() {
         assertThat(OneCValues.amount(node("{\"price\":4999.95}"), "price"))
                 .contains(new BigDecimal("4999.95"));
     }
 
-    /** Сумма должна поместиться в денежную колонку: тринадцать цифр до запятой. */
     @Test
     void amount_isLimitedByMoneyColumn() {
         assertThat(OneCValues.amount(node("{\"price\":9999999999999.99}"), "price"))
@@ -180,7 +153,6 @@ class OneCValuesTest {
                 .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
     }
 
-    /** Нулевой GUID в обязательном поле значит «ссылки нет», то есть поле не заполнено. */
     @Test
     void requiredGuid_rejectsZeroGuid() {
         ObjectNode data = node("{\"id\":\"00000000-0000-0000-0000-000000000000\"}");
@@ -190,10 +162,6 @@ class OneCValuesTest {
                 .hasMessage("нет обязательного GUID в поле id");
     }
 
-    /**
-     * Текст исключения попадает в журнал, поэтому в нём есть имя поля, но нет значения. Нестрогий
-     * {@code UUID.fromString} не вызывается: его ошибка процитировала бы значение.
-     */
     @Test
     void unparsableGuid_namesFieldButNotValue() {
         assertThatThrownBy(() -> OneCValues.uuid(node("{\"guid\":\"не-гуид-42\"}"), "guid"))
@@ -202,10 +170,6 @@ class OneCValuesTest {
                 .hasNoCause();
     }
 
-    /**
-     * Эти значения {@code UUID.fromString} в JDK 21 молча читает как чужой GUID, и сообщение 1С
-     * затёрло бы чужую запись. Поэтому принимается только каноническая запись 8-4-4-4-12.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"1-2-3-4-5", "000000001-002-0003-0004-000000000005",
             "00000001-0002-0003-0004-+00000000005", "00000001-0002-0003-0004-00000000000\uFF15"})
@@ -218,10 +182,6 @@ class OneCValuesTest {
                 .hasNoCause();
     }
 
-    /**
-     * Нестрогий разбор прочитал бы {@code 0-0-0-0-0} как нулевой GUID,
-     * и договор молча сохранился бы без ссылки.
-     */
     @Test
     void nonCanonicalZeroGuid_isContractViolationRatherThanNoReference() {
         assertThatThrownBy(() -> OneCValues.uuid(node("{\"guid\":\"0-0-0-0-0\"}"), "guid"))
@@ -229,7 +189,6 @@ class OneCValuesTest {
                 .hasMessage("поле guid не является GUID");
     }
 
-    /** 1С:УСК регистр не задаёт, поэтому GUID прописными цифрами — тот же GUID, и хранится он строчными. */
     @Test
     void uppercaseGuid_isTheSameGuid() {
         ObjectNode data = node("{\"id\":\"F3876C53-C7D8-4620-B364-9538164BA5D4\"}");
@@ -238,7 +197,6 @@ class OneCValuesTest {
                 .isEqualTo(UUID.fromString("f3876c53-c7d8-4620-b364-9538164ba5d4"));
     }
 
-    /** Пробелы по краям GUID отбрасываются до разбора, как у любой строки 1С. */
     @Test
     void guidWithSurroundingSpaces_isRead() {
         ObjectNode data = node("{\"id\":\"  f3876c53-c7d8-4620-b364-9538164ba5d4 \"}");
@@ -259,7 +217,6 @@ class OneCValuesTest {
                 .hasMessage("нет обязательной даты в поле beginDate");
     }
 
-    /** Значение в текст исключения не попадает, потому что им может оказаться дата рождения из полиса. */
     @Test
     void unparsableDate_namesFieldButNotValue() {
         assertThatThrownBy(() -> OneCValues.date(node("{\"birthDate\":\"17.05.1980\"}"), "birthDate"))
@@ -316,10 +273,6 @@ class OneCValuesTest {
                 .contains(Integer.parseInt(sent));
     }
 
-    /**
-     * Без своей проверки разбор падал бы непредвиденной ошибкой, по которой не видно, какое поле виновато.
-     * Так же отклоняется число из тысячи с лишним цифр, каким база возвращает сырое сообщение.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"2147483648", "-2147483649", "10000000000", "-100000000000000000000"})
     void integerBeyondIntBound_isRejectedNamingFieldButNotValue(String sent) {
@@ -339,10 +292,6 @@ class OneCValuesTest {
                 .hasMessage("поле rowNumber больше допустимого");
     }
 
-    /**
-     * Обрезанная дробь легла бы в справочник молча, поэтому дробная запись в целом поле отклоняется,
-     * даже с нулевой дробью. Число с порядком дробное, только если после запятой остаются знаки, как у 25e-1.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"2.5", "-2.5", "2.0", "2.00", "0.0", "25e-1", "3000000000.5"})
     void integerWrittenAsFraction_isRejectedNamingFieldButNotValue(String sent) {
@@ -353,7 +302,6 @@ class OneCValuesTest {
                 .hasMessage("поле layerNumber не является целым числом");
     }
 
-    /** Сообщения 1С разбираются с дробями в BigDecimal, и нулевая дробь в записи сохраняется: 2.0 — не целое. */
     @Test
     void integerWrittenAsDecimalWithZeroFraction_isRejected() {
         ObjectNode data = JSON.createObjectNode().put("hierarchyLevel", new BigDecimal("2.0"));
@@ -363,7 +311,6 @@ class OneCValuesTest {
                 .hasMessage("поле hierarchyLevel не является целым числом");
     }
 
-    /** Контракт передаёт числа числами, поэтому число, записанное строкой, числом не считается. */
     @Test
     void integerAsText_isEmpty() {
         assertThat(OneCValues.integer(node("{\"rowNumber\":\"7\"}"), "rowNumber")).isEmpty();
@@ -374,17 +321,12 @@ class OneCValuesTest {
         assertThat(OneCValues.amount(node("{\"price\":\"4999.95\"}"), "price")).isEmpty();
     }
 
-    /** Пустая ссылка значит «ссылки нет», как и нулевой GUID, и нарушением контракта не считается. */
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     void blankGuid_meansNoReference(String blank) {
         assertThat(OneCValues.uuid(node("{\"parentId\":\"%s\"}".formatted(blank)), "parentId")).isEmpty();
     }
 
-    /**
-     * Сравнение текста с «3000-01-01» пропустило бы открытую дату, записанную моментом, как в договорах
-     * ЛПУ (лечебно-профилактических учреждений) и страхования. Поэтому заглушки узнаются по календарному дню.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"3000-01-01T00:00:00+03:00", "3000-01-01T00:00:00",
             "0001-01-01T00:00:00+03:00", "0001-01-01T00:00:00"})
@@ -392,7 +334,6 @@ class OneCValuesTest {
         assertThat(OneCValues.date(node("{\"endDate\":\"%s\"}".formatted(unset)), "endDate")).isEmpty();
     }
 
-    /** В обязательном поле заглушка и открытая дата означают незаполненное поле, а не нечитаемую дату. */
     @ParameterizedTest
     @ValueSource(strings = {"0001-01-01", "3000-01-01T00:00:00+03:00"})
     void requiredDate_reportsPlaceholderAndOpenDateAsMissing(String unset) {
@@ -403,10 +344,6 @@ class OneCValuesTest {
                 .hasMessage("нет обязательной даты в поле beginDate");
     }
 
-    /**
-     * Календарный день — это не «первые десять символов»: момент с невозможным временем
-     * датой не является, и днём 2024-10-10 в базу он попасть не должен.
-     */
     @Test
     void momentWithImpossibleTime_isContractViolation() {
         assertThatThrownBy(() -> OneCValues.date(node("{\"beginDate\":\"2024-10-10T25:00:00\"}"), "beginDate"))
@@ -419,7 +356,6 @@ class OneCValuesTest {
         assertThat(OneCValues.text(node("{\"code\":[\"A00\"]}"), "code")).isEmpty();
     }
 
-    /** Флаг читается по значению, а не по присутствию поля, поэтому deleteMark=false значит «не в архиве». */
     @Test
     void explicitlyFalseFlag_isFalse() {
         assertThat(OneCValues.flag(node("{\"deleteMark\":false}"), "deleteMark")).isFalse();

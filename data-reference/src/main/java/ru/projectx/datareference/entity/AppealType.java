@@ -7,10 +7,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Вид обращения за медицинской помощью из 1С, например стационар или восстановительное лечение. Справочник
- * иерархический, и родитель хранится GUID'ом источника по той же причине, что и у {@link Mkb10}.
- */
 @Entity
 @Table(name = "appeal_types")
 public class AppealType extends OneCEntity {
@@ -40,19 +36,16 @@ public class AppealType extends OneCEntity {
     @Column(name = "direct_attachment", nullable = false)
     private boolean directAttachment;
 
-    /** Прикрепление через направление. Флаг не зависит от прямого прикрепления. */
     @Column(name = "non_direct_attachment", nullable = false)
     private boolean nonDirectAttachment;
 
     protected AppealType() {
-        // JPA
     }
 
     private AppealType(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static AppealType create(UUID externalId, Details details, Instant now) {
         AppealType appealType = new AppealType(externalId, now);
         appealType.applySnapshot(details, now);
@@ -71,7 +64,6 @@ public class AppealType extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения о виде обращения. */
     public record Details(
             @Nullable UUID externalParentId,
             @Nullable String externalCode,

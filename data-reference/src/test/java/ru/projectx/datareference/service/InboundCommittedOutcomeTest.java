@@ -34,11 +34,6 @@ import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Отказ после того, как исход разбора уже зафиксирован (соединение оборвалось сразу после фиксации), не переписывает
- * исход: иначе сообщение разобрали бы заново или отправили бы применённое дежурному. Исход сохраняется, в журнал идёт
- * предупреждение, а возвращённый статус говорит планировщику, держит ли сообщение свой поток.
- */
 @ExtendWith(MockitoExtension.class)
 class InboundCommittedOutcomeTest {
 
@@ -54,7 +49,6 @@ class InboundCommittedOutcomeTest {
             new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("6d0e4a7b-2c95-4f18-8b3d-e9a1c7f50d62"));
     private static final AwaitedParent HEAD_OFFICE =
             new AwaitedParent(ParentKind.CONTRAGENT, UUID.fromString("b515b8fc-d13c-4b0b-aae3-33e0ca86ff1c"));
-    /** Исход нового сообщения: так строка выглядела до попытки, которая зафиксировала исход. */
     private static final InboundOutcome NEW = new InboundOutcome(InboundStatus.NEW, 0, null, null, null, null);
 
     @Mock
@@ -88,7 +82,6 @@ class InboundCommittedOutcomeTest {
         assertThat(countedTransitions()).isEqualTo(1);
     }
 
-    /** Предупреждение называет сообщение, поток, сохранённый статус и отказ — тип и SQLSTATE, без текста. */
     @Test
     void temporaryFailureAfterCommittedOutcome_isReportedInJournal() {
         existing().markSkipped("программа не РВЛ", NOW);
@@ -103,7 +96,6 @@ class InboundCommittedOutcomeTest {
         });
     }
 
-    /** Часть передачи прайса, ушедшая в буфер, — тоже зафиксированный исход. */
     @Test
     void temporaryFailureAfterBuffered_keepsTheOutcome() {
         existing().markBuffered(UUID.fromString("7d2b1f0e-0000-4000-8000-0000000000cc"), 2, 10);
@@ -125,10 +117,6 @@ class InboundCommittedOutcomeTest {
         assertThat(logged.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
-    /**
-     * Ожидание родителя — тоже зафиксированный исход, если попытка его записала: строка отличается от той, что была
-     * до попытки. Повтор поверх него держал бы поток и засчитывал попытку, а отказ стёр бы ожидание.
-     */
     @Test
     void temporaryFailureAfterCommittedWait_keepsTheWait() {
         InboundMessage message = existing();
@@ -156,7 +144,6 @@ class InboundCommittedOutcomeTest {
         assertThat(counted(InboundStatus.FAILED)).isZero();
     }
 
-    /** Пересмотр, после которого сообщение ждёт другого родителя, тоже зафиксирован, хотя статус прежний. */
     @Test
     void temporaryFailureAfterCommittedWaitForAnotherParent_keepsTheWait() {
         InboundMessage message = existing();
@@ -169,7 +156,6 @@ class InboundCommittedOutcomeTest {
         assertThat(message.outcome().attempt()).isZero();
     }
 
-    /** Пересмотр ожидавшего сообщения откатился: строка та же, что до попытки, и отказ ставит повтор. */
     @Test
     void temporaryFailureOfRolledBackRecheck_schedulesARetry() {
         InboundMessage message = existing();
@@ -180,7 +166,6 @@ class InboundCommittedOutcomeTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /** Отказ сообщения, которое ждёт повтора, записывается как обычно: исход ещё не зафиксирован. */
     @Test
     void temporaryFailureOfRetryingMessage_isRecorded() {
         InboundMessage message = existing();
@@ -209,13 +194,11 @@ class InboundCommittedOutcomeTest {
         assertThat(service().recordPermanentFailure(MESSAGE_ID, NEW, COMMIT_FAILED)).isEqualTo(InboundStatus.FAILED);
     }
 
-    /** Сколько переходов потока MKB10 в статус {@code status} посчитано. */
     private double counted(InboundStatus status) {
         return meters.get(InboundTransitionMetrics.TRANSITIONS).tag("stream", "MKB10").tag("status", status.name())
                 .counter().count();
     }
 
-    /** Сколько переходов статусов посчитано по всем потокам и статусам. */
     private double countedTransitions() {
         return meters.find(InboundTransitionMetrics.TRANSITIONS).counters().stream()
                 .mapToDouble(Counter::count)

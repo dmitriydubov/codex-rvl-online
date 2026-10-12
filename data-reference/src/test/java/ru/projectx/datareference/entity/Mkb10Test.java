@@ -6,10 +6,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Код МКБ-10 хранит поля сообщения как пришли, а следующее сообщение того же кода замещает их целиком. Родитель
- * хранится ключом источника: так дерево не рвётся, если родитель приедет позже ребёнка.
- */
 class Mkb10Test {
 
     private static final Instant CREATED = Instant.parse("2026-10-01T09:00:00Z");

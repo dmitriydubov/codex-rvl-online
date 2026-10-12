@@ -20,11 +20,6 @@ import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Снимок очереди разбора на настоящем PostgreSQL: группировка по потоку и статусу, самое давнее сообщение, зависшие
- * передачи и просроченные тела. Пороги взяты из умолчаний (хранение 30 суток, тревога о передаче через час), а часы
- * остановлены, поэтому время приёма и статус меняются запросом.
- */
 @IntegrationTest
 class InboundBacklogReadsTest {
 
@@ -61,7 +56,6 @@ class InboundBacklogReadsTest {
         assertThat(backlog.takenAt()).isEqualTo(NOW);
     }
 
-    /** Разобранные и пропущенные строки в снимок не попадают: это не очередь и не отказ. */
     @Test
     void unfinishedMessages_areCountedByStreamAndStatusWithTheOldest() {
         store(OneCStream.POLICIES, InboundStatus.NEW, Duration.ofMinutes(10));
@@ -79,7 +73,6 @@ class InboundBacklogReadsTest {
                 new InboundBacklog.StatusCount(OneCStream.MKB10, InboundStatus.RETRY, 1, NOW.minus(Duration.ofMinutes(5))));
     }
 
-    /** Зависшей считается передача, первая часть которой старше часа; число частей значения не имеет. */
     @Test
     void stuckTransfers_areCountedOncePerTransfer() {
         UUID stuck = UUID.randomUUID();
@@ -92,7 +85,6 @@ class InboundBacklogReadsTest {
         assertThat(reads.read().stuckTransfers()).isEqualTo(2);
     }
 
-    /** Старше срока и с телом — просрочено; стёртое, свежее и тело другого потока — нет. */
     @Test
     void overduePayloads_areCountedForPoliciesAndQuarantine() {
         store(OneCStream.POLICIES, InboundStatus.PROCESSED, Duration.ofDays(31));

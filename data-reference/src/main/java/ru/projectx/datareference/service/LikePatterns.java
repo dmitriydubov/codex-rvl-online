@@ -1,9 +1,5 @@
 package ru.projectx.datareference.service;
 
-/**
- * Строит шаблоны {@code like} для поиска полисов и МКБ-10, в которых {@code %} и {@code _} из строки ищутся как есть.
- * Экранирует их символ {@code !}, тот же, что в {@code escape '!'} запросов репозиториев; сам он тоже экранируется.
- */
 final class LikePatterns {
 
     private static final String ESCAPE = "!";

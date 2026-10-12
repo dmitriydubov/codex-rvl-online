@@ -7,10 +7,6 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.MetricsProperties;
 
-/**
- * Перечитывает снимок метрик очереди разбора с заданным интервалом. Первое чтение идёт сразу после старта, чтобы
- * окно пустого снимка было коротким. При выключенных расписаниях снимок обновляют только явно.
- */
 @Component
 public class InboundBacklogSchedule implements SchedulingConfigurer {
 
