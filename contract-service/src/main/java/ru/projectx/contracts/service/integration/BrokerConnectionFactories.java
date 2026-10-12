@@ -5,14 +5,8 @@ import org.springframework.amqp.rabbit.connection.CachingConnectionFactory.Confi
 import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 
-/**
- * Собирает подключение к брокеру из его настроек. Подтверждения издателя и возвраты включены на каждом подключении:
- * брокер подтверждает и сообщение, которое никуда не маршрутизируется, и только возврат отличает доставку
- * от публикации в несуществующую очередь.
- */
 final class BrokerConnectionFactories {
 
-    /** Так подключение подписано в списке подключений брокера: администратор видит, какой сервис пришёл. */
     private static final String SERVICE_NAME = "contract-service";
 
     private BrokerConnectionFactories() {
@@ -29,7 +23,6 @@ final class BrokerConnectionFactories {
         return connectionFactory;
     }
 
-    /** Клиентская фабрика до инициализации: TLS применяется к ней один раз при {@code afterPropertiesSet()}. */
     static RabbitConnectionFactoryBean clientFactory(BrokerConnectionProperties properties) {
         RabbitConnectionFactoryBean factory = new RabbitConnectionFactoryBean();
         factory.setHost(properties.host());

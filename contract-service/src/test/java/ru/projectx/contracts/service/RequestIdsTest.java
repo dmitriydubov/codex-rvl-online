@@ -9,10 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 
-/**
- * Соседям уходит идентификатор текущей обработки, чтобы одну операцию находили в журналах всех сервисов; негодное
- * или отсутствующее значение заменяется новым UUID, а не отправляется как есть.
- */
 class RequestIdsTest {
 
     @AfterEach

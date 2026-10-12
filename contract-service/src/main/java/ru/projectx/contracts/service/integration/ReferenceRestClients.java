@@ -10,11 +10,6 @@ import ru.projectx.contracts.config.ReferenceProperties;
 import ru.projectx.contracts.service.RequestIds;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Собирает клиент HTTP к справочнику из его настроек: клиент JDK с таймаутом соединения, таймаут чтения на каждый
- * запрос, общий для контура разбор JSON и сквозной идентификатор запроса. Без таймаута чтения клиент JDK ждёт ответ
- * без предела.
- */
 final class ReferenceRestClients {
 
     private ReferenceRestClients() {

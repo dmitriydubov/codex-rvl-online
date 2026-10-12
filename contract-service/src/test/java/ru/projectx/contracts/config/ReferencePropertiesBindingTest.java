@@ -10,10 +10,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Настройки клиента справочников читаются и проверяются на старте: без адреса, с адресом не по HTTP или со слэшем на
- * конце, с нулевым таймаутом или отрицательным числом повторов сервис не поднимается, а отказ называет поле.
- */
 class ReferencePropertiesBindingTest {
 
     private static final String PREFIX = "projectx.reference";
@@ -51,7 +47,6 @@ class ReferencePropertiesBindingTest {
                 });
     }
 
-    /** Пустой адрес — так выглядит забытая переменная окружения с пустым умолчанием плейсхолдера. */
     @ParameterizedTest
     @CsvSource({
         "url, '', url",

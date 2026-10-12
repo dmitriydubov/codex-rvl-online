@@ -20,10 +20,6 @@ import ru.projectx.contracts.dto.ReferenceProgram;
 import ru.projectx.contracts.support.StandExample;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Клиент разбирает ответы тем {@code JsonMapper}, который собирает Spring Boot из настроек приложения: имена полей
- * контракта в snake_case читаются только с этой настройкой, и без неё запись пришла бы пустой.
- */
 class ReferenceJsonMappingTest {
 
     private static final String BASE = "http://reference.example/internal/v1";

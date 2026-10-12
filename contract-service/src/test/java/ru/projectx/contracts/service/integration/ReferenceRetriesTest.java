@@ -19,11 +19,6 @@ import ru.projectx.contracts.exception.ReferenceNotFoundException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
-/**
- * Повторы считаются и заканчиваются предсказуемо: временная недоступность повторяется заданное число раз и затем
- * выходит как недоступность, окончательный ответ выходит с первой попытки, а «не найден» повторяется только у поиска
- * полиса по идентификатору 1С:УСК. Пауза в этих тестах нулевая: её величину проверяет тест политики.
- */
 class ReferenceRetriesTest {
 
     private static final int RETRIES = 2;
@@ -57,7 +52,7 @@ class ReferenceRetriesTest {
 
     @Test
     void unavailable_recoversWhenARetrySucceeds() {
-        Supplier<String> read = answers(new ReferenceUnavailableException(Reason.TIMEOUT),
+        Supplier<String> read = attemptsInOrder(new ReferenceUnavailableException(Reason.TIMEOUT),
                 new ReferenceUnavailableException(Reason.CONNECTION_FAILED), "готово");
 
         assertThat(retries.byId(KIND, KEY, read)).isEqualTo("готово");
@@ -91,12 +86,11 @@ class ReferenceRetriesTest {
 
     @Test
     void policyByExternalId_isReturnedOnceItArrives() {
-        Supplier<String> read = answers(new ReferenceNotFoundException(ReferenceKind.POLICY), "полис");
+        Supplier<String> read = attemptsInOrder(new ReferenceNotFoundException(ReferenceKind.POLICY), "полис");
 
         assertThat(retries.byExternalId(KIND, KEY, read)).isEqualTo("полис");
     }
 
-    /** По идентификатору 1С ищут только полис; чужой «не найден» там — окончательный ответ. */
     @Test
     void otherNotFoundByExternalId_isFinalAfterOneAttempt() {
         ReferenceNotFoundException notFound = new ReferenceNotFoundException(ReferenceKind.PROGRAM);
@@ -136,7 +130,6 @@ class ReferenceRetriesTest {
         assertThat(attempts).hasValue(1);
     }
 
-    /** Ошибка виртуальной машины — не отказ справочника: она не повторяется и не заворачивается в другое исключение. */
     @Test
     void jvmError_isNotRetriedAndPassesThroughUnwrapped() {
         Error fatal = new Error("ошибка виртуальной машины");
@@ -149,10 +142,6 @@ class ReferenceRetriesTest {
         assertThat(attempts).hasValue(1);
     }
 
-    /**
-     * Механизм повторов ловит любой Throwable, а наружу обещано RuntimeException: проверяемое исключение, прошедшее
-     * мимо объявления Supplier, выходит как IllegalStateException с ним в причине, а не теряется и не повторяется.
-     */
     @Test
     void checkedFailure_isWrappedInIllegalStateExceptionWithoutRetry() {
         IOException checked = new IOException("обрыв");
@@ -177,14 +166,12 @@ class ReferenceRetriesTest {
         assertThat(attempts).hasValue(1);
     }
 
-    /** Бросает проверяемое исключение там, где оно не объявлено: так в байткоде может поступить любой Supplier. */
     @SuppressWarnings("unchecked")
     private static <T, E extends Throwable> T throwUndeclared(Throwable failure) throws E {
         throw (E) failure;
     }
 
-    /** Ответы по порядку: исключения бросаются, последнее значение возвращается. */
-    private static Supplier<String> answers(Object... scripted) {
+    private static Supplier<String> attemptsInOrder(Object... scripted) {
         Deque<Object> queue = new ArrayDeque<>(List.of(scripted));
         return () -> {
             Object next = queue.poll();

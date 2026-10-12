@@ -10,10 +10,6 @@ import ru.projectx.contracts.dto.ReferencePolicy;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 
-/**
- * Через порт проходят только живые записи: архивная запись останавливает выпуск по участнику ошибкой, которая
- * называет справочник и идентификатор записи.
- */
 class LiveRecordsTest {
 
     private static final UUID ID = UUID.fromString("4c6cb8a5-2d7e-4b65-9a1f-0f9d9d2a7c11");

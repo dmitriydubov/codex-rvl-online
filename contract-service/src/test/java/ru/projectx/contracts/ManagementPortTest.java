@@ -24,16 +24,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import ru.projectx.contracts.support.IntegrationTest;
 
-/**
- * Актуатор отвечает на своём порту, чтобы соседи с доступом к API не видели состояния компонентов и метрик.
- * На порту API только короткие {@code /livez} и {@code /readyz}: проба проверяет тот сервер, что принимает запросы.
- * Запросы идут настоящим HTTP: без запущенного сервера порт актуатора не поднимается вовсе.
- */
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = ManagementPortTest.INFO_PROPERTY_FROM_ENVIRONMENT)
 class ManagementPortTest {
 
-    /** Свойство {@code info.*}, как от окружения развёртывания: свойства окружения в info не публикуются. */
     static final String INFO_PROPERTY_FROM_ENVIRONMENT = "info.contour=test-contour";
     private static final String MODULE_NAME = "contract-service";
 
@@ -67,7 +61,6 @@ class ManagementPortTest {
         assertUp(get(apiPort, path));
     }
 
-    /** Порт API видят соседи: короткие пробы отдают одно состояние, без компонентов и их деталей. */
     @ParameterizedTest
     @ValueSource(strings = {"/livez", "/readyz"})
     void apiPort_probesShowStatusOnly(String path) throws IOException, InterruptedException {
@@ -93,7 +86,6 @@ class ManagementPortTest {
         assertThat(get(apiPort, path).statusCode()).isEqualTo(NOT_FOUND);
     }
 
-    /** Версия берётся из того же файла, что и у сборки, поэтому тест не правится при каждом выпуске. */
     @Test
     void managementPort_showsServiceVersion() throws IOException, InterruptedException {
         HttpResponse<String> info = get(managementPort, "/actuator/info");
@@ -112,10 +104,6 @@ class ManagementPortTest {
         assertThat(build.path("name").asString()).isEqualTo(MODULE_NAME);
     }
 
-    /**
-     * В info нет ни свойств окружения (там адреса и пароли), ни сведений о Java, процессе и машине.
-     * Время сборки тоже не публикуется: с ним каждая сборка давала бы другой jar.
-     */
     @Test
     void managementPort_infoShowsBuildFactsOnly() throws IOException, InterruptedException {
         JsonNode info = json.readTree(get(managementPort, "/actuator/info").body());
@@ -124,13 +112,11 @@ class ManagementPortTest {
         assertThat(info.path("build").propertyNames()).containsExactlyInAnyOrder("artifact", "name", "group", "version");
     }
 
-    /** Открыты только health, info и prometheus: открыть остальное — одна строка конфигурации. */
     @Test
     void managementPort_doesNotExposeOtherEndpoints() throws IOException, InterruptedException {
         assertThat(get(managementPort, "/actuator/env").statusCode()).isEqualTo(NOT_FOUND);
     }
 
-    /** Метрики пула видны под его именем: по метке pool строится оповещение о нехватке соединений. */
     @Test
     void managementPort_exposesPoolMetrics() throws IOException, InterruptedException {
         HttpResponse<String> metrics = get(managementPort, "/actuator/prometheus");

@@ -13,10 +13,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Настройки брокеров читаются и проверяются на старте: без пароля, с портом вне диапазона или с одним именем очереди
- * в двух свойствах сервис не поднимается, а TLS по умолчанию проверяет и сертификат, и имя хоста.
- */
 class BrokerPropertiesBindingTest {
 
     private static final String INTERNAL = "projectx.brokers.internal";
@@ -49,7 +45,6 @@ class BrokerPropertiesBindingTest {
         });
     }
 
-    /** Без явных настроек TLS выключен, а когда его включат, проверки сертификата и имени хоста уже стоят. */
     @Test
     void tls_isOffByDefaultAndVerifiesCertificateAndHostnameOnceEnabled() {
         contexts.withPropertyValues(both()).run(context -> {
@@ -83,7 +78,6 @@ class BrokerPropertiesBindingTest {
                 .run(context -> assertThat(context).hasFailed());
     }
 
-    /** Пароль не задан вовсе, как при забытой переменной окружения: отказ на старте, а не от брокера. */
     @ParameterizedTest
     @ValueSource(strings = {INTERNAL, ONEC})
     void absentPassword_failsStartup(String prefix) {
