@@ -1,5 +1,6 @@
-# Локальный контур вне тестов: база и сам сервис (профиль app).
-# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Команды и настройка через .env — в README модуля.
+# Локальный контур вне тестов: база, два брокера и сам сервис (профиль app).
+# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Брокеры — не брокеры контура: очередей
+# сервиса Заявок и 1С:УСК в них нет, и слушатели по умолчанию выключены. Команды и настройка через .env — в README модуля.
 
 name: contract-service
 
@@ -22,8 +23,49 @@ services:
       timeout: 5s
       retries: 10
 
+  # Межсервисный брокер контура (сервис Заявок). Та же версия, что у брокеров контура.
+  rabbitmq-internal:
+    image: rabbitmq:4.1.2-management-alpine
+    container_name: contract-service-rabbitmq-internal
+    environment:
+      RABBITMQ_DEFAULT_USER: contract_service
+      RABBITMQ_DEFAULT_PASS: contract_service
+    ports:
+      # Локально без TLS.
+      - "127.0.0.1:5672:5672"
+      # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
+      # в рабочем контуре их заводит сервис Заявок.
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-internal-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD-SHELL", "rabbitmq-diagnostics -q check_running" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # Брокер 1С:УСК: отдельный контейнер, как отдельный брокер в контуре. Порты сдвинуты на один,
+  # чтобы не занимать порты межсервисного.
+  rabbitmq-onec:
+    image: rabbitmq:4.1.2-management-alpine
+    container_name: contract-service-rabbitmq-onec
+    environment:
+      RABBITMQ_DEFAULT_USER: contract_service
+      RABBITMQ_DEFAULT_PASS: contract_service
+    ports:
+      - "127.0.0.1:5673:5672"
+      # Панель брокера; очереди 1С заводятся здесь вручную, в рабочем контуре их заводит 1С:УСК.
+      - "127.0.0.1:15673:15672"
+    volumes:
+      - rabbitmq-onec-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD-SHELL", "rabbitmq-diagnostics -q check_running" ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
   # Сервис из Dockerfile. В профиле, чтобы обычный up не собирал образ каждый раз.
-  # Внутри контейнера localhost — он сам, поэтому база указана по имени сервиса.
+  # Внутри контейнера localhost — он сам, поэтому база и брокеры указаны по именам сервисов.
   contract-service:
     profiles: [ app ]
     build:
@@ -40,10 +82,20 @@ services:
     env_file:
       - path: .env
         required: false
-    # Пароль задан явно: в application.yml умолчания у него нет.
+    # Пароли заданы явно: в application.yml умолчаний у них нет. У локальных брокеров нет TLS.
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/contract_service?logServerErrorDetail=false
       DB_PASSWORD: contract_service
+      RABBITMQ_INTERNAL_HOST: rabbitmq-internal
+      RABBITMQ_INTERNAL_PASSWORD: contract_service
+      RABBITMQ_INTERNAL_SSL_ENABLED: "false"
+      RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP: ${RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP:-false}
+      RABBITMQ_ONEC_HOST: rabbitmq-onec
+      # Внутри сети compose брокер 1С слушает свой штатный порт.
+      RABBITMQ_ONEC_PORT: "5672"
+      RABBITMQ_ONEC_PASSWORD: contract_service
+      RABBITMQ_ONEC_SSL_ENABLED: "false"
+      RABBITMQ_ONEC_LISTENER_AUTO_STARTUP: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:-false}
       # Тот же порт, что опубликован ниже.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     ports:
@@ -53,6 +105,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq-internal:
+        condition: service_healthy
+      rabbitmq-onec:
+        condition: service_healthy
 
 volumes:
   postgres-data:
+  rabbitmq-internal-data:
+  rabbitmq-onec-data:

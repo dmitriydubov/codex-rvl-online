@@ -10,13 +10,19 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AliasFor;
 
 /**
- * Приложение целиком на настоящем PostgreSQL с остановленными часами. Мутационное тестирование эти тесты не запускает
- * (тег {@code no-mutate}), поэтому логику классов покрывают unit-тесты.
+ * Приложение целиком на настоящем PostgreSQL с остановленными часами и без брокеров: слушатели и health подключений
+ * выключены, иначе health ждал бы несуществующий брокер, а пароли брокеров вымышленные, иначе проверка настроек не
+ * дала бы контексту подняться. Мутационное тестирование эти тесты не запускает ({@code no-mutate}).
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("no-mutate")
-@SpringBootTest
+@SpringBootTest(properties = {
+        "management.health.brokers.enabled=false",
+        "projectx.brokers.internal.connection.password=no-broker",
+        "projectx.brokers.onec.connection.password=no-broker",
+        "projectx.brokers.internal.listener-auto-startup=false",
+        "projectx.brokers.onec.listener-auto-startup=false"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class})
 public @interface IntegrationTest {
 
