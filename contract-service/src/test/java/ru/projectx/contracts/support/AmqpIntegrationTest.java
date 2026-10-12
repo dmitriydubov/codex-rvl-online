@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.brokers.internal.connection.tls.enabled=false",
+        "projectx.reference.url=http://reference.test:8080/internal/v1",
         "projectx.brokers.onec.connection.tls.enabled=false",
         "projectx.brokers.internal.listener-auto-startup=true",
         "projectx.brokers.onec.listener-auto-startup=true"})

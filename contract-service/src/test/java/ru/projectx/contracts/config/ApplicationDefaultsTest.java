@@ -37,7 +37,7 @@ class ApplicationDefaultsTest {
         assertThat(application.getProperty("projectx.brokers.onec.connection.port")).asString()
                 .isEqualTo("${RABBITMQ_ONEC_PORT:5675}");
         assertThat(application.getProperty("projectx.reference.url")).asString()
-                .isEqualTo("${REFERENCE_URL:http://localhost:8080/internal/v1}");
+                .isEqualTo("${REFERENCE_URL:}");
     }
 
     @Test

@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ReferenceErrorHandlerTest {
 
-    private final ReferenceErrorBodies bodies = new ReferenceErrorBodies(JsonMapper.shared());
+    private final ReferenceErrorCodes bodies = new ReferenceErrorCodes(JsonMapper.shared());
     private final ReferenceErrorHandler handler = new ReferenceErrorHandler(bodies);
 
     @ParameterizedTest
@@ -121,7 +121,7 @@ class ReferenceErrorHandlerTest {
 
     @Test
     void oversizedBody_hasNoCodeEvenIfItStartsWithTheContourFormat() {
-        String padding = " ".repeat(ReferenceErrorBodies.MAX_BODY_BYTES);
+        String padding = " ".repeat(ReferenceErrorCodes.MAX_BODY_BYTES);
 
         assertThat(bodies.code(stream(error("POLICY_NOT_FOUND") + padding))).isEmpty();
     }
@@ -129,7 +129,7 @@ class ReferenceErrorHandlerTest {
     @Test
     void bodyAtTheSizeLimit_isStillRead() {
         String contourError = error("POLICY_NOT_FOUND");
-        String padding = " ".repeat(ReferenceErrorBodies.MAX_BODY_BYTES - contourError.getBytes(StandardCharsets.UTF_8).length);
+        String padding = " ".repeat(ReferenceErrorCodes.MAX_BODY_BYTES - contourError.getBytes(StandardCharsets.UTF_8).length);
 
         assertThat(bodies.code(stream(padding + contourError))).contains("POLICY_NOT_FOUND");
     }

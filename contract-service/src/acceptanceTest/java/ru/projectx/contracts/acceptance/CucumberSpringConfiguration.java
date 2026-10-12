@@ -18,6 +18,7 @@ import ru.projectx.contracts.service.integration.InternalBroker;
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "management.server.port=0",
+        "projectx.reference.url=http://reference.test:8080/internal/v1",
         "management.health.brokers.enabled=false",
         "projectx.scheduling.enabled=false",
         "projectx.inbox.requeue-delay=1s",

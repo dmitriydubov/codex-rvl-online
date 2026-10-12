@@ -139,7 +139,7 @@ projectx:
       zone: ${CONTRACT_NUMBERING_ZONE:Europe/Moscow}
 
   reference:
-    url: ${REFERENCE_URL:http://localhost:8080/internal/v1}
+    url: ${REFERENCE_URL:}
     connect-timeout: ${REFERENCE_CONNECT_TIMEOUT:2s}
     read-timeout: ${REFERENCE_READ_TIMEOUT:7s}
     retry:
