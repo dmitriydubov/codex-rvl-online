@@ -77,7 +77,7 @@ class DatabaseConnectionSettingsTest {
                         () -> statement.execute("INSERT INTO party VALUES ('" + ROW_VALUE + "')"));
 
                 assertThat(failure.getSQLState()).isEqualTo("23505");
-                assertThat(failure.getMessage()).doesNotContain(ROW_VALUE);
+                assertThat(failure.getMessage()).contains("party_pkey").doesNotContain(ROW_VALUE);
             }
             finally {
                 connection.rollback();

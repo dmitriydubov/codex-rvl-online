@@ -26,11 +26,6 @@ class ContractServiceApplicationTest {
     @Autowired
     private Clock clock;
 
-    @Test
-    void contextLoads() {
-        // Достаточно самого факта старта: падение произойдёт до тела теста.
-    }
-
     /** Журнал миграций появляется, только если Liquibase действительно прошёл по оглавлению на этой базе. */
     @Test
     void migrations_runOnStartup() {
