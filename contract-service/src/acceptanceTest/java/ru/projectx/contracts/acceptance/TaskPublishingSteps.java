@@ -79,7 +79,7 @@ public class TaskPublishingSteps {
         published.rememberDefectiveEnvelopeSource(messages.bytes(messages.upserted(
                 "b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11", "61a7982c-a0b4-4bbf-9527-60b40b752803", 1,
                 DEFAULT_PARTICIPANTS)));
-        queue.publish(bytes);
+        queue.called(queueName).publish(bytes);
     }
 
     @Дано("сервис Заявок публикует в свою очередь прекращение работы {string} по заявке {string} версии {int}:")

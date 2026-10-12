@@ -118,6 +118,23 @@ class TaskQueueListenerTest {
     }
 
     @Test
+    void storageFailure_waitsTheRequeueDelayBeforeReturningTheMessage() throws IOException {
+        TaskQueueListener slow = new TaskQueueListener(new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
+                new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
+                        new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
+                        new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
+                        Duration.ofMillis(300)));
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("база"));
+        long started = System.nanoTime();
+
+        slow.onMessage(message(body), channel);
+
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(300));
+        verify(channel).basicNack(7L, false, true);
+    }
+
+    @Test
     void interruptedPause_stillReturnsMessageAndKeepsInterruptFlag() throws IOException {
         String body = TaskBodies.upserted().toJson();
         given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("база"));

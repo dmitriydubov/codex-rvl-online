@@ -22,13 +22,15 @@ public class ServiceLogSteps {
     private final InboxJournal inbox;
     private final PublishedMessages published;
     private final TaskMessages messages;
+    private final TaskQueue queue;
 
     public ServiceLogSteps(ServiceJournal journal, InboxJournal inbox, PublishedMessages published,
-            TaskMessages messages) {
+            TaskMessages messages, TaskQueue queue) {
         this.journal = journal;
         this.inbox = inbox;
         this.published = published;
         this.messages = messages;
+        this.queue = queue;
     }
 
     @Before(order = 20)
@@ -55,19 +57,20 @@ public class ServiceLogSteps {
                 .toList();
         assertThat(matching).as("записи ERROR об окончательном отказе %s", messageId).hasSize(1);
         assertThat(matching.get(0).getFormattedMessage())
-                .contains("тип события " + eventType)
-                .contains("попытка " + attempt)
-                .contains("SQLSTATE " + sqlState);
+                .startsWith("сообщение " + messageId + " отклонено окончательно: тип события " + eventType
+                        + ", попытка " + attempt + ", SQLSTATE " + sqlState + ": ");
         assertThat(matching.get(0).getThrowableProxy()).as("приложенное исключение").isNull();
     }
 
     @Тогда("в журнале Договоров есть запись уровня ERROR о потерянном сообщении очереди {string} с причиной {string}")
     public void lossLogged(String queueName, String reason) {
+        String queue = this.queue.called(queueName).name();
         List<ILoggingEvent> matching = journal.events().stream()
                 .filter(event -> event.getLevel() == Level.ERROR)
-                .filter(event -> event.getFormattedMessage().contains("потеряно: " + reason))
+                .filter(event -> event.getFormattedMessage()
+                        .startsWith("сообщение очереди " + queue + " потеряно: " + reason + " ("))
                 .toList();
-        assertThat(matching).as("записи ERROR о потерянном сообщении очереди «%s»", queueName).hasSize(1);
+        assertThat(matching).as("записи ERROR о потерянном сообщении очереди %s", queue).hasSize(1);
         assertThat(matching.get(0).getThrowableProxy()).isNull();
     }
 

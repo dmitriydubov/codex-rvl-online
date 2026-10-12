@@ -41,10 +41,12 @@ public class InboxSteps {
 
     @Тогда("очередь {string} пуста и у неё есть потребитель")
     public void queueEmptyWithConsumer(String queueName) {
+        TaskQueue target = queue.called(queueName);
         Awaitility.await().atMost(PATIENCE).untilAsserted(() -> {
-            var state = queue.state();
-            assertThat(state.getMessageCount()).as("сообщений в очереди «%s»", queueName).isZero();
-            assertThat(state.getConsumerCount()).as("потребителей очереди «%s»", queueName).isPositive();
+            var state = target.state();
+            assertThat(state.getQueue()).isEqualTo(target.name());
+            assertThat(state.getMessageCount()).as("сообщений в очереди %s", target.name()).isZero();
+            assertThat(state.getConsumerCount()).as("потребителей очереди %s", target.name()).isPositive();
         });
     }
 
@@ -171,6 +173,7 @@ public class InboxSteps {
             assertThat(entry.payload()).as("тело сообщения %s", messageId).isNull();
             return;
         }
+        assertThat(expectation).as("ожидание о теле").isEqualTo("сохранено");
         assertThat(entry.payload()).as("тело сообщения %s", messageId).isNotNull();
         assertThat(messages.read(entry.payload().getBytes())).isEqualTo(messages.read(published.of(messageId)));
     }

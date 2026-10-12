@@ -12,6 +12,7 @@ public class TaskQueue {
     private static final boolean DURABLE = true;
     private static final boolean EXCLUSIVE = false;
     private static final boolean AUTO_DELETE = false;
+    private static final String ALIAS = "задачи на выпуск";
 
     private final RabbitTemplate broker;
     private final String queue;
@@ -20,6 +21,17 @@ public class TaskQueue {
         this.broker = new RabbitTemplate(connections);
         this.queue = queue;
         broker.execute(channel -> channel.queueDeclare(queue, DURABLE, EXCLUSIVE, AUTO_DELETE, null));
+    }
+
+    TaskQueue called(String alias) {
+        if (!ALIAS.equals(alias)) {
+            throw new IllegalArgumentException("стенд знает только очередь «" + ALIAS + "», а не «" + alias + "»");
+        }
+        return this;
+    }
+
+    String name() {
+        return queue;
     }
 
     void publish(byte[] body) {

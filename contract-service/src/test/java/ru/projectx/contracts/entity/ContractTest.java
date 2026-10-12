@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class ContractTest {
 
@@ -31,6 +32,8 @@ class ContractTest {
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");
         assertThat(contract.state().request().individualRequestId()).isEqualTo(UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"));
         assertThat(contract.id()).as("идентификатор присваивает база при сохранении").isNull();
+        ReflectionTestUtils.setField(contract, "id", INSURED);
+        assertThat(contract.id()).isEqualTo(INSURED);
         assertThat(contract.state().error()).isEmpty();
         assertThat(contract.state().cancellation()).isEmpty();
         assertThat(contract.finished()).isFalse();

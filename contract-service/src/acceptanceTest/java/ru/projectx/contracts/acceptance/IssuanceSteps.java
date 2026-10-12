@@ -79,12 +79,23 @@ public class IssuanceSteps {
         String document = StepTables.required(expected, "документ");
         if ("ничего".equals(document)) {
             assertThat(record).as("запись о выпуске").isEmpty();
+            noRequisites(expected);
             return;
         }
         assertThat(record).as("запись о выпуске").isPresent();
         SoftAssertions softly = new SoftAssertions();
         softly.assertThat(record.get().document()).isEqualTo(document);
         requisites(softly, expected, record.get());
+        softly.assertAll();
+    }
+
+    private static void noRequisites(Map<String, String> expected) {
+        SoftAssertions softly = new SoftAssertions();
+        for (Map.Entry<String, String> cell : expected.entrySet()) {
+            if (!"документ".equals(cell.getKey())) {
+                softly.assertThat(blankAsNull(cell.getValue())).as("реквизит «%s» без записи", cell.getKey()).isNull();
+            }
+        }
         softly.assertAll();
     }
 
