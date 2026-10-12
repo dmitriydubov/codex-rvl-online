@@ -1,0 +1,58 @@
+# Локальный контур вне тестов: база и сам сервис (профиль app).
+# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Команды и настройка через .env — в README модуля.
+
+name: contract-service
+
+services:
+
+  postgres:
+    image: postgres:16.10-alpine
+    container_name: contract-service-postgres
+    environment:
+      POSTGRES_DB: contract_service
+      POSTGRES_USER: contract_service
+      POSTGRES_PASSWORD: contract_service
+    ports:
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U contract_service -d contract_service" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Сервис из Dockerfile. В профиле, чтобы обычный up не собирал образ каждый раз.
+  # Внутри контейнера localhost — он сам, поэтому база указана по имени сервиса.
+  contract-service:
+    profiles: [ app ]
+    build:
+      context: .
+      # Без значений: compose передаёт только заданные в .env или окружении аргументы,
+      # остальные берут умолчания из Dockerfile. Запись ${ИМЯ:-умолчание} их бы перекрыла.
+      args:
+        - JAR_SOURCE
+        - PUBLIC_REPOSITORIES
+        - JDK_IMAGE
+        - JRE_IMAGE
+        - GRADLE_DISTRIBUTION_URL
+    container_name: contract-service
+    env_file:
+      - path: .env
+        required: false
+    # Пароль задан явно: в application.yml умолчания у него нет.
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/contract_service?logServerErrorDetail=false
+      DB_PASSWORD: contract_service
+      # Тот же порт, что опубликован ниже.
+      MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
+    ports:
+      - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      # Актуатор (health, info, prometheus).
+      - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

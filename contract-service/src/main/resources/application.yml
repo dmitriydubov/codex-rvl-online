@@ -1,0 +1,112 @@
+spring:
+  application:
+    name: contract-service
+
+  # Синхронные вызовы — короткие запросы к базе, держать под каждый платформенный поток незачем.
+  threads:
+    virtual:
+      enabled: true
+
+  # Вместе с server.shutdown: на SIGTERM сервис перестаёт принимать запросы и дорабатывает начатые.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  # Поля JSON в ответах — snake_case, как во всех контрактах контура.
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml.
+  # У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой базе с таким же.
+  # Если переменную забыли, запуск падает на миграциях с «password authentication failed».
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/contract_service?logServerErrorDetail=false}
+    username: ${DB_USERNAME:contract_service}
+    password: ${DB_PASSWORD}
+    # Таймауты не дают запросу висеть на чужой блокировке или оборванной сети и держать поток.
+    # Отказ по таймауту — временная ошибка. Миграции эти таймауты не получают: у них своё соединение.
+    hikari:
+      # Имя — метка pool в метриках hikaricp.
+      pool-name: application
+      # При недоступной базе запрос получает отказ через это время, а не через 30 с, которые пул ждёт без настройки.
+      # Меньше 250 пул не принимает, а 0 означает ждать без предела.
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
+      # Проверка соединения перед выдачей из пула; меньше ожидания соединения, иначе зависшая база держит запрос
+      # дольше него. Меньше 250 пул не принимает.
+      validation-timeout: 1000
+      data-source-properties:
+        # Таймауты сеанса задаются при подключении, чтобы действовать с первого запроса; значения — в projectx.database.
+        # Секунды ожидания блокировки означают чужую долгую транзакцию. Брошенная транзакция закрывается,
+        # потому что держит блокировки и мешает VACUUM.
+        options: >-
+          -c lock_timeout=${projectx.database.session-timeouts.lock-timeout}
+          -c statement_timeout=${projectx.database.session-timeouts.statement-timeout}
+          -c idle_in_transaction_session_timeout=${projectx.database.session-timeouts.idle-in-transaction-session-timeout}
+        # Таймаут чтения сокета в секундах — на случай, когда сервер не отвечает вовсе.
+        # Поэтому он больше statement_timeout.
+        socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:60}
+        # Без подробностей сервера в тексте ошибки: PostgreSQL называет в них значения строки, а там бывают
+        # персональные данные сторон договора. Миграции свойств пула не получают, поэтому свой DB_URL
+        # сохраняет logServerErrorDetail=false.
+        logServerErrorDetail: false
+
+  jpa:
+    # Схему ведёт Liquibase: изменения схемы мимо миграций нечем откатить.
+    hibernate:
+      ddl-auto: none
+    # Сессия закрывается вместе с транзакцией, ленивые поля не догружаются отдельными запросами.
+    open-in-view: false
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    # Своё соединение без пула и его таймаутов, чтобы те не оборвали долгую миграцию.
+    # Пароль из spring.datasource не наследуется, поэтому задан здесь. Параметры драйвера,
+    # нужные и пулу, и миграциям (sslmode и т. п.), задаются в DB_URL.
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+    # Иначе Liquibase отправляет сведения об использовании на свой сервер.
+    analytics-enabled: false
+
+server:
+  # Без этого Tomcat обрывает соединения в момент SIGTERM.
+  shutdown: graceful
+
+logging:
+  # Журнал в JSON (Elastic Common Schema), чтобы сборщик журналов разбирал записи по полям. Все ключи MDC попадают
+  # в запись, поэтому персональные данные в MDC класть нельзя. Локально текстовый формат вернёт пустая
+  # переменная LOGGING_STRUCTURED_FORMAT_CONSOLE.
+  structured:
+    format:
+      console: ecs
+  level:
+    # Сюда Hibernate пишет текст SQL-ошибок вместе со значениями строки, то есть с персональными
+    # данными. Кавычки нужны: без них YAML читает off как false.
+    org.hibernate.orm.jdbc.error: "off"
+
+# Актуатор — на своём порту без авторизации: этот порт сетевая политика открывает только мониторингу и Kubernetes.
+# Компоненты health показаны, чтобы было видно, чей DOWN. Персональных данных нет ни в health, ни в метриках.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        add-additional-paths: true
+      show-components: always
+      show-details: always
+
+projectx:
+  database:
+    # Запись PostgreSQL (ms, s, min); число без единицы — миллисекунды, так что DB_STATEMENT_TIMEOUT=30 — это 30 мс.
+    session-timeouts:
+      lock-timeout: ${DB_LOCK_TIMEOUT:5s}
+      statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
+      idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
