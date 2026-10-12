@@ -6,10 +6,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Необязательные поля сообщения 1С для реквизитов сущностей: пустой результат {@link OneCValues} становится
- * {@code null}, который допускает колонка. Правила чтения остаются в {@link OneCValues}.
- */
 final class OptionalFields {
 
     static @Nullable UUID uuidOrNull(JsonNode data, String field) {

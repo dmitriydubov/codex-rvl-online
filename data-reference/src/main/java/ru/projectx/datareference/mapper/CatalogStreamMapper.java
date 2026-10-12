@@ -7,10 +7,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Разбор потока 1С, который ведёт справочник по GUID 1С. Наследник решает, принимать ли сообщение и как получить
- * из него снимок, а запись создаётся или обновляется через {@link SnapshotUpsert} по часам сервиса.
- */
 abstract class CatalogStreamMapper<E, S> implements StreamMapper {
 
     private final OneCStream stream;

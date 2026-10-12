@@ -10,11 +10,6 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ProgramLpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 
-/**
- * Программа страхования с перечнем услуг. Перечень читается отдельным запросом вместе с учреждениями и в устойчивом
- * порядке, потому что коллекция программы порядка не хранит. Повторяемое чтение не даёт смешать старую шапку с новым
- * перечнем, если между запросами зафиксируется сообщение 1С: такой ответ пережил бы сброс кэша.
- */
 @Service
 public class ProgramQueryService implements ProgramReads {
 

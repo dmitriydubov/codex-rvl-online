@@ -1,7 +1,3 @@
-/*
- * Плагин мутаций PIT нужен только внешнему набору проверок и есть только на портале плагинов Gradle. Поэтому он
- * объявлен здесь, а не в plugins {}: без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
- */
 buildscript {
     if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
         repositories {
@@ -20,18 +16,10 @@ plugins {
 
 description = 'РВЛ ОНЛАЙН — сервис справочных данных: справочники и полисы из 1С:УСК для сервисов Заявок и Договоров'
 
-/*
- * Артефакт сервиса один — исполняемый jar от bootJar. Иначе рядом в build/libs ложится ещё обычный jar, и CI,
- * этап host в Dockerfile и ручное копирование гадают, какой брать. Образу и тестам задача jar не нужна.
- */
 tasks.named('jar') {
     enabled = false
 }
 
-/*
- * По сведениям о сборке /actuator/info показывает версию сервиса. Время сборки не пишется: с ним задача никогда
- * не считается выполненной, тесты перезапускаются на каждой сборке, а два прогона одного кода дают разные jar.
- */
 springBoot {
     buildInfo {
         excludes = ['time']
@@ -39,7 +27,6 @@ springBoot {
 }
 
 java {
-    // Стек зафиксирован на Java 21 (LTS).
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
@@ -48,33 +35,19 @@ java {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs.addAll([
-            // Имена параметров нужны привязке @ConfigurationProperties к записям
             '-parameters',
             '-Xlint:all,-processing',
     ])
 }
 
-/*
- * Конфигурация только для пути к jar-у Mockito, который JVM получает как -javaagent. transitive = false: asPath
- * склеивает все файлы конфигурации, и второй артефакт молча испортил бы аргумент.
- */
 configurations {
     mockitoAgent
 }
 
-/*
- * Тесты исполняются на тех же версиях библиотек, что и сервис. Иначе тестовые зависимости поднимают общие с продом:
- * assertj-core требует byte-buddy новее, чем Hibernate получает из BOM. Своих версий сборка не задаёт.
- */
 configurations.testRuntimeClasspath.shouldResolveConsistentlyWith(configurations.runtimeClasspath)
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
-    /*
-     * Mockito подключает свой агент сам, на ходу, и JDK уже предупреждает, что однажды
-     * это запретит. Подключаем заранее и явно: mockito-core объявляет Premain-Class,
-     * то есть агентом служит он же — отдельной зависимости для этого не нужно.
-     */
     jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
     testLogging {
         events 'failed'
@@ -84,10 +57,6 @@ tasks.withType(Test).configureEach {
 }
 
 dependencies {
-    /*
-     * Версии — только из BOM Spring Boot, координаты ниже без версий. Плагин Spring Boot BOM сам не подключает,
-     * а compileOnly и annotationProcessor не наследуют implementation, поэтому платформа добавлена в каждую.
-     */
     ['implementation', 'compileOnly', 'annotationProcessor',
      'testCompileOnly', 'testAnnotationProcessor', 'mockitoAgent'].each { configuration ->
         add(configuration, platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
@@ -95,50 +64,26 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    // Миграции на старте запускает только этот стартер: в Boot 4 автоконфигурация Liquibase живёт в своём модуле,
-    // и одного liquibase-core на classpath для неё мало.
     implementation 'org.springframework.boot:spring-boot-starter-liquibase'
-    // REST для сервисов Заявок и Договоров. В Boot 4 starter-web устарел, но по составу совпадает со starter-webmvc,
-    // а Nexus контура отдаёт только его. Появится в Nexus starter-webmvc — заменить координаты, код не меняется.
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    // Приём сообщений из брокера 1С:УСК — единственного брокера, с которым говорит сервис.
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
-    // Проверка @ConfigurationProperties на старте: неверная конфигурация обязана
-    // ронять приложение при развёртывании, а не в первом же сообщении из очереди.
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    // Пробы Kubernetes: /actuator/health/liveness и /readiness. На порту актуатора открыты только
-    // health, info и prometheus, остальные ручки не публикуются (management в application.yml).
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    // Метрики приёма и разбора для Prometheus: /actuator/prometheus. Экспорт настраивает модуль
-    // spring-boot-micrometer-metrics, который уже приходит с актуатором, — он включается, как только
-    // на classpath появляется реестр Prometheus. Версия — из BOM Spring Boot.
     implementation 'io.micrometer:micrometer-registry-prometheus'
-    // Кэш ответов справочных ручек: стандартный кэш Spring, хранилище в памяти процесса — Caffeine
-    // (срок жизни, предел размера, статистика для метрик). Версии — из BOM Spring Boot.
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
-    // @Nullable в сигнатурах. Аннотации нужны и в рантайме — Spring 7 читает их сам.
     implementation 'org.jspecify:jspecify'
-    // Jackson 3 — тот, что приносит Boot 4. Явно, а не транзитивно: на нём написан
-    // мост к колонкам jsonb, и без объявления его не видно на пути компиляции.
     implementation 'tools.jackson.core:jackson-databind'
     runtimeOnly 'org.postgresql:postgresql'
 
-    // MockMvcTester приходит в spring-test с этим стартером. starter-webmvc-test не подключён: его зависимостей
-    // нет в Nexus контура, а единственное полезное из него, @AutoConfigureMockMvc, заменяет бин в TestSupportConfig.
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.testcontainers:testcontainers-rabbitmq'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    // Тот же mockito-core, что приходит со стартером тестов, — но как агент JVM.
     mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }
 
-/*
- * Внешний набор проверок качества, приёмочных и мутационных тестов подключается только во внешней сборке
- * с публичными репозиториями. ./gradlew build он не меняет: все его проверки — отдельные задачи.
- */
 if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
     apply plugin: 'info.solidsoft.pitest'
     apply from: '../gauntlet/gauntlet.gradle'

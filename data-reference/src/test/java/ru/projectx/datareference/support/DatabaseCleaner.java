@@ -8,11 +8,6 @@ import java.util.Objects;
 import javax.sql.DataSource;
 import org.springframework.cache.CacheManager;
 
-/**
- * Очищает базу и кэши ответов перед каждым тестом, потому что контекст Spring и база общие для всех классов. Таблицы
- * очищаются одним {@code TRUNCATE ... CASCADE} по списку из самой базы, чтобы не поддерживать вручную порядок внешних
- * ключей и перечень таблиц; служебные таблицы Liquibase не трогаются.
- */
 public class DatabaseCleaner {
 
     private static final String DOMAIN_TABLES = """

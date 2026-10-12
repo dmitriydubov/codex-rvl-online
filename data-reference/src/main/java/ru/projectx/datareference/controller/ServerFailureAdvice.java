@@ -10,11 +10,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.projectx.datareference.dto.ErrorResponse;
 import ru.projectx.datareference.service.DatabaseOutages;
 
-/**
- * Последний обработчик ошибок REST: недоступность или таймаут базы ({@link DatabaseOutages}) дают 503, и соседи
- * повторяют запрос, а остальное даёт 500 без повтора. Это верхняя граница сервиса, поэтому ловится любое исключение.
- * В журнал идёт цепочка причин ({@link FailureTrace}) без текстов и стека: в них бывают SQL и персональные данные.
- */
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.SERVER_FAILURE)
 public class ServerFailureAdvice {

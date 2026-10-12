@@ -14,11 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 
-/**
- * Отличает временный отказ базы данных, после которого операцию стоит повторить (REST отвечает 503), от прочих ошибок.
- * Перечень временных отказов один на весь сервис: его спрашивают и REST, и разбор сообщений 1С:УСК. В описание отказа
- * для журнала не входит текст исключения: в нём SQL и значения строки, в том числе персональные данные полиса.
- */
 @Component
 public class DatabaseOutages {
 
@@ -29,16 +24,11 @@ public class DatabaseOutages {
             RecoverableDataAccessException.class,
             TransientDataAccessException.class);
 
-    /**
-     * Истёкший лимит транзакции Hibernate и закрытый по простою сеанс Spring переводит в общий JpaSystemException,
-     * поэтому их узнают отдельными правилами. Для чтения такой сбой временный: оно ничего не меняет, повтор безопасен.
-     */
     private static final List<Predicate<Throwable>> TEMPORARY_RULES = List.of(
             DatabaseOutages::isTemporaryType,
             DatabaseOutages::isExpiredHibernateTransaction,
             DatabaseOutages::isSessionClosedForIdleTransaction);
 
-    /** Сеанс закрыт за простой транзакции дольше idle_in_transaction_session_timeout: пул даст новое соединение. */
     private static final String IDLE_IN_TRANSACTION_SESSION_TIMEOUT = "25P03";
 
     private final PersistenceExceptionTranslator translator;
@@ -47,18 +37,12 @@ public class DatabaseOutages {
         this.translator = translator;
     }
 
-    /** Описание отказа для журнала, если ошибка временная; пусто, если повтор её не вылечит. */
     public Optional<Outage> recognize(Exception failure) {
         return translated(failure)
                 .filter(DatabaseOutages::isTemporary)
                 .map(DatabaseOutages::outageOf);
     }
 
-    /**
-     * Описание любого отказа базы, временного или постоянного; пусто, если ошибка пришла не из базы.
-     * {@link IllegalStateException} и {@link IllegalArgumentException} отказом базы не считаются, хотя переводчик
-     * узнаёт и их: такие исключения бросает любой код.
-     */
     public Optional<Outage> describe(Exception failure) {
         if (failure instanceof DataAccessException || failure instanceof PersistenceException) {
             return translated(failure).map(DatabaseOutages::outageOf);
@@ -77,7 +61,6 @@ public class DatabaseOutages {
         return new Outage(typeOf(classified), sqlState(classified));
     }
 
-    /** Обёртка истёкшего лимита Hibernate называется с причиной, иначе его не отличить от другого сбоя транзакции. */
     private static String typeOf(Throwable classified) {
         String type = classified.getClass().getSimpleName();
         if (isExpiredHibernateTransaction(classified)) {
@@ -111,7 +94,6 @@ public class DatabaseOutages {
         return SqlStates.deepestOrNone(failure);
     }
 
-    /** Запись журнала об отказе базы: тип исключения после перевода и SQLSTATE драйвера («нет», если его не было). */
     public record Outage(String type, String sqlState) {
     }
 }

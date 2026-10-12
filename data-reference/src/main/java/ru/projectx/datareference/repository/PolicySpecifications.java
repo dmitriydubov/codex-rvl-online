@@ -16,11 +16,6 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 
-/**
- * Условия отбора полисов и единственное место правила «действует сегодня» для полиса и строки условий обслуживания: им
- * пользуются и поиск полисов, и каталог учреждений. Связь строки с программой по GUID 1С служит фильтром «только
- * восстановительное лечение»: других программ в справочнике нет.
- */
 public final class PolicySpecifications {
 
     private static final char ESCAPE = '!';
@@ -30,14 +25,12 @@ public final class PolicySpecifications {
     private PolicySpecifications() {
     }
 
-    /** Действующие полисы договора, у которых есть действующая строка условий по программе из справочника. */
     public static Specification<Policy> activeRvlPoliciesOf(UUID contractExternalId, LocalDate today) {
         return (policy, query, cb) -> cb.and(
                 activePolicyOf(cb, policy, contractExternalId, today),
                 cb.exists(rvlServiceLine(policy, requireQuery(query), cb, today)));
     }
 
-    /** Полис договора {@code contractExternalId}, который действует в день {@code today}. */
     static Predicate activePolicyOf(CriteriaBuilder cb, Path<Policy> policy, UUID contractExternalId, LocalDate today) {
         return cb.and(
                 cb.equal(policy.get("externalContractId"), contractExternalId),
@@ -46,7 +39,6 @@ public final class PolicySpecifications {
                 openOrAfter(cb, policy.get("endDate"), today));
     }
 
-    /** Строка условий, которая действует в день {@code today}, по программе {@code program} из справочника. */
     static Predicate activeRvlServiceLine(
             CriteriaBuilder cb, Path<PolicyServiceLine> line, Path<Program> program, LocalDate today) {
 
@@ -58,15 +50,10 @@ public final class PolicySpecifications {
                 cb.isFalse(program.<Boolean>get("archive")));
     }
 
-    /** Номер: {@code pattern} — уже экранированная подстрока в нижнем регистре, с {@code %} по краям. */
     public static Specification<Policy> numberContains(String pattern) {
         return (policy, query, cb) -> like(cb, cb.lower(policy.get("number")), pattern);
     }
 
-    /**
-     * ФИО: каждый шаблон-префикс (экранированный токен с {@code %} в конце) подходит к фамилии,
-     * имени или отчеству; {@code ё} с обеих сторон читается как {@code е}.
-     */
     public static Specification<Policy> namesPrefixedBy(List<String> prefixes) {
         return (policy, query, cb) -> cb.and(prefixes.stream()
                 .map(prefix -> cb.or(
@@ -76,12 +63,10 @@ public final class PolicySpecifications {
                 .toArray(Predicate[]::new));
     }
 
-    /** Имя в нижнем регистре, {@code ё} читается как {@code е} — так нормализована и строка поиска. */
     static Expression<String> normalized(CriteriaBuilder cb, Expression<String> name) {
         return cb.function("replace", String.class, cb.lower(name), cb.literal(YO), cb.literal(YE));
     }
 
-    /** {@code like} с символом экранирования {@code !}, которым экранирует вызывающий сервис. */
     static Predicate like(CriteriaBuilder cb, Expression<String> value, String pattern) {
         return cb.like(value, pattern, ESCAPE);
     }

@@ -3,11 +3,6 @@ package ru.projectx.datareference.exception;
 import java.io.Serial;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Копия причины отказа без её текста: имя типа и стек исходного исключения сохраняются, сообщение нет.
- * Исключения разбора JDK и Jackson цитируют исходное значение, а им бывает дата рождения из полиса, которую
- * вывел бы любой стек в журнале. Вложенные причины копируются так же.
- */
 final class RedactedCause extends RuntimeException {
 
     @Serial

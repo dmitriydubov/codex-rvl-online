@@ -16,11 +16,6 @@ import org.springframework.http.HttpMethod;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Пример запроса и ответа стенда из {@code src/test/resources/stand/examples}; те же файлы читает разработчик сервиса
- * Договоров. Примеры идут по порядку имён файлов, и порядок значим: пример, выдающий {@code id}, стоит раньше того,
- * что им пользуется ({@link StandPlaceholders}).
- */
 public record StandExample(String name, String text, JsonNode root) {
 
     private static final String LOCATION = "classpath:stand/examples/*.json";
@@ -73,16 +68,11 @@ public record StandExample(String name, String text, JsonNode root) {
         return root.path("response").path("body");
     }
 
-    /**
-     * Таблица, которую на время запроса другой сеанс держит под ACCESS EXCLUSIVE ({@code condition.locked_table}):
-     * так пример показывает 503 при базе, не ответившей вовремя.
-     */
     public Optional<String> lockedTable() {
         JsonNode table = root.path("condition").path("locked_table");
         return table.isMissingNode() ? Optional.empty() : Optional.of(table.asString());
     }
 
-    /** Плейсхолдеры, которые пример описал в разделе {@code placeholders}. */
     public Set<String> describedPlaceholders() {
         return Set.copyOf(root.path("placeholders").propertyNames());
     }

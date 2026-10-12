@@ -16,11 +16,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разметку сообщения передачи прайса: к какой передаче оно относится, финальное ли оно и сколько в нём строк.
- * По ней сборка находит части и сверяет счётчики, не разбирая тела заново, а перепутать финальное сообщение с пакетом
- * значит никогда не собрать передачу или собрать её неполной.
- */
 class PriceListTransferMarkupTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -42,7 +37,6 @@ class PriceListTransferMarkupTest {
         assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
     }
 
-    /** Ноль пакетов — легальная передача, которая очищает прайс; финальное узнаётся по наличию счётчика. */
     @Test
     void finalMessageWithZeroBatches_isStillFinal() {
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
@@ -51,7 +45,6 @@ class PriceListTransferMarkupTest {
         assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 0, 0));
     }
 
-    /** Счётчик за пределом целого — нарушение контракта с именем поля, без значения. */
     @ParameterizedTest
     @CsvSource({"countMessages, 10000000000, 1", "countMessages, -10000000000, 1", "countRows, 1, 2147483648"})
     void counterBeyondIntBound_isContractViolationNamingField(String field, String countMessages, String countRows) {
@@ -63,10 +56,6 @@ class PriceListTransferMarkupTest {
                 .hasMessage("поле " + field + " больше допустимого");
     }
 
-    /**
-     * Дробный счётчик — нарушение контракта с именем поля, без значения. Обрезанный до целого, он ждал бы части передачи,
-     * которой нет, или собрал бы передачу без последней части.
-     */
     @ParameterizedTest
     @CsvSource({"countMessages, 2.5, 1", "countMessages, 2.0, 1", "countRows, 1, -2.5", "countRows, 1, 2.0"})
     void fractionalCounter_isContractViolationNamingField(String field, String countMessages, String countRows) {
@@ -78,7 +67,6 @@ class PriceListTransferMarkupTest {
                 .hasMessage("поле " + field + " не является целым числом");
     }
 
-    /** Счётчик, пришедший не числом JSON, а строкой с целым, читается тем же целым. */
     @Test
     void counterWrittenAsText_isReadAsBefore() {
         PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""

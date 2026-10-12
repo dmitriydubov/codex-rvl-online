@@ -12,11 +12,6 @@ import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
 
-/**
- * Читает в одной транзакции всё для расчёта стоимости услуги за период; сам расчёт идёт уже без соединения с базой.
- * Считается только услуга из перечня услуг учреждения, и отбор берётся из {@link LpuOffers}, чтобы перечень и расчёт
- * не разошлись.
- */
 @Component
 public class ServicePriceLookup {
 
@@ -44,10 +39,6 @@ public class ServicePriceLookup {
         return new PricedService(new NamedRef(service.id(), service.externalId(), service.name()), lines);
     }
 
-    /**
-     * Услуга в архиве даёт 404 раньше сверки договора: удаление не ошибка данных в 1С. Услуга другого договора
-     * даёт 422, потому что по ценам непрайсового договора считать нельзя. Услуги не по РВЛ для вызывающего нет.
-     */
     private static void requireOffered(ContragentService service, LpuOffer offer) {
         requireNotArchived(service);
         if (!service.contract().id().equals(offer.priceContract().contract().id())) {

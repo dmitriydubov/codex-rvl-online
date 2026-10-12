@@ -12,10 +12,6 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Страховая программа РВЛ вместе с перечнем учреждений, где по ней обслуживают. Перечень замещается целиком,
- * потому что 1С присылает актуальный состав, а дописывание навсегда сохранило бы строки, которых в 1С уже нет.
- */
 @Entity
 @Table(name = "programs")
 public class Program extends OneCEntity {
@@ -35,19 +31,16 @@ public class Program extends OneCEntity {
     @Column(name = "type_programm")
     private String typeProgramm;
 
-    // Не final: Hibernate при загрузке подменяет коллекцию своей, а Jakarta Persistence запрещает final у полей.
     @OneToMany(mappedBy = "program", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProgramLpu> availableLpu = new ArrayList<>();
 
     protected Program() {
-        // JPA
     }
 
     private Program(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static Program create(UUID externalId, Details details, Instant now) {
         Program program = new Program(externalId, now);
         program.applySnapshot(details, now);
@@ -62,7 +55,6 @@ public class Program extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Пришло обновление, в котором программа больше не относится к РВЛ: поля применяются, запись уходит в архив. */
     public void archiveAfterLosingRvl(Details details, Instant now) {
         applySnapshot(details, now);
         archiveCommon(now);
@@ -75,7 +67,6 @@ public class Program extends OneCEntity {
         }
     }
 
-    /** Разобранные поля шапки сообщения о программе. */
     public record Details(
             @Nullable UUID externalProductId,
             @Nullable UUID externalParentId,

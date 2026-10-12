@@ -3,11 +3,6 @@ package ru.projectx.datareference.acceptance;
 import io.cucumber.java.ru.Дано;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Шаги «1С:УСК прислала ту же программу …» о пределах слоя и процента сооплаты строки услуги программы РВЛ. Сообщение
- * строится из программы, присланной сценарием раньше, и ложится в сырьё так, как его сохранил бы приём из очереди;
- * ожидаемый исход разбора несёт само сообщение.
- */
 public class OneCProgramRangeSteps {
 
     private final OneCInbox inbox;

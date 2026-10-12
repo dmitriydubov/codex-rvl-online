@@ -43,11 +43,6 @@ import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает то, что сборщик прайса, приходящего частями, делает сам: разметку отложенной части, набор строк для
- * применения прайса и то, что сохраняется после исхода. Решение о готовности передачи проверяет
- * {@link PriceListTransferStatusTest}, а путь целиком на настоящей базе — {@link PriceListTransferTest}.
- */
 @ExtendWith(MockitoExtension.class)
 class PriceListTransferAssemblerTest {
 
@@ -78,7 +73,6 @@ class PriceListTransferAssemblerTest {
         assertThat(assembler().stream()).isEqualTo(OneCStream.PRICE_LISTS);
     }
 
-    /** Пакет строк — не финальное сообщение: ожидаемого числа пакетов у него нет, а строк — сколько в нём пришло. */
     @Test
     void batch_isBufferedWithItsRowCount_andWaitsForFinalMessage() {
         InboundMessage batch = message(batchData(row(1, "100.00"), row(2, "200.00")));
@@ -95,7 +89,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.BUFFERED)).isEqualTo(1.0);
     }
 
-    /** Финальное сообщение узнаётся по наличию счётчиков, а не по их значению: ноль пакетов тоже легален. */
     @Test
     void finalMessage_isBufferedWithItsCounters() {
         InboundMessage finalMessage = message(finalData(2, 3));
@@ -109,7 +102,6 @@ class PriceListTransferAssemblerTest {
         assertThat(finalMessage.transferPart().rowCount()).isEqualTo(3);
     }
 
-    /** Строки всех пакетов идут в применение одним набором по возрастанию номера, как их пронумеровал источник. */
     @Test
     void assembledTransfer_appliesRowsOfAllBatchesInSourceOrder_andMarksWholeTransferProcessed() {
         InboundMessage first = buffered(batchData(row(3, "300.00"), row(1, "100.00")), null, 2);
@@ -132,7 +124,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.PROCESSED)).isEqualTo(3.0);
     }
 
-    /** Собранная передача по услуге, которой ещё нет, ждёт её вся, с одного момента и с причиной, которая её называет. */
     @Test
     void assembledTransferForServiceNotYetReceived_waitsForItWhole() {
         InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
@@ -150,7 +141,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.AWAITING_PARENT)).isEqualTo(2.0);
     }
 
-    /** Когда услуга пришла, пересмотр финального сообщения собирает передачу из тех же частей и применяет её. */
     @Test
     void waitingTransfer_isAssembledAgainFromItsParts_andApplied() {
         AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, SERVICE_ID);
@@ -188,7 +178,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.SKIPPED)).isEqualTo(2.0);
     }
 
-    /** Счётчики не сошлись — вся передача в ошибку, а прайс не применяется вовсе. */
     @Test
     void mismatchedCounters_failWholeTransfer_withoutTouchingPriceList() {
         InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
@@ -207,7 +196,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.FAILED)).isEqualTo(2.0);
     }
 
-    /** Ошибка в самой части прерывает разбор до сборки: отклонят её и всю передачу уже после отката. */
     @Test
     void batchWithRowWithoutNumber_isContractViolation_beforeAssembling() {
         InboundMessage finalMessage = buffered(finalData(1, 1), 1, 1);
@@ -232,7 +220,6 @@ class PriceListTransferAssemblerTest {
         verify(priceListMapper, never()).apply(any());
     }
 
-    /** Отказ передачи уже записан: опоздавшая часть отклоняется сразу, а прайс не трогается. */
     @Test
     void partOfRejectedTransfer_isRejectedRightAway() {
         InboundMessage rejected = buffered(batchData(row(1, "100.00")), null, 1);
@@ -263,10 +250,6 @@ class PriceListTransferAssemblerTest {
         assertThat(lateBatch.outcome().lastError()).isEqualTo("передача " + CID + " уже отклонена");
     }
 
-    /**
-     * Строка услуги блокируется раньше, чем читаются части передачи: проверка зависших передач не меняет их у сборки
-     * за спиной.
-     */
     @Test
     void serviceRowIsLocked_beforeTransferPartsAreRead() {
         receive(message(batchData(row(1, "100.00"))));
@@ -276,10 +259,6 @@ class PriceListTransferAssemblerTest {
         steps.verify(repository).findByCorrelationId(CID);
     }
 
-    /**
-     * Тела частей разбираются раньше первого запроса транзакции разбора и раньше блокировки строки услуги: долгий
-     * разбор не держит блокировку и не простаивает в открытой транзакции.
-     */
     @Test
     void transferParts_areReadInAdvance_beforeFirstQueryAndServiceLock() {
         receive(message(batchData(row(1, "100.00"))));
@@ -290,10 +269,6 @@ class PriceListTransferAssemblerTest {
         steps.verify(finalizations).lockByService(SERVICE_ID);
     }
 
-    /**
-     * Под блокировкой собранная передача берёт тела, разобранные заранее, и сама их не разбирает: здесь к моменту
-     * блокировки тело пакета уже не читается, а прайс применяется строками, разобранными до неё.
-     */
     @Test
     void assembledTransfer_takesBodiesParsedBeforeLock_andParsesNothingUnderIt() {
         InboundMessage batch = message(batchData(row(1, "100.00")));
@@ -312,7 +287,6 @@ class PriceListTransferAssemblerTest {
                 {"keyValue":"%s","recordSet":[%s]}""".formatted(SERVICE_ID, row(1, "100.00"))));
     }
 
-    /** Часть, которой не было при чтении заранее, сборка разбирает сама: исход передачи от этого не зависит. */
     @Test
     void partMissedByAdvanceRead_isParsedByAssembly() {
         InboundMessage batch = buffered(batchData(row(1, "100.00")), null, 1);
@@ -330,10 +304,6 @@ class PriceListTransferAssemblerTest {
         assertThat(batch.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
     }
 
-    /**
-     * Услуга части сверяется с частями передачи в буфере раньше, чем блокируется её строка: блокируется только
-     * услуга, которую передача называет целиком.
-     */
     @Test
     void serviceOfPart_isCheckedBeforeItsRowIsLocked() {
         receive(message(batchData(row(1, "100.00"))));
@@ -343,7 +313,6 @@ class PriceListTransferAssemblerTest {
         steps.verify(finalizations).lockByService(SERVICE_ID);
     }
 
-    /** Часть называет не ту услугу, что части в буфере: ошибка части, ничего не заблокировано и не сохранено. */
     @Test
     void partNamingAnotherServiceThanTransfer_isContractViolation_beforeLocking() {
         InboundMessage batch = message(batchData(row(1, "100.00")));
@@ -357,7 +326,6 @@ class PriceListTransferAssemblerTest {
         verify(priceListMapper, never()).apply(any());
     }
 
-    /** Применённая передача становится последней по услуге: следующие сравниваются с её финальным сообщением. */
     @Test
     void appliedTransfer_becomesTheLastOfItsService() {
         buffered(batchData(row(1, "100.00")), null, 1);
@@ -369,10 +337,6 @@ class PriceListTransferAssemblerTest {
         verify(finalizations).recordApplied(SERVICE_ID, finalMessage.receipt().messageId());
     }
 
-    /**
-     * Передача, финал которой принят раньше финала уже применённой, собралась позже неё: прайс не трогается, а вся
-     * передача пропускается с причиной, называющей услугу и применённую передачу.
-     */
     @Test
     void transferFinalizedBeforeTheAppliedOne_isSkippedWhole_andPricesStay() {
         InboundMessage olderFinal = buffered(finalData(1, 1), 1, 1);
@@ -393,7 +357,6 @@ class PriceListTransferAssemblerTest {
         verify(finalizations, never()).recordApplied(any(), any());
     }
 
-    /** Исход пропущенной передачи записан: опоздавшая часть пропускается сразу, даже испорченная, прайс не трогается. */
     @Test
     void partOfSkippedTransfer_isSkippedRightAway() {
         InboundMessage skipped = buffered(finalData(1, 1), 1, 1);
@@ -413,7 +376,6 @@ class PriceListTransferAssemblerTest {
         assertThat(transitions(InboundStatus.SKIPPED)).isEqualTo(1.0);
     }
 
-    /** Финальное сообщение у передачи ровно одно: второе — ошибка этой части ещё до сборки. */
     @Test
     void secondFinalMessage_isContractViolation_beforeAssembling() {
         buffered(finalData(1, 1), 1, 1);
@@ -425,7 +387,6 @@ class PriceListTransferAssemblerTest {
         verify(priceListMapper, never()).apply(any());
     }
 
-    /** Тело пакета стёрто — собрать передачу нечем, и повтор этого не исправит. */
     @Test
     void batchWithErasedBody_isContractViolation() {
         InboundMessage batch = InboundMessage.receive(
@@ -439,7 +400,6 @@ class PriceListTransferAssemblerTest {
                 .hasMessage("тело сообщения передачи стёрто, собрать её нечем");
     }
 
-    /** Конверт части без объекта data — нарушение контракта с тем же текстом, что при разборе одного сообщения. */
     @Test
     void batchWithoutDataObject_isContractViolation() {
         InboundMessage batch = InboundMessage.receive(
@@ -469,7 +429,6 @@ class PriceListTransferAssemblerTest {
         return assembler().handle(message, dataOf(message));
     }
 
-    /** Сначала сохраняется разметка пришедшего сообщения, затем исход всей передачи: финальное первым. */
     private void verifySavedAfterBuffering(InboundMessage received, InboundMessage... others) {
         InOrder saves = inOrder(repository);
         saves.verify(repository).save(received);
@@ -502,7 +461,6 @@ class PriceListTransferAssemblerTest {
         return message;
     }
 
-    /** Та же часть с той же разметкой, но с телом, стёртым к моменту блокировки. */
     private static InboundMessage withoutBody(InboundMessage part) {
         InboundMessage copy = InboundMessage.receive(part.receipt(), null);
         copy.markBuffered(CID, part.transferPart().batchCount(), part.transferPart().rowCount());

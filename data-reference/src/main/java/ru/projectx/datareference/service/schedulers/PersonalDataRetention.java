@@ -9,11 +9,6 @@ import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
-/**
- * Срок хранения персональных данных (ПДн): по истечении стираются тела сообщений 1С:УСК, которые могут их нести, и
- * ПДн застрахованного в полисах, а сами строки остаются. Стирание идёт пачками, каждая своей короткой транзакцией,
- * чтобы не держать блокировки строк, которые читает разбор.
- */
 @Component
 public class PersonalDataRetention {
 

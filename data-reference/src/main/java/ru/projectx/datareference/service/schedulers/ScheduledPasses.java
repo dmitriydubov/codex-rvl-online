@@ -6,11 +6,6 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 
-/**
- * Расписание проходов по сырью: разбора, стирания персональных данных и проверки зависших передач прайсов. Паузы
- * берутся из проверенных на старте {@link ImportProperties}, а не из аннотаций, которые явно пустую задержку приняли
- * бы за нулевую. Проход начинается после конца предыдущего, и долгий проход одной задачи не задерживает другие.
- */
 @Component
 public class ScheduledPasses implements SchedulingConfigurer {
 

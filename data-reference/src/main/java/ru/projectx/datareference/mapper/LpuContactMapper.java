@@ -16,10 +16,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает адрес и регион санатория из потока контактов всех контрагентов 1С:УСК. Адрес замещается целиком,
- * и без подходящих строк очищается: иначе каталог показывал бы адрес, которого в 1С уже нет.
- */
 @Component
 public class LpuContactMapper implements StreamMapper {
 
@@ -50,7 +46,6 @@ public class LpuContactMapper implements StreamMapper {
         return sanatoriums.applyIfKnown(contragentOf(data), sanatorium -> replaceAddress(sanatorium, data));
     }
 
-    /** Сообщение меняет самого контрагента, потому что адрес лежит в его строке справочника. */
     @Override
     public Optional<UUID> recordOf(ObjectNode data) {
         return Optional.of(contragentOf(data));
@@ -66,11 +61,6 @@ public class LpuContactMapper implements StreamMapper {
         return ImportResult.applied();
     }
 
-    /**
-     * GUID контрагента, чьи это контакты, лежит в фильтре сообщения, и в каждой строке набора он
-     * повторяется. Сначала читается фильтр, а первая строка набора служит запасным вариантом. Набор строк
-     * может быть пустым, и тогда адрес всё равно нужно очистить у конкретного санатория.
-     */
     private static UUID contragentOf(ObjectNode data) {
         return filterValue(data)
                 .or(() -> firstRecordOwner(data))
@@ -92,10 +82,6 @@ public class LpuContactMapper implements StreamMapper {
                 .findFirst();
     }
 
-    /**
-     * Порядок видов адреса задан настройкой. Вид не из списка тоже подходит, но проигрывает любому названному: какой-то
-     * адрес лучше пустой карточки. Среди равных выигрывает строка с меньшим номером.
-     */
     private Optional<JsonNode> selectAddress(ObjectNode data) {
         List<String> priority = contract.addressKindPriority();
         return rows(data, RECORD_SET)

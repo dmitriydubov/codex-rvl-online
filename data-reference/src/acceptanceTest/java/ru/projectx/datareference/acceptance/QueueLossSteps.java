@@ -12,15 +12,9 @@ import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import ru.projectx.datareference.service.integration.OneCConsumerSubscriptions;
 
-/**
- * Очередь 1С:УСК пропала на брокере. Контекст общий на все фичи, поэтому после сценария стенд, как перезапуск сервиса,
- * объявляет очередь заново и поднимает её контейнер; хук идёт последним из «после», когда база доступна и пауза снята,
- * иначе запуск контейнера отменили бы.
- */
 public class QueueLossSteps {
 
     private static final int AFTER_RESUME = 50;
-    /** Запас на повторы потребителя, который ещё ищет очередь, и на подтверждение подписки. */
     private static final Duration RESTORE_TIMEOUT = Duration.ofSeconds(60);
 
     private final OneCBroker broker;

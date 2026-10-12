@@ -10,10 +10,6 @@ import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.config.ImportProperties;
 
-/**
- * Шаги о сроке хранения тела и причины исхода сообщения 1С:УСК в сырье. Срок берётся из настроек сервиса, поэтому
- * сценарий закрепляет границу: на час старше срока стирается, на час моложе нет.
- */
 public class OneCRetentionSteps {
 
     private static final Duration HOUR = Duration.ofHours(1);
@@ -56,7 +52,6 @@ public class OneCRetentionSteps {
         }
     }
 
-    /** Только тело: причина исхода у таких сообщений остаётся, и её проверяет шаг об исходе. */
     @Тогда("тело последнего сообщения {word}")
     public void body(String state) {
         assertThat(BODY_ERASED).as("состояния тела, которые знает шаг").containsKey(state);

@@ -18,11 +18,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор частей передачи прайса до блокировки строки услуги: части разбираются, только когда пришедшая часть
- * собирает передачу, и ни одна часть при этом не меняется. Часть, тело которой заранее не разобрать, остаётся сборке:
- * её отказ называет сборка, как и для любой другой части.
- */
 @ExtendWith(MockitoExtension.class)
 class PriceTransferPartsInAdvanceTest {
 
@@ -35,7 +30,6 @@ class PriceTransferPartsInAdvanceTest {
     @Mock
     private PriceTransferPartsReader reader;
 
-    /** Последний пакет собирает передачу: заранее разобраны и он сам, и финальное сообщение, и прежние пакеты. */
     @Test
     void partCompletingTransfer_parsesWholeTransfer() {
         InboundMessage finalMessage = buffered(finalData(2, 2), 2, 2);
@@ -51,7 +45,6 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(parsed.dataOf(lastBatch)).get().isSameAs(lastBatchData);
     }
 
-    /** Пришедшую часть, которой при чтении ещё не видно в сырье, разбор заранее всё равно учитывает. */
     @Test
     void receivedPartNotYetVisibleInStoredParts_stillCompletesTransfer() {
         InboundMessage batch = buffered(batchData(1), null, 1);
@@ -63,10 +56,6 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(parsed.dataOf(batch)).contains(dataOf(batch));
     }
 
-    /**
-     * Повторная доставка части, которая уже лежит в буфере: её прежняя строка заменяется пришедшей, а не считается
-     * вторым пакетом. Иначе счётчики передачи не сошлись бы и заранее не разобралось бы ничего.
-     */
     @Test
     void redeliveredPartAlreadyBuffered_countsOnce() {
         InboundMessage finalMessage = buffered(finalData(1, 1), 1, 1);
@@ -80,7 +69,6 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(parsed.dataOf(finalMessage)).contains(dataOf(finalMessage));
     }
 
-    /** Передача ещё не собрана: разбирать заранее нечего, тела частей не читаются. */
     @Test
     void transferStillWaitingForParts_parsesNothing() {
         InboundMessage finalMessage = buffered(finalData(2, 2), 2, 2);
@@ -90,7 +78,6 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(parse(batch, dataOf(batch))).isEqualTo(ParsedTransferParts.NONE);
     }
 
-    /** Ни прочитанные части, ни пришедшая часть не меняются: в буфер её кладёт сборка под блокировкой. */
     @Test
     void advanceParsing_changesNoPart() {
         InboundMessage batch = buffered(batchData(1), null, 1);
@@ -105,7 +92,6 @@ class PriceTransferPartsInAdvanceTest {
         assertThat(finalMessage.transferPart().correlationId()).isNull();
     }
 
-    /** Стёртое и нечитаемое тело заранее не разбирается и разбор не роняет: отказ части назовёт сборка. */
     @Test
     void erasedOrUnreadableBody_isLeftToAssembly() {
         InboundMessage erased = buffered(null, null, 1);
@@ -124,12 +110,10 @@ class PriceTransferPartsInAdvanceTest {
         return new PriceTransferPartsInAdvance(reader, json).parse(received, PriceListTransferMarkup.of(data), data);
     }
 
-    /** Копия части, какой её прочитала бы отдельная транзакция: та же строка сырья, ещё не разобранная. */
     private static InboundMessage storedCopy(InboundMessage part) {
         return InboundMessage.receive(part.receipt(), part.payload());
     }
 
-    /** Без {@code data} тело части считается стёртым, а данные не в виде JSON-объекта не читаются. */
     private static InboundMessage buffered(String data, Integer batchCount, int rowCount) {
         InboundMessage message = InboundMessage.receive(receipt(), data == null ? null : envelope(data));
         message.markBuffered(CID, batchCount, rowCount);

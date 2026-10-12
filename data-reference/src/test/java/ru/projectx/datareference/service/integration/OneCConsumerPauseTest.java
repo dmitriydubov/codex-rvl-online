@@ -43,11 +43,6 @@ import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 
-/**
- * Защищает паузу приёма из 1С:УСК: она останавливает только работающих потребителей и возвращает только тех, кого
- * остановила сама, когда база снова отвечает и их остановка завершилась; повторный отказ во время паузы ничего не
- * меняет. Контейнеры подменены, а что остановка делает с каналом, проверяют тесты на настоящем брокере.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class OneCConsumerPauseTest {
@@ -74,7 +69,6 @@ class OneCConsumerPauseTest {
     @Mock
     private MessageListenerContainer mkb10;
 
-    /** Контейнер, выключенный не паузой: автостарт отключён настройкой, человеком или не стартовал вовсе. */
     @Mock
     private MessageListenerContainer disabled;
 
@@ -109,7 +103,6 @@ class OneCConsumerPauseTest {
         stopCompletesAtOnce(mkb10);
     }
 
-    /** Счётчик остановок растёт на каждую новую паузу и не растёт на повторный отказ во время паузы. */
     @Test
     void pauseCounter_countsNewPausesOnly() {
         OneCConsumerPause pause = pause();
@@ -124,7 +117,6 @@ class OneCConsumerPauseTest {
         assertThat(meters.get(OneCIngestMetrics.PAUSES).counter().count()).isEqualTo(2.0);
     }
 
-    /** Остановка — с обратным вызовом: контейнер отменяет потребителя сразу, а конца обработки ждёт не в потоке слушателя. */
     @Test
     void pause_stopsRunningConsumersOnlyAndRemembersThem() {
         OneCConsumerPause pause = pause();
@@ -143,7 +135,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.consumersStopped()).isTrue();
     }
 
-    /** Повторный отказ во время паузы не трогает контейнеры и не меняет причину: она — первый отказ. */
     @Test
     void secondOutageDuringPause_changesNothing() {
         OneCConsumerPause pause = pause();
@@ -179,7 +170,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.paused()).isPresent();
     }
 
-    /** Возвращаются ровно остановленные паузой контейнеры; выключенный не паузой остаётся выключенным. */
     @Test
     void storageBack_restartsOnlyConsumersStoppedByThePause() {
         OneCConsumerPause pause = pause();
@@ -194,10 +184,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.paused()).isEmpty();
     }
 
-    /**
-     * Контейнер, остановка которого ещё идёт, запускать нельзя — он откажет. Пока хотя бы одна остановка не
-     * завершилась, пауза остаётся, а запуск откладывается до следующей проверки.
-     */
     @Test
     void stopStillInProgress_postponesResume() {
         doAnswer(invocation -> null).when(mkb10).stop(any(Runnable.class));
@@ -213,7 +199,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.paused()).isPresent();
     }
 
-    /** После возобновления новый отказ ставит новую паузу — с новой причиной. */
     @Test
     void outageAfterResume_pausesAgainWithTheNewReason() {
         OneCConsumerPause pause = pause();
@@ -227,11 +212,6 @@ class OneCConsumerPauseTest {
         verify(policies, times(2)).stop(any(Runnable.class));
     }
 
-    /**
-     * База «мигнула»: пока возобновление запускает потребителей, слушатель первого из них снова отказывает из своего
-     * потока. Его пауза ждёт конца запуска и не теряется, поэтому оба потребителя останавливаются уже после запуска.
-     * Итог ожидания запоминает флаг, потому что исключение из запуска контейнера пауза перехватывает.
-     */
     @Test
     void outageFromAnotherThreadDuringResume_waitsAndStartsAFreshPause() throws Exception {
         OneCConsumerPause pause = pause();
@@ -262,10 +242,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.paused()).map(OneCConsumerPause.Paused::outage).hasValue(LOCK_TIMEOUT);
     }
 
-    /**
-     * Пауза, прочитанная до проверки базы, успела смениться другой (её сняли и поставили новую, пока шла
-     * проверка): возобновлять нечего, новую паузу не трогаем — ею займётся следующая проверка.
-     */
     @Test
     void pauseReplacedDuringStorageCheck_isLeftForTheNextCheck() {
         OneCConsumerPause pause = pause();
@@ -286,10 +262,6 @@ class OneCConsumerPauseTest {
         verify(mkb10).start();
     }
 
-    /**
-     * Контейнер не запустился по причине на стороне брокера: остальные всё равно запускаются, пауза снята, а
-     * отказ виден в журнале с именем очереди.
-     */
     @Test
     void startFailureOfOneContainer_startsTheOthersAndReportsIt() {
         doThrow(new AmqpException("очередь пропала")).when(policies).start();
@@ -306,7 +278,6 @@ class OneCConsumerPauseTest {
                 .satisfies(event -> assertThat(event.getFormattedMessage()).contains(POLICIES, "не запущен"));
     }
 
-    /** Отказ остановки одного контейнера не заклинивает паузу: его остановка считается завершённой, остальные стоят. */
     @Test
     void stopFailureOfOneContainer_doesNotWedgeThePause() {
         doThrow(new AmqpException("канал закрыт")).when(mkb10).stop(any(Runnable.class));
@@ -323,7 +294,6 @@ class OneCConsumerPauseTest {
         assertThat(pause.paused()).isEmpty();
     }
 
-    /** Без брокера реестра контейнеров нет: пауза запоминает отказ, останавливать ей нечего, и возобновление проходит. */
     @Test
     void withoutRegistry_pauseIsRecordedAndNothingIsStopped() {
         when(registryProvider.getIfAvailable()).thenReturn(null);
@@ -338,10 +308,6 @@ class OneCConsumerPauseTest {
         verifyNoInteractions(policies, mkb10, disabled);
     }
 
-    /**
-     * Реестр назвал очередь, но контейнера по ней не отдал: это несогласованность реестра, а не отказ базы.
-     * Пауза отказывает, называя очередь, и не остаётся наполовину поставленной.
-     */
     @Test
     void queueWithoutContainer_failsNamingTheQueueAndRecordsNoPause() {
         when(registry.getListenerContainer(MKB10)).thenReturn(null);
@@ -359,7 +325,6 @@ class OneCConsumerPauseTest {
         stopCompletesAtOnce(container, () -> { });
     }
 
-    /** Остановка завершается сразу; перед обратным вызовом контейнер сообщает о ней {@code onStop}. */
     private static void stopCompletesAtOnce(MessageListenerContainer container, Runnable onStop) {
         doAnswer(invocation -> {
             onStop.run();
@@ -387,10 +352,6 @@ class OneCConsumerPauseTest {
         return "остановлен " + queue;
     }
 
-    /**
-     * Поток ждёт блокировку потока возобновления именно в {@code OneCConsumerPause.pause}: одно состояние
-     * «заблокирован» не говорит, на чём и у кого он ждёт. Завершившийся поток сведений не отдаёт и, значит, не ждёт.
-     */
     private static boolean waitsInPauseForLockOf(Thread waiting, long ownerThreadId) {
         ThreadInfo info = ManagementFactory.getThreadMXBean().getThreadInfo(waiting.threadId(), 1);
         return info != null && info.getLockOwnerId() == ownerThreadId

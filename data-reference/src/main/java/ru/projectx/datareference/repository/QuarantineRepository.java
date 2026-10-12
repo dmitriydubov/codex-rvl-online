@@ -9,15 +9,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.QuarantinedMessage;
 
-/** Карантин сообщений 1С:УСК, тела которых база не приняла: таблица {@code quarantine}. */
 @Repository
 public interface QuarantineRepository extends JpaRepository<QuarantinedMessage, UUID> {
 
-    /**
-     * Стирает тела не больше {@code limit} самых старых карантинных записей, принятых раньше {@code receivedBefore};
-     * сами записи остаются. SQL PostgreSQL, потому что в языке запросов JPA у подзапроса нет ограничения числа строк.
-     * Транзакцию открывает вызывающий, отдельную на каждую пачку.
-     */
     @Modifying
     @Query(nativeQuery = true, value = """
             update quarantine
@@ -31,10 +25,6 @@ public interface QuarantineRepository extends JpaRepository<QuarantinedMessage, 
             """)
     int forgetBodies(@Param("receivedBefore") Instant receivedBefore, @Param("limit") int limit);
 
-    /**
-     * Сколько тел карантинных записей, принятых раньше {@code receivedBefore}, ещё не стёрто. Тот же отбор и тот же
-     * частичный индекс, что у {@link #forgetBodies}.
-     */
     @Query("""
             select count(quarantined)
               from QuarantinedMessage quarantined

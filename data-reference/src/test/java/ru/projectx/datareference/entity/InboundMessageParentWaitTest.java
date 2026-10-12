@@ -9,11 +9,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Защищает переходы сообщения 1С, которое ждёт родителя. Если повторное ожидание сдвинет момент начала,
- * сообщение не уйдёт в отказ никогда; если выход из ожидания его не сотрёт, отказ по другой причине
- * потеряет тело по сроку хранения, как отказ по сроку ожидания.
- */
 class InboundMessageParentWaitTest {
 
     private static final UUID MESSAGE_ID = UUID.fromString("0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c31");
@@ -48,10 +43,6 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().lastError()).isEqualTo(HEAD_OFFICE.waitingReason());
     }
 
-    /**
-     * Дежурный возвращает отклонённое сообщение в разбор SQL-запросом, а в сущности такого перехода нет,
-     * поэтому тест ставит статус так же. Новое ожидание отсчитывает срок заново.
-     */
     @Test
     void waitingAfterManualReturnToParsing_startsTheWaitAnew() {
         InboundMessage message = waiting();
@@ -63,7 +54,6 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).contains(new ParentWait(BRANCH, LATER, RECORD));
     }
 
-    /** Часть передачи прайса, вручную возвращённая в разбор, ждёт услугу заново, а не с прежнего момента. */
     @Test
     void transferPartAfterManualReturnToParsing_startsTheWaitAnew() {
         InboundMessage part = waiting();
@@ -76,7 +66,6 @@ class InboundMessageParentWaitTest {
         assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
     }
 
-    /** После ручного возврата и временной ошибки ожидание идёт заново: старый срок сразу отклонил бы сообщение. */
     @Test
     void waitingAfterManualReturnAndRetry_startsTheWaitAnew() {
         InboundMessage message = returnedToParsingAfterExpiry();
@@ -87,7 +76,6 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).contains(new ParentWait(BRANCH, LATER, RECORD));
     }
 
-    /** То же для части передачи прайса: после повтора она собирается в буфере и ждёт услугу заново. */
     @Test
     void transferPartAfterManualReturnAndRetry_startsTheWaitAnew() {
         InboundMessage part = returnedToParsingAfterExpiry();
@@ -99,7 +87,6 @@ class InboundMessageParentWaitTest {
         assertThat(part.outcome().parentWait().orElseThrow().since()).isEqualTo(LATER);
     }
 
-    /** Ждущая часть, которую сборщик снова кладёт в буфер при пересмотре, сохраняет момент начала ожидания. */
     @Test
     void waitingTransferPartBufferedAgain_keepsTheMomentOfTheWait() {
         InboundMessage part = waiting();
@@ -149,7 +136,6 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).isEmpty();
     }
 
-    /** Отказ по другой причине ожидание стирает: иначе тело отказа стиралось бы как у отказа по сроку ожидания. */
     @Test
     void failedForAnotherReason_forgetsTheWait() {
         InboundMessage message = waiting();
@@ -159,7 +145,6 @@ class InboundMessageParentWaitTest {
         assertThat(message.outcome().parentWait()).isEmpty();
     }
 
-    /** Временный отказ при пересмотре ожидание не стирает: срок продолжает идти от первого ожидания. */
     @Test
     void retrying_keepsTheWait() {
         InboundMessage message = waiting();
@@ -175,7 +160,6 @@ class InboundMessageParentWaitTest {
         return message;
     }
 
-    /** Сообщение, отклонённое по сроку и возвращённое дежурным в разбор SQL-запросом со статусом NEW. */
     private static InboundMessage returnedToParsingAfterExpiry() {
         InboundMessage message = waiting();
         message.markParentWaitExpired();

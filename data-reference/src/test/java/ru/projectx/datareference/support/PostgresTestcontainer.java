@@ -7,27 +7,18 @@ import org.springframework.core.env.Environment;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/**
- * PostgreSQL той же версии, что в контуре: уникальные ключи, {@code jsonb} и Liquibase на встроенной базе ведут себя
- * иначе. Адрес контейнера или внешней базы ({@link TestDatabase}) приходит свойствами {@code spring.datasource.*}, без
- * {@code @ServiceConnection}, чтобы миграции шли со своими настройками соединения, как в контуре.
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class PostgresTestcontainer {
 
     private static final String IMAGE = "postgres:16.10-alpine";
-    /** Учётные данные внешней базы по умолчанию — те же, что у локального контура. */
     private static final String LOCAL_CREDENTIAL = "data_reference";
 
-    // Контейнер — бин контекста, а не статическое поле теста: живёт вместе с закэшированным контекстом Spring.
-    // Статическое поле остановилось бы после своего класса, а контекст продолжал бы ходить по старому адресу.
     @Bean
     @ConditionalOnExpression("'${" + TestDatabase.URL_PROPERTY + ":}'.isEmpty()")
     public PostgreSQLContainer postgresContainer() {
         return new PostgreSQLContainer(IMAGE);
     }
 
-    /** Контейнер к этому моменту запущен: Boot стартует его при создании бина. */
     @Bean
     @ConditionalOnExpression("'${" + TestDatabase.URL_PROPERTY + ":}'.isEmpty()")
     public DynamicPropertyRegistrar containerPostgres(PostgreSQLContainer container) {

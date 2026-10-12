@@ -23,10 +23,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Сообщение каждого потока 1С:УСК сбрасывает ровно те кэши, чьи ответы собираются из таблиц потока. Лишний сброс
- * сводит кэш на нет (полисы приходят десятками тысяч), а недостающий оставляет устаревший ответ до конца срока жизни.
- */
 class ReferenceCacheDependenciesTest {
 
     static Stream<Arguments> cachesByStream() {

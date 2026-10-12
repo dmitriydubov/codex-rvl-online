@@ -7,10 +7,6 @@ import java.io.IOException;
 import java.time.format.DateTimeParseException;
 import org.junit.jupiter.api.Test;
 
-/**
- * Исключения разбора повторяют значение поля, а им бывают персональные данные полиса. Поэтому причина отказа
- * сохраняет тип и место исходного исключения, но не его текст.
- */
 class RedactedCauseTest {
 
     private static final String VALUE = "1980-05-17";
@@ -25,7 +21,6 @@ class RedactedCauseTest {
         assertThat(cause.getStackTrace()).containsExactly(original.getStackTrace());
     }
 
-    /** Причины исходного исключения тоже остаются без текста, иначе значение пришло бы на шаг глубже. */
     @Test
     void nestedCauses_areRedactedToo() {
         var original = new UncheckedIOException(VALUE, new IOException(VALUE));

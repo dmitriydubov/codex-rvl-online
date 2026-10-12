@@ -17,11 +17,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Кэш и транзакции в собранном приложении. Сброс идёт после фиксации разбора: до неё чтение видит старые строки и
- * снова положило бы их в кэш, а откат кэш не трогает. Кэш срабатывает раньше транзакции чтения, поэтому ответ из кэша
- * не занимает соединение пула.
- */
 @IntegrationTest
 class ReferenceCacheTransactionTest {
 

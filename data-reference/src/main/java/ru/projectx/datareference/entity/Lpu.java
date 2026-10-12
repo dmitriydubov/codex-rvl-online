@@ -7,11 +7,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Санаторий (лечебно-профилактическое учреждение, ЛПУ): контрагент 1С с видом деятельности РВЛ
- * (реабилитационно-восстановительное лечение). Реквизиты приходят с контрагентом, а адрес и регион отдельным
- * сообщением о контактах, и каждое сообщение не трогает поля другого.
- */
 @Entity
 @Table(name = "lpu")
 public class Lpu extends OneCEntity {
@@ -44,14 +39,12 @@ public class Lpu extends OneCEntity {
     private String address;
 
     protected Lpu() {
-        // JPA
     }
 
     private Lpu(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static Lpu create(UUID externalId, Details details, Instant now) {
         Lpu lpu = new Lpu(externalId, now);
         lpu.applySnapshot(details, now);
@@ -68,23 +61,17 @@ public class Lpu extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /**
-     * Замещает адрес и регион; пустое значение значит, что в 1С адреса больше нет. Признак архивности не меняется:
-     * сообщение о контактах о нём не знает и не должно возвращать санаторий из архива.
-     */
     public void applyContacts(@Nullable String address, @Nullable String region, Instant now) {
         this.address = address;
         this.region = region;
         applyCommon(isArchive(), now);
     }
 
-    /** Санаторий потерял вид деятельности РВЛ: запись уходит в архив, но реквизиты всё равно обновляются. */
     public void archiveAfterLosingRvl(Details details, Instant now) {
         applySnapshot(details, now);
         archiveCommon(now);
     }
 
-    /** Разобранные поля сообщения о контрагенте-санатории. */
     public record Details(
             String name,
             @Nullable String fullName,

@@ -23,11 +23,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.projectx.datareference.dto.ErrorResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
-/**
- * Ошибки вызывающего: 400 с именем поля, 404, 405 и 406; в журнал они не пишутся. Ответы 404, 405 и 406 явно помечены
- * JSON, иначе при {@code Accept: text/xml} Spring отдал бы их без тела. В {@code Allow} к GET добавляется HEAD, а ко
- * всем наборам OPTIONS, потому что на них сервис отвечает сам.
- */
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.REQUEST)
 public class RequestErrorAdvice {
@@ -38,13 +33,8 @@ public class RequestErrorAdvice {
     private static final String NOT_ACCEPTABLE = "NOT_ACCEPTABLE";
     private static final String MALFORMED_REQUEST = "нарушен формат запроса";
 
-    /**
-     * Как назвать в причине отказа ожидаемое значение параметра. Дату вызывающий должен узнать по записи, а не по
-     * имени класса Java; остальные типы называются именем класса, как UUID.
-     */
     private static final Map<Class<?>, String> EXPECTED_VALUES = Map.of(LocalDate.class, "дата yyyy-mm-dd");
 
-    /** Причина отказа по пропущенному обязательному параметру; ею же отказывают ручки, которые сами видят пропуск. */
     static final String REQUIRED_PARAMETER = "обязательный параметр";
 
     @ExceptionHandler(InvalidRequestException.class)
@@ -68,10 +58,6 @@ public class RequestErrorAdvice {
         return validationError(List.of(new ErrorResponse.Violation(mismatch.getName(), "ожидается " + expected)));
     }
 
-    /**
-     * Ни одна ручка с условием на параметры не подошла. Каждое условие называется в ответе так, как оно
-     * записано у ручки: имена параметров через запятую.
-     */
     @ExceptionHandler(UnsatisfiedServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse unsatisfiedParameters(UnsatisfiedServletRequestParameterException unsatisfied) {

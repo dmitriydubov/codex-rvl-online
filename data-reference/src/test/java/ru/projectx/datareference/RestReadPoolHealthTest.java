@@ -20,11 +20,6 @@ import ru.projectx.datareference.support.IntegrationTest;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Всплеск REST-чтений при живой базе — не повод выводить экземпляр из работы, поэтому здоровье и готовность
- * остаются в строю. Нехватку соединений видно по метрикам с меткой {@code pool}, и оповещение о приёме и разборе
- * смотрит только на {@code pool="application"}.
- */
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 class RestReadPoolHealthTest {
 
@@ -64,7 +59,6 @@ class RestReadPoolHealthTest {
         }
     }
 
-    /** Отказ занятого пула REST-чтений считает счётчик этого пула, а не пула приложения. */
     @Test
     void restReadPoolTimeout_countedUnderItsOwnPoolLabel() throws SQLException, IOException, InterruptedException {
         try (ExhaustedPool ignored = ExhaustedPool.ofRestReads(dataSource)) {
@@ -77,7 +71,6 @@ class RestReadPoolHealthTest {
         assertThat(counter(metrics, "application")).isZero();
     }
 
-    /** Долю отказов REST считают по счётчику запросов сервера с меткой статуса и шаблоном пути ручки. */
     @Test
     void restReadPoolTimeout_countedAsServiceUnavailableRequest() throws SQLException, IOException, InterruptedException {
         try (ExhaustedPool ignored = ExhaustedPool.ofRestReads(dataSource)) {

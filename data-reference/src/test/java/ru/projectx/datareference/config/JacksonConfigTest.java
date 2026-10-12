@@ -10,18 +10,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Через двоичную дробь длинная сумма из сообщения 1С теряла бы последние знаки ещё до проверок, а целое, ставшее
- * дробным, не прошло бы проверку целых полей. Поэтому дробь читается точно, а целое остаётся целым.
- */
 class JacksonConfigTest {
 
     private final ObjectMapper json = OneCJson.mapper();
 
-    /**
-     * Свой бин маппера до сервисов не дошёл бы: основной маппер Spring Boot помечен как главный,
-     * и дробь снова читалась бы двоичной. Поэтому проверяется маппер, который получает приложение.
-     */
     @Test
     void mapperOfTheApplication_readsFractionExactly() {
         new ApplicationContextRunner()

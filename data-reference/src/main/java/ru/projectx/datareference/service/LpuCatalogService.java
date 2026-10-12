@@ -18,11 +18,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
 
-/**
- * Каталог лечебно-профилактических учреждений (ЛПУ) по действующему договору страхования для кабинета кадровика.
- * Учреждение без прайсового договора в каталог не попадает, а с неоднозначным уходит в {@code skipped} и в журнал:
- * одна ошибочная строка в 1С не должна ломать каталог всем. Кэшируется по сегодняшнему дню и договору.
- */
 @Service
 public class LpuCatalogService implements LpuCatalogReads {
 
@@ -68,7 +63,6 @@ public class LpuCatalogService implements LpuCatalogReads {
         return new LpuCatalogResponse(items, skippedOf(candidates, priceContractByLpu));
     }
 
-    /** Учреждения из перечней программ восстановительного лечения (РВЛ); сроки строки перечня в отбор не входят. */
     private List<Lpu> rvlLpuOf(UUID contractExternalId, LocalDate today) {
         List<UUID> programs = policies.findRvlProgramExternalIdsOfActivePolicies(contractExternalId, today);
         Set<UUID> appealTypes = rvlAppealTypes.externalIds();
@@ -78,7 +72,6 @@ public class LpuCatalogService implements LpuCatalogReads {
         return lpus.findRvlCatalog(programs, appealTypes);
     }
 
-    /** Цикл, а не стрим, потому что каждое исключённое учреждение ещё и пишется в журнал. */
     private static List<LpuCatalogResponse.Skipped> skippedOf(List<Lpu> candidates, Map<UUID, Resolution> byLpu) {
         List<LpuCatalogResponse.Skipped> skipped = new ArrayList<>();
         for (Lpu lpu : candidates) {
@@ -89,7 +82,6 @@ public class LpuCatalogService implements LpuCatalogReads {
         return List.copyOf(skipped);
     }
 
-    /** Код причины тот же, что у карточки учреждения; по записям журнала собирают исправления на стороне 1С. */
     private static LpuCatalogResponse.Skipped skip(Lpu lpu, Resolution.Ambiguous ambiguous) {
         log.warn("каталог: ЛПУ {} исключено, кандидатов на прайсовый договор больше одного: {}",
                 lpu.id(), ambiguous.lpuContractIds());

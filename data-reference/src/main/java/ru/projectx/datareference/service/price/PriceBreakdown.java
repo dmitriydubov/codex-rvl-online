@@ -4,10 +4,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Стоимость услуги за период по отрезкам прайса с итогами. Итог со скидкой есть, только если скидочная цена есть
- * у каждого отрезка: складывать скидочные цены с обычными в одном итоге нельзя.
- */
 public record PriceBreakdown(List<PriceSegment> segments) {
 
     public PriceBreakdown {

@@ -25,10 +25,6 @@ import ru.projectx.datareference.service.PolicyContractViews;
 import ru.projectx.datareference.service.PolicySearchReads;
 import ru.projectx.datareference.service.PolicyReads;
 
-/**
- * Проверяет, что ручки полиса выбирают верный сервис чтения по ключу запроса и отдают найденное им,
- * включая полис для сервиса Договоров без персональных данных. ФИО и даты рождения в фикстурах — заглушки.
- */
 @ExtendWith(MockitoExtension.class)
 class PolicyControllerTest {
 
@@ -37,11 +33,8 @@ class PolicyControllerTest {
     private static final UUID POLICY_EXTERNAL_ID = UUID.fromString("9011c000-0000-4000-8000-000000000002");
     private static final UUID CONTRACT_EXTERNAL_ID = UUID.fromString("9011c000-0000-4000-8000-000000000004");
     private static final String POLICY_NUMBER = "П-0001";
-    /** Отказ самого контроллера называет оба ключа; у пропущенного параметра Spring причина другая. */
     private static final String NO_KEY_REASON = "нужен external_id либо number вместе с contract_external_id";
-    /** У полиса для Договоров ключ по GUID 1С один, поэтому отказ называет только его. */
     private static final String NO_EXTERNAL_ID_REASON = "нужен external_id";
-    /** Причина отказа Spring по пустому обязательному параметру ({@link RequestErrorAdvice}). */
     private static final String MISSING_VALUE_REASON = "обязательный параметр";
 
     @Mock
@@ -103,7 +96,6 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
-    /** Номер без договора — половина ключа: отказ называет недостающий договор, а не ключ другого способа. */
     @Test
     void numberWithoutContract_isMissingContractExternalId() {
         MvcTestResult result = mvc.get().uri(POLICIES + "?number={number}", POLICY_NUMBER).exchange();
@@ -114,10 +106,6 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
-    /**
-     * Пустой номер — недостающая часть ключа, как и пустой UUID: отказ по полю {@code number} приходит
-     * без обращения к сервису чтения, а не как «полиса нет» после поиска в базе.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"", "%20%20"})
     void blankNumberWithContract_isMissingNumber_withoutAskingService(String number) {
@@ -191,10 +179,6 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
-    /**
-     * Ручка отдаёт только JSON, поэтому запрос, принимающий только XML, отсекается ещё при выборе ручки,
-     * а ответ 406 уходит в едином формате ошибки.
-     */
     @Test
     void policyById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(POLICIES + "/{id}", POLICY_ID).accept(MediaType.APPLICATION_XML)
@@ -216,7 +200,6 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch);
     }
 
-    /** Путь {@code contract-view} выигрывает у {@code /policies/{id}}: он не читается как id полиса. */
     @Test
     void contractViewByExternalId_returnsViewFoundByService_withoutAskingFullPolicy() {
         when(contractViews.byExternalId(POLICY_EXTERNAL_ID)).thenReturn(contractView());
@@ -241,10 +224,6 @@ class PolicyControllerTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
-    /**
-     * Пустой {@code external_id} значит «ключ передан пустым», а не «ключа нет»: выбирается ручка с параметром,
-     * и Spring отказывает, потому что пустая строка читается как {@code null}.
-     */
     @Test
     void contractViewWithEmptyExternalId_isMissingValueOfExternalId_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(POLICIES + "/contract-view?external_id=").exchange();

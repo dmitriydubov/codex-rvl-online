@@ -8,7 +8,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
-/** Предел выдачи подсказки: не задан — умолчание, задан — от 1 до максимума, иначе 400 по полю limit. */
 class ResultLimitsTest {
 
     private static final int DEFAULT_LIMIT = 10;

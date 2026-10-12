@@ -21,10 +21,6 @@ import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Срок хранения тела сообщения с персональными данными. Часы остановлены, поэтому «старое» сообщение кладётся
- * с временем приёма в прошлом: ждать сутки через {@code Thread.sleep} значит не проверять вовсе.
- */
 @IntegrationTest
 class PersonalDataRetentionTest {
 
@@ -62,7 +58,6 @@ class PersonalDataRetentionTest {
         assertThat(inboundMessageRepository.findById(messageId).orElseThrow().payload()).isNotNull();
     }
 
-    /** Стирается только тело; сама строка остаётся — по ней видно, что сообщение приходило. */
     @Test
     void expiredPolicyPayload_isErasedButRowSurvives() {
         UUID messageId = storePolicy(Duration.ofDays(31));
@@ -75,10 +70,6 @@ class PersonalDataRetentionTest {
         assertThat(stored.receipt().receivedAt()).isNotNull();
     }
 
-    /**
-     * В остальных потоках персональных данных нет, а тело справочного сообщения — то
-     * единственное, чем строку можно переобработать, когда починили маппер.
-     */
     @Test
     void expiredReferencePayload_isKept() {
         UUID messageId = storeRaw(OneCStream.MKB10, Duration.ofDays(400));
@@ -88,10 +79,6 @@ class PersonalDataRetentionTest {
         assertThat(inboundMessageRepository.findById(messageId).orElseThrow().payload()).isNotNull();
     }
 
-    /**
-     * Строку со стёртым телом повторить нечем. Это должно быть внятным терминальным
-     * отказом, а не обращением к пустой ссылке.
-     */
     @Test
     void messageWithErasedPayload_failsWithClearReason() {
         UUID messageId = storePolicy(Duration.ofDays(31));
@@ -107,10 +94,6 @@ class PersonalDataRetentionTest {
         return storeRaw(OneCStream.POLICIES, age);
     }
 
-    /**
-     * Кладёт сырьё и отодвигает время приёма в прошлое. Через сервис — чтобы строка была
-     * настоящей; время правится запросом, потому что часы в тесте остановлены.
-     */
     private UUID storeRaw(OneCStream stream, Duration age) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope("{\"id\":\"%s\"}".formatted(messageId)));

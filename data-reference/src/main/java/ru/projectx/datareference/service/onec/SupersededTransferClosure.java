@@ -13,11 +13,6 @@ import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
 
-/**
- * Закрывает пропуском зависшую передачу прайса, которую уже обогнала применённая передача той же услуги, чтобы о ней
- * больше не предупреждали; её поздние части пропускаются при разборе. Передача, которая ещё может стать последней,
- * остаётся в буфере для ручного разбора.
- */
 @Component
 public class SupersededTransferClosure {
 
@@ -37,10 +32,6 @@ public class SupersededTransferClosure {
         this.clock = clock;
     }
 
-    /**
-     * Строка услуги блокируется до чтения частей, как и при разборе части, поэтому разбор видит передачу либо до
-     * закрытия, либо уже закрытой.
-     */
     @Transactional
     public boolean closeIfSuperseded(UUID cid) {
         return repository.findBufferedTransferService(cid)
@@ -62,7 +53,6 @@ public class SupersededTransferClosure {
         return true;
     }
 
-    /** Обычный цикл, а не стрим: каждый шаг пишет в базу. */
     private void skipAll(List<InboundMessage> parts, String reason) {
         Instant now = clock.instant();
         for (InboundMessage part : parts) {

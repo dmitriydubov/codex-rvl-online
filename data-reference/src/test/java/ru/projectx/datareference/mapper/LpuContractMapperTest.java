@@ -34,11 +34,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор договоров санаториев: договор отделения достаётся отделению, ещё не пришедшее отделение договор ждёт,
- * а договор не нашего контрагента запоминается как не наш, чтобы его услуги не ждали его. Известный договор получает
- * реквизиты последнего сообщения и может перейти к другому санаторию. Данные вымышленные.
- */
 class LpuContractMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -358,7 +353,6 @@ class LpuContractMapperTest {
         return saved.getValue();
     }
 
-    /** Договор в том виде, в каком его присылает 1С, сокращённый до полей, которые читает маппер. */
     private static ObjectNode contract(UUID ownerId, UUID branchId) {
         ObjectNode data = JSON.createObjectNode();
         data.put("id", CONTRACT.toString());

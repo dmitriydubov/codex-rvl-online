@@ -12,7 +12,6 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import ru.projectx.datareference.entity.OneCStream;
 
-/** Счётчики приёма из 1С:УСК: исход доставки с потоком и очередью, остановки потребителей. */
 class OneCIngestMetricsTest {
 
     private static final String POLICIES_QUEUE = "1c-usk_to_rvl-online_policies";
@@ -45,7 +44,6 @@ class OneCIngestMetricsTest {
                         "stored", "duplicate", "quarantined", "unidentified", "returned", "storage_outage");
     }
 
-    /** Метка без значения роняла бы саму доставку: счёт идёт в потоке слушателя. */
     @Test
     void deliveryWithoutQueue_isCountedUnderUnknownQueue() {
         metrics.record(delivery(OneCStream.MKB10, null), IngestOutcome.STORED);
@@ -61,10 +59,6 @@ class OneCIngestMetricsTest {
                 .startsWith("Доставки из очередей 1С:УСК");
     }
 
-    /**
-     * Нулевые ряды на каждую очередь из настроек и каждый исход: первая потеря видна как рост с нуля. Очередь несёт
-     * свой поток — у прайсов две очереди на один поток.
-     */
     @Test
     void creation_registersZeroSeriesForEveryQueueAndOutcome() {
         assertThat(registry.find(OneCIngestMetrics.DELIVERIES).counters())
@@ -79,7 +73,6 @@ class OneCIngestMetricsTest {
         assertThat(registry.get(OneCIngestMetrics.PAUSES).counter().count()).isZero();
     }
 
-    /** Заведённый заранее ряд и ряд, в который считает доставка, — один и тот же ряд. */
     @Test
     void deliveryFromConfiguredQueue_countsIntoTheRegisteredSeries() {
         metrics.record(delivery(OneCStream.POLICIES, "q-policies"), IngestOutcome.QUARANTINED);

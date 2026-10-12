@@ -6,7 +6,6 @@ import ru.projectx.datareference.service.price.PriceBreakdown;
 import ru.projectx.datareference.service.price.PriceSegment;
 import ru.projectx.datareference.service.price.StayPeriod;
 
-/** Собирает ответ о стоимости; основной для сооплаты отмечается сумма со скидкой, если она есть у итога. */
 final class ServicePriceResponses {
 
     private ServicePriceResponses() {

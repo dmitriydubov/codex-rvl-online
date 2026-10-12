@@ -13,11 +13,6 @@ import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 
-/**
- * Услуги учреждения по прайсовому договору, без цен или с ценами; у двух вариантов разные кэши. Услуга без
- * актуальных цен остаётся с пустым перечнем, потому что в расчёте стоимости она даст 422 и видеть её надо заранее.
- * Цены всех услуг читаются одним запросом: в прейскуранте санатория десятки позиций.
- */
 @Service
 public class LpuServicesQueryService implements LpuServiceReads {
 

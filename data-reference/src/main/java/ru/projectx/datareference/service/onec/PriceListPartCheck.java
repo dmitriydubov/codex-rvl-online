@@ -10,11 +10,6 @@ import ru.projectx.datareference.mapper.PriceListMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Ошибки одной части передачи прайса, которые видны, как только часть пришла: строка пакета без номера, цены или
- * даты начала, пакет к уже применённой передаче и второе финальное сообщение. Такую часть отклоняют её собственной
- * причиной, а остальные части передачи — ссылкой на неё.
- */
 final class PriceListPartCheck {
 
     private static final String RECORD_SET = "recordSet";
@@ -25,12 +20,6 @@ final class PriceListPartCheck {
         this.priceList = priceList;
     }
 
-    /**
-     * Часть уже отклонённой или пропущенной передачи не проверяется: она разделяет исход передачи.
-     *
-     * @param parts сообщения передачи, которые уже есть в сырье; среди них может быть и проверяемое
-     * @throws OneCFieldException с причиной для этой части
-     */
     void check(UUID messageId, PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
         if (PriceListTransfer.isClosed(parts)) {
             return;
@@ -49,7 +38,6 @@ final class PriceListPartCheck {
         }
     }
 
-    /** Финальное сообщение у передачи ровно одно: какое из двух решает, иначе не определить. */
     private static void checkSingleFinal(UUID messageId, PriceListTransferMarkup markup, List<InboundMessage> parts) {
         if (parts.stream().anyMatch(part -> isAnotherFinal(part, messageId))) {
             throw new OneCFieldException(secondFinalReason(parts).formatted(markup.cid()));

@@ -8,10 +8,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 
-/**
- * Граница хранения персональных данных — «сейчас минус запас». День окончания полиса берётся по зоне сервиса,
- * а не по UTC: полис действует по свой день включительно, и ошибка зоны сдвинула бы границу на сутки.
- */
 class PersonalDataCutoffTest {
 
     private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");

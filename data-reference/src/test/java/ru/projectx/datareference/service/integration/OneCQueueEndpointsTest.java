@@ -22,11 +22,6 @@ import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Связь «очередь → поток» — единственное знание регистрации, и ошибка в ней не видна
- * ни в одном другом тесте, кроме пути через брокер: сообщение молча легло бы в сырьё
- * под чужим потоком. Поэтому здесь проверяются все одиннадцать очередей, а не одна.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueEndpointsTest {
 
@@ -35,7 +30,6 @@ class OneCQueueEndpointsTest {
             "q-programs", "q-appeal-types", "q-lpu-contacts", "q-price-lists", "q-price-lists-final",
             "q-contragent-services");
 
-    /** Одиннадцать очередей на десять потоков: у прайсов их две. */
     private static final int QUEUE_COUNT = 11;
 
     @Mock
@@ -70,7 +64,6 @@ class OneCQueueEndpointsTest {
         }
     }
 
-    /** У каждой очереди свой контейнер: значит, и своя точка со своим именем. */
     @Test
     void eachQueue_getsItsOwnEndpoint() {
         List<SimpleRabbitListenerEndpoint> endpoints = registeredEndpoints();
@@ -84,22 +77,12 @@ class OneCQueueEndpointsTest {
                 .allSatisfy(id -> assertThat(id).isNotBlank());
     }
 
-    /**
-     * Идентификатор точки — имя её очереди: по нему контейнер достают из
-     * {@code RabbitListenerEndpointRegistry.getListenerContainer(id)}, чтобы остановить
-     * или проверить приём из конкретной очереди.
-     */
     @Test
     void endpointId_isItsQueueName() {
         assertThat(registeredEndpoints())
                 .allSatisfy(endpoint -> assertThat(endpoint.getId()).isEqualTo(onlyQueueOf(endpoint)));
     }
 
-    /**
-     * Подтверждение вручную, один потребитель, prefetch, автостарт и реакция на отсутствующую
-     * очередь задаются в {@code spring.rabbitmq.listener.simple}. Точка, которая задала бы
-     * хоть одно из них сама, молча перекрыла бы конфигурацию контура.
-     */
     @Test
     void endpoints_leaveContainerSettingsToConfiguration() {
         assertThat(registeredEndpoints()).allSatisfy(endpoint -> {

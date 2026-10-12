@@ -7,10 +7,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-/**
- * Правка справочника прямо в базе мимо 1С:УСК, как ручной SQL дежурного: кэш ответов о ней не узнаёт. Правка обязана
- * изменить ровно одну строку, иначе опечатка в имени или GUID не правила бы ничего и сценарий проходил бы вхолостую.
- */
 public class DirectEditSteps {
 
     private static final Map<String, String> UPDATES = Map.of(

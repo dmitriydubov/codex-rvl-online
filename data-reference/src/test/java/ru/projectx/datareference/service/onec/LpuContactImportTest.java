@@ -18,10 +18,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает заполнение адреса и региона санатория из потока контактной информации: тем же потоком едут телефоны
- * и почта всех контрагентов 1С:УСК, а нужны из него только действующие адреса наших санаториев.
- */
 @IntegrationTest
 class LpuContactImportTest {
 
@@ -60,10 +56,6 @@ class LpuContactImportTest {
         assertThat(stored.region()).isEqualTo("Краснодарский край");
     }
 
-    /**
-     * Приоритет видов адреса задан конфигурацией: фактический важнее адреса регистрации,
-     * и порядок строк в сообщении на это не влияет.
-     */
     @Test
     void severalAddresses_takeTheOneWithHigherPriority() {
         importOne(OneCStream.LPU_CONTACTS, contacts("""
@@ -77,7 +69,6 @@ class LpuContactImportTest {
                 .isEqualTo("Фактический адрес");
     }
 
-    /** Телефоны и почта едут тем же потоком — этому маппингу они не нужны. */
     @Test
     void nonAddressRows_areIgnored() {
         importOne(OneCStream.LPU_CONTACTS, contacts("""
@@ -86,7 +77,6 @@ class LpuContactImportTest {
         assertThat(lpuRepository.findByExternalId(SANATORIUM_ID).orElseThrow().address()).isNull();
     }
 
-    /** Источник помечает недействительные адреса сам; такой адрес — не адрес. */
     @Test
     void invalidAddress_isIgnored() {
         importOne(OneCStream.LPU_CONTACTS, contacts("""
@@ -97,11 +87,6 @@ class LpuContactImportTest {
         assertThat(lpuRepository.findByExternalId(SANATORIUM_ID).orElseThrow().address()).isNull();
     }
 
-    /**
-     * Режим замещения: подходящих строк в сообщении нет — адрес очищается. Оставить
-     * прежний значило бы показывать в каталоге адрес, которого в 1С уже нет, и никогда
-     * об этом не узнать.
-     */
     @Test
     void messageWithoutAddresses_clearsPreviousOne() {
         importOne(OneCStream.LPU_CONTACTS, contacts("""
@@ -147,7 +132,6 @@ class LpuContactImportTest {
         return importService.importMessage(message);
     }
 
-    /** Владелец контактов лежит в фильтре сообщения, строки набора — в {@code recordSet}. */
     private static String contacts(String rows) {
         return """
                 {"filter":[{"fieldName":"object","value":{"value":"%s"}}],"recordSet":[%s]}"""

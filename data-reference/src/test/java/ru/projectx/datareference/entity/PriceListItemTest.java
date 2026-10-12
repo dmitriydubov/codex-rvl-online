@@ -8,10 +8,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * У строки прейскуранта нет ключа источника, а строки одной услуги могут совпадать датами и ценами.
- * Поэтому сервис сам даёт каждой свой идентификатор, а значения хранит как пришли: по ним выбирается цена на дату.
- */
 class PriceListItemTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");

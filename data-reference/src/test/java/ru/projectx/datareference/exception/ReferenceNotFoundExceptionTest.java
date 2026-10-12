@@ -9,10 +9,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * Код и текст отказа 404 потребитель видит как есть, поэтому каждая фабрика проверяется дословно.
- * Номер полиса в текст не попадает: вызывающий его знает, а в журнале он лишний.
- */
 class ReferenceNotFoundExceptionTest {
 
     private static final UUID ID = UUID.fromString("0a9e0000-0000-4000-8000-000000000001");

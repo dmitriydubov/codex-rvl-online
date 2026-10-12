@@ -8,11 +8,6 @@ import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 
-/**
- * Пул соединений сервиса с выключателем, потому что общую на всю приёмку базу остановить нельзя. В состоянии «база
- * недоступна» каждое соединение отказывает так же, как HikariCP без базы: {@code SQLTransientConnectionException}
- * с заданным SQLSTATE.
- */
 final class SwitchableDataSource extends DelegatingDataSource {
 
     private volatile @Nullable String failingSqlState;

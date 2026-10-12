@@ -9,11 +9,6 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.web.bind.WebDataBinder;
 
-/**
- * Защищает подключение строгого чтения UUID к связыванию параметров запроса. Связыватель здесь
- * устроен так же, как в Spring MVC: у него есть служба конвертации и стандартный редактор UUID,
- * который читает неполную запись. Строгое правило должно победить их обоих.
- */
 class UuidParametersTest {
 
     private final WebDataBinder binder = new WebDataBinder(null);

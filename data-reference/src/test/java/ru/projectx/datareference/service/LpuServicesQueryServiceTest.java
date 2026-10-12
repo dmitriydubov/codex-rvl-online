@@ -24,10 +24,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 
-/**
- * Перечень услуг учреждения: без цен поля {@code prices} нет и цены не читаются, с ценами у каждой услуги есть
- * перечень цен, а у услуги без актуальных цен он пуст.
- */
 @ExtendWith(MockitoExtension.class)
 class LpuServicesQueryServiceTest {
 

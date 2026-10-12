@@ -8,10 +8,6 @@ import javax.sql.DataSource;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
-/**
- * Действующие на соединении из {@link DataSource} параметры времени сеанса PostgreSQL, такие как {@code lock_timeout} и
- * {@code statement_timeout}. Только чтение; параметр с единицей не {@code ms} в ответ не попадает.
- */
 @Repository
 public class SessionSettingsRepository {
 

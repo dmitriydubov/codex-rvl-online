@@ -6,10 +6,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Карантинная запись хранит отвергнутое сообщение байт в байт и свою копию тела, чтобы никто снаружи
- * не изменил сохранённое. Стирание по сроку оставляет всё, кроме тела.
- */
 class QuarantinedMessageTest {
 
     private static final UUID MESSAGE_ID = UUID.fromString("0a4f1c0e-7b2d-4e7a-9c1b-2d3e4f5a6b70");
@@ -32,7 +28,6 @@ class QuarantinedMessageTest {
         assertThat(quarantined.receivedAt()).isEqualTo(RECEIVED_AT);
     }
 
-    /** Массив тела копируется в обе стороны: исходный можно менять после создания, прочитанный — после чтения. */
     @Test
     void body_isCopiedOnWriteAndOnRead() {
         byte[] body = {1, 2, 3};

@@ -26,10 +26,6 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InboxRepository;
 
-/**
- * Проверка доступности читает обе таблицы приёма в одной транзакции только для чтения; отказ любой из них —
- * база недоступна. Как читается заблокированная таблица, проверяет приёмка на настоящей базе.
- */
 @ExtendWith(MockitoExtension.class)
 class IngestStorageProbeTest {
 
@@ -75,7 +71,6 @@ class IngestStorageProbeTest {
         verify(transactions).commit(any());
     }
 
-    /** Нулевого GUID в таблицах нет — проверка проходит молча, без предупреждений. */
     @Test
     void bothTablesWithoutNilGuid_logNothing() {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -85,7 +80,6 @@ class IngestStorageProbeTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /** Нулевой GUID в журнале входящих — чужая запись мимо приёма: база доступна, но об этом предупреждают. */
     @Test
     void nilGuidInInbox_isAvailableButWarns() {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
@@ -96,7 +90,6 @@ class IngestStorageProbeTest {
         assertThat(onlyWarning().getFormattedMessage()).contains(NIL_GUID_WARNING);
     }
 
-    /** Нулевой GUID в сырье — то же предупреждение, даже когда журнал входящих чист. */
     @Test
     void nilGuidInRawMessages_isAvailableButWarns() {
         when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());

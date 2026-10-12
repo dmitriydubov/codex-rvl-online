@@ -23,11 +23,6 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает полис застрахованного с программами и условиями обслуживания; последнее сообщение целиком заменяет полис.
- * Здесь проходят персональные данные, поэтому ничего разобранного нет ни в журнале, ни в тексте исключения: проблемный
- * случай разбирают по строке сырья в базе.
- */
 @Component
 public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot> {
 
@@ -55,10 +50,6 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
         this.contract = contract;
     }
 
-    /**
-     * Полис, пришедший уже после срока хранения своих персональных данных, сохраняется без них в том же разборе:
-     * иначе они пролежали бы в базе до ближайшего прохода стирания.
-     */
     private static Policy withinTerm(Policy policy, PolicyPersonalDataTerm term, Instant now) {
         policy.erasePersonalDataBeyond(term.cutoffAt(now), now);
         return policy;
@@ -94,11 +85,6 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
                 OneCValues.flag(data, "deleteMark"));
     }
 
-    /**
-     * Срок действия полиса берётся из строки шапки с наибольшим номером среди действующих, а если их нет, из строки
-     * с наибольшим номером вообще: у прекращённого полиса действующих строк нет, а срок нужен. Неверный номер
-     * строки отклоняет полис, даже если строка единственная.
-     */
     private static JsonNode actualHeaderRow(ObjectNode data) {
         List<NumberedRow> rows = rowsOf(data, HEADER).map(NumberedRow::of).toList();
         return rows.stream()
@@ -110,10 +96,6 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
                         "в сообщении нет ни одной строки header — срок действия полиса брать неоткуда"));
     }
 
-    /**
-     * Почта ищется среди дополнительных свойств по имени из настройки. Её отсутствие не ошибка: такой застрахованный
-     * просто не войдёт в личный кабинет.
-     */
     private Optional<String> email(ObjectNode data) {
         return rowsOf(data, EXT_PROPERTIES)
                 .filter(property -> contract.emailProperty()
@@ -151,7 +133,6 @@ public class PolicyMapper extends UnfilteredStreamMapper<Policy, Policy.Snapshot
         return StreamSupport.stream(data.path(field).spliterator(), false);
     }
 
-    /** Строка шапки и её номер; строка без номера считается нулевой. */
     private record NumberedRow(int number, JsonNode row) {
 
         static NumberedRow of(JsonNode row) {

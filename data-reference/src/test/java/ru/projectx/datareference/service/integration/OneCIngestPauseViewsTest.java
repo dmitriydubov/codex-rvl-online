@@ -19,11 +19,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
-/**
- * Ручка здоровья и ряд Prometheus говорят о паузе приёма одно и то же: оба читают одну и ту же паузу, а не
- * держат каждый свою копию. Пауза настоящая; брокера здесь нет, поэтому останавливать ей нечего, а очереди без
- * потребителя подменены пустым перечнем — так видна только пауза.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCIngestPauseViewsTest {
 

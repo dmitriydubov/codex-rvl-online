@@ -12,14 +12,8 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.node.MissingNode;
 
-/**
- * Решение о судьбе сообщения 1С:УСК после неудачного разбора. Повторяется только временный отказ базы, тот же, при
- * котором REST отвечает 503, остальное отклоняется сразу. Причина — свой текст с типом ошибки и SQLSTATE, потому что
- * текст ошибки вставки печатает значения полей, а через разбор идут полисы с персональными данными.
- */
 class ParseFailuresTest {
 
-    /** Похоже на персональные данные, то есть ровно на то, чего в причине быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна, 1980-05-17";
 
     private final ParseFailures failures =
@@ -36,7 +30,6 @@ class ParseFailuresTest {
                 "CannotAcquireLockException", "55P03"));
     }
 
-    /** Сеанс, закрытый по простою транзакции, — временный отказ: разбор повторят на новом соединении. */
     @Test
     void sessionClosedForIdleTransaction_isTemporary() {
         var closed = new GenericJDBCException(PERSONAL_DATA, new SQLException(PERSONAL_DATA, "25P03"));
@@ -58,7 +51,6 @@ class ParseFailuresTest {
                 "DataIntegrityViolationException", "22003"));
     }
 
-    /** Свой текст разбора называет поле без значения, поэтому он и есть причина. */
     @Test
     void contractViolation_isPermanent_withItsOwnText() {
         ParseFailure failure = failures.classify(new OneCFieldException("поле ИНН длиннее 12 символов"));
@@ -67,7 +59,6 @@ class ParseFailuresTest {
                 new ParseFailure.Permanent("поле ИНН длиннее 12 символов", "OneCFieldException", "нет"));
     }
 
-    /** Ошибка кода или неожиданная форма JSON повтором не лечится; в причине — только тип. */
     @Test
     void unexpectedFailure_isPermanent_namedByTypeOnly() {
         ParseFailure failure = failures.classify(JsonNodeException.from(MissingNode.getInstance(), PERSONAL_DATA));

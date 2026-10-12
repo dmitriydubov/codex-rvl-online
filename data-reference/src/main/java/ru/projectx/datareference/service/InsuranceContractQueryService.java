@@ -12,11 +12,6 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 
-/**
- * Читает договор страхования по нашему {@code id} или по GUID 1С вместе со страхователем. Страхователь связан
- * логически, без внешнего ключа, и его может не быть в справочнике, если это физлицо: тогда {@code insurer} пуст,
- * а договор всё равно отдаётся. Ответы по двум ключам кэшируются раздельно.
- */
 @Service
 public class InsuranceContractQueryService implements InsuranceContractReads {
 

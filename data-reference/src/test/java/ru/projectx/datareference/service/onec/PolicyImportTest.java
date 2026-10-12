@@ -22,11 +22,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает разбор полиса там, где контракт расходится с наивным чтением маппинга: срок действия берётся из строки
- * шапки, а почта лежит в наборе дополнительных свойств. {@code @Transactional} нужен не ради отката, а чтобы проверки
- * читали ленивые табличные части при выключенном {@code open-in-view}.
- */
 @Transactional
 @IntegrationTest
 class PolicyImportTest {
@@ -56,7 +51,6 @@ class PolicyImportTest {
         databaseCleaner.clear();
     }
 
-    /** Полис действует на часах теста: у кончившегося давно полиса ФИО и почта стираются уже при разборе. */
     @Test
     void policyMessage_becomesPolicyRow() {
         importOne(policy(header("2026-01-01", "2026-12-31", true, 1), programs(), services()));
@@ -68,10 +62,6 @@ class PolicyImportTest {
         assertThat(stored.details().externalContractId()).isEqualTo(CONTRACT_ID);
     }
 
-    /**
-     * Срок действия берётся из строки шапки с наибольшим номером среди
-     * действующих — не из первой попавшейся и не из полей самого полиса.
-     */
     @Test
     void validityPeriod_comesFromTheActualHeaderRow() {
         importOne(policy(
@@ -83,10 +73,6 @@ class PolicyImportTest {
         assertThat(stored.details().endDate()).isEqualTo(LocalDate.of(2024, 12, 31));
     }
 
-    /**
-     * У прекращённого полиса действующих строк нет вовсе, а срок его действия всё равно
-     * нужно знать. Это нормальное состояние, а не запасной вариант на случай ошибки.
-     */
     @Test
     void policyWithoutActiveHeaderRows_stillGetsItsPeriod() {
         importOne(policy(
@@ -98,7 +84,6 @@ class PolicyImportTest {
         assertThat(stored.details().availability()).isFalse();
     }
 
-    /** Открытая дата источника — это «пока не заменят», а не тысяча лет. */
     @Test
     void openEndDate_becomesEmpty() {
         importOne(policy(header("2024-01-01", "3000-01-01", true, 1), programs(), services()));
@@ -106,7 +91,6 @@ class PolicyImportTest {
         assertThat(policyRepository.findByExternalId(POLICY_ID).orElseThrow().details().endDate()).isNull();
     }
 
-    /** Почта лежит в наборе дополнительных свойств, а не отдельным полем. */
     @Test
     void email_isTakenFromExtProperties() {
         importOne(policy(header("2026-01-01", "2026-12-31", true, 1), programs(), services()));
@@ -115,7 +99,6 @@ class PolicyImportTest {
                 .isEqualTo("ivanov@example.org");
     }
 
-    /** Почты может не быть — это значит лишь, что в личный кабинет человек не войдёт. */
     @Test
     void policyWithoutEmail_isStillStored() {
         importOne("""
@@ -139,11 +122,6 @@ class PolicyImportTest {
         assertThat(stored.serviceLines().getFirst().copayment()).isEqualByComparingTo(new BigDecimal("20.00"));
     }
 
-    /**
-     * Табличные части замещаются целиком: сообщение всегда несёт полный состав строк,
-     * и строка, пропавшая из него, обязана пропасть из базы. Слить старые с новыми
-     * значило бы накапливать программы, которых у человека уже нет.
-     */
     @Test
     void tableParts_areReplacedEntirely() {
         importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
@@ -155,11 +133,6 @@ class PolicyImportTest {
         assertThat(stored.serviceLines()).isEmpty();
     }
 
-    /**
-     * Версий у сообщений нет: применяется последнее полученное, даже если по содержанию
-     * оно старее. Здесь это заметно сильнее, чем в справочниках, — вместе со снимком
-     * замещаются и табличные части, поэтому программы и услуги полиса пропадают.
-     */
     @Test
     void lastMessageWins_replacingSnapshotAndTableParts() {
         importOne(policy(header("2024-01-01", "2024-12-31", true, 1), programs(), services()));
@@ -172,7 +145,6 @@ class PolicyImportTest {
         assertThat(stored.programs()).isEmpty();
     }
 
-    /** Без единой строки шапки срок действия полиса брать неоткуда. */
     @Test
     void policyWithoutHeaderRows_isContractViolation() {
         assertThatThrownBy(() -> importOne(policy("", programs(), services())))
@@ -180,10 +152,6 @@ class PolicyImportTest {
                 .hasMessageContaining("header");
     }
 
-    /**
-     * Персональные данные не должны попадать в текст исключения: он доезжает до лога.
-     * Сообщение называет поле, но не значение.
-     */
     @Test
     void contractViolation_namesTheFieldButNotItsValue() {
         String withBrokenBirthDate = """

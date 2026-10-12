@@ -4,10 +4,6 @@ import java.util.function.Function;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Очередь брокера 1С:УСК, её поток и свойство с её именем, по строке на очередь. Имя задаёт контур через
- * {@link OneCQueueProperties}, а связь с потоком — контракт, и с адресом она не меняется.
- */
 enum OneCQueue {
 
     POLICIES(OneCStream.POLICIES, OneCQueueProperties::policies),
@@ -19,10 +15,8 @@ enum OneCQueue {
     APPEAL_TYPES(OneCStream.APPEAL_TYPES, OneCQueueProperties::appealTypes),
     LPU_CONTACTS(OneCStream.LPU_CONTACTS, OneCQueueProperties::lpuContacts),
 
-    /** Пакеты строк прайса. Применяются не поодиночке, а в составе собранной передачи. */
     PRICE_LISTS(OneCStream.PRICE_LISTS, OneCQueueProperties::priceLists),
 
-    /** Финальное сообщение передачи прайса — то, что несёт счётчики. Поток тот же. */
     PRICE_LISTS_FINAL(OneCStream.PRICE_LISTS, OneCQueueProperties::priceListsFinal),
 
     CONTRAGENT_SERVICES(OneCStream.CONTRAGENT_SERVICES, OneCQueueProperties::contragentServices);
@@ -39,7 +33,6 @@ enum OneCQueue {
         return stream;
     }
 
-    /** Имя очереди на брокере контура. */
     String nameIn(OneCQueueProperties queues) {
         return nameProperty.apply(queues);
     }

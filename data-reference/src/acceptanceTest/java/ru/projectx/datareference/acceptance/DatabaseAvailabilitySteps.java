@@ -12,16 +12,10 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import ru.projectx.datareference.service.integration.OneCConsumerPause;
 import ru.projectx.datareference.service.integration.OneCConsumerSubscriptions;
 
-/**
- * Недоступность базы в сценарии: пул сервиса отказывает каждому соединению с заданным SQLSTATE, а проверку доступности
- * шаг вызывает явно, потому что расписания в приёмке выключены. После сценария приём возвращается даже после провала;
- * хук идёт после снятия блокировки таблиц (хуки «после» идут от большего порядка), иначе потребители не вернутся.
- */
 public class DatabaseAvailabilitySteps {
 
     private static final int AFTER_LOCK_RELEASE = 100;
     private static final Duration STOP_TIMEOUT = Duration.ofSeconds(30);
-    /** Запас на подтверждение подписок и на остановку контейнера, который после повторов не нашёл свою очередь. */
     private static final Duration SUBSCRIBE_TIMEOUT = Duration.ofSeconds(30);
 
     private final SwitchableDataSource dataSource;
@@ -49,11 +43,6 @@ public class DatabaseAvailabilitySteps {
         dataSource.restore();
     }
 
-    /**
-     * В работающем сервисе между отказом, проверкой и запросом мониторинга проходят секунды, здесь ожидания явные.
-     * Подтверждение подписки приходит из потока клиента брокера позже, чем запуск контейнера возвращает управление,
-     * и без ожидания следующий шаг иногда застал бы потребителя за миг до подписки.
-     */
     @Когда("Дата-референс проверяет доступность базы")
     public void storageChecked() {
         await().atMost(STOP_TIMEOUT).until(pause::consumersStopped);

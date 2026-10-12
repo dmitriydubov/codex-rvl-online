@@ -25,11 +25,6 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Разбор части передачи прайса на настоящем PostgreSQL ждёт строку её услуги, пока ту держит другая транзакция, —
- * например, закрытие зависших передач той же услуги. Ждёт он до чтения остальных частей, поэтому не сохраняет поверх
- * закрытия устаревшие статусы. Не дождавшись, разбор уходит во временный отказ, и сообщение повторят.
- */
 @IntegrationTest
 class PriceListServiceLockTest {
 
@@ -37,7 +32,6 @@ class PriceListServiceLockTest {
     private static final UUID APPLIED_CID = UUID.fromString("8e4fab21-5c3d-4a9f-8b72-1d6c9f3a5e28");
     private static final UUID CID = UUID.fromString("7d3e9a10-4b2c-4f8e-9a61-0c5b8e2f4d17");
     private static final String QUEUE = "1c-usk_to_rvl-online_pricelists-contragents-changes";
-    /** SQLSTATE lock_not_available: так PostgreSQL отменяет оператор по lock_timeout. */
     private static final String LOCK_NOT_AVAILABLE = "55P03";
 
     @Autowired
@@ -94,7 +88,6 @@ class PriceListServiceLockTest {
                 .hasValueSatisfying(stored -> assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW));
     }
 
-    /** Когда строку услуги отпустили, та же часть разбирается обычно и ложится в буфер. */
     @Test
     void partOfService_isBuffered_whenServiceRowIsFree() {
         InboundMessage batch = inboundMessageService.store(UUID.randomUUID(), OneCStream.PRICE_LISTS, QUEUE,

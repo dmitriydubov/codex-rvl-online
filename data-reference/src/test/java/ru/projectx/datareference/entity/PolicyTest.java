@@ -10,11 +10,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
-/**
- * Полис замещает обе табличные части целиком: строка, пропавшая из нового сообщения, пропадает и из полиса,
- * иначе у застрахованного копились бы программы и условия, которых у него уже нет. Каждая строка хранит
- * признак доступности как пришёл и получает собственный идентификатор.
- */
 class PolicyTest {
 
     private static final Instant CREATED = Instant.parse("2026-10-01T09:00:00Z");

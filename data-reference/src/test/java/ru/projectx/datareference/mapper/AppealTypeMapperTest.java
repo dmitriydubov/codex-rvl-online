@@ -24,11 +24,6 @@ import ru.projectx.datareference.repository.AppealTypeRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор справочника видов обращения. Справочник приходит целиком и без фильтра: каждое
- * сообщение создаёт вид обращения или заменяет его реквизиты последним полученным снимком. Без GUID
- * записи и без названия сообщение нарушает контракт, и в справочник ничего не пишется.
- */
 class AppealTypeMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

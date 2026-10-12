@@ -47,11 +47,6 @@ import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.service.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
-/**
- * Защищает единственное решение слушателя очередей 1С:УСК: что ответить брокеру после приёма. Брокер здесь не нужен,
- * потому что исходы различаются вызовом канала. Разбор конверта настоящий, потому что это чистая функция, а карантин
- * и пауза подменены: проверяется, что слушатель их позвал, а не что они сделали.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerTest {
 
@@ -90,10 +85,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("stored");
     }
 
-    /**
-     * Сырьё записано, а счётчик отказал: это не отказ базы. Приём не встаёт на паузу, в карантин ничего не пишется,
-     * а исключение уходит из слушателя как есть.
-     */
     @Test
     void metricsFailureAfterStorage_isNotTakenForStorageFailure() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
@@ -105,7 +96,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(consumers, quarantineService, channel);
     }
 
-    /** Дубль не считается ошибкой: сырьё уже лежит, и брокеру достаточно подтверждения. */
     @Test
     void duplicateMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(false);
@@ -116,7 +106,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("duplicate");
     }
 
-    /** Сырьё сохраняется целиком и как есть, потому что разбирает его планировщик, а не слушатель. */
     @Test
     void storedMessage_keepsRawBody() throws IOException {
         String body = envelope(MESSAGE_ID);
@@ -126,10 +115,6 @@ class OneCQueueListenerTest {
         verify(ingestService).receive(MESSAGE_ID, OneCStream.MKB10, QUEUE, body);
     }
 
-    /**
-     * Ведущая метка порядка байтов UTF-8 снимается до разбора и до записи: колонка jsonb её не принимает, а
-     * сообщение от этого хуже не становится. В сырьё уходит конверт без метки.
-     */
     @Test
     void leadingUtf8Bom_isStrippedBeforeStorage() throws IOException {
         String body = envelope(MESSAGE_ID);
@@ -141,10 +126,6 @@ class OneCQueueListenerTest {
         verify(channel).basicAck(DELIVERY_TAG, false);
     }
 
-    /**
-     * Недоступная база не повод терять сообщение и не повод возвращать его в очередь: оно остаётся
-     * неподтверждённым, а потребители встают на паузу. Вернёт его в очередь остановка контейнера.
-     */
     @Test
     void storageOutage_pausesConsumersAndLeavesMessageUnanswered() throws IOException {
         when(ingestService.receive(any(), any(), any(), any()))
@@ -158,7 +139,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("storage_outage");
     }
 
-    /** Блокировка дольше lock_timeout — тоже временный отказ хранилища: та же пауза, а не возврат в очередь. */
     @Test
     void lockTimeout_pausesConsumers() throws IOException {
         when(ingestService.receive(any(), any(), any(), any()))
@@ -170,10 +150,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(channel);
     }
 
-    /**
-     * Сорвавшийся коммит без кода SQLSTATE — неизвестный отказ. Его лучше задержать, чем потерять: пауза, а
-     * код в причине — «нет».
-     */
     @Test
     void commitFailureWithoutSqlState_pausesConsumers() throws IOException {
         when(ingestService.receive(any(), any(), any(), any()))
@@ -185,10 +161,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(channel);
     }
 
-    /**
-     * Тело, которое база не принимает, уходит в карантин байт в байт — вместе с меткой порядка байтов, если
-     * она была, — и подтверждается: вернуть его в очередь значило бы остановить весь поток.
-     */
     @Test
     void poisonBody_isQuarantinedWithReasonAndAcknowledged() throws IOException {
         byte[] raw = ("﻿" + envelope(MESSAGE_ID)).getBytes(StandardCharsets.UTF_8);
@@ -208,7 +180,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("quarantined");
     }
 
-    /** Подтверждение — только после того, как карантин зафиксирован, иначе отказ записи карантина потерял бы сообщение. */
     @Test
     void poisonBody_isAcknowledgedOnlyAfterQuarantine() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(poison());
@@ -221,7 +192,6 @@ class OneCQueueListenerTest {
         quarantineThenBroker.verify(channel).basicAck(DELIVERY_TAG, false);
     }
 
-    /** Повторная доставка уже карантинного сообщения — подтверждение, а не второй отказ и не возврат. */
     @Test
     void redeliveredQuarantinedMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(poison());
@@ -233,7 +203,6 @@ class OneCQueueListenerTest {
         verify(channel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
     }
 
-    /** Карантин — тоже запись в базу: если и она не удалась, это отказ хранилища, и потребители встают на паузу. */
     @Test
     void quarantineWriteFailure_pausesConsumersWithoutAcknowledgement() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(poison());
@@ -247,10 +216,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("storage_outage");
     }
 
-    /**
-     * Две доставки одного отравленного сообщения пишут карантин одновременно: вторая упала на ключе карантина.
-     * Запись уже есть, поэтому она подтверждается — без паузы и без возврата в очередь.
-     */
     @Test
     void concurrentQuarantineOfTheSameMessage_isAcknowledged() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(poison());
@@ -264,10 +229,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("quarantined");
     }
 
-    /**
-     * Две доставки одного сообщения столкнулись на ключе: вторая возвращается в очередь после паузы и на
-     * повторе будет принята как дубль. Потребители не останавливаются — база здорова.
-     */
     @Test
     void duplicateRace_returnsMessageToQueueAfterPause() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(duplicateRace());
@@ -280,10 +241,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("returned");
     }
 
-    /**
-     * Без {@code message-id} сообщение принять нечем, поэтому оно подтверждается и теряется. Возврат
-     * в очередь дал бы бесконечную передоставку одного и того же.
-     */
     @Test
     void unreadableEnvelope_isAcknowledgedAndDropped() throws IOException {
         listener().receive(OneCStream.MKB10, delivery("{\"data\":{},\"metadata\":{}}"), channel);
@@ -294,11 +251,6 @@ class OneCQueueListenerTest {
         assertThat(outcomes()).containsExactly("unidentified");
     }
 
-    /**
-     * Сообщение с {@code message-id} не в канонической записи неопознаваемо и теряется, как нечитаемый конверт.
-     * Иначе оно легло бы в сырьё под GUID {@code 00000001-0002-0003-0004-000000000005}, который нестрогий разбор
-     * вычитал бы из {@code 1-2-3-4-5}.
-     */
     @Test
     void nonCanonicalMessageId_isAcknowledgedAndDropped() throws IOException {
         listener().receive(OneCStream.MKB10, delivery(envelope("1-2-3-4-5")), channel);
@@ -308,11 +260,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(ingestService);
     }
 
-    /**
-     * Нулевой {@code message-id} значит, что идентификатора нет, и такое сообщение тоже подтверждается
-     * и теряется. Если бы слушатель сохранил его под нулевым ключом, каждое следующее такое сообщение
-     * молча считалось бы дублем первого.
-     */
     @Test
     void zeroMessageId_isAcknowledgedAndDropped() throws IOException {
         listener().receive(OneCStream.MKB10, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);
@@ -322,11 +269,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(ingestService);
     }
 
-    /**
-     * У прайсов две очереди на один поток: пакеты строк и финальные сообщения со счётчиками. Различает
-     * их только имя очереди, и оно обязано дойти до сырья. Иначе сборка передачи прайса не отличит одно
-     * от другого.
-     */
     @Test
     void priceListFinal_isStoredWithItsOwnQueue() throws IOException {
         String queue = "1c-usk_to_rvl-online_pricelists-contragents-changes-final";
@@ -336,10 +278,6 @@ class OneCQueueListenerTest {
         verify(ingestService).receive(eq(MESSAGE_ID), eq(OneCStream.PRICE_LISTS), eq(queue), any());
     }
 
-    /**
-     * Подтверждение уходит только после того, как приём зафиксирован. Подтверждённое, но не
-     * сохранённое сообщение брокер больше не отдаст, и оно будет потеряно.
-     */
     @Test
     void storedMessage_isAcknowledgedOnlyAfterItIsStored() throws IOException {
         when(ingestService.receive(eq(MESSAGE_ID), eq(OneCStream.MKB10), eq(QUEUE), any())).thenReturn(true);
@@ -351,11 +289,6 @@ class OneCQueueListenerTest {
         storageThenBroker.verify(channel).basicAck(DELIVERY_TAG, false);
     }
 
-    /**
-     * Пауза стоит <b>между</b> столкновением доставок и возвратом, а не после возврата: возврат,
-     * отправленный сразу, брокер передоставит немедленно, и пауза уже ничего не сдержит.
-     * Поэтому замеряется промежуток от самого отказа до самого {@code nack}.
-     */
     @Test
     void duplicateRace_returnsMessageOnlyAfterThePause() throws IOException {
         Duration backoff = Duration.ofMillis(50);
@@ -376,11 +309,6 @@ class OneCQueueListenerTest {
         assertThat(Duration.ofNanos(returnedAt.get() - failedAt.get())).isGreaterThanOrEqualTo(backoff);
     }
 
-    /**
-     * «Сразу» значит «не досиживая паузу». Прерывание означает остановку контейнера, и полная пауза на
-     * каждом сообщении задержала бы её. Пауза здесь длится час, поэтому тест, который её досидит,
-     * оборвётся по таймауту.
-     */
     @Test
     void interruptedPause_returnsMessageWithoutWaitingOutTheBackoff() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(duplicateRace());
@@ -397,10 +325,6 @@ class OneCQueueListenerTest {
         verify(channel).basicNack(DELIVERY_TAG, false, true);
     }
 
-    /**
-     * Сырьё совпадает с текстом, который прислала 1С, вместе с кириллицей, потому что тело читается как
-     * UTF-8. Другая кодировка превратила бы наименования в мусор без единой ошибки.
-     */
     @Test
     void cyrillicBody_isStoredAsSent() throws IOException {
         String body = """
@@ -413,11 +337,6 @@ class OneCQueueListenerTest {
         verify(ingestService).receive(MESSAGE_ID, OneCStream.MKB10, QUEUE, body);
     }
 
-    /**
-     * {@link IOException} канала на подтверждении не является сбоем хранения, потому что сырьё уже
-     * лежит в базе. Ошибка уходит контейнеру, а возврата в очередь нет. Неподтверждённое сообщение
-     * брокер передоставит сам, и дедупликация примет его как дубль.
-     */
     @Test
     void acknowledgementIoFailure_isNotTakenForStorageFailure() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenReturn(true);
@@ -430,11 +349,6 @@ class OneCQueueListenerTest {
         verifyNoInteractions(consumers, quarantineService);
     }
 
-    /**
-     * Закрытый канал за прокси фабрики соединений бросает на подтверждении {@code IllegalStateException}
-     * («Channel closed; cannot ack/nack»). Это не сбой хранения: запись уже закоммичена, поэтому паузы и возврата
-     * в очередь нет, а исключение уходит контейнеру.
-     */
     @Test
     void acknowledgementChannelClosed_isNotTakenForStorageFailure() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenReturn(true);
@@ -451,10 +365,6 @@ class OneCQueueListenerTest {
         return listener(Duration.ofMillis(1));
     }
 
-    /**
-     * Пауза перед возвратом почти нулевая, потому что проверяется факт возврата, а не длина ожидания.
-     * Настоящие пять секунд здесь были бы просто пятью секундами прогона.
-     */
     private OneCQueueListener listener(Duration duplicateDeliveryBackoff) {
         return listener(duplicateDeliveryBackoff, metrics);
     }
@@ -468,7 +378,6 @@ class OneCQueueListenerTest {
                 ingestMetrics);
     }
 
-    /** Реестр, у которого любой счётчик отказывает на увеличении: так выглядит сломанный экспорт метрик. */
     private static final class FailingMeterRegistry extends SimpleMeterRegistry {
 
         @Override
@@ -490,14 +399,12 @@ class OneCQueueListenerTest {
         }
     }
 
-    /** Исходы посчитанных доставок, по одному на доставку, с потоком и очередью этой доставки. */
     private List<String> outcomes() {
         return meters.find(OneCIngestMetrics.DELIVERIES).tag("stream", "MKB10").tag("queue", QUEUE).counters().stream()
                 .flatMap(counter -> Collections.nCopies((int) counter.count(), counter.getId().getTag("outcome")).stream())
                 .toList();
     }
 
-    /** Отказ базы на теле с JSON-escape нулевого символа: класс 22, как его бросает запись сырья. */
     private static RuntimeException poison() {
         return new DataIntegrityViolationException("unsupported Unicode escape sequence",
                 new SQLException("unsupported Unicode escape sequence", UNTRANSLATABLE_CHARACTER));

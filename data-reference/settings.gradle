@@ -1,8 +1,3 @@
-/*
- * Свойство publicRepositories выбирает репозитории: по умолчанию, в рабочем контуре, — только Nexus контура,
- * со значением true — портал плагинов Gradle и Maven Central. Переключатель объявлен внутри pluginManagement {},
- * потому что этот блок вычисляется отдельно от остального файла; по той же причине адрес Nexus повторён ниже.
- */
 pluginManagement {
     gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
             .getOrElse(false)
@@ -44,10 +39,6 @@ dependencyResolutionManagement {
  * }
  */
 
-/*
- * Внешний набор проверок качества подключается, только когда его каталог лежит рядом с модулем и репозитории
- * публичные: плагин мутаций PIT есть только на портале плагинов Gradle. В рабочий контур каталог не переносится.
- */
 gradle.ext.gauntletEnabled = file('../gauntlet/gauntlet.gradle').isFile() &&
         providers.gradleProperty('gauntlet').map { it.isEmpty() || it.toBoolean() }
                 .getOrElse(gradle.ext.has('publicRepositories') && gradle.ext.publicRepositories)

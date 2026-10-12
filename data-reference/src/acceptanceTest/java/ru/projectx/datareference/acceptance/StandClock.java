@@ -11,11 +11,6 @@ import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Часы сервиса на стенде: идут как системные, пока сценарий их не остановил, и могут быть перенесены на другой день.
- * Часы в другой зоне остаются видом тех же часов, а не снимком: сервис берёт московскую зону для дня контура, и
- * остановка и сдвиг должны быть видны и там.
- */
 final class StandClock extends Clock {
 
     private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");
@@ -38,10 +33,6 @@ final class StandClock extends Clock {
         this.zone = zone;
     }
 
-    /**
-     * Сдвиг считается по календарю Москвы, а не сутками по 24 часа, потому что смещение зоны для прошлых дат другое.
-     * Результат сразу сверяется тем же путём, которым сервис считает «сегодня», иначе ошибка сдвига прошла бы молча.
-     */
     static StandClock runningOn(LocalDate today) {
         ZonedDateTime now = ZonedDateTime.now(MOSCOW);
         StandClock clock = new StandClock(Duration.between(now, now.with(today)));
@@ -56,7 +47,6 @@ final class StandClock extends Clock {
         stopped.set(Optional.of(moment));
     }
 
-    /** Сдвигает остановленные часы; идущие часы сдвигать нельзя — шаг сценария ошибся бы молча. */
     void advance(Duration duration) {
         Instant moment = stopped.get().orElseThrow(() -> new IllegalStateException("часы стенда не остановлены"));
         stopped.set(Optional.of(moment.plus(duration)));
@@ -66,10 +56,6 @@ final class StandClock extends Clock {
         stopped.set(Optional.empty());
     }
 
-    /**
-     * Момент для параметра запроса: драйвер PostgreSQL принимает {@link OffsetDateTime}, а {@link Instant} нет. Шаги
-     * пишут время сервиса, а не {@code now()} базы, иначе на перенесённых часах сроки разошлись бы с таблицами.
-     */
     OffsetDateTime moment() {
         return OffsetDateTime.ofInstant(instant(), ZoneOffset.UTC);
     }

@@ -9,11 +9,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/**
- * Очереди 1С:УСК, которые по настройкам должен читать сервис, а брокер подписку их потребителя не подтвердил. Где
- * слушатели выключены или брокера нет, перечень пуст. Он упорядочен по имени, чтобы ответ ручки здоровья не менялся от
- * запроса к запросу.
- */
 @Component
 public class OneCQueueConsumers {
 
@@ -29,7 +24,6 @@ public class OneCQueueConsumers {
         this.subscriptions = subscriptions;
     }
 
-    /** Очереди, у которых должен быть потребитель, а брокер его подписку не подтвердил. */
     public List<String> queuesWithoutConsumer() {
         return Optional.ofNullable(containers.getIfAvailable())
                 .map(this::queuesWithoutConsumer)

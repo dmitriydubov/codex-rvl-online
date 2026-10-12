@@ -21,11 +21,6 @@ import ru.projectx.datareference.repository.StatusBacklog;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Сборка снимка очереди разбора из ответов базы, без базы: строки группировки, самое давнее сообщение, моменты
- * «сейчас минус порог» для каждого подсчёта и момент снимка по часам. Пороги нарочно разные, чтобы перепутанный порог
- * не совпал со строгой заглушкой Mockito; подсчёт в самой базе проверяет {@link InboundBacklogReadsTest}.
- */
 @ExtendWith(MockitoExtension.class)
 class InboundBacklogSnapshotTest {
 

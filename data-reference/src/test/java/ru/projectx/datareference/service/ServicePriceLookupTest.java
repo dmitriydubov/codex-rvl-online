@@ -28,11 +28,6 @@ import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
 
-/**
- * Расчёт стоимости берёт только услугу, которую учреждение отдаёт в перечне своих услуг, с тем же отбором по
- * прайсовому договору и видам обращения РВЛ. Отказы идут по порядку: учреждение и его договор, архив услуги, её
- * договор, отбор по видам обращения, и только потом прайс, строки которого читаются одним запросом за весь период.
- */
 @ExtendWith(MockitoExtension.class)
 class ServicePriceLookupTest {
 

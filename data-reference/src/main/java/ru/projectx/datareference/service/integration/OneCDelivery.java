@@ -9,37 +9,27 @@ import org.springframework.amqp.core.Message;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.RejectedMessage;
 
-/**
- * Одна доставка из очереди 1С с ответом брокеру: ответов ровно два, чтобы слушатель не собирал {@code basicNack} из
- * флагов. Ведущая метка порядка байтов UTF-8 (BOM) снимается: колонка {@code jsonb} её не принимает, а дефектом тела
- * она не является, это след редактора.
- */
 record OneCDelivery(OneCStream stream, Message message, Channel channel) {
 
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
-    /** Очередь, из которой пришло сообщение: у прайсов она отличает пакет от финального. */
     String queue() {
         return message.getMessageProperties().getConsumerQueue();
     }
 
-    /** Тело без ведущей метки порядка байтов: его разбирает конверт и его сохраняет сырьё. */
     byte[] body() {
         byte[] raw = rawBody();
         return startsWithBom(raw) ? Arrays.copyOfRange(raw, UTF8_BOM.length, raw.length) : raw;
     }
 
-    /** Тело как прислал брокер, байт в байт: таким оно уходит в карантин. */
     byte[] rawBody() {
         return message.getBody();
     }
 
-    /** Тело как есть, текстом: в сырьё оно уходит без разбора. */
     String payload() {
         return new String(body(), StandardCharsets.UTF_8);
     }
 
-    /** Это сообщение как отвергнутое базой: для карантина, с телом байт в байт. */
     RejectedMessage rejected(UUID messageId) {
         return new RejectedMessage(messageId, stream, queue(), rawBody());
     }
@@ -48,7 +38,6 @@ record OneCDelivery(OneCStream stream, Message message, Channel channel) {
         channel.basicAck(deliveryTag(), false);
     }
 
-    /** Сообщение не принято, брокер возвращает его в очередь и отдаст снова. */
     void returnToQueue() throws IOException {
         channel.basicNack(deliveryTag(), false, true);
     }

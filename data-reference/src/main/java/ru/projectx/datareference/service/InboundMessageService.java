@@ -23,11 +23,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Сохраняет сообщения 1С как они пришли и записывает исход их обработки. Судьба сообщения решается только здесь:
- * временный отказ базы ставит повтор по списку задержек, постоянная ошибка и исчерпанные повторы дают окончательный
- * отказ, а отказ, пришедший после фиксации исхода, исход не меняет.
- */
 @Service
 public class InboundMessageService {
 
@@ -53,17 +48,12 @@ public class InboundMessageService {
                 .collect(Collectors.toUnmodifiableMap(RejectionScope::stream, Function.identity()));
     }
 
-    /**
-     * Сохраняет сообщение целиком со статусом {@code NEW} в транзакции вызывающего: отмеченное принятым, но не
-     * сохранённое сообщение потеряно навсегда, потому что брокер его больше не пришлёт.
-     */
     @Transactional
     public InboundMessage store(UUID messageId, OneCStream stream, String sourceQueue, String payload) {
         InboundReceipt receipt = new InboundReceipt(messageId, stream, sourceQueue, clock.instant());
         return repository.save(InboundMessage.receive(receipt, payload));
     }
 
-    /** Работает в транзакции вызывающего: изменения справочников и смена статуса фиксируются только вместе. */
     @Transactional
     public void markProcessed(UUID messageId) {
         InboundMessage message = require(messageId);
@@ -71,7 +61,6 @@ public class InboundMessageService {
         transitions.record(message);
     }
 
-    /** Работает в транзакции вызывающего: пропуск и изменения, которые разбор успел сделать, фиксируются вместе. */
     @Transactional
     public void markSkipped(UUID messageId, String reason) {
         InboundMessage message = require(messageId);
@@ -79,10 +68,6 @@ public class InboundMessageService {
         transitions.record(message);
     }
 
-    /**
-     * Отмечает, что сообщение ждёт записи, на которую ссылается; работает в транзакции вызывающего.
-     * {@code record} пуст, если у потока нет записи справочника, которую меняет сообщение.
-     */
     @Transactional
     public void markAwaitingParent(UUID messageId, AwaitedParent parent, @Nullable UUID record) {
         InboundMessage message = require(messageId);
@@ -90,10 +75,6 @@ public class InboundMessageService {
         transitions.record(message);
     }
 
-    /**
-     * Ставит повтор, а когда задержки кончились, окончательный отказ. Транзакция своя, потому что транзакция
-     * вызывающего уже откатилась. Возвращает статус, с которым сообщение осталось.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public InboundStatus recordTemporaryFailure(UUID messageId, InboundOutcome beforeAttempt,
             ParseFailure.Temporary failure) {
@@ -114,10 +95,6 @@ public class InboundMessageService {
         return message.outcome().status();
     }
 
-    /**
-     * Сразу ставит окончательный отказ в своей транзакции; исход, зафиксированный до отказа, не меняется.
-     * Возвращает статус, с которым сообщение осталось.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public InboundStatus recordPermanentFailure(UUID messageId, InboundOutcome beforeAttempt,
             ParseFailure.Permanent failure) {
@@ -130,33 +107,21 @@ public class InboundMessageService {
         return message.outcome().status();
     }
 
-    /** Читает передачу прайса целиком в транзакции вызывающего, где сборщик потом запишет её исход. */
     @Transactional
     public List<InboundMessage> transferParts(UUID correlationId) {
         return repository.findByCorrelationId(correlationId);
     }
 
-    /** Работает в транзакции вызывающего: исход передачи и изменения прайса фиксируются вместе. */
     @Transactional
     public void saveTransferPart(InboundMessage message) {
         repository.save(message);
         transitions.record(message);
     }
 
-    /**
-     * Неудавшаяся попытка откатывает свой исход, поэтому изменившаяся строка значит, что попытка зафиксировалась,
-     * а отказ пришёл позже, например обрыв соединения сразу после фиксации. Сравнивается исход целиком: сообщение
-     * может снова ждать уже другого родителя с прежним статусом.
-     */
     private static boolean isOutcomeCommitted(InboundMessage message, InboundOutcome beforeAttempt) {
         return !message.outcome().equals(beforeAttempt);
     }
 
-    /**
-     * Зафиксированный исход не перезаписывается, иначе применённое сообщение разобрали бы заново или отклонили.
-     * Переход считается здесь, потому что транзакция разбора о своей фиксации не узнала; редкий двойной счёт
-     * дешевле потерянного перехода.
-     */
     private InboundStatus keepCommitted(InboundMessage message, ParseFailure failure) {
         InboundReceipt receipt = message.receipt();
         InboundStatus committed = message.outcome().status();
@@ -166,12 +131,10 @@ public class InboundMessageService {
         return committed;
     }
 
-    /** Счётчик в строке считает только отложенные попытки, поэтому неудавшаяся попытка следует за ними. */
     private static int failedAttempt(InboundMessage message) {
         return message.outcome().attempt() + 1;
     }
 
-    /** Отклоняет сообщение и тех, кто разделяет его исход; запись ERROR в журнале одна, о самом сообщении. */
     private List<InboundMessage> fail(InboundMessage message, String reason, ParseFailure failure) {
         int failedAttempt = failedAttempt(message);
         List<InboundMessage> rejected = Optional.ofNullable(scopes.get(message.receipt().stream()))

@@ -5,11 +5,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import org.springframework.stereotype.Component;
 
-/**
- * Признак паузы приёма из 1С:УСК в Prometheus, на который удобно ставить правило оповещения: 1, если потребители
- * остановлены из-за недоступной базы, иначе 0. Очередь без потребителя по другой причине видна только в ручке здоровья.
- * Значение берётся из памяти, к базе и брокеру скрейп не ходит.
- */
 @Component
 class OneCIngestPauseGauge implements MeterBinder {
 

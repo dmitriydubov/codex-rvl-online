@@ -13,11 +13,6 @@ import java.util.Optional;
 import javax.sql.DataSource;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Долгая операция в базе, как ручной SQL или миграция на живой базе: другой сеанс держит таблицу под ACCESS EXCLUSIVE,
- * которую ждёт даже SELECT (PostgreSQL 16, «Explicit Locking»). Блокировка снимается откатом шагом или после сценария,
- * чтобы следующий начинал с доступной базой; неизвестное имя данных роняет шаг, а не блокирует «что-нибудь».
- */
 public class DatabaseLockSteps {
 
     private static final Map<String, String> TABLES = Map.of(

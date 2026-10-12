@@ -9,10 +9,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Строка перечня учреждений принадлежит программе, которая её заместила: по этой связи база хранит,
- * в каких санаториях обслуживают по программе. Условия обслуживания хранятся как пришли.
- */
 class ProgramLpuTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");

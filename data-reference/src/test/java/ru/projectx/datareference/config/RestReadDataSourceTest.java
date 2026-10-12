@@ -10,10 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/**
- * Источник соединений приложения держит оба пула и отдаёт их по отдельности (здоровье базы, метрики, тесты). Сам
- * он соединений не открывает, пока они не нужны.
- */
 @ExtendWith(MockitoExtension.class)
 class RestReadDataSourceTest {
 

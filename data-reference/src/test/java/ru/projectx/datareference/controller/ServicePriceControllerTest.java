@@ -23,10 +23,6 @@ import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
 import ru.projectx.datareference.service.ServicePriceReads;
 
-/**
- * Расчёт стоимости услуги за период строго читает параметры: неверная дата или UUID дают 400
- * с именем параметра, и сервис расчёта не вызывается.
- */
 @ExtendWith(MockitoExtension.class)
 class ServicePriceControllerTest {
 
@@ -67,7 +63,6 @@ class ServicePriceControllerTest {
         assertViolation(result, "date_from", "ожидается дата yyyy-mm-dd");
     }
 
-    /** Короткую запись даты по языку запроса стандартное чтение Spring принимает, а сервису нужна только yyyy-mm-dd. */
     @Test
     void dateFromInLocalizedShortRecord_isValidationError_namingDateFrom() {
         MvcTestResult result = mvc.get().uri(PRICE + "?date_from={from}&date_to=2026-04-12", SERVICE_ID, "4/10/26")

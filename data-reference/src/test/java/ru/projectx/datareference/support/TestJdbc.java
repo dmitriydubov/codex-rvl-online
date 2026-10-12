@@ -5,10 +5,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 
-/**
- * Запрос к базе в обход модели для того, что тест обязан подготовить, а приложение делать не должно: сейчас это
- * состаривание строки сырья при остановленных часах. Метод в боевом репозитории однажды вызвали бы не из теста.
- */
 public class TestJdbc {
 
     private final DataSource dataSource;

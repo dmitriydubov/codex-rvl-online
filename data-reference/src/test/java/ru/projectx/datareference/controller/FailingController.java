@@ -7,10 +7,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-/**
- * Заглушка-контроллер для тестов обработчиков ошибок: бросает заданное тестом исключение и даёт ручки,
- * на которых Spring сам отказывает. Ручки объявлены как настоящие: только GET и только JSON.
- */
 @RestController
 class FailingController {
 
@@ -40,7 +36,6 @@ class FailingController {
         return key;
     }
 
-    /** Ручка, где Spring сравнивает метод и формат ответа: на другой метод — 405, на XML — 406. */
     @GetMapping(path = READ_ONLY, produces = MediaType.APPLICATION_JSON_VALUE)
     String readOnly() {
         return "{}";

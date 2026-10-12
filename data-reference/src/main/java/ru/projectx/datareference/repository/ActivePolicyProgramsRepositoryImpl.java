@@ -12,10 +12,6 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 
-/**
- * Реализация {@link ActivePolicyProgramsRepository} на Criteria API: условия «действует» берутся из
- * {@link PolicySpecifications}, чтобы у каталога и у поиска полисов было одно правило, а не две его копии.
- */
 class ActivePolicyProgramsRepositoryImpl implements ActivePolicyProgramsRepository {
 
     private final EntityManager entityManager;

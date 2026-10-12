@@ -5,10 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Защищает то, что идентификатор из запроса REST читается по тому же правилу записи GUID, что и сообщения 1С:УСК:
- * каноническая запись читается, укороченная не становится чужим GUID.
- */
 class CanonicalGuidsTest {
 
     @Test

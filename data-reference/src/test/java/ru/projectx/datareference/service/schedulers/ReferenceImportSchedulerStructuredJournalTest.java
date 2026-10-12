@@ -34,17 +34,12 @@ import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.StructuredJournal;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Запись об исходе разбора сообщения в рабочем формате журнала несёт {@code messageId} и поток отдельными
- * полями: по ним исход находится тем же поиском, что и приём этого сообщения из брокера.
- */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ReferenceImportSchedulerStructuredJournalTest {
 
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
 
-    /** Похоже на персональные данные, то есть ровно на то, чего в журнале быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна";
 
     @Mock
@@ -85,10 +80,6 @@ class ReferenceImportSchedulerStructuredJournalTest {
         assertThat(outcome.path(OneCLogContext.STREAM).asString()).isEqualTo(OneCStream.MKB10.name());
     }
 
-    /**
-     * Текст временного отказа не попадает в журнал ни строкой, ни приложенным исключением: рабочий формат выводит его
-     * полями {@code error.message} и {@code error.stack_trace}, а текст ошибки вставки печатает значения полей.
-     */
     @Test
     void temporaryFailure_carriesMessageIdAndStreamButNoFailureText(CapturedOutput output) {
         InboundMessage message = received();

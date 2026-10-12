@@ -8,11 +8,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Договор добровольного медицинского страхования из 1С. Полис и страхователь связаны с ним GUID'ом без внешнего
- * ключа: полис может прийти раньше договора, а страхователь-человек в справочник страхователей не попадает.
- * Договор действует с первого по последний день срока включительно, пока он не в архиве.
- */
 @Entity
 @Table(name = "insurance_contracts")
 public class InsuranceContract extends OneCEntity {
@@ -23,7 +18,6 @@ public class InsuranceContract extends OneCEntity {
     @Column(name = "begin_date", nullable = false)
     private LocalDate beginDate;
 
-    /** {@code null} — открытая дата: в источнике это 3000-01-01, а не «через тысячу лет». */
     @Nullable
     @Column(name = "end_date")
     private LocalDate endDate;
@@ -33,14 +27,12 @@ public class InsuranceContract extends OneCEntity {
     private UUID externalInsurerId;
 
     protected InsuranceContract() {
-        // JPA
     }
 
     private InsuranceContract(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static InsuranceContract create(UUID externalId, Details details, Instant now) {
         InsuranceContract contract = new InsuranceContract(externalId, now);
         contract.applySnapshot(details, now);
@@ -55,7 +47,6 @@ public class InsuranceContract extends OneCEntity {
         applyCommon(details.notActive(), now);
     }
 
-    /** {@code notActive} — признак архивности; имя взято из сообщения 1С, а не {@code deleteMark}, как у остальных. */
     public record Details(
             String number,
             LocalDate beginDate,

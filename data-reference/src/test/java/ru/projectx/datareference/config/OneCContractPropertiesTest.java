@@ -5,11 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * Защищает то, как настройки обмена с 1С:УСК отличают «значение не задано» от заданного. Пустая строка
- * в переменной окружения должна значить то же, что отсутствие настройки, иначе маппер принял бы её
- * за значение и применял правило с пустым признаком.
- */
 class OneCContractPropertiesTest {
 
     @Test

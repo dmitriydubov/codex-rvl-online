@@ -24,10 +24,6 @@ import ru.projectx.datareference.repository.Mkb10Repository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор справочника МКБ-10, который приходит целиком и без фильтра. Код диагноза приходит дополненным
- * пробелами и хранится без них, иначе поиск по коду его не найдёт.
- */
 class Mkb10MapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

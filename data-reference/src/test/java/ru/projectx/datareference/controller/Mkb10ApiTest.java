@@ -15,7 +15,6 @@ import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/** Проверяет на настоящей базе подсказку МКБ-10 по коду и наименованию, раскрытие перечня кодов и код родителя. */
 @IntegrationTest
 class Mkb10ApiTest {
 

@@ -27,11 +27,6 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Защищает окончательный отказ части передачи прайса: вместе с ней отклоняются все части передачи, ещё лежащие в
- * буфере, чтобы передача не осталась наполовину собранной. Если ошибка в самой части, у неё своя причина, а у
- * остальных — ссылка на неё; если отказ случился при сборке, у всех частей одна причина передачи.
- */
 class PriceListTransferRejectionTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -45,7 +40,6 @@ class PriceListTransferRejectionTest {
     private final PriceListTransferRejection rejection = new PriceListTransferRejection(repository,
             new PriceTransferServiceLock(repository, finalizations), priceList, JsonMapper.builder().build());
 
-    /** Строка услуги блокируется до чтения частей: закрытие зависших передач не пишет их одновременно с отказом. */
     @Test
     void serviceRowIsLocked_beforeTransferPartsAreRead() {
         InboundMessage trigger = received(batchData(GOOD_ROW));
@@ -58,10 +52,6 @@ class PriceListTransferRejectionTest {
         steps.verify(repository).findByCorrelationId(CID);
     }
 
-    /**
-     * Часть называет другую услугу: блокируется услуга, которую называют части в буфере, — та же, что у проверки
-     * зависших передач.
-     */
     @Test
     void serviceOfBufferedParts_isLocked_whenPartNamesAnotherService() {
         UUID otherService = UUID.randomUUID();
@@ -77,7 +67,6 @@ class PriceListTransferRejectionTest {
         verify(finalizations, never()).lockByService(otherService);
     }
 
-    /** Разные услуги в частях — ошибка той части, на которой это обнаружено: у остальных ссылка на неё. */
     @Test
     void partNamingAnotherService_keepsItsOwnReason_andOthersPointToIt() {
         InboundMessage other = buffered(null);
@@ -94,7 +83,6 @@ class PriceListTransferRejectionTest {
                 + ": " + reason);
     }
 
-    /** Часть без GUID услуги — тоже её собственная ошибка. */
     @Test
     void partWithoutService_keepsItsOwnReason_andOthersPointToIt() {
         InboundMessage other = buffered(null);
@@ -109,10 +97,6 @@ class PriceListTransferRejectionTest {
                 + ": " + reason);
     }
 
-    /**
-     * Счётчик финального сообщения за пределом целого — ошибка этого сообщения: передача находится по её
-     * идентификатору, пакеты в буфере отклоняются со ссылкой на него.
-     */
     @Test
     void finalMessageWithCounterBeyondInt_keepsItsOwnReason_andBufferedBatchPointsToIt() {
         InboundMessage batch = buffered(null);
@@ -129,10 +113,6 @@ class PriceListTransferRejectionTest {
         verify(finalizations).lockByService(SERVICE_ID);
     }
 
-    /**
-     * Финальное сообщение с нечитаемым счётчиком, пришедшее первым, записывается отклонённым в свою передачу, но без
-     * счётчиков: пакеты, пришедшие позже, видят отказ передачи и разделяют его.
-     */
     @Test
     void firstFinalMessageWithCounterBeyondInt_isRecordedInItsTransferWithoutCounters() {
         InboundMessage trigger = received("{\"cid\":\"%s\",\"keyValue\":\"%s\",\"countMessages\":1,\"countRows\":1e10}"
@@ -153,7 +133,6 @@ class PriceListTransferRejectionTest {
         assertThat(rejection.stream()).isEqualTo(OneCStream.PRICE_LISTS);
     }
 
-    /** Отказ при сборке не принадлежит ни одной части: у всех частей одна причина передачи. */
     @Test
     void failureWhileAssembling_failsEveryBufferedPartWithTransferReason() {
         InboundMessage finalMessage = buffered(1);
@@ -168,7 +147,6 @@ class PriceListTransferRejectionTest {
         assertThat(rejected).allSatisfy(message -> assertFailed(message, reason));
     }
 
-    /** Исчерпанные повторы — тоже отказ сборки, а не ошибка части. */
     @Test
     void exhaustedRetries_failEveryBufferedPartWithTransferReason() {
         InboundMessage batch = buffered(null);
@@ -181,7 +159,6 @@ class PriceListTransferRejectionTest {
         assertFailed(batch, "передача " + CID + " отклонена: " + retries);
     }
 
-    /** Ошибка в самой части: у неё своя причина, у остальных — какое сообщение и почему сорвало передачу. */
     @Test
     void defectOfThePart_keepsItsOwnReason_andOthersPointToIt() {
         InboundMessage batch = buffered(null);
@@ -196,7 +173,6 @@ class PriceListTransferRejectionTest {
                 .formatted(CID, trigger.receipt().messageId()));
     }
 
-    /** Своя же запись в буфере — не другая часть: отклонённая часть в ответе одна, её копия не трогается. */
     @Test
     void ownBufferedCopy_isNotRejectedAsAnotherPart() {
         InboundMessage trigger = received(batchData(GOOD_ROW));
@@ -225,7 +201,6 @@ class PriceListTransferRejectionTest {
                 .formatted(CID, trigger.receipt().messageId()));
     }
 
-    /** Лишний пакет — ошибка его самого; применённые части свой исход сохраняют. */
     @Test
     void surplusBatch_failsAlone_andAppliedPartsKeepTheirOutcome() {
         InboundMessage applied = buffered(null);
@@ -239,7 +214,6 @@ class PriceListTransferRejectionTest {
         assertThat(applied.outcome().status()).isEqualTo(InboundStatus.PROCESSED);
     }
 
-    /** Отклонённая часть помнит передачу: по ней опоздавшие части узнают, что передача уже отклонена. */
     @Test
     void rejectedPart_remembersItsTransfer() {
         InboundMessage trigger = received(finalData());
@@ -270,7 +244,6 @@ class PriceListTransferRejectionTest {
         verifyNoInteractions(repository);
     }
 
-    /** Тело, которое не читается, ни к какой передаче не относится; отказ не должен падать сам. */
     @Test
     void unreadableOrErasedBody_failsAlone() {
         InboundMessage erased = InboundMessage.receive(receipt(), null);

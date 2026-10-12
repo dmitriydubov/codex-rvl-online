@@ -7,14 +7,8 @@ import java.util.function.BiConsumer;
 import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Программа РВЛ со слоем или процентом сооплаты на пределе или за ним (по ответу 1С:УСК слой не меньше 0, сооплата от
- * 0 до 100), построенная из присланной сценарием раньше. Словари закрытые: иначе испорченное значение из «Примеров»
- * молча дало бы другое сообщение, и сценарий прошёл бы на нём.
- */
 final class OneCProgramRangeMessages {
 
-    /** Слой — целое число JSON, в том числе за пределом {@code int}, сооплата — число JSON, как в примере ТЗ-6. */
     private static final Map<String, BiConsumer<ObjectNode, BigDecimal>> NUMERIC_TERMS = Map.of(
             "numberLayer", (row, value) -> row.put("numberLayer", value.toBigIntegerExact()),
             "percentCopayment", (row, value) -> row.put("percentCopayment", value));
@@ -24,7 +18,6 @@ final class OneCProgramRangeMessages {
             "на одну сотую меньше", new BigDecimal("-0.01"),
             "на одну сотую больше", new BigDecimal("0.01"),
             "на одну тысячную больше", new BigDecimal("0.001"));
-    /** Значение «за пределом» для каждого поля: ближайшее к допустимому, которое правило 1С:УСК запрещает. */
     private static final Map<String, BigDecimal> PAST_LIMIT = Map.of(
             "numberLayer", BigDecimal.ONE.negate(),
             "percentCopayment", new BigDecimal("100.01"));
@@ -32,14 +25,12 @@ final class OneCProgramRangeMessages {
     private OneCProgramRangeMessages() {
     }
 
-    /** Та же программа под прежним наименованием; поле строки услуги — присланное число. Разбор её применяет. */
     static OneCMessage withTerm(OneCMessage program, String field, String number) {
         ObjectNode data = program.data().deepCopy();
         lookup(NUMERIC_TERMS, field).accept(OneCProgramTermsMessages.firstRow(data), new BigDecimal(number));
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /** Та же программа под новым наименованием; поле строки услуги — число на шаг за пределом. Разбор её отклоняет. */
     static OneCMessage withTermPastLimit(OneCMessage program, String field, String stepPastLimit, String limit) {
         ObjectNode data = OneCProgramTermsMessages.renamed(program);
         BigDecimal value = new BigDecimal(limit).add(lookup(STEPS_PAST_LIMIT, stepPastLimit));
@@ -47,7 +38,6 @@ final class OneCProgramRangeMessages {
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.FAILED);
     }
 
-    /** Та же программа под новым наименованием и с ещё одной строкой, которую разбор не сохраняет, с полем за пределом. */
     static OneCMessage withDroppedRowPastLimit(OneCMessage program, String droppedRow, String field) {
         ObjectNode data = OneCProgramTermsMessages.renamed(program);
         ObjectNode extra = OneCProgramTermsMessages.firstRow(data).deepCopy();
@@ -57,7 +47,6 @@ final class OneCProgramRangeMessages {
         return new OneCMessage(program.stream(), program.queue(), data, InboundStatus.PROCESSED);
     }
 
-    /** Та же программа без признака РВЛ; поле её строки услуги за пределом. */
     static OneCMessage withoutRvlPastLimit(OneCMessage program, String field) {
         ObjectNode data = program.data().deepCopy().put("rvl", false);
         pastLimit(OneCProgramTermsMessages.firstRow(data), field);

@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.context.WebApplicationContext;
 
-/** Вспомогательные бины, нужные только тестам. */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestSupportConfig {
 
@@ -23,11 +22,6 @@ public class TestSupportConfig {
         return new TestJdbc(dataSource);
     }
 
-    /**
-     * Клиент к стеку MVC поверх контекста вместо {@code @AutoConfigureMockMvc}, модуль которого недоступен
-     * в Nexus контура. Без Boot фильтры из контекста сами не подключаются, поэтому они добавляются здесь в порядке
-     * {@code @Order}: иначе тест на {@code X-Request-Id} проверял бы фильтр, которого нет в цепочке.
-     */
     @Bean
     public MockMvcTester mockMvcTester(WebApplicationContext context, List<Filter> filters) {
         return MockMvcTester.from(context, builder -> builder

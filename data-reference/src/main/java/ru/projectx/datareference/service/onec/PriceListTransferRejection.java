@@ -14,11 +14,6 @@ import ru.projectx.datareference.service.RejectionScope;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Окончательный отказ части передачи прайса отклоняет и части в буфере, иначе передача навсегда осталась бы
- * наполовину собранной. Ошибка самой части остаётся её причиной, а остальные ссылаются на неё; отказ при сборке
- * получает у всех частей общую причину. Часть без читаемого идентификатора передачи отклоняется одна.
- */
 @Component
 public class PriceListTransferRejection implements RejectionScope {
 
@@ -53,10 +48,6 @@ public class PriceListTransferRejection implements RejectionScope {
                 });
     }
 
-    /**
-     * Строка услуги передачи блокируется до чтения частей, как при разборе: закрытие зависших не пишет их
-     * одновременно, даже если отклоняемая часть называет другую услугу.
-     */
     private List<InboundMessage> rejectTransfer(InboundMessage message, TransferPart part, String reason) {
         serviceLock.lockTransferService(part.cid(), part.data());
         List<InboundMessage> parts = repository.findByCorrelationId(part.cid());
@@ -86,10 +77,6 @@ public class PriceListTransferRejection implements RejectionScope {
                 .toList();
     }
 
-    /**
-     * Те же проверки, что прервали разбор части: если они находят ошибку, отказ принадлежит этой части. Нечитаемая
-     * разметка — тоже ошибка самой части.
-     */
     private boolean hasOwnDefect(InboundMessage message, TransferPart part, List<InboundMessage> parts) {
         return part.markup()
                 .map(markup -> failsOwnChecks(message, part, markup, parts))
@@ -108,10 +95,6 @@ public class PriceListTransferRejection implements RejectionScope {
         }
     }
 
-    /**
-     * Часть передачи, если в её теле читается идентификатор передачи. Нечитаемое тело или идентификатор — тоже
-     * окончательный отказ, но отнести его к передаче нельзя, и такая часть отклоняется одна.
-     */
     private Optional<TransferPart> partOf(InboundMessage message) {
         try {
             return envelope.dataOf(message)
@@ -124,10 +107,6 @@ public class PriceListTransferRejection implements RejectionScope {
 
     private record TransferPart(UUID cid, ObjectNode data) {
 
-        /**
-         * Разметка части, если она читается. Нечитаемый счётчик — ошибка самой части: передача находится по
-         * идентификатору, а разметка в часть не записывается.
-         */
         Optional<PriceListTransferMarkup> markup() {
             try {
                 return Optional.of(PriceListTransferMarkup.of(data));
@@ -137,16 +116,11 @@ public class PriceListTransferRejection implements RejectionScope {
             }
         }
 
-        /**
-         * Разметка, с которой часть записывается отклонённой. Если счётчики не читаются, часть всё равно записывается
-         * в свою передачу, но без счётчиков: так части, пришедшие позже, видят отказ передачи и разделяют его.
-         */
         PriceListTransferMarkup markupOrTransferOnly() {
             return markup().orElseGet(() -> new PriceListTransferMarkup(cid, null, 0));
         }
     }
 
-    /** Причина у отклонённой части и у остальных частей её передачи. */
     private record Reasons(String own, String others) {
     }
 }

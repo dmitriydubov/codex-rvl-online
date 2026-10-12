@@ -9,10 +9,6 @@ import ru.projectx.datareference.entity.AwaitedParent;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.mapper.ImportResult;
 
-/**
- * Защищает исход разбора сообщения 1С так, как его видит журнал прохода: текст после слов «сообщение такое-то потока
- * такого-то» и уровень записи. Отклонённое сообщение — предупреждение, остальные исходы — сведения.
- */
 class ImportOutcomeTest {
 
     private static final AwaitedParent CONTRACT =

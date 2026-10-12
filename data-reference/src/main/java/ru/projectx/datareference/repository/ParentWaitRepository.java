@@ -10,18 +10,9 @@ import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Сообщения 1С, которые ждут родителя: не дождавшиеся за срок и устаревшие из-за более нового сообщения той же записи.
- * Статус записан в запросах значением, а не параметром, чтобы PostgreSQL видел частичные индексы.
- */
 @Repository
 public interface ParentWaitRepository extends org.springframework.data.repository.Repository<InboundMessage, UUID> {
 
-    /**
-     * Сообщения, которые начали ждать не позже {@code deadline}, а их родитель так и не появился в справочнике и не
-     * признан не нашим, в порядке приёма. Сообщение, родитель которого уже есть, сюда не попадает, даже если срок
-     * вышел: его применит ближайший разбор.
-     */
     @Query("""
             select message
               from InboundMessage message
@@ -47,7 +38,6 @@ public interface ParentWaitRepository extends org.springframework.data.repositor
             """)
     List<InboundMessage> findExpiredUnresolved(@Param("deadline") Instant deadline, Limit limit);
 
-    /** Сообщения потока {@code stream} о записи {@code record}, принятые раньше {@code receivedBefore} и ждущие родителя. */
     @Query("""
             select message
               from InboundMessage message

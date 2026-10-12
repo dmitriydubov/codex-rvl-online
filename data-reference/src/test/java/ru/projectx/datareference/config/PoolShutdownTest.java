@@ -11,10 +11,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Незакрытый пул оставил бы соединения висеть на стороне базы до их собственного тайм-аута, поэтому при остановке
- * закрываются оба пула. Контекст свой, потому что после теста он непригоден.
- */
 @IntegrationTest
 @TestPropertySource(properties = "spring.application.name=data-reference-pool-shutdown")
 @DirtiesContext

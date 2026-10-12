@@ -12,7 +12,6 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.entity.OneCStream;
 
-/** Применённое сообщение 1С сбрасывает кэши своего потока целиком и не трогает остальные. */
 class ReferenceCacheEvictionTest {
 
     private static final String KEY = "ключ";

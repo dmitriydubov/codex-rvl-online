@@ -17,11 +17,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает поток контрагентов 1С:УСК, где санатории и страхователи различаются полем {@code thisIsLPU}. Санаторий
- * принимается только с видом деятельности РВЛ, а потерявший его становится архивным, а не удаляется. Страхователь
- * сохраняется без фильтра, но, как и чужой санаторий, запоминается как не наш, чтобы его договоры не ждали санатория.
- */
 @Component
 public class ContragentMapper implements StreamMapper {
 
@@ -69,10 +64,6 @@ public class ContragentMapper implements StreamMapper {
                 : applyInsurer(externalId, data);
     }
 
-    /**
-     * Заданный GUID вида РВЛ принимается только в канонической записи и ненулевым, иначе сервис не стартует: иначе все
-     * санатории молча уходили бы в пропуск. Пустая настройка значит, что GUID не задан.
-     */
     private static @Nullable UUID rvlActivityOf(OneCContractProperties contract) {
         return contract.rvlActivity()
                 .map(setting -> OneCGuid.parse(setting)
@@ -113,10 +104,6 @@ public class ContragentMapper implements StreamMapper {
         return lpu;
     }
 
-    /**
-     * Страхователь сохраняется, но исход называется пропуском: по исходу видно, появился ли санаторий. Иначе «санаториев
-     * не присылали» и «все оказались страхователями» выглядели бы в базе одинаково.
-     */
     private ImportResult applyInsurer(UUID externalId, ObjectNode data) {
         Insurer.Details details = insurerDetailsOf(data);
         Instant now = clock.instant();
@@ -151,10 +138,6 @@ public class ContragentMapper implements StreamMapper {
         return OneCValues.text(data, field).orElse(null);
     }
 
-    /**
-     * Поля, общие для санатория и страхователя, читаются в одном месте, чтобы правила реквизитов не разошлись.
-     * Кириллические имена полей — это ключи JSON из 1С.
-     */
     private record CommonFields(
             String name, @Nullable String fullName, @Nullable String inn, @Nullable String kpp, boolean deleteMark) {
 

@@ -7,7 +7,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Значение времени в записи PostgreSQL 16 («Numeric with Unit»): единицы us, ms, s, min, h, d; без единицы — ms. */
 class PostgresDurationsTest {
 
     @ParameterizedTest
@@ -25,7 +24,6 @@ class PostgresDurationsTest {
         assertThat(PostgresDurations.parse(value)).contains(expected);
     }
 
-    /** Регистр единицы значим, а записи, которые здесь не разбираются, — пусто, а не догадка. */
     @ParameterizedTest
     @ValueSource(strings = {"", "s", "5S", "5 sec", "1.5s", "-1s", "5m", "abc"})
     void unparsed_isEmpty(String value) {

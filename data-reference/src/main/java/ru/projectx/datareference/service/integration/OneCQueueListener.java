@@ -13,11 +13,6 @@ import ru.projectx.datareference.exception.OneCEnvelopeException;
 import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
-/**
- * Вход из брокера 1С:УСК: подтверждение уходит только после того, как приём зафиксирован в базе, иначе падение до
- * коммита теряло бы сообщение молча. Отказ записи разбирает {@link OneCStorageFailures}, а нечитаемый конверт
- * подтверждается и теряется. На время обработки в MDC лежат поток, очередь и {@code message-id}.
- */
 @Component
 public class OneCQueueListener {
 
@@ -37,7 +32,6 @@ public class OneCQueueListener {
         this.metrics = metrics;
     }
 
-    /** Принимает одно сообщение очереди потока {@code stream} и отвечает брокеру. */
     public void receive(OneCStream stream, Message message, Channel channel) throws IOException {
         OneCDelivery delivery = new OneCDelivery(stream, message, channel);
         MDC.put(OneCLogContext.STREAM, stream.name());
@@ -69,10 +63,6 @@ public class OneCQueueListener {
         }
     }
 
-    /**
-     * Подтверждение и счёт исхода стоят вне {@code try} намеренно: ни отказ канала на подтверждении, ни отказ
-     * счётчика — не отказ записи. Сырьё уже закоммичено, и повторная запись дала бы дубль, а не потерю.
-     */
     private void store(OneCDelivery delivery, UUID messageId) throws IOException {
         IngestOutcome outcome;
         try {
@@ -86,7 +76,6 @@ public class OneCQueueListener {
         delivery.acknowledge();
     }
 
-    /** Счёт исхода — снаружи, после записи: отказ счётчика не должен выглядеть отказом базы. */
     private IngestOutcome ingest(OneCDelivery delivery, UUID messageId) {
         if (ingestService.receive(messageId, delivery.stream(), delivery.queue(), delivery.payload())) {
             return IngestOutcome.STORED;
@@ -95,11 +84,6 @@ public class OneCQueueListener {
         return IngestOutcome.DUPLICATE;
     }
 
-    /**
-     * Сообщение без читаемого {@code message-id} подтверждается и теряется: возврат в очередь дал бы бесконечную
-     * передоставку, а придуманный ключ сломал бы дедупликацию. Единственный след — ERROR в журнале, без тела, потому
-     * что внутри может оказаться полис.
-     */
     private void dropUnidentifiable(OneCDelivery delivery, OneCEnvelopeException cause) throws IOException {
         metrics.record(delivery, IngestOutcome.UNIDENTIFIED);
         log.error("сообщение потока {} из очереди {} потеряно: {} ({} байт). "

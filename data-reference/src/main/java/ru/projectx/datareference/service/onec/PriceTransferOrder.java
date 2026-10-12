@@ -10,11 +10,6 @@ import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 
-/**
- * Порядок передач прайса по услуге: цены меняет только передача, финал которой принят не раньше финала применённой.
- * Методы первым делом блокируют строку услуги до конца транзакции вызывающего, поэтому сборка и закрытие зависших
- * передач решают за одну услугу по очереди и не применяют старую передачу поверх новой.
- */
 @Component
 public class PriceTransferOrder {
 
@@ -26,7 +21,6 @@ public class PriceTransferOrder {
         this.inbound = inbound;
     }
 
-    /** Замещает прайс, если по услуге не применена более новая передача; иначе пропуск с причиной. */
     ImportResult applyInOrder(UUID service, InboundMessage finalMessage, Supplier<ImportResult> replacement) {
         return lockApplied(service)
                 .filter(applied -> applied.isNewerThan(finalMessage.receipt().receivedAt()))
@@ -34,7 +28,6 @@ public class PriceTransferOrder {
                 .orElseGet(() -> replaceAndRemember(service, finalMessage, replacement));
     }
 
-    /** Последняя применённая передача по услуге; строка услуги заблокирована до конца транзакции вызывающего. */
     Optional<AppliedPriceTransfer> lockApplied(UUID service) {
         return finalizations.lockByService(service)
                 .map(finalization -> appliedBy(service, finalization.finalMessageId()));
@@ -50,7 +43,6 @@ public class PriceTransferOrder {
         return result;
     }
 
-    /** Пишет в базу мимо сущности, загруженной блокировкой: после этого её в транзакции не читают. */
     private void remember(UUID service, UUID finalMessageId) {
         finalizations.recordApplied(service, finalMessageId);
     }

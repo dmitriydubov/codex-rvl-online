@@ -27,11 +27,6 @@ import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Проверка зависших передач прайсов строки сырья не трогает, её единственный результат — предупреждение в журнале.
- * Поэтому журнал проверяется целиком, с текстом, по которому передачу ищут глазами: идентификатор, сколько она ждёт
- * и сколько частей пришло, без тел сообщений.
- */
 @ExtendWith(MockitoExtension.class)
 class StuckTransferAlertTest {
 
@@ -63,10 +58,6 @@ class StuckTransferAlertTest {
         logged.stop();
     }
 
-    /**
-     * Строка на все передачи, а не на каждую: у одной незавершённой передачи частей может быть десятки, и
-     * строка на каждую сделала бы журнал нечитаемым ровно тогда, когда его читают.
-     */
     @Test
     void stuckTransfers_areReportedWithAgeAndPartsInOneWarning() {
         when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(List.of(
@@ -82,7 +73,6 @@ class StuckTransferAlertTest {
         });
     }
 
-    /** Достигнут предел — строка говорит, что названы не все: иначе предел молча прятал бы остальные. */
     @Test
     void reportLimitReached_warningSaysOthersMayExist() {
         when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(List.of(
@@ -95,7 +85,6 @@ class StuckTransferAlertTest {
                 .endsWith("только источник. Названы 3 самых давних, зависших может быть больше");
     }
 
-    /** Зависших передач нет — молчание: пустой WARN по расписанию приучил бы его не читать. */
     @Test
     void noStuckTransfers_nothingIsLogged() {
         when(agedMessages.transfersBufferedLongerThan(THRESHOLD, REPORT_LIMIT)).thenReturn(List.of());
@@ -105,10 +94,6 @@ class StuckTransferAlertTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /**
-     * Передача, которую уже обогнала применённая по её услуге, закрывается и в предупреждение не попадает; остальные
-     * называются, как прежде. Список для предупреждения читается после закрытия.
-     */
     @Test
     void supersededTransfer_isClosed_andOnlyTheRestAreReported() {
         when(agedMessages.allTransfersBufferedLongerThan(THRESHOLD)).thenReturn(
@@ -125,10 +110,6 @@ class StuckTransferAlertTest {
                 .startsWith("передачи прайсов не собрались за PT1H30M: " + SECOND_TRANSFER + " (ждёт PT2H, частей 1).");
     }
 
-    /**
-     * Закрываются все зависшие передачи, а не только названные в предупреждении: иначе обогнанные передачи за пределом
-     * числа названных ждали бы, пока закроются более давние, и могли не закрыться никогда.
-     */
     @Test
     void transfersBeyondReportLimit_areClosedToo() {
         List<BufferedTransfer> beyondLimit = List.of(transfer(FIRST_TRANSFER, Duration.ofHours(9), 1),
@@ -154,10 +135,6 @@ class StuckTransferAlertTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /**
-     * Отказ базы при закрытии одной передачи не мешает остальным и предупреждению: передача остаётся в буфере, о ней
-     * предупреждают, а следующая проверка попробует закрыть её снова. В журнал — тип отказа и SQLSTATE, без текста.
-     */
     @Test
     void databaseFailureWhileClosing_isLogged_andTransferIsStillReported() {
         List<BufferedTransfer> stuck = List.of(
