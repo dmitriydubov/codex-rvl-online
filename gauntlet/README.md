@@ -78,8 +78,8 @@ gauntlet/
 
 **Монорепо.** Если в репозитории несколько независимых Gradle-сборок (у каждой свой `build.gradle` и
 `gradlew` в подкаталоге), в `config/gauntlet.properties` перечисляются охраняемые:
-`module=data-reference` (позже — `module=data-reference,contract-service`). Хуки запускают Gradle в каждом
-изменённом модуле, CI — во всех;
+`module=data-reference,contract-service`. Хуки запускают Gradle в каждом
+изменённом модуле, CI — в модулях, которых касается PR (все — когда менялись `gauntlet/` или `.github/`);
 `src/` и `build/` — каждого модуля, `gauntlet/` остаётся в корне, прочие модули не трогаются. Общие
 пороги — в `config/`, своё у модуля (`basePackage`, `acceptance.glue`, `exclude.classes`, архитектура) —
 в `config/<module>/` (`gauntlet.properties` дополняет общий, остальные файлы заменяют одноимённые);
