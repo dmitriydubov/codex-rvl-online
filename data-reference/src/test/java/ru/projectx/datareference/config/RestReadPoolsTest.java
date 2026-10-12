@@ -7,10 +7,6 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
-/**
- * Пул REST-чтений берёт у пула приложения адрес, учётные данные и общие свойства {@code spring.datasource.hikari.*},
- * а имя, размер и тайм-ауты у него свои. Пул приложения при этом не меняется.
- */
 class RestReadPoolsTest {
 
     private static final RestReadPoolProperties SETTINGS =
@@ -26,7 +22,6 @@ class RestReadPoolsTest {
         assertThat(restRead.getDriverClassName()).isEqualTo("org.postgresql.Driver");
     }
 
-    /** Драйвер найдётся по адресу, поэтому без явного драйвера у пула приложения его нет и у пула REST-чтений. */
     @Test
     void restReadPool_withoutDriverOfApplicationPool_leavesDriverUnset() {
         HikariDataSource application = new HikariDataSource();
@@ -71,7 +66,6 @@ class RestReadPoolsTest {
         assertThat(restRead.getSchema()).isEqualTo("public");
     }
 
-    /** Соединения пул откроет при первом REST-чтении, как и пул приложения. */
     @Test
     void restReadPool_isNotStartedYet() {
         HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
@@ -90,7 +84,6 @@ class RestReadPoolsTest {
         return application;
     }
 
-    /** Свойства пула приложения, как в {@code application.yml}, с собственными именем, размером и ожиданием. */
     private static MockEnvironment applicationPoolProperties() {
         return new MockEnvironment()
                 .withProperty("spring.datasource.hikari.pool-name", "application")

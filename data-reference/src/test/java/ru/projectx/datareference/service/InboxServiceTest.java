@@ -14,10 +14,6 @@ import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Дедупликация на настоящем PostgreSQL. Проверять её на моке репозитория бессмысленно:
- * половина поведения — в первичном ключе таблицы.
- */
 @IntegrationTest
 class InboxServiceTest {
 
@@ -56,10 +52,6 @@ class InboxServiceTest {
         assertThat(repository.count()).isEqualTo(1);
     }
 
-    /**
-     * Дубль не должен переписывать уже принятую строку: время первого приёма — то,
-     * по чему в разборе инцидента видно, когда сообщение пришло на самом деле.
-     */
     @Test
     void duplicateMessageId_keepsOriginalReceivedAt() {
         UUID messageId = UUID.randomUUID();
@@ -73,7 +65,6 @@ class InboxServiceTest {
                 .contains(firstReceipt);
     }
 
-    /** Время приёма берётся из бина {@link Clock}, а не из системных часов JVM, иначе тест не управлял бы им. */
     @Test
     void receivedAt_isTakenFromClock() {
         UUID messageId = UUID.randomUUID();

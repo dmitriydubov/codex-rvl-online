@@ -18,11 +18,6 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/**
- * Какие очереди 1С:УСК остались без потребителя: ожидаются очереди из настроек, контейнеры которых велено
- * запускать, а потребитель есть только у тех, чью подписку подтвердил брокер. Выключенные настройкой
- * слушатели и сервис без брокера потребителей не ждут — иначе стенд без брокера 1С был бы нездоров всегда.
- */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class OneCQueueConsumersTest {

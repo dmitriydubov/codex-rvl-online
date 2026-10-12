@@ -5,11 +5,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
-/**
- * Чтение таблиц шагов «Дано»: строка, которой шаг не знает, и логическое значение не из «true»/«false» — ошибка
- * сценария, а не молча пропущенное или ложное поле. Иначе опечатка в имени строки превращала бы сценарий в проверку
- * совсем других данных.
- */
 final class StepTables {
 
     private static final Set<String> FLAGS = Set.of("true", "false");
@@ -33,7 +28,6 @@ final class StepTables {
         return Boolean.parseBoolean(value);
     }
 
-    /** Логическое значение, которое сценарий может не называть: тогда действует {@code absent}. */
     static boolean flagOr(Map<String, String> table, String key, boolean absent) {
         return table.containsKey(key) ? flag(table, key) : absent;
     }

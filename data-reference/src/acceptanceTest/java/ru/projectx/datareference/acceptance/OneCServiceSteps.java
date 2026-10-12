@@ -4,10 +4,6 @@ import io.cucumber.java.ru.Дано;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Шаги «1С:УСК прислала услугу ЛПУ» и «1С:УСК прислала прайс услуги». Сырьё ложится так, как его сохранил бы приём
- * из очереди, а разбирает его шаг «Дата-референс разобрал присланные сообщения» штатным проходом.
- */
 public class OneCServiceSteps {
 
     private final OneCInbox inbox;

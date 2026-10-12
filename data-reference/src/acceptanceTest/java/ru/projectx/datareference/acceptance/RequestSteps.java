@@ -10,15 +10,9 @@ import java.time.Duration;
 import org.springframework.http.HttpMethod;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Запросы сервисов Договоров и Заявок и мониторинга. Потребители ходят одними шагами: без аутентификации между
- * сервисами они для Дата-референса неразличимы, а имя в сценарии говорит читателю, чья это ручка. Метод принимается
- * только стандартный, потому что опечатку сервис тоже отклонил бы с 405, и сценарий прошёл бы не на том запросе.
- */
 public class RequestSteps {
 
     private static final int OK = 200;
-    /** Запас на повторы потребителя, который ищет пропавшую очередь (три по 5 с), и на остановку его контейнера. */
     private static final Duration UNTIL_TIMEOUT = Duration.ofSeconds(45);
     private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
 
@@ -38,16 +32,11 @@ public class RequestSteps {
         contracts.request(path);
     }
 
-    /** Ручку здоровья читают Kubernetes и мониторинг — на порту актуатора, а не на порту API соседей. */
     @Когда("мониторинг запрашивает {string}")
     public void monitoringRequests(String path) {
         contracts.monitor(path);
     }
 
-    /**
-     * Повторяет запрос, пока строковое поле ответа не примет ожидаемое значение: так ждут изменения, которое сервис
-     * замечает не сразу. Дальше шаги проверяют последний ответ.
-     */
     @Когда("мониторинг запрашивает {string}, пока поле {string} ответа не станет равно {string}")
     public void monitoringRequestsUntil(String path, String field, String expected) {
         await().atMost(UNTIL_TIMEOUT).pollInterval(POLL_INTERVAL)

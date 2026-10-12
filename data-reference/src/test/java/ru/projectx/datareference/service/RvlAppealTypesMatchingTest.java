@@ -19,17 +19,11 @@ import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.repository.AppealTypeRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Виды обращения РВЛ находятся по наименованиям из конфигурации без учёта регистра и краевых пробелов, а ненайденные
- * называются поимённо в журнале на старте. Отбор по наименованию хрупок: лишний пробел или другая буква в 1С молча
- * обнулили бы перечень программы и услуги, и без предупреждения этого никто бы не заметил.
- */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class RvlAppealTypesMatchingTest {
 
     private static final UUID SKL = UUID.fromString("a0000000-0000-4000-8000-000000000001");
     private static final UUID RUSSIA = UUID.fromString("a0000000-0000-4000-8000-000000000002");
-    /** Нормализованные наименования — то, что уходит в запрос репозитория. */
     private static final Set<String> NORMALIZED = Set.of("рвл и скл", "рвл в россии");
 
     @Mock

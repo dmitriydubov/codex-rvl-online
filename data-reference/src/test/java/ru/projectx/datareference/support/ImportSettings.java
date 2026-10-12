@@ -3,11 +3,6 @@ package ru.projectx.datareference.support;
 import java.time.Duration;
 import ru.projectx.datareference.config.ImportProperties;
 
-/**
- * Настройки задач по расписанию для unit-тестов: умолчания сервиса, из которых тест меняет только то, что
- * проверяет. Так тест не перечисляет все значения по порядку и не ломается, когда настроек становится
- * больше.
- */
 public final class ImportSettings {
 
     private Duration pollInterval = Duration.ofSeconds(10);

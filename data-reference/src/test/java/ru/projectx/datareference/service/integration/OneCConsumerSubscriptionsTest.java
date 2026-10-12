@@ -13,11 +13,6 @@ import org.springframework.amqp.rabbit.listener.AsyncConsumerStoppedEvent;
 import org.springframework.amqp.rabbit.listener.BlockingQueueConsumer;
 import org.springframework.amqp.rabbit.listener.ConsumeOkEvent;
 
-/**
- * Подписка потребителя на очередь 1С:УСК считается по подтверждению брокера, а снимается, когда этот же
- * потребитель остановлен или заменён после сбоя. Запоздалое известие об остановке прежнего потребителя не
- * снимает подписку нового: иначе очередь с работающим потребителем навсегда числилась бы без него.
- */
 class OneCConsumerSubscriptionsTest {
 
     private static final String POLICIES = "1c-usk_to_rvl-online_policies";
@@ -39,11 +34,6 @@ class OneCConsumerSubscriptionsTest {
         assertThat(subscriptions.subscribed(MKB10)).isFalse();
     }
 
-    /**
-     * Остановленный потребитель закрывает свой канал. Если известие об остановке не пришло (контейнер остановили, пока
-     * потребитель перезапускался) или подтверждение подписки пришло уже после него, закрытый канал всё равно не
-     * считается подпиской.
-     */
     @Test
     void subscriptionOnClosedChannel_isNotSubscribedWithoutAnyStopEvent() {
         Channel channel = openChannel();

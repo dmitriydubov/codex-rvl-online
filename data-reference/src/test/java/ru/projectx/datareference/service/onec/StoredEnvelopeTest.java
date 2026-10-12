@@ -22,11 +22,6 @@ import tools.jackson.core.exc.StreamConstraintsException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Защищает единое чтение поля {@code data} из сохранённого конверта: стёртое тело даёт пустой результат, а конверт без
- * {@code data} и нечитаемое тело считаются нарушением контракта без цитаты тела. Число читается такой длины, какую
- * хранит {@code numeric} PostgreSQL, а общий маппер REST и очереди свой предел длины числа сохраняет.
- */
 class StoredEnvelopeTest {
 
     private static final String LONGEST_STORED_NUMBER = "9".repeat(131_072) + "." + "9".repeat(16_383);
@@ -78,7 +73,6 @@ class StoredEnvelopeTest {
                         .isEqualTo(147_455));
     }
 
-    /** Граница предела — на целом числе: длина целого считается разбором точно, цифра в цифру. */
     @Test
     void integerAtNumberLengthLimit_isRead() {
         assertThat(serviceEnvelope.dataOf(message(envelopeOf("{\"price\":" + "9".repeat(147_455) + "}"))))
@@ -107,11 +101,6 @@ class StoredEnvelopeTest {
                 .isInstanceOf(StreamConstraintsException.class);
     }
 
-    /**
-     * Скорость чтения длинных чисел: пакет прайса из ста строк, где цена, цена со скидкой и незнакомое поле — числа самой
-     * большой длины, какую хранит база. Все триста чисел читаются за секунды. Сколько чисел может прийти в одном
-     * сообщении, этот тест не ограничивает.
-     */
     @Test
     void messageFullOfLongestNumbers_isReadFast() {
         String row = "{\"price\":%1$s,\"priceWithDiscount\":%1$s,\"unknown\":%1$s}".formatted(LONGEST_STORED_NUMBER);

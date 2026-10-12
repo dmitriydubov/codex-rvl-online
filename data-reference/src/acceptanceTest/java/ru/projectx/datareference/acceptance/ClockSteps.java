@@ -8,10 +8,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-/**
- * Шаги часов контура: остановить часы сервиса на моменте по Москве и сдвигать их. Перед каждым сценарием часы
- * снова идут как системные: сценарии, которые часов не касаются, живут в настоящем времени.
- */
 public class ClockSteps {
 
     private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");

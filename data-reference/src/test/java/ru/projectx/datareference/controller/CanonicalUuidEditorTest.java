@@ -8,10 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * REST принимает UUID только в канонической записи 8-4-4-4-12: стандартное чтение превращает «1-2-3-4-5»
- * в существующий GUID, и сервис отдал бы чужую запись вместо отказа.
- */
 class CanonicalUuidEditorTest {
 
     private static final UUID CONTRACT = UUID.fromString("77ff17b5-e659-4720-b57f-e8a19c00fcea");
@@ -41,7 +37,6 @@ class CanonicalUuidEditorTest {
         assertThatIllegalArgumentException().isThrownBy(() -> editor.setAsText(text));
     }
 
-    /** Текст отказа может попасть в журнал, поэтому присланное значение в нём не повторяется. */
     @Test
     void rejection_doesNotRepeatTheValue() {
         assertThatIllegalArgumentException()
@@ -49,10 +44,6 @@ class CanonicalUuidEditorTest {
                 .withMessageNotContaining("1-2-3-4-5");
     }
 
-    /**
-     * Пустое значение означает «параметра нет», а не «параметр нечитаем», как и при стандартном чтении.
-     * Тогда обработчик отвечает 400 с текстом про обязательный параметр.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
     void blankValue_isNoValue(String text) {

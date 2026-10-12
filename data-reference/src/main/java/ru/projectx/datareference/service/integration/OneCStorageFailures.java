@@ -8,11 +8,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.service.QuarantineService;
 
-/**
- * Что делать с сообщением 1С:УСК, сырьё которого база не записала: отравленное тело — в карантин, столкновение двух
- * доставок — возврат в очередь после паузы, остальное — пауза потребителей. В журнал идут тип и SQLSTATE, но не текст
- * ошибки: он печатает параметры запроса, а этим путём проходят полисы.
- */
 @Component
 class OneCStorageFailures {
 
@@ -32,7 +27,6 @@ class OneCStorageFailures {
         this.metrics = metrics;
     }
 
-    /** Отвечает брокеру за сообщение, сырьё которого не записалось из-за {@code failure}. */
     void handle(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
         switch (OneCStorageFailure.of(failure)) {
             case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
@@ -41,11 +35,6 @@ class OneCStorageFailures {
         }
     }
 
-    /**
-     * Карантин — тоже запись в базу, и она тоже может не удаться: тогда это уже отказ хранилища, а не отравленное
-     * тело (колонка bytea принимает любое тело), и потребители встают на паузу. Повторная доставка уже карантинного
-     * сообщения второй записи не создаёт и просто подтверждается.
-     */
     private void quarantine(OneCDelivery delivery, UUID messageId, String sqlState) throws IOException {
         if (storeInQuarantine(delivery, messageId, sqlState)) {
             metrics.record(delivery, IngestOutcome.QUARANTINED);
@@ -53,7 +42,6 @@ class OneCStorageFailures {
         }
     }
 
-    /** {@code true} — сообщение в карантине (записано сейчас или раньше), можно подтверждать; {@code false} — пауза. */
     private boolean storeInQuarantine(OneCDelivery delivery, UUID messageId, String sqlState) {
         try {
             reportQuarantined(quarantine.quarantine(delivery.rejected(messageId), sqlState), delivery, messageId, sqlState);
@@ -64,11 +52,6 @@ class OneCStorageFailures {
         }
     }
 
-    /**
-     * Две доставки одного отравленного сообщения могут писать карантин одновременно: обе не нашли записи, вторая
-     * упала на ключе (23505). Запись уже есть — первая доставка её закоммитила, иначе ключ не столкнулся бы, — и
-     * второй достаточно подтверждения. Любой другой отказ записи карантина — отказ хранилища.
-     */
     private boolean quarantinedByConcurrentDelivery(
             OneCDelivery delivery, UUID messageId, RuntimeException storageFailure) {
 
@@ -95,17 +78,12 @@ class OneCStorageFailures {
         delivery.returnToQueue();
     }
 
-    /** Сообщение остаётся неподтверждённым намеренно: в очередь его вернёт остановка контейнера. */
     private void pauseConsumers(OneCDelivery delivery, UUID messageId, StorageOutage outage) {
         metrics.record(delivery, IngestOutcome.STORAGE_OUTAGE);
         log.warn("сырьё сообщения {} не сохранено: {} SQLSTATE {}", messageId, outage.failureType(), outage.sqlState());
         consumers.pause(outage);
     }
 
-    /**
-     * Держит паузу перед возвратом сообщения. Прерывание — это остановка контейнера:
-     * флаг восстанавливаем и возвращаем сообщение сразу, канал ещё открыт.
-     */
     private void pauseBeforeRedelivery() {
         try {
             Thread.sleep(properties.duplicateDeliveryBackoff());

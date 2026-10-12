@@ -9,10 +9,6 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Строка программы полиса хранит значения табличной части как пришли: период, страховые суммы и премии по обеим
- * частям и лимит на лечение. Ничего не пересчитывается и не подставляется по умолчанию.
- */
 class PolicyProgramTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");

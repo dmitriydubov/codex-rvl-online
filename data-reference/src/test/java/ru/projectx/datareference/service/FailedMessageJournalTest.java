@@ -32,11 +32,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Окончательный отказ сообщения 1С:УСК пишется в журнал записью ERROR: по ней дежурный узнаёт, что сообщение больше
- * не повторят и его нужно разобрать вручную. В записи только идентификаторы и коды (message-id, поток, номер попытки,
- * тип ошибки, SQLSTATE), без текста из строки сырья, потому что журнал уходит из сервиса целиком.
- */
 @ExtendWith(MockitoExtension.class)
 class FailedMessageJournalTest {
 
@@ -80,7 +75,6 @@ class FailedMessageJournalTest {
         });
     }
 
-    /** Номер попытки считает и временные отказы перед окончательным: вторая попытка — «на попытке 2». */
     @Test
     void permanentFailureAfterTemporaryOne_namesTheAttemptThatFailed() {
         existing().markRetrying(LOCK_TIMEOUT.reason(), NOW);
@@ -116,10 +110,6 @@ class FailedMessageJournalTest {
         assertThat(logged.list).noneMatch(event -> event.getLevel() == Level.ERROR);
     }
 
-    /**
-     * В транзакции запись ждёт её фиксации: если отказ не зафиксировался, сообщение разберут снова, и журнал не
-     * должен говорить, что оно отклонено.
-     */
     @Test
     void permanentFailureInTransaction_isReportedOnlyAfterCommit() {
         existing();
@@ -137,7 +127,6 @@ class FailedMessageJournalTest {
         }
     }
 
-    /** Откат транзакции значит, что отказ не записан: сообщение разберут снова, и записи ERROR быть не должно. */
     @Test
     void permanentFailureInRolledBackTransaction_isNotReported() {
         existing();
@@ -155,7 +144,6 @@ class FailedMessageJournalTest {
         }
     }
 
-    /** Исход строки сейчас: попытка откатилась, и строка такая же, как до неё. */
     private InboundOutcome unchanged() {
         return repository.findById(MESSAGE_ID).orElseThrow().outcome();
     }

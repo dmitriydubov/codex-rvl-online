@@ -24,11 +24,6 @@ import ru.projectx.datareference.support.IntegrationTest;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает отбор договоров страхования: обмен с 1С:УСК присылает договоры всех продуктов страховщика, а до таблицы
- * доходят только договоры добровольного медицинского страхования (ДМС). Даты здесь приходят моментом без смещения,
- * и календарный день должен сохраниться как написан. Номер договора и идентификаторы сторон вымышленные.
- */
 @IntegrationTest
 class InsuranceContractImportTest {
 
@@ -75,10 +70,6 @@ class InsuranceContractImportTest {
         assertThat(stored.isArchive()).isFalse();
     }
 
-    /**
-     * Даты приходят моментом без смещения, и календарный день берётся как написан. Конец дня
-     * 23:59:59 остаётся тем же днём и не переезжает на следующий.
-     */
     @Test
     void datesWithoutOffset_keepTheirCalendarDay() {
         importOne(contract(DMS, insurerParty()));
@@ -88,7 +79,6 @@ class InsuranceContractImportTest {
         assertThat(stored.endDate()).isEqualTo(LocalDate.of(2027, 5, 6));
     }
 
-    /** Обмен присылает договоры всех продуктов страховщика, и договоры не по ДМС до таблицы не доходят. */
     @Test
     void contractOfAnotherProduct_isSkipped() {
         ImportOutcome result = importOne(contract("Обязательное страхование", insurerParty()));
@@ -99,10 +89,6 @@ class InsuranceContractImportTest {
         assertThat(repository.count()).isZero();
     }
 
-    /**
-     * Сторон в договоре несколько, и брать первую попавшуюся нельзя: застрахованный и страхователь
-     * бывают разными лицами. Страхователь выбирается по его роли в договоре.
-     */
     @Test
     void insurer_isPickedByRoleAmongSeveralParties() {
         importOne(contract(DMS, party(INSURED_ID, "Застрахованный") + "," + insurerParty()));
@@ -111,10 +97,6 @@ class InsuranceContractImportTest {
                 .isEqualTo(INSURER_ID);
     }
 
-    /**
-     * Если ни у одной стороны договора нет роли «Страхователь», договор всё равно сохраняется,
-     * только без страхователя.
-     */
     @Test
     void contractWithoutInsurerRole_isStoredWithoutInsurer() {
         importOne(contract(DMS, party(INSURED_ID, "Застрахованный")));
@@ -122,10 +104,6 @@ class InsuranceContractImportTest {
         assertThat(repository.findByExternalId(CONTRACT_ID).orElseThrow().externalInsurerId()).isNull();
     }
 
-    /**
-     * В этом обмене признак {@code notActive} значит то же, что {@code deleteMark} в остальных:
-     * договор уходит в архив.
-     */
     @Test
     void notActiveContract_isArchived() {
         importOne(contract(DMS, insurerParty()).replace("\"notActive\":false", "\"notActive\":true"));
@@ -133,11 +111,6 @@ class InsuranceContractImportTest {
         assertThat(repository.findByExternalId(CONTRACT_ID).orElseThrow().isArchive()).isTrue();
     }
 
-    /**
-     * Без настроенного типа продукта ДМС нечем отличить от других продуктов, и договор пропускается, чтобы не завести
-     * у себя чужие, например еОСАГО. Маппер собран вручную: менять конфигурацию общего контекста ради одного теста
-     * значило бы поднимать второй контекст на весь прогон.
-     */
     @Test
     void productTypeNotConfigured_isSkipped() {
         InsuranceContractMapper withoutDms = new InsuranceContractMapper(
@@ -163,11 +136,6 @@ class InsuranceContractImportTest {
         return (ObjectNode) json.readTree(data);
     }
 
-    /**
-     * Пример сообщения о договоре страхования из обмена с 1С:УСК, сокращённый до полей, которые читает
-     * маппер. Код продукта маппер не читает: он оставлен, чтобы сообщение было похоже на настоящее.
-     * Значения вымышленные.
-     */
     private static String contract(String productType, String parties) {
         return """
                 {"contractId":"%s","number":"%s","productType":"%s",\

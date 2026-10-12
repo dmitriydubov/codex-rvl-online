@@ -13,10 +13,6 @@ import org.springframework.scheduling.config.IntervalTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import ru.projectx.datareference.config.IngestProperties;
 
-/**
- * Проверка базы во время паузы приёма регистрируется одной задачей с паузой между проходами из настроек приёма:
- * проверка, повисшая на ожидании блокировки, не должна накладываться на следующую.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCConsumerPauseScheduleTest {
 

@@ -26,10 +26,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает чтение перечня учреждений страховой программы. Строка остаётся, только если санаторий есть в справочнике
- * и указан тип покрытия; отброшенные строки считаются по причинам порознь, потому что лечатся причины по-разному.
- */
 class AvailableLpuReaderTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -96,7 +92,6 @@ class AvailableLpuReaderTest {
         assertThat(row.endDate()).isNull();
     }
 
-    /** Ноль сооплаты и false прямого прикрепления — присланные значения, а не отсутствие полей. */
     @Test
     void zeroCopaymentAndIndirectAttachment_areReadAsSent() {
         ObjectNode data = program(row(SANATORIUM, "r")
@@ -123,7 +118,6 @@ class AvailableLpuReaderTest {
                 .hasMessage("нет обязательного поля " + field);
     }
 
-    /** Строки, которые и так не сохраняются, условия не проверяют: их условия никому не уходят. */
     @ParameterizedTest
     @ValueSource(strings = {"numberLayer", "directAttachment", "percentCopayment"})
     void droppedRowWithoutRequiredTerm_isOnlyCounted(String field) {
@@ -139,7 +133,6 @@ class AvailableLpuReaderTest {
         assertThat(read.withoutCoverage()).isEqualTo(1);
     }
 
-    /** Тип покрытия у строки ровно один, поэтому строка с обеими частями считается строкой без типа. */
     @Test
     void rowWithRiskAndDeposit_isDroppedAsRowWithoutCoverage() {
         ObjectNode both = row(SANATORIUM, "r").put("d", true);
@@ -178,7 +171,6 @@ class AvailableLpuReaderTest {
         assertThat(row.percentCopayment()).isEqualByComparingTo("100");
     }
 
-    /** Пределы, как и наличие условий, проверяются только у строк, которые будут сохранены. */
     @Test
     void droppedRowWithTermOutOfRange_isOnlyCounted() {
         ObjectNode stranger = row(STRANGER, "r").put("numberLayer", -1);

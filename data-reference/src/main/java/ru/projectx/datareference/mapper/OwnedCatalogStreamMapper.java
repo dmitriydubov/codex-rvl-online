@@ -10,11 +10,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбор потока, записи которого принадлежат другой записи справочника, как договор санаторию. Владелец передаётся
- * и при обновлении, потому что привязка может смениться. Пропущенная запись запоминается как не наша, чтобы её
- * собственные записи пропускались сразу, а не ждали её.
- */
 abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, OwnedCatalogStreamMapper.Owned<P, D>> {
 
     private static final String RECORD_ID = "id";
@@ -22,7 +17,6 @@ abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, 
     private final ParentKind kind;
     private final CatalogReferences references;
 
-    /** @param kind вид записей потока, каким его называют записи, которые на них ссылаются */
     OwnedCatalogStreamMapper(OneCStream stream, Function<UUID, Optional<E>> finder, Creation<E, P, D> creation,
                              Refresh<E, P, D> refresh, Consumer<E> store, Clock clock, ParentKind kind,
                              CatalogReferences references) {
@@ -46,7 +40,6 @@ abstract class OwnedCatalogStreamMapper<E, P, D> extends CatalogStreamMapper<E, 
 
     protected abstract ImportResult decide(ObjectNode data);
 
-    /** Единственный путь сохранения для наследника, чтобы владелец и реквизиты всегда приходили вместе. */
     protected final ImportResult upsertUnder(P owner, UUID externalId, D details) {
         return upsert(externalId, new Owned<>(owner, details));
     }

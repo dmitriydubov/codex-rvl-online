@@ -7,10 +7,6 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Отметка, что сообщение с таким {@code message-id} уже принималось: таблица нужна только для дедупликации.
- * Тело хранит {@code inbound_message}, а ключом служит сам GUID сообщения из 1С без суррогатного идентификатора.
- */
 @Entity
 @Table(name = "inbox")
 public class InboxEntry {
@@ -23,7 +19,6 @@ public class InboxEntry {
     private Instant receivedAt;
 
     protected InboxEntry() {
-        // JPA
     }
 
     private InboxEntry(UUID messageId, Instant receivedAt) {

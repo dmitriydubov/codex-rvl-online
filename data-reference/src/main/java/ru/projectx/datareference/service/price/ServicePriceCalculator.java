@@ -10,14 +10,8 @@ import java.util.stream.Stream;
 import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
 
-/**
- * Считает стоимость услуги за период по границам строк прайса, а не по суткам. Две строки на одни сутки дают отказ
- * с перечнем строк, потому что выбирать наугад нельзя, и этот отказ важнее отказа за непокрытые сутки. Частичная
- * сумма не отдаётся: она хуже честного отказа.
- */
 public final class ServicePriceCalculator {
 
-    /** Порядок конфликтующих строк в отказе: по началу срока, при равном начале — бессрочная последней. */
     private static final Comparator<PriceLine> BY_VALIDITY = Comparator.comparing(PriceLine::validFrom)
             .thenComparing(PriceLine::validTo, Comparator.nullsLast(Comparator.naturalOrder()));
 
@@ -27,7 +21,6 @@ public final class ServicePriceCalculator {
     private ServicePriceCalculator() {
     }
 
-    /** Строки, которые на период не приходятся, пропускаются. */
     public static PriceBreakdown calculate(UUID serviceId, StayPeriod period, List<PriceLine> lines) {
         List<PriceSegment> segments = lines.stream()
                 .map(line -> segmentWithin(period, line))
@@ -45,7 +38,6 @@ public final class ServicePriceCalculator {
         return from.isBefore(to) ? Optional.of(new PriceSegment(from, to, line)) : Optional.empty();
     }
 
-    /** Строка действует по {@code validTo} включительно, поэтому её последняя ночь кончается на следующий день. */
     private static LocalDate endWithin(StayPeriod period, PriceLine line) {
         return Optional.ofNullable(line.validTo())
                 .map(lastDay -> lastDay.plusDays(1))
@@ -65,7 +57,6 @@ public final class ServicePriceCalculator {
         }
     }
 
-    /** Отрезок пересекается сам с собой, поэтому пересечение с другим — это больше одного совпадения. */
     private static boolean overlapsAnother(List<PriceSegment> segments, PriceSegment segment) {
         return segments.stream().filter(other -> intersect(other, segment)).count() > 1;
     }
@@ -74,7 +65,6 @@ public final class ServicePriceCalculator {
         return first.from().isBefore(second.to()) && second.from().isBefore(first.to());
     }
 
-    /** Отрезки здесь уже не пересекаются и упорядочены, поэтому пробел ищется между соседями и по краям периода. */
     private static void requireNoGap(UUID serviceId, StayPeriod period, List<PriceSegment> segments) {
         List<LocalDate> gapStarts = Stream.concat(Stream.of(period.checkIn()), segments.stream().map(PriceSegment::to))
                 .toList();

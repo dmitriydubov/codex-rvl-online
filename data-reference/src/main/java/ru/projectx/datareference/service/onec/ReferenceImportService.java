@@ -19,11 +19,6 @@ import ru.projectx.datareference.service.OneCMessageApplied;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбор одного сообщения 1С: достаёт {@code data} из сохранённого конверта и отдаёт его обработчику потока.
- * Изменения справочника и статус строки сырья фиксируются одной транзакцией, иначе сообщение применится дважды или
- * потеряется. Отказ уходит к планировщику разбора, потому что записать его можно только после отката.
- */
 @Service
 public class ReferenceImportService {
 
@@ -32,11 +27,6 @@ public class ReferenceImportService {
     private final StoredEnvelope envelope;
     private final ApplicationEventPublisher events;
 
-    /**
-     * @param mappers           мапперы потоков с обычным путём: каждый становится обработчиком своего потока
-     * @param dedicatedHandlers обработчики потоков с особым путём, например прайс-листов
-     * @throws IllegalStateException если у одного потока оказалось два обработчика
-     */
     public ReferenceImportService(
             List<StreamMapper> mappers,
             List<StreamHandler> dedicatedHandlers,
@@ -55,12 +45,6 @@ public class ReferenceImportService {
         this.events = events;
     }
 
-    /**
-     * Сообщение, которое могло изменить справочник, публикует {@link OneCMessageApplied}: по нему после фиксации
-     * сбрасываются кэши потока. Отказ и ожидание родителя справочник не меняют и события не публикуют.
-     *
-     * @throws OneCFieldException если сообщение не соответствует контракту; повторять такую ошибку бессмысленно
-     */
     @Transactional
     public ImportOutcome importMessage(InboundMessage message) {
         ObjectNode data = dataOf(message);
@@ -78,10 +62,6 @@ public class ReferenceImportService {
         return Optional.ofNullable(handlers.get(stream));
     }
 
-    /**
-     * Поток без обработчика даёт пропуск, а не отказ, потому что потоки подключаются постепенно. Когда маппер
-     * появится, строку разбирают заново, вернув ей статус {@code NEW}, пока её тело не стёрто по сроку хранения.
-     */
     private ImportOutcome skipWithoutHandler(InboundMessage message) {
         InboundReceipt receipt = message.receipt();
         String reason = "маппера для потока " + receipt.stream() + " ещё нет";
@@ -89,10 +69,6 @@ public class ReferenceImportService {
         return ImportOutcome.skipped(reason);
     }
 
-    /**
-     * Стёртое тело — строка, у которой вышел срок хранения. Повторить её нечем: недостающее может прислать только
-     * источник.
-     */
     private ObjectNode dataOf(InboundMessage message) {
         return envelope.dataOf(message).orElseThrow(
                 () -> new OneCFieldException("тело сообщения стёрто по сроку хранения, разбирать нечего"));

@@ -13,12 +13,6 @@ import java.time.Duration;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 
-/**
- * Шаги о счётчиках в выдаче {@code /actuator/prometheus} на порту мониторинга: так их видит Prometheus контура.
- *
- * <p>Счётчики общие на весь прогон приёмки, поэтому шаг сравнивает значение ряда с тем, что было перед сценарием, а
- * не с нулём. Выдача перед сценарием снимается тем же запросом, что и в шаге.
- */
 public class PrometheusSteps {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -52,7 +46,6 @@ public class PrometheusSteps {
         return response.body();
     }
 
-    /** Значение ряда с меткой {@code stream}; ряда нет — ноль. Другие метки ряда шаг не сравнивает. */
     private static double valueOf(String exposition, String name, String stream) {
         Pattern series = Pattern.compile("^" + Pattern.quote(name) + "\\{[^}]*stream=\"" + Pattern.quote(stream)
                 + "\"[^}]*} (\\S+)$", Pattern.MULTILINE);

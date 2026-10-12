@@ -10,11 +10,6 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionSystemException;
 
-/**
- * Судьба сообщения после отказа записи решается по коду SQLSTATE самого глубокого исключения JDBC. Постоянный
- * отказ — только класс 22 (тело, которое база не принимает); гонка доставок — 23505; всё прочее, включая
- * неизвестный код и отказ без кода, — временный отказ хранилища, после которого потребители ждут базу.
- */
 class OneCStorageFailureTest {
 
     private static final String TEXT = "отказ";
@@ -32,7 +27,6 @@ class OneCStorageFailureTest {
         assertThat(OneCStorageFailure.of(withSqlState("23505"))).isEqualTo(new OneCStorageFailure.DuplicateRace());
     }
 
-    /** Другие нарушения ограничений — не гонка: 23502 и 23514 говорят об ошибке схемы или кода, повтор их не лечит. */
     @ParameterizedTest
     @ValueSource(strings = {"08001", "08006", "08003", "55P03", "57014", "57P01", "53300", "23502", "23514", "XX000", "2"})
     void connectionLockTimeoutAndUnknownCodes_areOutageWithCodeAndType(String sqlState) {
@@ -50,7 +44,6 @@ class OneCStorageFailureTest {
                 new StorageOutage("нет", TransactionSystemException.class.getName())));
     }
 
-    /** Код берётся у самого глубокого исключения JDBC: внешнее 23505 поверх внутреннего 22P05 — отравленное тело. */
     @Test
     void deepestSqlStateWins() {
         var nested = new DataAccessResourceFailureException(TEXT,
@@ -59,7 +52,6 @@ class OneCStorageFailureTest {
         assertThat(OneCStorageFailure.of(nested)).isEqualTo(new OneCStorageFailure.Poison("22P05"));
     }
 
-    /** Отказ записи карантина читается как отказ хранилища, каким бы ни был его код: тело bytea принимает любое. */
     @Test
     void anyFailure_readsAsOutageWithItsCodeAndType() {
         assertThat(OneCStorageFailure.Outage.of(withSqlState("22P05")))

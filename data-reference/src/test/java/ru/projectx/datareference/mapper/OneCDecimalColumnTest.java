@@ -14,10 +14,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает предел целой части денег: значение, которое не поместится в колонку, отклоняется при разборе
- * с именем поля, а не отказом базы, где поля не видно. JSON читается настройкой сервиса, от неё зависит экспонента.
- */
 class OneCDecimalColumnTest {
 
     private static final ObjectMapper JSON = OneCJson.mapper();
@@ -37,7 +33,6 @@ class OneCDecimalColumnTest {
                 .hasMessage(TOO_LARGE_PRICE);
     }
 
-    /** Знаки после запятой проверяются первыми: у значения с обоими нарушениями причина — знаки. */
     @Test
     void valueBreakingBothRules_isReportedByScale() {
         assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "10000000000000.001"), "price"))
@@ -45,7 +40,6 @@ class OneCDecimalColumnTest {
                 .hasMessage("поле price содержит больше двух знаков после запятой");
     }
 
-    /** У самой границы {@code int} число цифр целой части не переполняется, и значение не проскакивает проверку. */
     @Test
     void exponentAtIntLimit_isRejected() {
         assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "1e2147483647"), "price"))
@@ -53,10 +47,6 @@ class OneCDecimalColumnTest {
                 .hasMessage(TOO_LARGE_PRICE);
     }
 
-    /**
-     * Число с огромным порядком нельзя разворачивать в цифры: миллиард нулей занял бы память и время.
-     * Проверка сравнивает только длину целой части.
-     */
     @Test
     void hugeExponent_isRejectedWithoutExpandingDigits() {
         ObjectNode data = node("price", "1e999999999");
@@ -64,10 +54,6 @@ class OneCDecimalColumnTest {
                 () -> OneCDecimalColumn.amount(data, "price")).isInstanceOf(OneCFieldException.class));
     }
 
-    /**
-     * Самое длинное число, которое база может вернуть из сырья. Нули дроби не снимаются по одному, а значение
-     * не разбирается заново из текста, поэтому отказ занимает доли секунды, а не десятки секунд.
-     */
     @Test
     void longestStoredNumber_isRejectedQuickly() {
         ObjectNode data = JSON.createObjectNode()
@@ -78,7 +64,6 @@ class OneCDecimalColumnTest {
                 .hasMessage(TOO_LARGE_PRICE));
     }
 
-    /** Диапазон сооплаты строже колонки процента, поэтому причина одна для всех значений больше 100 или меньше 0. */
     @ParameterizedTest
     @ValueSource(strings = {"1E+3", "1e999999999", "-1e999999999"})
     void requiredPercentFarBeyondColumn_isRejectedByRange(String sent) {
@@ -87,7 +72,6 @@ class OneCDecimalColumnTest {
                 .hasMessage("поле percentCopayment вне диапазона от 0 до 100");
     }
 
-    /** Сырьё хранится в {@code jsonb}, и база отдаёт {@code 1e500} цифрами, без порядка. */
     @Test
     void longPlainNumberFromStoredPayload_isRejected() {
         assertThatThrownBy(() -> OneCDecimalColumn.amount(node("price", "1" + "0".repeat(500)), "price"))

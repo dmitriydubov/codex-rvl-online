@@ -7,10 +7,6 @@ import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.entity.Lpu;
 
-/**
- * Собирает карточку лечебного учреждения (ЛПУ) с прайсовым договором. Подменить ответ по одному учреждению нечем,
- * поэтому неоднозначный договор даёт 409, а отсутствующий 422. Кэшируется по сегодняшнему дню и учреждению.
- */
 @Service
 public class LpuCardService implements LpuCardReads {
 

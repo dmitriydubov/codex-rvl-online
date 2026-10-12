@@ -9,10 +9,6 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
 
-/**
- * Полис для сервиса Договоров, выбранный из базы строкой без персональных данных, чтобы они не попали ни в ответ,
- * ни в память сервиса. Кэша нет: Договоры читают полис в момент выпуска, и важна свежесть.
- */
 @Service
 @RestReadTransaction
 public class PolicyContractViewService implements PolicyContractViews {

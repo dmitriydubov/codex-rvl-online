@@ -10,10 +10,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Услуга, которую санаторий оказывает по договору; к ней привязан прейскурант. Вид обращения хранится GUID'ом
- * источника, чтобы услуга не пропадала из-за справочника, который ещё не пришёл.
- */
 @Entity
 @Table(name = "contragent_services")
 public class ContragentService extends OneCEntity {
@@ -33,14 +29,12 @@ public class ContragentService extends OneCEntity {
     private String name;
 
     protected ContragentService() {
-        // JPA
     }
 
     private ContragentService(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static ContragentService create(UUID externalId, LpuContract contract, Details details, Instant now) {
         ContragentService service = new ContragentService(externalId, now);
         service.applySnapshot(contract, details, now);
@@ -55,7 +49,6 @@ public class ContragentService extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения об услуге санатория. */
     public record Details(
             @Nullable UUID externalAppealTypeId,
             @Nullable String code,

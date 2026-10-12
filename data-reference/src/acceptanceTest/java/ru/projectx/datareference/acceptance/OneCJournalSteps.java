@@ -14,13 +14,8 @@ import java.util.regex.Pattern;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Шаги о журнале при отказе разбора сообщения 1С:УСК: запись ERROR называет сообщение, поток, попытку, тип ошибки
- * и SQLSTATE. Значений полей сообщения в журнале нет нигде, потому что этим путём идут полисы с персональными данными.
- */
 public class OneCJournalSteps {
 
-    /** Потоки так, как их называет 1С:УСК; неизвестное имя — ошибка сценария, а не другой поток. */
     private static final Map<String, OneCStream> STREAMS = Map.of(
             "контрагенты", OneCStream.CONTRAGENTS,
             "договоры ЛПУ", OneCStream.LPU_CONTRACTS,
@@ -33,7 +28,6 @@ public class OneCJournalSteps {
             "МКБ-10", OneCStream.MKB10,
             "виды обращений", OneCStream.APPEAL_TYPES);
 
-    /** Сводная запись об истёкших ожиданиях потока: поток, число отклонённых и перечень GUID родителей. */
     private static final Pattern EXPIRED_WAITS = Pattern.compile(
             "сообщения потока (\\S+) не дождались родителя за срок ожидания \\S+: отклонено (\\d+), "
                     + "первые родители: \\[(.*)]");
@@ -79,10 +73,6 @@ public class OneCJournalSteps {
                         && event.getThrowableProxy() == null);
     }
 
-    /**
-     * Ровно одна запись ERROR за сценарий, и она сводная: называет поток, число отклонённых в проходе и ровно столько
-     * GUID родителей, сколько сказано. Исключения к ней не приложено.
-     */
     @Тогда("в журнале Дата-референса есть ровно одна запись уровня ERROR об истёкших ожиданиях потока {string}: истекло {int}, в перечне {int} GUID родителей")
     public void expiredWaitsSummaryLogged(String stream, int expired, int listed) {
         assertThat(STREAMS).as("потоки, которые знает шаг").containsKey(stream);

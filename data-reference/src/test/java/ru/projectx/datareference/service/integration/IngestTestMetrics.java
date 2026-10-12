@@ -4,7 +4,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/** Счётчики приёма для тестов пакета: реестр в памяти и имена очередей, как в тестах точек приёма. */
 final class IngestTestMetrics {
 
     static final OneCQueueProperties QUEUES = new OneCQueueProperties(
@@ -19,7 +18,6 @@ final class IngestTestMetrics {
         return new OneCIngestMetrics(registry, QUEUES);
     }
 
-    /** Счётчики над своим реестром, когда тесту они не важны. */
     static OneCIngestMetrics discarded() {
         return on(new SimpleMeterRegistry());
     }

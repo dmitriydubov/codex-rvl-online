@@ -31,11 +31,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор услуг санаториев: услуга принимается только по договору из справочника, ещё не пришедшего
- * договора ждёт, а услуга не нашего договора пропускается и запоминается как не наша, чтобы её прайс не ждал
- * её до отказа по сроку. Известная услуга получает реквизиты последнего сообщения.
- */
 class ContragentServiceMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

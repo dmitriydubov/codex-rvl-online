@@ -22,10 +22,6 @@ import ru.projectx.datareference.service.PolicyReads;
 import ru.projectx.datareference.service.PolicySearchReads;
 import ru.projectx.datareference.service.ProgramReads;
 
-/**
- * На всех ручках UUID в пути и параметрах принимается только в канонической записи 8-4-4-4-12. Иначе сервис
- * нашёл бы по неканонической записи чужую запись, поэтому она даёт 400 и до сервиса не доходит.
- */
 class UuidParameterRecordTest {
 
     private static final String API = InternalApi.BASE_PATH;
@@ -76,7 +72,6 @@ class UuidParameterRecordTest {
                 insuranceContracts, programs, policies, policySearch, contractViews, catalogs, cards, services);
     }
 
-    /** Пустой параметр — это «параметра нет», а не нечитаемый UUID; ответ тот же 400 с именем параметра. */
     @ParameterizedTest
     @CsvSource(delimiterString = " => ", value = {
             "/insurance-contracts?external_id= => external_id",

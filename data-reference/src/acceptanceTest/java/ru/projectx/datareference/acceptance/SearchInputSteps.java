@@ -5,11 +5,6 @@ import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/**
- * Запросы на границе пределов поиска: строка из заданного числа символов и перечень МКБ-10 из заданного числа кодов.
- * Буква «ж» занимает в UTF-8 два байта и отличает предел в символах от предела в байтах; у предела длины запроса
- * самого сервера берётся «q», которая не кодируется, и длина запроса равна числу букв плюс путь.
- */
 public class SearchInputSteps {
 
     private static final String QUERY = "query";

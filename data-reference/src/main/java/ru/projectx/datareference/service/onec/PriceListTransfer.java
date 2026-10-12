@@ -10,18 +10,8 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.mapper.ImportResult;
 
-/**
- * Передача прайс-листа по одной услуге: во что сложились её отложенные части и какой исход у них общий. Здесь только
- * решение и смена статусов без базы, а сохраняет части и применяет прайс сборщик передачи. Собранная передача может
- * ждать услугу, которой ещё нет в справочнике, и при пересмотре собирается заново из тех же частей.
- */
 sealed interface PriceListTransfer {
 
-    /**
-     * Финальное сообщение узнаётся по ожидаемому числу пакетов; в сборку идут только части без записанного исхода.
-     *
-     * @param correlated все сообщения передачи {@code cid}, в любом порядке и в любом статусе
-     */
     static PriceListTransfer of(UUID cid, List<InboundMessage> correlated) {
         List<InboundMessage> buffered = correlated.stream()
                 .filter(PriceListTransfer::isCollected)
@@ -35,24 +25,15 @@ sealed interface PriceListTransfer {
         return assembling(cid, buffered);
     }
 
-    /**
-     * Часть передачи, исход которой ещё не записан: она в буфере или вместе со всей собранной передачей ждёт услугу,
-     * которой пока нет в справочнике.
-     */
     static boolean isCollected(InboundMessage part) {
         InboundStatus status = part.outcome().status();
         return status == InboundStatus.BUFFERED || status == InboundStatus.AWAITING_PARENT;
     }
 
-    /** Исход передачи записан отказом или пропуском: её части, пришедшие позже, разделяют этот исход. */
     static boolean isClosed(List<InboundMessage> correlated) {
         return isRejected(correlated) || anyIn(correlated, InboundStatus.SKIPPED);
     }
 
-    /**
-     * Передача отклонена, если среди её частей есть отказ, а применённых нет: у применённой передачи отказ бывает
-     * только у лишнего пакета.
-     */
     static boolean isRejected(List<InboundMessage> correlated) {
         return anyIn(correlated, InboundStatus.FAILED) && !anyIn(correlated, InboundStatus.PROCESSED);
     }
@@ -72,7 +53,6 @@ sealed interface PriceListTransfer {
                 .orElseGet(() -> new Pending("передача %s ждёт финального сообщения".formatted(cid)));
     }
 
-    /** Пока пришли не все обещанные пакеты, сверять счётчики рано: порядок доставки двух очередей не гарантирован. */
     private static PriceListTransfer withFinalMessage(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
 
@@ -84,10 +64,6 @@ sealed interface PriceListTransfer {
         return checkedCounters(cid, finalMessage, batches, expectedBatches);
     }
 
-    /**
-     * Лишний пакет или другое число строк означают, что источник прислал не то, что обещал. Применить такую
-     * передачу значит записать заведомо неполный прайс и никогда об этом не узнать.
-     */
     private static PriceListTransfer checkedCounters(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches, int expectedBatches) {
 
@@ -103,7 +79,6 @@ sealed interface PriceListTransfer {
         return new Mismatched(reason, finalMessage, batches);
     }
 
-    /** Финальное сообщение первым, за ним пакеты: в этом порядке сообщения передачи получают исход. */
     private static List<InboundMessage> wholeTransfer(InboundMessage finalMessage, List<InboundMessage> batches) {
         List<InboundMessage> messages = new ArrayList<>();
         messages.add(finalMessage);
@@ -111,7 +86,6 @@ sealed interface PriceListTransfer {
         return List.copyOf(messages);
     }
 
-    /** Отклоняет все сообщения передачи с одной причиной; возвращает их же, чтобы сохранить. */
     private static List<InboundMessage> failAll(List<InboundMessage> messages, String reason) {
         for (InboundMessage message : messages) {
             message.markFailed(reason);
@@ -119,23 +93,18 @@ sealed interface PriceListTransfer {
         return messages;
     }
 
-    /** Передача ещё не пришла целиком; её сообщения остаются в буфере. */
     record Pending(String reason) implements PriceListTransfer {
     }
 
-    /** Передача уже отклонена; её части, пришедшие позже, отклоняются сразу и прайс не трогают. */
     record Rejected(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
 
-        /** @return части с новым статусом, которые осталось сохранить */
         List<InboundMessage> fail() {
             return failAll(lateParts, reason);
         }
     }
 
-    /** Передача уже пропущена; её части, пришедшие позже, пропускаются сразу и прайс не трогают. */
     record Closed(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
 
-        /** @return части с новым статусом, которые осталось сохранить */
         List<InboundMessage> skip(Instant processedAt) {
             for (InboundMessage message : lateParts) {
                 message.markSkipped(reason, processedAt);
@@ -144,24 +113,16 @@ sealed interface PriceListTransfer {
         }
     }
 
-    /** Передача пришла целиком, но не совпала со своими счётчиками. Прежний прайс по услуге не трогается. */
     record Mismatched(String reason, InboundMessage finalMessage, List<InboundMessage> batches)
             implements PriceListTransfer {
 
-        /**
-         * Ошибку получают все сообщения сразу: если пометить только последнее, остальные навсегда останутся в буфере.
-         *
-         * @return сообщения с новым статусом, которые осталось сохранить
-         */
         List<InboundMessage> fail() {
             return failAll(wholeTransfer(finalMessage, batches), reason);
         }
     }
 
-    /** Передача собрана: пришли финальное сообщение и все обещанные пакеты, счётчики сошлись. */
     record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements PriceListTransfer {
 
-        /** @return сообщения передачи с исходом применения прайса, которые осталось сохранить */
         List<InboundMessage> markOutcome(ImportResult result, Instant at) {
             return switch (result) {
                 case ImportResult.Applied ignored -> markProcessed(at);
@@ -170,7 +131,6 @@ sealed interface PriceListTransfer {
             };
         }
 
-        /** Все сообщения передачи ждут услугу с одного момента: срок ожидания у передачи общий. */
         List<InboundMessage> markAwaitingParent(AwaitedParent service, Instant at) {
             List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
             for (InboundMessage message : messages) {
@@ -179,7 +139,6 @@ sealed interface PriceListTransfer {
             return messages;
         }
 
-        /** @return сообщения передачи с новым статусом, которые осталось сохранить */
         List<InboundMessage> markProcessed(Instant processedAt) {
             List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
             for (InboundMessage message : messages) {
@@ -188,7 +147,6 @@ sealed interface PriceListTransfer {
             return messages;
         }
 
-        /** @return сообщения передачи с общей причиной пропуска, которые осталось сохранить */
         List<InboundMessage> markSkipped(String reason, Instant processedAt) {
             List<InboundMessage> messages = wholeTransfer(finalMessage, batches);
             for (InboundMessage message : messages) {

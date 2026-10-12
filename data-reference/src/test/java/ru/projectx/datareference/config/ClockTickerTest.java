@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 
-/** Время кэша идёт по часам сервиса: сдвиг часов на десять минут — те же десять минут для срока жизни. */
 class ClockTickerTest {
 
     private static final Instant NOON = Instant.parse("2026-10-06T09:00:00Z");

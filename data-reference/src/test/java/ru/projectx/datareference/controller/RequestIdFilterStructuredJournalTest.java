@@ -17,10 +17,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import ru.projectx.datareference.support.StructuredJournal;
 
-/**
- * Запись журнала во время REST-запроса несёт его {@code requestId} отдельным полем, по которому вызывающий
- * сервис и дежурный находят в журнале всё, что случилось с запросом.
- */
 @ExtendWith(OutputCaptureExtension.class)
 class RequestIdFilterStructuredJournalTest {
 
@@ -52,7 +48,6 @@ class RequestIdFilterStructuredJournalTest {
                 .isEqualTo(REQUEST_ID);
     }
 
-    /** После запроса ключ снят: запись вне запроса не получает чужой идентификатор. */
     @Test
     void recordAfterRequest_carriesNoRequestId(CapturedOutput output) throws ServletException, IOException {
         new RequestIdFilter().doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), (req, res) -> {

@@ -24,11 +24,6 @@ import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 
-/**
- * Временный отказ базы распознаётся и тогда, когда исключение пришло сырым из Hibernate с ленивой догрузки, мимо
- * репозитория: иначе отмена по таймауту ушла бы как внутренняя ошибка, которую сервис Заявок не повторяет. Переводчик —
- * тот же класс Spring, что у прокси репозиториев, поэтому тест проверяет настоящий перевод.
- */
 class DatabaseOutagesTest {
 
     private static final String TEXT = "canceling statement due to user request";
@@ -37,7 +32,6 @@ class DatabaseOutagesTest {
 
     private final DatabaseOutages outages = new DatabaseOutages(new HibernateExceptionTranslator());
 
-    /** Отмена оператора по таймауту на ленивой догрузке: Hibernate сообщает своим типом, с SQLSTATE 57014. */
     @Test
     void hibernateQueryTimeout_isTemporary_namedByTranslatedTypeWithSqlState() {
         var timeout = new org.hibernate.QueryTimeoutException(TEXT, new SQLException(TEXT, QUERY_CANCELED), "select 1");
@@ -47,7 +41,6 @@ class DatabaseOutagesTest {
         assertThat(outage).hasValue(new DatabaseOutages.Outage("QueryTimeoutException", QUERY_CANCELED));
     }
 
-    /** Истёкший лимит транзакции Hibernate проверяет сам, перед оператором, и бросает без причины из JDBC. */
     @Test
     void rawHibernateTransactionTimeout_isTemporary() {
         Optional<DatabaseOutages.Outage> outage = outages.recognize(new TransactionException("Transaction timeout expired"));
@@ -55,7 +48,6 @@ class DatabaseOutagesTest {
         assertThat(outage).hasValue(new DatabaseOutages.Outage("JpaSystemException/TransactionException", "нет"));
     }
 
-    /** Та же обёртка, уже сделанная Spring на пути через репозиторий: в журнале видна причина, а не только обёртка. */
     @Test
     void wrappedHibernateTransactionTimeout_isTemporary_namedWithItsCause() {
         var wrapped = new JpaSystemException(new TransactionException("Transaction timeout expired"));
@@ -65,7 +57,6 @@ class DatabaseOutagesTest {
         assertThat(outage).hasValue(new DatabaseOutages.Outage("JpaSystemException/TransactionException", "нет"));
     }
 
-    /** При обрыве соединения драйвер кладёт SQLSTATE класса 08 поверх IOException: нужен не корень, а ближайший SQLException. */
     @Test
     void connectionLoss_carriesSqlStateOfDeepestSqlException_notOfRootCause() {
         var lost = new JDBCConnectionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE, new IOException("reset")));
@@ -84,7 +75,6 @@ class DatabaseOutagesTest {
                 new TransactionTimedOutException(TEXT));
     }
 
-    /** Уже переведённые Spring отказы остаются временными и после прохода через переводчик. */
     @ParameterizedTest
     @MethodSource("springOutages")
     void springOutage_staysTemporary_namedByItsOwnType(RuntimeException failure) {
@@ -103,17 +93,12 @@ class DatabaseOutagesTest {
                 new Exception(TEXT));
     }
 
-    /** Нарушение ограничения, ошибка программиста или чужое исключение повтором не лечатся. */
     @ParameterizedTest
     @MethodSource("permanentFailures")
     void permanentFailure_isNotAnOutage(Exception failure) {
         assertThat(outages.recognize(failure)).isEmpty();
     }
 
-    /**
-     * Постоянный отказ базы тоже описывается для журнала: тип после перевода и SQLSTATE. По ним разбор сообщений
-     * 1С:УСК называет причину окончательного отказа, не повторяя текста ошибки базы.
-     */
     @Test
     void permanentDatabaseFailure_isDescribedByTranslatedTypeWithSqlState() {
         var overflow = new ConstraintViolationException(TEXT, new SQLException(TEXT, "23514"), "ck_percent");
@@ -130,10 +115,6 @@ class DatabaseOutagesTest {
         assertThat(outages.describe(lost)).isEqualTo(outages.recognize(lost)).isPresent();
     }
 
-    /**
-     * Ошибка не из базы не описывается, даже если переводчик называет её ошибкой доступа к данным: обычные
-     * {@code IllegalStateException} и {@code IllegalArgumentException} он считает неверным вызовом JPA.
-     */
     @Test
     void failureOutsideTheDatabase_isNotDescribed() {
         assertThat(outages.describe(new IllegalStateException(TEXT))).isEmpty();
@@ -141,10 +122,6 @@ class DatabaseOutagesTest {
         assertThat(outages.describe(new Exception(TEXT))).isEmpty();
     }
 
-    /**
-     * Отказ на входе в транзакцию — исключение транзакций Spring, а не доступа к данным, но это временный отказ
-     * базы, и он описывается так же, как распознаётся: своим типом и SQLSTATE драйвера.
-     */
     @Test
     void transactionLevelOutage_isDescribedByItsOwnTypeWithSqlState() {
         var noConnection = new CannotCreateTransactionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE));
@@ -153,7 +130,6 @@ class DatabaseOutagesTest {
                 .hasValue(new DatabaseOutages.Outage("CannotCreateTransactionException", CONNECTION_FAILURE));
     }
 
-    /** Исключение JPA без перевода в Hibernate — тоже отказ базы, и описывается переведённым типом. */
     @Test
     void persistenceException_isDescribed() {
         assertThat(outages.describe(new jakarta.persistence.PersistenceException(TEXT)))
@@ -166,11 +142,6 @@ class DatabaseOutagesTest {
                 .hasValue(new DatabaseOutages.Outage("DataIntegrityViolationException", "нет"));
     }
 
-    /**
-     * Сеанс, закрытый сервером по простою открытой транзакции (25P03), — временный отказ: пул заменит соединение, и
-     * та же операция пройдёт. Перевод даёт общий {@code JpaSystemException}, поэтому отказ узнаётся по коду: REST
-     * отвечает 503, а разбор сообщения 1С:УСК идёт на повтор.
-     */
     @Test
     void sessionClosedForIdleTransaction_isTemporary_recognizedBySqlState() {
         var closed = new GenericJDBCException(TEXT, new SQLException(TEXT, "25P03"));
@@ -178,7 +149,6 @@ class DatabaseOutagesTest {
         assertThat(outages.recognize(closed)).hasValue(new DatabaseOutages.Outage("JpaSystemException", "25P03"));
     }
 
-    /** Остальные коды класса 25 — ошибки кода в обращении с транзакцией: повтор их не лечит. */
     @ParameterizedTest
     @ValueSource(strings = {"25001", "25P02"})
     void otherTransactionStateCodes_areNotOutages(String sqlState) {

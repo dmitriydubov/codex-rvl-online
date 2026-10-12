@@ -29,10 +29,6 @@ import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.MigrationSql;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Проверяет на настоящем PostgreSQL хранение последней применённой передачи прайса: блокировку строки услуги,
- * чтение услуги зависшей передачи из тела и заполнение таблицы из сырья при обновлении.
- */
 @IntegrationTest
 class PriceListFinalizationStorageTest {
 
@@ -42,7 +38,6 @@ class PriceListFinalizationStorageTest {
     private static final Instant EARLIER = Instant.parse("2026-03-14T09:00:00Z");
     private static final Instant LATER = Instant.parse("2026-03-14T10:00:00Z");
     private static final String FILL_CHANGE_SET = "017-price-list-finalization-fill";
-    /** SQLSTATE lock_not_available: так PostgreSQL отменяет оператор по lock_timeout. */
     private static final String LOCK_NOT_AVAILABLE = "55P03";
 
     @Autowired
@@ -68,7 +63,6 @@ class PriceListFinalizationStorageTest {
         databaseCleaner.clear();
     }
 
-    /** Пока одна транзакция держит строку услуги, вторая её не получает: ждёт и уходит с временным отказом. */
     @Test
     void lockedServiceRow_isNotGivenToAnotherTransaction() throws SQLException {
         UUID finalId = part("PROCESSED", SERVICE, 1, EARLIER);
@@ -101,7 +95,6 @@ class PriceListFinalizationStorageTest {
         assertThat(inTransaction(() -> finalizations.lockByService(OTHER_SERVICE))).isEmpty();
     }
 
-    /** Услуга берётся из финального сообщения, если оно в буфере, иначе из самой ранней части. */
     @Test
     void serviceOfBufferedTransfer_isReadFromFinalFirst() {
         part("BUFFERED", OTHER_SERVICE, null, EARLIER);
@@ -118,7 +111,6 @@ class PriceListFinalizationStorageTest {
         assertThat(inbound.findBufferedTransferService(CID)).contains(SERVICE.toString());
     }
 
-    /** Части с записанным исходом не в буфере: закрывать такую передачу нечего. */
     @Test
     void transferWithoutBufferedParts_hasNoServiceToClose() {
         part("SKIPPED", SERVICE, 1, EARLIER);
@@ -126,10 +118,6 @@ class PriceListFinalizationStorageTest {
         assertThat(inbound.findBufferedTransferService(CID)).isEmpty();
     }
 
-    /**
-     * Обновление заполняет по каждой услуге финальное сообщение «применено», принятое позже всех.
-     * Пакеты, пропущенные финалы и GUID не в канонической записи не учитываются.
-     */
     @Test
     void fill_takesLatestAppliedFinalOfEveryService() {
         part("PROCESSED", SERVICE, 1, EARLIER);
@@ -145,7 +133,6 @@ class PriceListFinalizationStorageTest {
                 SERVICE, latest, OTHER_SERVICE, otherServiceFinal));
     }
 
-    /** Повторный запуск ничего не меняет, а уже записанная последняя передача не перезаписывается. */
     @Test
     void fill_isIdempotent_andKeepsExistingRows() {
         UUID recorded = part("PROCESSED", SERVICE, 1, EARLIER);
@@ -160,7 +147,6 @@ class PriceListFinalizationStorageTest {
                 SERVICE, recorded, OTHER_SERVICE, otherServiceFinal));
     }
 
-    /** Из финалов, принятых в один момент, последней становится передача, собранная позже. */
     @Test
     void fill_breaksTieOfSameMomentByAssemblyTime() {
         UUID assembledLater = part("PROCESSED", SERVICE, 1, LATER);
@@ -175,7 +161,6 @@ class PriceListFinalizationStorageTest {
         assertThat(finalizationsByService()).containsExactlyEntriesOf(Map.of(SERVICE, assembledLater));
     }
 
-    /** Применение записывает финал последней передачи: строку услуги добавляет, а у существующей заменяет финал. */
     @Test
     void recordApplied_addsServiceRow_thenReplacesItsFinal() {
         UUID first = part("PROCESSED", SERVICE, 1, EARLIER);
@@ -195,7 +180,6 @@ class PriceListFinalizationStorageTest {
         assertThat(finalizations.count()).isZero();
     }
 
-    /** Строки таблицы по услугам сценариев; лишних строк в таблице нет. */
     private Map<UUID, UUID> finalizationsByService() {
         Map<UUID, UUID> rows = Stream.of(SERVICE, OTHER_SERVICE)
                 .flatMap(service -> finalizations.findById(service).stream()
@@ -232,7 +216,6 @@ class PriceListFinalizationStorageTest {
         return messageId;
     }
 
-    /** Выполняет заполнение ровно тем текстом, что лежит в миграции. */
     private void runFill() {
         testJdbc.update(fillSql());
     }

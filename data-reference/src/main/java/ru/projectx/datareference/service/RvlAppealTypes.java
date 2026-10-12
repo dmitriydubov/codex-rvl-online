@@ -16,11 +16,6 @@ import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.repository.AppealTypeRepository;
 
-/**
- * Виды обращения РВЛ из конфигурации, найденные в справочнике по наименованию; по ним отбираются учреждения и услуги.
- * Переименование в 1С молча обнулит выдачу, поэтому сравнение идёт без регистра и краевых пробелов, а на старте
- * пишется WARN о ненайденных. Кэша нет: запрос дешёвый, а устаревший кэш обошёлся бы дороже.
- */
 @Component
 public class RvlAppealTypes {
 
@@ -34,7 +29,6 @@ public class RvlAppealTypes {
         this.api = api;
     }
 
-    /** Ключ — GUID 1С, по которому на вид обращения ссылаются перечни программ и услуги. */
     public Map<UUID, AppealType> byExternalId() {
         return found().stream().collect(Collectors.toMap(AppealType::externalId, Function.identity()));
     }
@@ -43,7 +37,6 @@ public class RvlAppealTypes {
         return byExternalId().keySet();
     }
 
-    /** Наименования из конфигурации, которых нет в справочнике: по ним каталог и услуги будут пусты. */
     public List<String> missing() {
         Set<String> present = found().stream().map(type -> normalize(type.name())).collect(Collectors.toSet());
         return api.rvlAppealTypes().stream().filter(name -> !present.contains(normalize(name))).toList();

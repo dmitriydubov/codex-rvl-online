@@ -12,11 +12,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбор тел частей собирающейся передачи прайса заранее, вне транзакции: долгий разбор под блокировкой задерживал бы
- * другие решения по той же услуге. Сборка под блокировкой всё равно перечитывает части и сама разбирает недостающие.
- * Разобранное здесь тело она берёт как есть, потому что тела частей в буфере и ждущих услугу по сроку не стираются.
- */
 @Component
 public class PriceTransferPartsInAdvance {
 
@@ -28,10 +23,6 @@ public class PriceTransferPartsInAdvance {
         this.envelope = new StoredEnvelope(json);
     }
 
-    /**
-     * Разбирает части, только если вместе с пришедшей частью передача выглядит собранной. Вызывается до первого
-     * запроса транзакции разбора.
-     */
     ParsedTransferParts parse(InboundMessage received, PriceListTransferMarkup markup, ObjectNode data) {
         List<InboundMessage> parts = withReceivedBuffered(reader.parts(markup.cid()), received, markup);
         if (PriceListTransfer.of(markup.cid(), parts) instanceof PriceListTransfer.Assembled assembled) {
@@ -40,10 +31,6 @@ public class PriceTransferPartsInAdvance {
         return ParsedTransferParts.NONE;
     }
 
-    /**
-     * Части передачи такими, какими они станут, когда пришедшая часть ляжет в буфер. Вместо пришедшей части берётся её
-     * копия с разметкой: ни прочитанные части, ни сама пришедшая часть при этом не меняются.
-     */
     private static List<InboundMessage> withReceivedBuffered(
             List<InboundMessage> stored, InboundMessage received, PriceListTransferMarkup markup) {
 
@@ -56,7 +43,6 @@ public class PriceTransferPartsInAdvance {
                 .toList();
     }
 
-    /** Обычный цикл, а не стрим: у каждой части свой источник данных, и не у каждой они есть. */
     private ParsedTransferParts parsed(PriceListTransfer.Assembled transfer, UUID receivedId, ObjectNode receivedData) {
         Map<UUID, ObjectNode> dataByMessage = new HashMap<>();
         for (InboundMessage part : partsOf(transfer)) {
@@ -71,10 +57,6 @@ public class PriceTransferPartsInAdvance {
         return Stream.concat(Stream.of(transfer.finalMessage()), transfer.batches().stream()).toList();
     }
 
-    /**
-     * Стёртое или нечитаемое тело заранее не разбирается: отказ такой части сборка назовёт сама, после проверок,
-     * которые идут раньше разбора частей.
-     */
     private Optional<ObjectNode> readableData(InboundMessage part) {
         try {
             return envelope.dataOf(part);

@@ -14,20 +14,13 @@ import java.util.UUID;
 import org.springframework.amqp.core.QueueInformation;
 import ru.projectx.datareference.mapper.OneCGuid;
 
-/**
- * Шаги «1С:УСК публикует …» в настоящий брокер стенда и проверки его очередей. Ушедший брокеру ack снаружи не виден,
- * поэтому «очередь пуста и у неё есть потребитель» ждёт, пока каждое опубликованное сообщение не окажется в сырье
- * или в карантине: готовых к выдаче у брокера нет, но одно может ещё обрабатываться.
- */
 public class OneCBrokerSteps {
 
-    /** Запас на доставку, запись, остановку и запуск контейнеров; ожидание по условию, а не сон. */
     private static final Duration SETTLE_TIMEOUT = Duration.ofSeconds(30);
 
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
     private static final Map<String, byte[]> BEFORE_ENVELOPE = Map.of("UTF-8 BOM", UTF8_BOM, "ничего", new byte[0]);
 
-    /** Дефект тела — последовательность JSON-escape, которую читает разбор конверта и отвергает база. */
     private static final Map<String, String> BODY_DEFECTS = Map.of(
             "JSON-escape нулевого символа U+0000", "\\u0000",
             "JSON-escape одиночного суррогата U+D83D", "\\ud83d");
@@ -112,7 +105,6 @@ public class OneCBrokerSteps {
         assertThat(inbox.stored(canonical(messageId))).as("строка сырья сообщения %s", messageId).isFalse();
     }
 
-    /** Договор публикуется конвертом, каким его сохранил бы приём, с байтами перед конвертом из таблицы, если они названы. */
     private void publishContract(Map<String, String> contract) {
         OneCMessage message = OneCMessages.insuranceContract(contract);
         byte[] prefix = BEFORE_ENVELOPE.get(contract.getOrDefault(OneCMessages.BEFORE_ENVELOPE, "ничего"));

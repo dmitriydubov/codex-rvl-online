@@ -6,11 +6,6 @@ import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Insurer;
 
-/**
- * Договор страхования для сервиса Договоров вместе со страхователем. У страхователя отдаются оба наименования
- * из 1С, краткое и полное, потому что в ТЗ не сказано, какое из них нужно. Страхователем бывает физическое лицо,
- * которого нет в справочнике страхователей, поэтому {@code insurer} может быть пуст.
- */
 public record InsuranceContractResponse(
         UUID id,
         UUID externalId,
@@ -27,7 +22,6 @@ public record InsuranceContractResponse(
                 insurer == null ? null : Organization.of(insurer));
     }
 
-    /** Страхователь: организация из справочника контрагентов 1С, которая не является ЛПУ. */
     public record Organization(
             UUID id,
             UUID externalId,

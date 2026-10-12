@@ -13,11 +13,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Цена услуги санатория на период. Своего {@code external_id} у строки нет, поэтому она не наследует
- * {@link OneCEntity}: прейскурант замещается целиком по услуге. Пустая {@code validTo} означает открытую дату
- * (3000-01-01 в источнике), а не «неизвестно»: цена действует, пока её не заменят.
- */
 @Entity
 @Table(name = "price_list_items")
 public class PriceListItem {
@@ -59,7 +54,6 @@ public class PriceListItem {
     private Instant createdAt;
 
     protected PriceListItem() {
-        // JPA
     }
 
     private PriceListItem(ContragentService service, Row row, Instant now) {
@@ -79,10 +73,6 @@ public class PriceListItem {
         return new PriceListItem(service, row, now);
     }
 
-    /**
-     * Разобранная строка прейскуранта. Прейскурант по услуге приходит несколькими сообщениями со строками
-     * и одним итоговым, а применяется, только когда все они собраны.
-     */
     public record Row(
             @Nullable String serviceName,
             @Nullable String serviceCode,

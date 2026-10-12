@@ -6,10 +6,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Вид обращения хранит поля сообщения как пришли, а следующее сообщение того же вида замещает их целиком:
- * сервисы Заявок и Договоров показывают человеку то, что сейчас лежит в 1С, а не смесь старых и новых значений.
- */
 class AppealTypeTest {
 
     private static final Instant CREATED = Instant.parse("2026-10-01T09:00:00Z");

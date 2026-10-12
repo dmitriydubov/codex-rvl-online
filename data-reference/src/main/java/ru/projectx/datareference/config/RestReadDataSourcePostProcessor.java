@@ -6,14 +6,8 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
 
-/**
- * Оборачивает готовый пул Spring Boot в {@link RestReadDataSource} с пулом REST-чтений рядом, чтобы у пула приложения
- * остались все настройки {@code spring.datasource.*}. Обработчик стоит первым, чтобы другие обёртки видели уже два
- * пула; настройки он берёт лениво, потому что создаётся раньше, чем они связаны со свойствами.
- */
 public class RestReadDataSourcePostProcessor implements BeanPostProcessor, Ordered {
 
-    /** Имя бина пула Spring Boot: оборачивается только он, а пул REST-чтений, тоже бин, остаётся как есть. */
     static final String BOOT_POOL = "dataSource";
 
     private final BeanFactory beans;

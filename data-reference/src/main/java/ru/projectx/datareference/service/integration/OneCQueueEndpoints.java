@@ -8,11 +8,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Точки приёма из брокера 1С:УСК, по одной на очередь; настройки контейнера берутся из
- * {@code spring.rabbitmq.listener.simple}, и точка их не перекрывает. Идентификатор точки — имя очереди, поэтому две
- * настройки на одну очередь не дадут приложению запуститься: два потребителя перемешали бы порядок потока.
- */
 @Component
 public class OneCQueueEndpoints implements RabbitListenerConfigurer {
 

@@ -10,10 +10,6 @@ import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Ссылки потоков 1С на родительские записи: санаторий, договор, услугу. Собраны в одном месте, чтобы поиск родителя
- * и память о не наших записях у всех потоков были одинаковыми.
- */
 @Component
 class CatalogReferences {
 
@@ -30,17 +26,14 @@ class CatalogReferences {
         this.foreign = foreign;
     }
 
-    /** @param outsideCatalog начало причины пропуска сообщения, которое ссылается на не наш санаторий */
     CatalogReference<Lpu> sanatoriums(String outsideCatalog) {
         return new CatalogReference<>(lpus::findByExternalId, ParentKind.CONTRAGENT, foreign, outsideCatalog);
     }
 
-    /** @param outsideCatalog начало причины пропуска сообщения, которое ссылается на не наш договор */
     CatalogReference<LpuContract> contracts(String outsideCatalog) {
         return new CatalogReference<>(contracts::findByExternalId, ParentKind.LPU_CONTRACT, foreign, outsideCatalog);
     }
 
-    /** @param outsideCatalog начало причины пропуска сообщения, которое ссылается на не нашу услугу */
     CatalogReference<ContragentService> services(String outsideCatalog) {
         return new CatalogReference<>(services::findByExternalId, ParentKind.CONTRAGENT_SERVICE, foreign,
                 outsideCatalog);

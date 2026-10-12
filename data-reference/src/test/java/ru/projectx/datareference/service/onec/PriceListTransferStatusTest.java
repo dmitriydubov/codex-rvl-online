@@ -15,11 +15,6 @@ import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.mapper.ImportResult;
 
-/**
- * Защищает решение, во что сложилась передача прайс-листа, и общий исход для всех её сообщений. Передача, признанная
- * собранной раньше времени, заменит прайс неполным, а сообщение без исхода навсегда останется в буфере. Логика
- * чистая, поэтому проверяется без базы и без контекста Spring.
- */
 class PriceListTransferStatusTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -42,7 +37,6 @@ class PriceListTransferStatusTest {
                 "передача " + CID + " собрана на 1 из 2 сообщений"));
     }
 
-    /** Финальное может прийти раньше последнего пакета: собранность проверяется по составу, а не по порядку. */
     @Test
     void allPromisedBatches_assembleTransfer_whateverTheOrder() {
         InboundMessage first = batch(1);
@@ -54,7 +48,6 @@ class PriceListTransferStatusTest {
         assertThat(transfer).isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of(first, second)));
     }
 
-    /** Ноль пакетов — легальная передача: прайс по услуге очищается. */
     @Test
     void emptyTransfer_isAssembledRightAway() {
         InboundMessage finalMessage = finalMessage(0, 0);
@@ -64,7 +57,6 @@ class PriceListTransferStatusTest {
         assertThat(transfer).isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of()));
     }
 
-    /** Сообщения той же передачи с уже проставленным исходом в сборку не входят. */
     @Test
     void messagesNoLongerBuffered_areLeftOut() {
         InboundMessage processedFinal = finalMessage(1, 1);
@@ -77,7 +69,6 @@ class PriceListTransferStatusTest {
         assertThat(transfer).isInstanceOf(PriceListTransfer.Pending.class);
     }
 
-    /** Исход отклонённой передачи уже записан: части, пришедшие после него, не собираются заново, а отклоняются. */
     @Test
     void partsArrivingAfterRejection_areRejectedRightAway() {
         InboundMessage rejectedBatch = batch(1);
@@ -91,7 +82,6 @@ class PriceListTransferStatusTest {
                 "передача " + CID + " уже отклонена", List.of(lateFinal, lateBatch)));
     }
 
-    /** У применённой передачи отказ бывает только у лишнего пакета: сама передача не отклонена. */
     @Test
     void appliedTransferWithRejectedSurplusBatch_isNotRejected() {
         InboundMessage applied = batch(1);
@@ -106,7 +96,6 @@ class PriceListTransferStatusTest {
                 .isInstanceOf(PriceListTransfer.Pending.class);
     }
 
-    /** Исход пропущенной передачи тоже записан: опоздавшие части не ждут в буфере, а пропускаются вслед за ней. */
     @Test
     void partsArrivingAfterSkip_areSkippedRightAway() {
         InboundMessage skippedFinal = finalMessage(1, 1);
@@ -135,7 +124,6 @@ class PriceListTransferStatusTest {
         });
     }
 
-    /** Закрыта передача, исход которой записан отказом или пропуском; у применённой исход не закрывает её частей. */
     @Test
     void transferIsClosed_onlyWhenRejectedOrSkipped() {
         InboundMessage applied = batch(1);
@@ -253,7 +241,6 @@ class PriceListTransferStatusTest {
         });
     }
 
-    /** Собранная передача, которая ждёт услугу, при пересмотре собирается снова из тех же частей. */
     @Test
     void transferWaitingForItsService_isAssembledAgainFromTheSameParts() {
         InboundMessage finalMessage = finalMessage(1, 1);

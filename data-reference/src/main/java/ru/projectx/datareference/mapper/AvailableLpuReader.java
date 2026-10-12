@@ -18,11 +18,6 @@ import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Читает из сообщения о страховой программе перечень учреждений, куда по ней можно поехать. Строка без санатория
- * в справочнике или без однозначного типа покрытия отбрасывается, а у остальных испорченное условие обслуживания
- * отклоняет всё сообщение: по этим условиям сервис Договоров выпускает договор.
- */
 @Component
 public class AvailableLpuReader {
 
@@ -35,10 +30,6 @@ public class AvailableLpuReader {
         this.lpuRepository = lpuRepository;
     }
 
-    /**
-     * @throws ru.projectx.datareference.exception.OneCFieldException если у остающейся строки нет обязательного условия
-     *         или оно за пределом
-     */
     public AvailableLpu read(ObjectNode data) {
         List<JsonNode> received = StreamSupport.stream(data.path(SERVICE).spliterator(), false).toList();
         Map<UUID, Lpu> sanatoriums = sanatoriumsOf(received);
@@ -52,7 +43,6 @@ public class AvailableLpuReader {
         return new AvailableLpu(rows, received.size(), unknownSanatorium);
     }
 
-    /** Санатории читаются одним запросом: в перечне бывает под тысячу строк, и запрос на строку был бы дорог. */
     private Map<UUID, Lpu> sanatoriumsOf(List<JsonNode> received) {
         Set<UUID> referenced = received.stream()
                 .map(row -> OneCValues.uuid(row, ID_LPU))
@@ -83,10 +73,6 @@ public class AvailableLpuReader {
                 coverage.get()));
     }
 
-    /**
-     * Тип покрытия есть, только когда выставлен ровно один из флагов рисковой и депозитной части. Иначе строка
-     * отбрасывается, а не сохраняется с типом, выбранным за источник.
-     */
     private static Optional<ProgramLpu.CoverageType> coverageTypeOf(JsonNode row) {
         boolean risk = OneCValues.flag(row, "r");
         if (risk == OneCValues.flag(row, "d")) {
@@ -95,22 +81,16 @@ public class AvailableLpuReader {
         return Optional.of(risk ? ProgramLpu.CoverageType.R : ProgramLpu.CoverageType.D);
     }
 
-    /**
-     * Прочитанный перечень со счётчиками отброшенных строк. Причины считаются порознь: санаторий вне справочника
-     * лечится порядком загрузки и фильтром, а строка без типа покрытия требует вопроса к 1С.
-     */
     public record AvailableLpu(List<ProgramLpu.Row> rows, int received, long unknownSanatorium) {
 
         public AvailableLpu {
             rows = List.copyOf(rows);
         }
 
-        /** Сколько пришедших строк не попало в перечень по любой из причин. */
         public int dropped() {
             return received - rows.size();
         }
 
-        /** Сколько строк с известным санаторием отброшено из-за того, что у них нет типа покрытия. */
         public long withoutCoverage() {
             return dropped() - unknownSanatorium;
         }

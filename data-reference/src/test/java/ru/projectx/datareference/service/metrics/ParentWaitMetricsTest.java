@@ -6,10 +6,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Защищает счётчик истёкших ожиданий родителя: нулевой ряд на каждый поток с самого создания, чтобы правило оповещения
- * видело первое же увеличение, и метка — только поток, без идентификаторов сообщений.
- */
 class ParentWaitMetricsTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();

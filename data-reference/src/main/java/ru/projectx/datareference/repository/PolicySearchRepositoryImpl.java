@@ -10,11 +10,6 @@ import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 import ru.projectx.datareference.entity.Policy;
 
-/**
- * Реализация {@link PolicySearchRepository} на Criteria API, потому что число слов ФИО заранее неизвестно. Ранг записан
- * признаками по убыванию важности, а не числом, чтобы не связывать литералы ранга параметрами. Последний ключ порядка —
- * {@code id}: предел режет выдачу в базе, и повтор запроса должен вернуть те же строки.
- */
 class PolicySearchRepositoryImpl implements PolicySearchRepository {
 
     private static final String NUMBER = "number";
@@ -75,8 +70,6 @@ class PolicySearchRepositoryImpl implements PolicySearchRepository {
     }
 
     private static Predicate anyPrefix(CriteriaBuilder cb, Expression<String> name, List<String> prefixes) {
-        // Имя обрезается по краям только в ранге, отбор сравнивает его как хранится: если их выровнять,
-        // поиск начнёт находить другие полисы.
         Expression<String> normalized = PolicySpecifications.normalized(cb, cb.trim(name));
         return cb.or(prefixes.stream()
                 .map(prefix -> PolicySpecifications.like(cb, normalized, prefix))

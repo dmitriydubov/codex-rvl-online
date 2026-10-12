@@ -10,10 +10,6 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Защищает правило, какая передача прайса новее: та, финальное сообщение которой принято позже. Ошибка здесь тихо
- * возвращает услуге старые цены или навсегда оставляет передачу в буфере.
- */
 class AppliedPriceTransferTest {
 
     private static final UUID SERVICE = UUID.fromString("2a6f0c3e-9b18-4d57-8e41-c5d2a7f9b063");
@@ -31,7 +27,6 @@ class AppliedPriceTransferTest {
         assertThat(applied.isNewerThan(AFTER)).isFalse();
     }
 
-    /** Финалы, принятые в один момент: побеждает передача, собравшаяся позже, то есть та, что решается сейчас. */
     @Test
     void transferFinalizedAtTheSameMoment_isNotOlder() {
         assertThat(applied.isNewerThan(APPLIED_FINAL)).isFalse();
@@ -43,20 +38,17 @@ class AppliedPriceTransferTest {
                 .isEqualTo("по услуге " + SERVICE + " уже применена более новая передача " + APPLIED_CID);
     }
 
-    /** Все части зависшей передачи пришли раньше финала применённой: финал, пришедший потом, был бы ещё более старым. */
     @Test
     void stuckTransferReceivedEntirelyBeforeAppliedFinal_isSuperseded() {
         assertThat(applied.supersedes(List.of(batch(BEFORE), batch(BEFORE.minusSeconds(60))))).isTrue();
     }
 
-    /** Часть пришла после финала применённой, а своего финала нет: он ещё может прийти позже и выиграть. */
     @Test
     void stuckTransferWithPartAfterAppliedFinal_andNoFinalOfItsOwn_isNotSuperseded() {
         assertThat(applied.supersedes(List.of(batch(BEFORE), batch(AFTER)))).isFalse();
         assertThat(applied.supersedes(List.of(batch(APPLIED_FINAL)))).isFalse();
     }
 
-    /** Свой финал старше финала применённой: выиграть по порядку передача уже не может, сколько бы пакетов ни пришло. */
     @Test
     void stuckTransferWithOlderFinalOfItsOwn_isSuperseded_evenWithLaterBatch() {
         assertThat(applied.supersedes(List.of(finalMessage(BEFORE), batch(AFTER)))).isTrue();
@@ -68,7 +60,6 @@ class AppliedPriceTransferTest {
         assertThat(applied.supersedes(List.of(finalMessage(APPLIED_FINAL), batch(BEFORE)))).isFalse();
     }
 
-    /** Частей в буфере уже нет — передачу закрывать нечего. */
     @Test
     void transferWithoutBufferedParts_isNotSuperseded() {
         assertThat(applied.supersedes(List.of())).isFalse();

@@ -12,11 +12,6 @@ import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 
-/**
- * Полис целиком для сервиса Заявок; вместе с поиском полисов — единственные ответы с персональными данными, в журнал
- * не пишутся. Программы только РВЛ и не в архиве; сроки без фильтра по дате: вызывающему бывает нужен будущий период.
- * Признак {@code personalDataErased} отличает данные, стёртые по сроку хранения, от не переданных из 1С.
- */
 public record PolicyResponse(
         UUID id,
         UUID externalId,
@@ -51,7 +46,6 @@ public record PolicyResponse(
                 policy.personalDataErased(), contract == null ? null : ContractRef.of(contract), programs);
     }
 
-    /** Договор страхования полиса; пуст, если договора ещё нет в справочнике. */
     public record ContractRef(UUID id, UUID externalId, String number) {
 
         static ContractRef of(InsuranceContract contract) {
@@ -59,7 +53,6 @@ public record PolicyResponse(
         }
     }
 
-    /** Программа полиса с условиями обслуживания. Лимит и сооплата отдаются как есть: считает их ЛК HR. */
     public record ProgramLine(
             NamedRef program,
             BigDecimal limitAmount,
@@ -79,7 +72,6 @@ public record PolicyResponse(
     }
 
 
-    /** Условие обслуживания ({@code policy_services}): слой, процент сооплаты, срок. */
     public record ServiceLine(
             int layerNumber,
             BigDecimal copayment,

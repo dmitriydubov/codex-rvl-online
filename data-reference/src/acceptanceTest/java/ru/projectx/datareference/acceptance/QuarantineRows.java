@@ -7,10 +7,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-/**
- * Карантин сообщений 1С:УСК так, как его видит дежурный: таблица {@code quarantine} — очередь-источник, причина
- * (код SQLSTATE), тело байтами и момент приёма.
- */
 @Component
 public class QuarantineRows {
 
@@ -49,10 +45,6 @@ public class QuarantineRows {
         return jdbc.sql(COUNT).query(Long.class).single();
     }
 
-    /**
-     * Ставит момент приёма записи на {@code age} раньше времени часов стенда — тех же, по которым сервис считает срок
-     * хранения: часы стенда не остановлены, а ждать сутки нельзя.
-     */
     public void age(UUID messageId, Duration age) {
         int updated = jdbc.sql(AGE)
                 .param("now", clock.moment())
@@ -64,9 +56,6 @@ public class QuarantineRows {
         }
     }
 
-    /**
-     * Карантинная запись: очередь-источник, причина и тело (пусто — стёрто по сроку хранения).
-     */
     public record Row(String sourceQueue, String reason, @Nullable byte[] body) {
     }
 }

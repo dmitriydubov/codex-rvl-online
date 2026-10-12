@@ -36,10 +36,6 @@ import ru.projectx.datareference.repository.ProgramRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор страховых программ: программа РВЛ берёт реквизиты и перечень учреждений из последнего сообщения,
- * чужая неизвестная уходит в пропуск, а потерявшая признак РВЛ становится архивной и теряет перечень.
- */
 class ProgramMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -97,7 +93,6 @@ class ProgramMapperTest {
                 .isSameAs(sanatorium);
     }
 
-    /** Строка услуги без обязательного условия отклоняет сообщение до записи: частичной программы нет. */
     @Test
     void rvlProgramWithIncompleteRow_isRejectedWithoutSaving() {
         when(repository.findByExternalId(PROGRAM)).thenReturn(Optional.empty());

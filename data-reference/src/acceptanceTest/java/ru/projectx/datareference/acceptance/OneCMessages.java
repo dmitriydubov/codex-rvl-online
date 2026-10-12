@@ -16,20 +16,12 @@ import ru.projectx.datareference.mapper.OneCGuid;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Сообщения 1С:УСК о полисах, договорах страхования, контрагентах и программах из таблиц шагов «Дано». Обязательные
- * поля, которых сценарий не называет, заполняются вымышленными значениями; вид деятельности РВЛ и тип продукта ДМС
- * взяты из конфигурации контура, и их расхождение с ней ловит шаг разбора по ожидаемому исходу сообщения.
- */
 final class OneCMessages {
 
-    /** {@code projectx.onec.contract.rvl-activity-id} из application.yml. */
     private static final String RVL_ACTIVITY = "f3876c53-c7d8-4620-b364-9538164ba5d4";
-    /** {@code projectx.onec.contract.dms-product-type} из application.yml. */
     private static final String DMS_PRODUCT = "Личное страхование";
     private static final String INSURER_ROLE = "Страхователь";
     private static final BigDecimal POLICY_PROGRAM_LIMIT = new BigDecimal("150000.00");
-    /** {@code projectx.onec.policy.email-property} — умолчание {@code PolicyContractProperties}. */
     private static final String EMAIL_PROPERTY = "Адрес элпочты застрахованного";
     private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
     private static final String PLACEHOLDER_FIRST_NAME = "Шаг";
@@ -43,9 +35,7 @@ final class OneCMessages {
     private static final String LINE_AVAILABILITY = "условие обслуживания: доступность";
     private static final String POLICY_AVAILABILITY = "доступность";
 
-    /** Строка таблицы шага с явным {@code message-id} сообщения. */
     static final String MESSAGE_ID = "message-id";
-    /** Строка таблицы шага о байтах перед конвертом («UTF-8 BOM» или «ничего»); читает её шаг публикации. */
     static final String BEFORE_ENVELOPE = "перед конвертом";
 
     private static final String CONTRAGENTS_QUEUE = "1c-usk_to_rvl-online_contragents-ul-changes";
@@ -58,10 +48,6 @@ final class OneCMessages {
     private OneCMessages() {
     }
 
-    /**
-     * Контрагент без признака ЛПУ — страхователь (ТЗ-3). Строка в справочнике страхователей
-     * создаётся, а сообщение уходит в пропуск с причиной: санаторием оно не стало.
-     */
     static OneCMessage insurer(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование", "полное наименование");
         ObjectNode data = JSON.createObjectNode()
@@ -73,7 +59,6 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.SKIPPED);
     }
 
-    /** ЛПУ с видом деятельности РВЛ — санаторий (ТЗ-3). Пометка удаления — если сценарий её назвал. */
     static OneCMessage sanatorium(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование", DELETE_MARK);
         ObjectNode data = JSON.createObjectNode()
@@ -85,16 +70,10 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.CONTRAGENTS, CONTRAGENTS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Договор страхования продукта ДМС (ТЗ-2); страхователь — если сценарий его назвал. Строки
-     * «message-id» и «перед конвертом» — свойства доставки, а не договора: первая задаёт идентификатор
-     * сообщения явно, вторую читает шаг публикации в брокер.
-     */
     static OneCMessage insuranceContract(Map<String, String> table) {
         return insuranceContract(DMS_PRODUCT, InboundStatus.PROCESSED, table);
     }
 
-    /** Договор страхования другого продукта: разбор пропускает его, потому что сохраняются только договоры ДМС. */
     static OneCMessage insuranceContractOfProduct(String productType, Map<String, String> table) {
         return insuranceContract(productType, InboundStatus.SKIPPED, table);
     }
@@ -112,10 +91,6 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, expected, fixedMessageId(table));
     }
 
-    /**
-     * {@code message-id} из таблицы шага — только канонический GUID: иное значение — ошибка сценария, а не
-     * сообщение с испорченным конвертом (тот путь закрепляют тесты приёма).
-     */
     static @Nullable UUID fixedMessageId(Map<String, String> table) {
         return Optional.ofNullable(table.get(MESSAGE_ID))
                 .map(raw -> OneCGuid.parse(raw).orElseThrow(() -> new IllegalArgumentException(
@@ -123,7 +98,6 @@ final class OneCMessages {
                 .orElse(null);
     }
 
-    /** Программа РВЛ с одной строкой перечня учреждений (ТЗ-6). */
     static OneCMessage program(Map<String, String> table) {
         onlyKnown(table, "external_id", "наименование", "услуга: санаторий", "услуга: вид обращения",
                 "услуга: начало", "услуга: окончание", "услуга: слой", "услуга: прямое прикрепление",
@@ -146,11 +120,6 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.PROGRAMS, PROGRAMS_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Полис со сроком действия (ТЗ-1); программа полиса, строка условий обслуживания, отчество, пол, e-mail,
-     * доступность и пометка удаления — если сценарий их назвал. Фамилия, имя и дата рождения обязательны
-     * в контракте: не названные сценарием заполняются заглушками.
-     */
     static OneCMessage policy(Map<String, String> table) {
         onlyKnown(table, "external_id", "номер", "договор", "программа", BEGIN, "окончание",
                 "фамилия", "имя", "отчество", "дата рождения", "пол", "e-mail", DELETE_MARK, POLICY_AVAILABILITY,
@@ -171,10 +140,6 @@ final class OneCMessages {
         return new OneCMessage(OneCStream.POLICIES, POLICIES_QUEUE, data, InboundStatus.PROCESSED);
     }
 
-    /**
-     * Строка условий обслуживания по программе: первый слой без франшизы. Начало, окончание и доступность — если
-     * сценарий их назвал, иначе строка начинается в день начала полиса, бессрочна и доступна.
-     */
     private static void addServiceLine(ObjectNode policy, String program, Map<String, String> table) {
         ObjectNode line = policy.putArray("services").addObject()
                 .put("idProgramm", program)
@@ -185,11 +150,6 @@ final class OneCMessages {
         Optional.ofNullable(table.get(LINE_END)).ifPresent(end -> line.put("endDate", end));
     }
 
-    /**
-     * Застрахованный полиса. Заглушки нарочно не совпадают со значениями сценариев: шаг,
-     * который забыл бы взять ФИО из таблицы, иначе выглядел бы как правильный. Почта в сообщении полиса —
-     * не поле, а дополнительное свойство полиса с именем из конфигурации контура.
-     */
     private static void addInsured(ObjectNode policy, Map<String, String> table) {
         policy.put("lastName", table.getOrDefault("фамилия", PLACEHOLDER_LAST_NAME))
                 .put("firstName", table.getOrDefault("имя", PLACEHOLDER_FIRST_NAME))

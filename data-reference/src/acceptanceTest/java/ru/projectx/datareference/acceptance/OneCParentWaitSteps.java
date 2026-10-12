@@ -13,12 +13,6 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
-/**
- * Шаги о сообщении 1С:УСК, пришедшем раньше своего родителя: присланные записи, повторные проходы разбора, давность
- * ожидания и исход «ждёт родителя».
- *
- * <p>Исход читается по строке сырья так, как её видит дежурный: статус и причина дословно.
- */
 public class OneCParentWaitSteps {
 
     private static final Duration HOUR = Duration.ofHours(1);
@@ -52,7 +46,6 @@ public class OneCParentWaitSteps {
         OneCParentWaitMessages.contractsOfUnknownSanatoriums(count).forEach(inbox::receive);
     }
 
-    /** Штатные проходы разбора друг за другом: столько, сколько звеньев у цепочки ожидающих записей. */
     @Когда("Дата-референс разбирает присланные сообщения ещё {int} раза подряд")
     public void importPasses(int passes) {
         assertThat(passes).as("число проходов в шаге").isPositive();
@@ -61,7 +54,6 @@ public class OneCParentWaitSteps {
         }
     }
 
-    /** Срок берётся из настроек сервиса: сценарий закрепляет границу, а не число. */
     @Дано("с начала ожидания родителя прошло на час {word} срока ожидания родителя")
     public void parentWaitsAgedAroundTimeout(String moreOrLess) {
         assertThat(AGE_AROUND_TIMEOUT).as("давность, которую умеет изображать шаг").containsKey(moreOrLess);

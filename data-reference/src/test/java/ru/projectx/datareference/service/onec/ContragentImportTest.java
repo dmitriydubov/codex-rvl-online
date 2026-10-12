@@ -17,11 +17,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает отбор в потоке контрагентов: он несёт всех юрлиц 1С:УСК, а санаторием становится только контрагент
- * с видом деятельности РВЛ (восстановительное лечение). Поэтому здесь важен не столько маппинг полей, сколько то,
- * какие сообщения доходят до таблиц санаториев и страхователей.
- */
 @IntegrationTest
 class ContragentImportTest {
 
@@ -64,7 +59,6 @@ class ContragentImportTest {
         assertThat(insurerRepository.count()).isZero();
     }
 
-    /** Контрагент без РВЛ — это просто не наше юрлицо, а не ошибка. */
     @Test
     void contragentWithoutRvlActivity_isSkipped() {
         ImportOutcome result = importOne(contragent(true, OTHER_ACTIVITY, "ООО «Ромашка»"));
@@ -73,11 +67,6 @@ class ContragentImportTest {
         assertThat(lpuRepository.count()).isZero();
     }
 
-    /**
-     * У известного нам санатория пропал вид деятельности РВЛ. Запись
-     * не удаляется — физического удаления нет нигде, — а помечается архивной.
-     * Реквизиты при этом обновляются: сообщение принесло актуальные.
-     */
     @Test
     void knownSanatoriumLosingRvl_isArchivedAndStillUpdated() {
         importOne(contragent(true, RVL, "Санаторий «Заря»"));
@@ -89,7 +78,6 @@ class ContragentImportTest {
         assertThat(sanatorium.name()).isEqualTo("Санаторий «Заря» (переименован)");
     }
 
-    /** Контрагент, который не ЛПУ, считается страхователем, и фильтр по виду деятельности к нему не применяется. */
     @Test
     void contragentThatIsNotLpu_becomesInsurer() {
         importOne(contragent(false, OTHER_ACTIVITY, "АО «Работодатель»"));
@@ -98,11 +86,6 @@ class ContragentImportTest {
         assertThat(lpuRepository.count()).isZero();
     }
 
-    /**
-     * Страхователь записан — но исход всё равно пропуск, и причина называет, куда он лёг.
-     * Иначе «в lpu пусто, потому что таких контрагентов не присылали» и «пусто, потому
-     * что все они оказались страхователями» выглядят в сырье одинаково.
-     */
     @Test
     void insurerIsStored_butMessageIsSkippedWithReason() {
         ImportOutcome result = importOne(contragent(false, OTHER_ACTIVITY, "АО «Работодатель»"));
@@ -113,10 +96,6 @@ class ContragentImportTest {
         assertThat(insurerRepository.findByExternalId(CONTRAGENT_ID)).isPresent();
     }
 
-    /**
-     * Версии у сообщений контрагентов нет, и защиты от переприменения тоже: действует последнее полученное
-     * сообщение, даже если по содержанию оно старее.
-     */
     @Test
     void lastMessageWins_thereIsNoVersionGuard() {
         importOne(contragent(true, RVL, "Санаторий «Заря»"));
@@ -135,7 +114,6 @@ class ContragentImportTest {
         return importService.importMessage(message);
     }
 
-    /** Имена полей кириллические — это ключи JSON источника, а не наш словарь. */
     private static String contragent(boolean thisIsLpu, String activityGuid, String name) {
         return """
                 {"guid":"%s","thisIsLPU":%b,"Наименование":"%s","НаименованиеПолное":"%s",\

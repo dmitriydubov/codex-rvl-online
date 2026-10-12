@@ -16,11 +16,6 @@ import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.ProgramRepository;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает страховые программы РВЛ из 1С:УСК с перечнем учреждений. Программа, потерявшая признак РВЛ, становится
- * архивной и теряет перечень, а не удаляется. Отброшенные строки перечня пишутся в журнал, чтобы перечень, сократившийся
- * до нуля, отличался от программы, у которой учреждений и правда нет.
- */
 @Component
 public class ProgramMapper implements StreamMapper {
 

@@ -5,10 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Шаги «1С:УСК прислала …» о частях передачи прайса по услуге с заданными сценарием {@code message-id} и
- * идентификатором передачи. Сырьё ложится так, как его сохранил бы приём из очереди.
- */
 public class OneCPriceTransferSteps {
 
     private final OneCInbox inbox;

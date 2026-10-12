@@ -7,11 +7,6 @@ import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
-/**
- * Код SQLSTATE берётся у самого глубокого {@link SQLException} в цепочке причин: драйвер PostgreSQL
- * кладёт код поверх {@code IOException}, а Spring и Hibernate оборачивают ошибку драйвера своими
- * исключениями без кода.
- */
 class SqlStatesTest {
 
     private static final String TEXT = "отказ";
@@ -40,7 +35,6 @@ class SqlStatesTest {
         assertThat(SqlStates.deepest(new SQLException(TEXT))).isEmpty();
     }
 
-    /** Исключение JDBC без кода глубже в цепочке не затирает код, который стоит выше него. */
     @Test
     void deeperSqlExceptionWithoutState_doesNotHideTheOuterState() {
         var outer = new SQLException(TEXT, "22P05", new SQLException(TEXT));

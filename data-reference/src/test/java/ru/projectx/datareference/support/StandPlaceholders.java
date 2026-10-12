@@ -12,11 +12,6 @@ import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Плейсхолдеры {@code {имя}} в примерах стенда стоят на месте значений, которые генерирует сервис: {@code id}
- * и {@code X-Request-Id}. Плейсхолдер связывается со значением ответа там, где встретился впервые, и дальше
- * подставляется в следующие запросы и ответы. Связанные значения живут один проход примеров.
- */
 public final class StandPlaceholders {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-z_]+)}");
@@ -32,10 +27,6 @@ public final class StandPlaceholders {
                 .collect(Collectors.toSet());
     }
 
-    /**
-     * Связывает ещё не известные плейсхолдеры ожидания со значениями ответа на тех же местах. Расхождение по структуре
-     * покажет сравнение, а здесь такое место получает только отказ формата.
-     */
     public void bind(JsonNode expected, JsonNode actual) {
         if (expected.isObject()) {
             expected.properties().forEach(field -> bind(field.getValue(), actual.path(field.getKey())));
@@ -50,7 +41,6 @@ public final class StandPlaceholders {
         }
     }
 
-    /** То же для заголовка ответа: у него значение — строка, а не узел JSON. */
     public void bindValue(String expected, String actual) {
         Matcher whole = PLACEHOLDER.matcher(expected);
         if (!whole.matches() || bound.containsKey(whole.group(1))) {
@@ -61,7 +51,6 @@ public final class StandPlaceholders {
         bound.put(name, actual);
     }
 
-    /** Подставляет связанные значения. Несвязанный плейсхолдер — ошибка порядка примеров. */
     public String resolve(String template) {
         return PLACEHOLDER.matcher(template).replaceAll(match -> Matcher.quoteReplacement(valueOf(match.group(1))));
     }

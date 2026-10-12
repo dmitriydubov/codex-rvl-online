@@ -3,10 +3,6 @@ package ru.projectx.datareference.acceptance;
 import io.cucumber.java.ru.Когда;
 import java.util.UUID;
 
-/**
- * Шаги о времени и ручной работе с сырьём 1С:УСК: наступивший срок повтора и возврат сообщения к разбору дежурным.
- * Оба меняют строки сырья запросом, как это сделали бы время и дежурный, а разбирает их потом штатный проход.
- */
 public class OneCRetrySteps {
 
     private final OneCInbox inbox;

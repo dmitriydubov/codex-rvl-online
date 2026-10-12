@@ -24,11 +24,6 @@ import ru.projectx.datareference.repository.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Проверяет чтение полисов через REST поверх настоящей базы, включая полис для сервиса Договоров без персональных
- * данных. Часы остановлены на {@link ru.projectx.datareference.support.FixedClockConfig#NOW} (14.03.2026 по Москве),
- * от него считается «действующий на сегодня». Все ФИО, даты рождения, почта и номера полисов вымышленные.
- */
 @IntegrationTest
 class PolicyApiTest {
 
@@ -103,10 +98,6 @@ class PolicyApiTest {
         assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(policy.id().toString());
     }
 
-    /**
-     * Архивный полис отдаётся с признаком архива, а не как «не найден», и ФИО, дата рождения, пол и почта в ответ
-     * не попадают. Сравнение строгое: лишнее поле роняет тест так же, как неверное значение.
-     */
     @Test
     void contractView_archivedPolicyWithOpenEnd_isOnlyKeysPeriodAndArchiveFlag() {
         LocalDate begin = TODAY.minusMonths(1);
@@ -195,10 +186,6 @@ class PolicyApiTest {
                 .containsExactly("99 TS T/000001/1", "99 TS T/000001/12");
     }
 
-    /**
-     * В подсказку попадают только полисы, по которым сотрудника можно направить на лечение: архивные,
-     * истёкшие, ещё не начавшиеся и полисы без программы РВЛ поиск пропускает.
-     */
     @Test
     void search_skipsArchivedExpiredFutureAndNonRvlPolicies() {
         savePolicy("П-000020", "Фильтров", "Действует", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));
@@ -247,10 +234,6 @@ class PolicyApiTest {
         assertThat(result).bodyJson().extractingPath("$.items[0].last_name").isEqualTo("Пределов");
     }
 
-    /**
-     * Ранг и предел считает один запрос в базе, поэтому предел режет уже ранжированный список, а не алфавитный.
-     * Совпавшая фамилия и точно совпавший номер идут раньше, хотя по алфавиту второй полис был бы первым.
-     */
     @Test
     void search_limitAppliesAfterRanking_notAlphabet() {
         savePolicy("П-000040", "Алфавитов", "Ранг", null, TODAY.minusMonths(1), null, List.of(RVL_PROGRAM_EXT));

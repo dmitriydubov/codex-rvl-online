@@ -5,11 +5,6 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Шаги «1С:УСК прислала …» о денежных полях прайса, полиса и программы, которые не помещаются в колонку, и о целых
- * полях полиса за пределом целого. Программа и
- * полис строятся из присланных сценарием раньше, прайс — заново. Ожидаемый исход разбора несёт само сообщение.
- */
 public class OneCMoneyLimitSteps {
 
     private final OneCInbox inbox;

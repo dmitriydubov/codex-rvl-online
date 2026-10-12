@@ -11,10 +11,6 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.entity.PersonalDataCutoff;
 import ru.projectx.datareference.entity.Policy;
 
-/**
- * У многих полей ответа с полисом один тип (строки ФИО, даты), и перепутанные местами значения ушли бы
- * вызывающему молча, поэтому каждое поле проверяется отдельно.
- */
 class PolicyResponseTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");
@@ -45,7 +41,6 @@ class PolicyResponseTest {
                 "Тестов", "Макет", null, BIRTH, null, null, BEGIN, null, false, true, false, null, List.of()));
     }
 
-    /** Стёртые по сроку данные приходят пустыми и с признаком, а реквизиты и пол — как были. */
     @Test
     void of_policyWithErasedPersonalData_hasEmptyNameBirthDateEmailAndTheMark() {
         Policy policy = policy(new Policy.Details(UUID.randomUUID(), "П-0004", "Тестов", "Макет", "Заглушкович",

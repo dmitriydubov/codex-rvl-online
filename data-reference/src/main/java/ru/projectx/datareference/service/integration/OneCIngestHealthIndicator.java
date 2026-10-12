@@ -5,11 +5,6 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
-/**
- * Компонент {@code onecIngest} ручки здоровья: UP, только когда у каждой очереди, которую сервису велено читать, есть
- * потребитель с подтверждённой брокером подпиской. Так мониторинг отличает «сообщений нет» от «их никто не читает».
- * Имя бина задаёт имя компонента, на которое смотрит мониторинг: Spring Boot отбрасывает суффикс {@code HealthIndicator}.
- */
 @Component("onecIngestHealthIndicator")
 public class OneCIngestHealthIndicator implements HealthIndicator {
 

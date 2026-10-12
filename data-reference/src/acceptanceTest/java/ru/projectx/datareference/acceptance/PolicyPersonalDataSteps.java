@@ -22,11 +22,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Шаги обезличивания полисов: часы около границы запаса, состояние персональных данных полиса прямо в базе и журнал
- * прохода стирания. Запас берётся из настроек сервиса, поэтому сценарии закрепляют границу, а не число суток.
- * Состояние читается из таблицы полисов, а не из ответа: иначе маскировку при чтении не отличить от стирания.
- */
 public class PolicyPersonalDataSteps {
 
     private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");
@@ -127,7 +122,6 @@ public class PolicyPersonalDataSteps {
         return LocalDateTime.parse(moment, MOMENT).atZone(MOSCOW);
     }
 
-    /** ФИО, дата рождения ({@code yyyy-mm-dd}) и почта застрахованного. */
     private record PersonalData(@Nullable String lastName, @Nullable String firstName, @Nullable String middleName,
                                 @Nullable String dateOfBirth, @Nullable String email) {
 
@@ -138,7 +132,6 @@ public class PolicyPersonalDataSteps {
         }
     }
 
-    /** Полис, как его видно в таблице, или каким его должно сохранить сообщение 1С. */
     private record StoredPolicy(String number, String beginDate, @Nullable String endDate, boolean archive,
                                 @Nullable String gender, PersonalData personalData, boolean erased) {
 
@@ -165,7 +158,6 @@ public class PolicyPersonalDataSteps {
             return node.isMissingNode() ? null : node.asString();
         }
 
-        /** Дата сообщения 1С бывает моментом; в таблице — календарный день, как он написан. */
         private static @Nullable String day(JsonNode node) {
             return node.isMissingNode() ? null : node.asString().substring(0, DAY_LENGTH);
         }

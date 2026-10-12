@@ -11,10 +11,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-/**
- * Защищает настройки задач по расписанию: умолчания, привязку из свойств и значения, которые не пускают сервис
- * в работу. Неверное значение обязано уронить запуск, а не всплыть потом тиком не в тот момент.
- */
 class ImportPropertiesTest {
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()
@@ -38,7 +34,6 @@ class ImportPropertiesTest {
         });
     }
 
-    /** Каждый интервал читается из своего свойства: опечатка в имени молча оставила бы умолчание. */
     @Test
     void schedules_areBoundFromTheirProperties() {
         context.withPropertyValues("projectx.import.poll-interval=11s", "projectx.import.retention-poll-interval=2h",
@@ -53,10 +48,6 @@ class ImportPropertiesTest {
                 });
     }
 
-    /**
-     * Нулевую паузу пул планировщика отвергает исключением при регистрации задачи, не называя свойства.
-     * Проверка при привязке называет его.
-     */
     @ParameterizedTest
     @CsvSource({"poll-interval,pollInterval", "retention-poll-interval,retentionPollInterval",
             "stuck-transfer-poll-interval,stuckTransferPollInterval"})
@@ -75,10 +66,6 @@ class ImportPropertiesTest {
                         .rootCause().hasMessageContaining("stuckTransferThreshold"));
     }
 
-    /**
-     * Со сроком хранения тела около нуля стирались бы тела ещё не разобранных полисов,
-     * и разобрать их стало бы нечем. Поэтому срок меньше суток не пускает сервис в работу.
-     */
     @Test
     void payloadTtlBelowOneDay_failsStartup() {
         context.withPropertyValues("projectx.import.payload-ttl=23h")
@@ -87,7 +74,6 @@ class ImportPropertiesTest {
                         .rootCause().hasMessageContaining("payloadTtl"));
     }
 
-    /** Сутки — наименьший срок хранения; срок ожидания родителя тогда должен быть короче суток. */
     @Test
     void payloadTtlOfOneDay_isAccepted() {
         context.withPropertyValues("projectx.import.payload-ttl=1d", "projectx.import.parent-wait-timeout=12h")
@@ -103,10 +89,6 @@ class ImportPropertiesTest {
                         .rootCause().hasMessageContaining("stuckTransferReportLimit"));
     }
 
-    /**
-     * Явно пустое значение, например пустая переменная окружения, — это умолчание, а не нулевая задержка:
-     * иначе забытое значение в манифесте молча вернуло бы первый проход на старт.
-     */
     @Test
     void emptyInitialDelay_fallsBackToDefault() {
         context.withPropertyValues("projectx.import.initial-delay=")
@@ -121,7 +103,6 @@ class ImportPropertiesTest {
                         .isEqualTo(Duration.ofMinutes(2)));
     }
 
-    /** Ноль — осознанное «без задержки»: это значение, а не ошибка. */
     @Test
     void zeroInitialDelay_isAccepted() {
         context.withPropertyValues("projectx.import.initial-delay=0s")
@@ -129,10 +110,6 @@ class ImportPropertiesTest {
                         .isZero());
     }
 
-    /**
-     * Отрицательную задержку планировщик Spring молча принимает за нулевую, и первый проход случается
-     * сразу на старте, ровно то, от чего задержка защищает. Наносекунда ниже нуля проверяет саму границу.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"-1s", "-1ns"})
     void negativeInitialDelay_failsStartup(String initialDelay) {
@@ -178,10 +155,6 @@ class ImportPropertiesTest {
                         .rootCause().hasMessageContaining(component));
     }
 
-    /**
-     * Тело ожидающего сообщения не стирается, поэтому срок ожидания должен быть короче срока хранения тела.
-     * Иначе сервис не стартует, и ошибка называет оба свойства.
-     */
     @ParameterizedTest
     @CsvSource({"30d,30d,false", "31d,30d,false", "2d,1d,false", "29d,30d,true", "PT719H59M59S,30d,true"})
     void parentWaitAgainstPayloadTtl_decidesTheStartup(String timeout, String payloadTtl, boolean starts) {

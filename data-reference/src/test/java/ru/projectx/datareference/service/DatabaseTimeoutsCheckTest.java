@@ -22,11 +22,6 @@ import ru.projectx.datareference.config.RestReadPoolProperties;
 import ru.projectx.datareference.repository.SessionSettingsRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Проверка таймаутов при старте: у соединения пула значения из настройки, у соединения миграций ноль. Расхождение
- * пишется в журнал предупреждением с параметром и обоими значениями, без адресов и персональных данных, а старт
- * не прерывается.
- */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class DatabaseTimeoutsCheckTest {
 
@@ -36,7 +31,6 @@ class DatabaseTimeoutsCheckTest {
             "lock_timeout", Duration.ofSeconds(5),
             "statement_timeout", Duration.ofSeconds(30),
             "idle_in_transaction_session_timeout", Duration.ofMinutes(1));
-    /** Сетевой тайм-аут пула REST-чтений по умолчанию: лимит чтения (3 с) и ожидание отмены (2 с). */
     private static final int REST_SOCKET_TIMEOUT_SECONDS = 5;
     private static final Map<String, Duration> DISABLED = Map.of(
             "lock_timeout", Duration.ZERO,
@@ -76,7 +70,6 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output).doesNotContain("WARN");
     }
 
-    /** Пулер выбросил {@code options}: у сеанса пула умолчания сервера, то есть нули. */
     @Test
     void poolWithoutTimeouts_warnsPerParameter_withBothValues(CapturedOutput output) {
         withMigrations();
@@ -92,7 +85,6 @@ class DatabaseTimeoutsCheckTest {
                 "параметр=idle_in_transaction_session_timeout, ожидается=PT1M, фактически=PT0S");
     }
 
-    /** Таймаут на роли или базе достался и миграциям — долгая миграция оборвётся. */
     @Test
     void migrationsWithTimeout_warn(CapturedOutput output) {
         withMigrations();
@@ -133,7 +125,6 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
     }
 
-    /** Проверка — наблюдение, а не условие старта: недоступная база или права на pg_settings — WARN, не отказ. */
     @Test
     void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnection(CapturedOutput output) {
         withMigrations();
@@ -147,7 +138,6 @@ class DatabaseTimeoutsCheckTest {
                 .doesNotContain("Иванов");
     }
 
-    /** Миграции в контуре могут идти отдельно ({@code spring.liquibase.enabled=false}) — проверять нечего. */
     @Test
     void withoutLiquibase_warnsThatMigrationsAreNotChecked(CapturedOutput output) {
         when(liquibaseProvider.getIfAvailable()).thenReturn(null);
@@ -159,7 +149,6 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
     }
 
-    /** Лимит REST-чтения не меньше lock_timeout — под чужой блокировкой REST уже не отказывает первым. */
     @Test
     void readTimeoutNotBelowLockTimeout_warns(CapturedOutput output) {
         withMigrations();
@@ -184,10 +173,6 @@ class DatabaseTimeoutsCheckTest {
         assertThat(output).doesNotContain("лимит REST-чтения");
     }
 
-    /**
-     * Сетевой тайм-аут пула REST-чтений меньше лимита чтения вместе с ожиданием отмены (3 с + 2 с) — он оборвёт
-     * медленное чтение раньше, чем его отменит сама база, и вместе с ним соединение.
-     */
     @Test
     void restSocketTimeoutBelowReadLimitAndCancel_warns(CapturedOutput output) {
         withMigrations();

@@ -13,11 +13,6 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Строка условий обслуживания по полису: слой, процент франшизы и период; «строкой», потому что «сервисом» в коде
- * называется другое. Франшиза хранится как есть и в расчёт не идёт, как лимит в {@link PolicyProgram}.
- * Программа здесь необязательна, нулевой GUID значит «нет».
- */
 @Entity
 @Table(name = "policy_services")
 public class PolicyServiceLine {
@@ -54,7 +49,6 @@ public class PolicyServiceLine {
     private Instant createdAt;
 
     protected PolicyServiceLine() {
-        // JPA
     }
 
     private PolicyServiceLine(Policy policy, Row row, Instant now) {
@@ -73,7 +67,6 @@ public class PolicyServiceLine {
         return new PolicyServiceLine(policy, row, now);
     }
 
-    /** Разобранная строка табличной части условий обслуживания. */
     public record Row(
             @Nullable UUID externalProgramId,
             int layerNumber,

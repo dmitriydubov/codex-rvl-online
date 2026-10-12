@@ -19,16 +19,10 @@ import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает смысл отказа пула в соединении, то есть недоступной базы: для приёма из 1С:УСК это временный отказ хранилища
- * с паузой потребителей, для разбора по расписанию — временный отказ с повтором позже. Короткое ожидание соединения
- * меняет только скорость отказа, и проверка, ожила ли база, отвечает «нет» за секунды.
- */
 @IntegrationTest
 class IngestPoolWaitTest {
 
     private static final Duration CONNECTION_TIMEOUT = Duration.ofSeconds(2);
-    /** Пауза между проверками базы во время паузы приёма: проверка обязана укладываться в неё с запасом. */
     private static final Duration STORAGE_CHECK_INTERVAL = Duration.ofSeconds(10);
 
     @Autowired
@@ -46,10 +40,6 @@ class IngestPoolWaitTest {
     @Autowired
     private PlatformTransactionManager transactions;
 
-    /**
-     * Проверка базы и разбор идут в потоках задач по расписанию, без HTTP-запроса. Spring кладёт в поток теста
-     * HTTP-запрос-заглушку, и без сброса чтение «только чтение» ушло бы в пул REST-чтений, а не в пул приложения.
-     */
     @BeforeEach
     void outsideHttpRequest() {
         RequestContextHolder.resetRequestAttributes();

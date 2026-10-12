@@ -11,7 +11,6 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.Mkb10Repository;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Разбирает справочник диагнозов МКБ-10 из 1С:УСК целиком, без фильтра. */
 @Component
 public class Mkb10Mapper extends UnfilteredStreamMapper<Mkb10, Mkb10.Details> {
 

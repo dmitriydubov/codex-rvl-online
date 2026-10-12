@@ -17,10 +17,6 @@ import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Стёртое по сроку хранения тело не возвращается в строку, когда разбор сохраняет исход сообщения, прочитанного до
- * стирания. Разбор строку не блокирует, и проход стирания может зафиксироваться между чтением и сохранением исхода.
- */
 @IntegrationTest
 class InboundPayloadErasureTest {
 

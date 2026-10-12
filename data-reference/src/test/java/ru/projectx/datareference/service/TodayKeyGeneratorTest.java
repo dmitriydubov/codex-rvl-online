@@ -12,10 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.cache.interceptor.SimpleKey;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Ключ кэша начинается с сегодняшнего дня контура (Europe/Moscow), а не дня UTC: в 21:30 UTC в Москве уже
- * следующие сутки, и ответ вчерашнего дня не должен отдаваться.
- */
 class TodayKeyGeneratorTest {
 
     private static final UUID LPU = UUID.fromString("b515b8fc-d13c-4b0b-aae3-33e0ca86ff1c");

@@ -31,11 +31,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор адреса санатория из контактной информации: адрес берётся по предпочтению видов из настроек,
- * а сообщение без подходящего адреса очищает прежний адрес и регион. Контакты не нашего контрагента пропускаются,
- * а ещё не пришедшего ждут его. Данные вымышленные.
- */
 class LpuContactMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -211,7 +206,6 @@ class LpuContactMapperTest {
         verifyNoInteractions(repository);
     }
 
-    /** Контакты санатория: GUID санатория в фильтре сообщения и строки в наборе. */
     private static ObjectNode contacts(ObjectNode... rows) {
         ObjectNode data = JSON.createObjectNode();
         data.set("filter", filter("object", SANATORIUM));

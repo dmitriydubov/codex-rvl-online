@@ -7,10 +7,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Страхователь, то есть юридическое лицо, застраховавшее своих сотрудников. Приходит одним потоком с санаториями
- * как контрагент без отметки лечебного учреждения, и сохраняются все такие контрагенты без отбора.
- */
 @Entity
 @Table(name = "insurers")
 public class Insurer extends OneCEntity {
@@ -31,14 +27,12 @@ public class Insurer extends OneCEntity {
     private String kpp;
 
     protected Insurer() {
-        // JPA
     }
 
     private Insurer(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static Insurer create(UUID externalId, Details details, Instant now) {
         Insurer insurer = new Insurer(externalId, now);
         insurer.applySnapshot(details, now);
@@ -53,7 +47,6 @@ public class Insurer extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения о контрагенте-страхователе. */
     public record Details(
             String name,
             @Nullable String fullName,

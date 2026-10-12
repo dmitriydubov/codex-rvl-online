@@ -8,19 +8,12 @@ import java.util.regex.Pattern;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Проверки ответа Дата-референса: статус, поля тела JSON и {@code X-Request-Id}. Число сравнивается по величине, и
- * строка {@code "1"} совпала бы с «1», потому что спецификация типов не называет; «null», «true» и «false» совпадают
- * только с литералом JSON. Объект, список и отсутствующее поле не равны ничему, в том числе «null».
- */
 public class ResponseSteps {
 
     private static final String NULL = "null";
     private static final Set<String> JSON_LITERALS = Set.of(NULL, "true", "false");
-    /** UUID, каким его выдаёт сервис: 8-4-4-4-12 шестнадцатеричных цифр в нижнем регистре. */
     private static final Pattern ISSUED_UUID =
             Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-    /** Перечень полей в шаге: имена через запятую, пробелы вокруг запятой не значимы. */
     private static final Pattern FIELD_LIST = Pattern.compile("\\s*,\\s*");
 
     private final ContractsService contracts;
@@ -60,11 +53,6 @@ public class ResponseSteps {
         assertThat(actual.isArray() && actual.isEmpty()).as("поле %s — пустой список: %s", field, actual).isTrue();
     }
 
-    /**
-     * Поля нет вовсе — не «есть и пусто»: {@code null} в ответе тоже раскрыл бы, что поле существует.
-     * Тело при этом — объект JSON: в пустом теле или списке путь тоже ничего не находит, и проверка
-     * прошла бы вхолостую.
-     */
     @Тогда("поля {string} в ответе нет")
     public void fieldAbsent(String field) {
         JsonNode body = objectBody();
@@ -73,10 +61,6 @@ public class ResponseSteps {
                 .isTrue();
     }
 
-    /**
-     * Поля верхнего уровня тела — ровно названные, в любом порядке: лишнее поле (в том числе
-     * {@code null}) проваливает проверку так же, как недостающее.
-     */
     @Тогда("ответ состоит ровно из полей {string}")
     public void responseHasExactlyFields(String fields) {
         JsonNode body = objectBody();
@@ -100,11 +84,6 @@ public class ResponseSteps {
         soleRequestId();
     }
 
-    /**
-     * Сервис выдал свой идентификатор: ровно один заголовок, и в нём UUID. Присланное значение,
-     * возвращённое как есть, эту проверку не проходит: недопустимые значения сценариев на UUID
-     * не похожи (см. request_id.feature).
-     */
     @Тогда("заголовок X-Request-Id ответа — новый UUID")
     public void requestIdIsIssuedUuid() {
         assertThat(soleRequestId()).as("заголовок X-Request-Id").matches(ISSUED_UUID);

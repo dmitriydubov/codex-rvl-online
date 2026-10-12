@@ -22,11 +22,6 @@ import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает правило «передача прайса — это прайс одной услуги» и выбор строки услуги, которую блокирует часть
- * передачи: часть, которая называет другую услугу, чем части в буфере, или не называет её читаемым GUID, отклоняется
- * раньше, чем что-то заблокировано, а отказ передачи блокирует ту же услугу, что и проверка зависших передач.
- */
 class PriceTransferServiceLockTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -47,7 +42,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations).lockByService(SERVICE);
     }
 
-    /** Услуга сверяется с частями в буфере раньше, чем блокируется её строка. */
     @Test
     void serviceIsCheckedAgainstBufferedParts_beforeItsRowIsLocked() {
         bufferedParts(SERVICE.toString());
@@ -69,7 +63,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
-    /** Часть в буфере без читаемого GUID услуги не называет ту же услугу: собрать передачу по одной услуге нельзя. */
     @Test
     void partWithoutService_isDefect() {
         assertThatThrownBy(() -> lock.lockServiceOf(CID, json.createObjectNode()))
@@ -78,7 +71,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
-    /** Исход передачи уже записан: поздняя часть разделяет его, и какую услугу она называет, не проверяется. */
     @Test
     void partOfTransferWithRecordedOutcome_isNotChecked_andLocksItsReadableService() {
         outcomeRecorded();
@@ -99,10 +91,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
-    /**
-     * При отказе блокируется услуга, которую называют части передачи в буфере, — та же, что блокирует проверка
-     * зависших передач, даже если отклоняемая часть называет другую.
-     */
     @Test
     void transferService_isTheServiceOfBufferedParts() {
         when(inbound.findBufferedTransferService(CID)).thenReturn(Optional.of(SERVICE.toString()));
@@ -113,7 +101,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(OTHER_SERVICE);
     }
 
-    /** Частей в буфере нет: блокируется услуга, которую называет сама отклоняемая часть. */
     @Test
     void transferWithoutBufferedParts_locksServiceOfThePart() {
         when(inbound.findBufferedTransferService(CID)).thenReturn(Optional.empty());
@@ -123,7 +110,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations).lockByService(SERVICE);
     }
 
-    /** Ни части в буфере, ни сама часть не называют услугу читаемым GUID: блокировать нечего. */
     @Test
     void transferWithoutReadableService_locksNothing() {
         when(inbound.findBufferedTransferService(CID)).thenReturn(Optional.of("не GUID"));
@@ -134,7 +120,6 @@ class PriceTransferServiceLockTest {
         verify(finalizations, never()).lockByService(any());
     }
 
-    /** Исход передачи записан, если хотя бы одна её часть применена, пропущена или отклонена. */
     private void outcomeRecorded() {
         when(inbound.existsByCorrelationIdAndStatusIn(
                 CID, EnumSet.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED, InboundStatus.FAILED)))

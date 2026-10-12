@@ -11,16 +11,10 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
 
-/**
- * Ищет полисы действующего договора для подсказки «найти сотрудника» по входу, уже проверенному
- * {@link PolicySearchService}: при недоступной базе неверный запрос не должен получать 503. Строка с цифрами
- * ищется как номер, иначе каждое слово должно начинать фамилию, имя или отчество.
- */
 @Service
 class PolicySearchLookup {
 
     private static final Pattern DIGIT = Pattern.compile("\\d");
-    /** Слова в нормализованной строке поиска разделены ровно одним пробелом. */
     static final String WORD_SEPARATOR = " ";
 
     private final PolicyRepository policies;
@@ -35,7 +29,6 @@ class PolicySearchLookup {
         this.calendar = calendar;
     }
 
-    /** Строка уже нормализована: слова разделены одним пробелом, буквы в нижнем регистре. */
     @RestReadTransaction
     public PolicySearchResponse search(UUID contractExternalId, String query, int limit) {
         LocalDate today = calendar.today();

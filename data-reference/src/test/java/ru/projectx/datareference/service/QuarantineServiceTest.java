@@ -20,10 +20,6 @@ import ru.projectx.datareference.entity.QuarantinedMessage;
 import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
-/**
- * Карантин идемпотентен по {@code message-id}: повторная доставка уже карантинного сообщения второй записи не
- * создаёт, а новая запись несёт тело, очередь, причину и момент по часам сервиса.
- */
 @ExtendWith(MockitoExtension.class)
 class QuarantineServiceTest {
 

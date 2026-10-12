@@ -9,11 +9,6 @@ import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.repository.Mkb10Row;
 
-/**
- * Читает МКБ-10 из базы по входу, который уже проверил {@link Mkb10QueryService}. Транзакция берёт соединение
- * при открытии, поэтому проверка идёт до неё: иначе при недоступной базе неверный запрос получил бы 503
- * и вызывающий повторял бы его без конца.
- */
 @Service
 class Mkb10Lookup {
 
@@ -33,7 +28,6 @@ class Mkb10Lookup {
         return response(mkb10.findActiveByNamePattern(LikePatterns.substring(namePart.toLowerCase(Locale.ROOT)), limit));
     }
 
-    /** Архивные коды тоже отдаются: на них ссылаются старые заявки. */
     @RestReadTransaction
     public Mkb10Response byCodes(List<String> codes) {
         return response(mkb10.findByCodes(codes));
