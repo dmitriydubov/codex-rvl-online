@@ -1,0 +1,37 @@
+{
+  "description": "Программа по id data-reference: наименование, external_id, перечень услуг (учреждения программы, ТЗ-6). Дата 3000-01-01 источника — открытая дата, в ответе null.",
+  "placeholders": {
+    "program_id": "UUID, id программы у data-reference; в прогоне стенда — из примера 01 (R-05); сервис Договоров хранит id программы у себя и полис с ПДн для этого не читает",
+    "lpu_id": "UUID, id санатория у data-reference; генерирует сервис"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/programs/{program_id}",
+    "headers": { "X-Request-Id": "stand-05" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-05" },
+    "body": {
+      "id": "{program_id}",
+      "external_id": "995448e7-dd5b-499a-8a4e-97b363d06dd3",
+      "name": "Стенд: восстановительное лечение",
+      "type_programm": "СКЛ",
+      "is_archive": false,
+      "services": [
+        {
+          "lpu_id": "{lpu_id}",
+          "lpu_external_id": "b515b8fc-d13c-4b0b-aae3-33e0ca86ff1c",
+          "lpu_name": "Санаторий «Стенд»",
+          "appeal_type_external_id": "95ca15cf-daed-4c11-9b70-8e5366a97295",
+          "begin_date": "2026-01-01",
+          "end_date": null,
+          "layer_number": 1,
+          "direct_attachment": true,
+          "percent_copayment": 10.00,
+          "coverage_type": "R"
+        }
+      ]
+    }
+  }
+}

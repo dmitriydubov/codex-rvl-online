@@ -21,11 +21,12 @@ spring:
     exclude:
       - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
 
-  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml.
+  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml: порт 5433, чтобы рядом
+  # поднимался локальный контур сервиса справочных данных со своей базой на 5432.
   # У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой базе с таким же.
   # Если переменную забыли, запуск падает на миграциях с «password authentication failed».
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/contract_service?logServerErrorDetail=false}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/contract_service?logServerErrorDetail=false}
     username: ${DB_USERNAME:contract_service}
     password: ${DB_PASSWORD}
     # Таймауты не дают запросу висеть на чужой блокировке или оборванной сети и держать поток.
@@ -121,8 +122,9 @@ projectx:
     internal:
       connection:
         host: ${RABBITMQ_INTERNAL_HOST:localhost}
-        # Тестовый контур слушает 5671 (TLS), локальный брокер — 5672.
-        port: ${RABBITMQ_INTERNAL_PORT:5672}
+        # Тестовый контур слушает 5671 (TLS), локальный брокер из docker-compose.yml — 5674: 5672 и 5673 остаются
+        # локальному контуру сервиса справочных данных.
+        port: ${RABBITMQ_INTERNAL_PORT:5674}
         virtual-host: ${RABBITMQ_INTERNAL_VHOST:/}
         username: ${RABBITMQ_INTERNAL_USERNAME:contract_service}
         # Пустое умолчание нарочно: без переменной проверка настроек останавливает старт с именем поля,
@@ -149,8 +151,8 @@ projectx:
     onec:
       connection:
         host: ${RABBITMQ_ONEC_HOST:localhost}
-        # Локальный брокер 1С из docker-compose.yml слушает 5673, чтобы не занимать порт межсервисного.
-        port: ${RABBITMQ_ONEC_PORT:5673}
+        # Локальный брокер 1С из docker-compose.yml слушает 5675, чтобы не занимать порт межсервисного.
+        port: ${RABBITMQ_ONEC_PORT:5675}
         virtual-host: ${RABBITMQ_ONEC_VHOST:/}
         username: ${RABBITMQ_ONEC_USERNAME:contract_service}
         password: ${RABBITMQ_ONEC_PASSWORD:}
@@ -173,3 +175,19 @@ projectx:
       lock-timeout: ${DB_LOCK_TIMEOUT:5s}
       statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
       idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+
+  # Сервис справочных данных (data-reference): программы, договоры страхования и полисы читаются по его внутреннему
+  # API в момент выпуска, без кэша на нашей стороне. Умолчание адреса ведёт на его локальный контур из его же
+  # docker-compose.yml; адрес контура задаётся переменной. Пустое значение останавливает старт с именем поля.
+  reference:
+    url: ${REFERENCE_URL:http://localhost:8080/internal/v1}
+    connect-timeout: ${REFERENCE_CONNECT_TIMEOUT:2s}
+    # Не меньше 7 с: при отказе своей базы справочник отвечает 503 примерно за 5 с (ожидание соединения 2 с
+    # плюс чтение до 3 с), и клиент не должен обрывать запрос раньше этого ответа.
+    read-timeout: ${REFERENCE_READ_TIMEOUT:7s}
+    # Повторы одного чтения при 503, таймауте, обрыве соединения и неожиданном ответе; у поиска полиса по
+    # идентификатору 1С:УСК — ещё и при «не найден»: полис мог не дойти до справочника. После исчерпания задача выпуска
+    # повторит чтение по своим правилам.
+    retry:
+      max-retries: ${REFERENCE_MAX_RETRIES:3}
+      delay: ${REFERENCE_RETRY_DELAY:1s}

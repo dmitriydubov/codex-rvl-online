@@ -34,6 +34,38 @@ class ApplicationDefaultsTest {
                 .endsWith("?logServerErrorDetail=false}");
     }
 
+    /** Локальный контур живёт рядом с контуром сервиса справочных данных: его порты 5432, 5672 и 8080 не занимаем. */
+    @Test
+    void localDefaults_doNotCollideWithTheReferenceServiceContour() {
+        assertThat(application.getProperty("spring.datasource.url")).asString().contains("localhost:5433/");
+        assertThat(application.getProperty("projectx.brokers.internal.connection.port")).asString()
+                .isEqualTo("${RABBITMQ_INTERNAL_PORT:5674}");
+        assertThat(application.getProperty("projectx.brokers.onec.connection.port")).asString()
+                .isEqualTo("${RABBITMQ_ONEC_PORT:5675}");
+        assertThat(application.getProperty("projectx.reference.url")).asString()
+                .isEqualTo("${REFERENCE_URL:http://localhost:8080/internal/v1}");
+    }
+
+    /** Таймаут чтения не меньше 7 с: худший ответ справочника при отказе его базы около 5 с. */
+    @Test
+    void referenceClientDefaults_matchTheReferenceServiceContract() {
+        assertThat(application.getProperty("projectx.reference.connect-timeout")).asString()
+                .isEqualTo("${REFERENCE_CONNECT_TIMEOUT:2s}");
+        assertThat(application.getProperty("projectx.reference.read-timeout")).asString()
+                .isEqualTo("${REFERENCE_READ_TIMEOUT:7s}");
+        assertThat(application.getProperty("projectx.reference.retry.max-retries")).asString()
+                .isEqualTo("${REFERENCE_MAX_RETRIES:3}");
+        assertThat(application.getProperty("projectx.reference.retry.delay")).asString()
+                .isEqualTo("${REFERENCE_RETRY_DELAY:1s}");
+    }
+
+    /** Клиент справочников разбирает ответы общим JsonMapper приложения, поэтому имена полей в нём — snake_case. */
+    @Test
+    void jsonFieldNames_areSnakeCaseForTheWholeContour() {
+        assertThat(application.getProperty("spring.jackson.property-naming-strategy")).asString()
+                .isEqualTo("SNAKE_CASE");
+    }
+
     /** Порт 8081 открывает образ, и на него настроены мониторинг и пробы актуатора. */
     @Test
     void defaultManagementPort_is8081() {

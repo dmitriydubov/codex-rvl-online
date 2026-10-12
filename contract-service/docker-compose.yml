@@ -1,6 +1,8 @@
 # Локальный контур вне тестов: база, два брокера и сам сервис (профиль app).
 # Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Брокеры — не брокеры контура: очередей
 # сервиса Заявок и 1С:УСК в них нет, и слушатели по умолчанию выключены. Команды и настройка через .env — в README модуля.
+# Опубликованные порты сдвинуты относительно локального контура сервиса справочных данных (5432, 5672/15672, 8080, 8081),
+# чтобы оба контура поднимались на одной машине; внутри сети compose порты штатные.
 
 name: contract-service
 
@@ -14,7 +16,7 @@ services:
       POSTGRES_USER: contract_service
       POSTGRES_PASSWORD: contract_service
     ports:
-      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:5432:5432"
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -32,10 +34,10 @@ services:
       RABBITMQ_DEFAULT_PASS: contract_service
     ports:
       # Локально без TLS.
-      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:5674:5672"
       # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
       # в рабочем контуре их заводит сервис Заявок.
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:15674:15672"
     volumes:
       - rabbitmq-internal-data:/var/lib/rabbitmq
     healthcheck:
@@ -53,9 +55,9 @@ services:
       RABBITMQ_DEFAULT_USER: contract_service
       RABBITMQ_DEFAULT_PASS: contract_service
     ports:
-      - "127.0.0.1:5673:5672"
+      - "127.0.0.1:5675:5672"
       # Панель брокера; очереди 1С заводятся здесь вручную, в рабочем контуре их заводит 1С:УСК.
-      - "127.0.0.1:15673:15672"
+      - "127.0.0.1:15675:15672"
     volumes:
       - rabbitmq-onec-data:/var/lib/rabbitmq
     healthcheck:
@@ -96,12 +98,17 @@ services:
       RABBITMQ_ONEC_PASSWORD: contract_service
       RABBITMQ_ONEC_SSL_ENABLED: "false"
       RABBITMQ_ONEC_LISTENER_AUTO_STARTUP: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:-false}
-      # Тот же порт, что опубликован ниже.
+      # Сервис справочных данных из его локального compose слушает 127.0.0.1:8080 на машине; из контейнера машина
+      # доступна по имени host.docker.internal (extra_hosts ниже). Другой адрес задаётся в .env.
+      REFERENCE_URL: ${REFERENCE_URL:-http://host.docker.internal:8080/internal/v1}
+      # Порт актуатора внутри контейнера; снаружи он опубликован как 8083.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8082:8080"
       # Актуатор (health, info, prometheus).
-      - "127.0.0.1:${MANAGEMENT_PORT:-8081}:${MANAGEMENT_PORT:-8081}"
+      - "127.0.0.1:8083:${MANAGEMENT_PORT:-8081}"
     depends_on:
       postgres:
         condition: service_healthy

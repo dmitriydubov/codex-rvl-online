@@ -26,6 +26,19 @@
   отказ запуска без очереди) и компонент здоровья `internalBroker` / `onecBroker` в `/actuator/health`. Недоступный
   брокер не роняет старт. Слушателей очередей и публикаций пока нет; очереди сервис не объявляет.
 - Метрики подключений к брокерам `rabbitmq_*` с меткой `name` (`internalBroker`, `onecBroker`).
+- Чтение справочников сервиса справочных данных по его внутреннему API: программа, договор страхования и полис без
+  персональных данных по идентификатору справочника, полис — ещё и по идентификатору 1С:УСК. Адрес, таймауты и повторы
+  — настройки `projectx.reference`; ответ 503, таймаут, обрыв соединения и ответ не из контракта повторяются
+  ограниченно и после исчерпания повторов становятся ошибкой «справочник недоступен»; «не найдено» по идентификатору
+  и запись в архиве — окончательные ошибки; «не найден» полис по идентификатору 1С:УСК повторяется, пока полис идёт в
+  справочник. Каждый запрос несёт сквозной `X-Request-Id`. Кэша нет.
+
+### Изменено
+
+- Локальный контур (`docker-compose.yml`) публикует порты со сдвигом, чтобы подниматься рядом с локальным контуром
+  сервиса справочных данных: база `5433`, межсервисный брокер `5674`/`15674`, брокер 1С:УСК `5675`/`15675`, сервис в
+  контейнере `8082`, его актуатор `8083`. Умолчания `DB_URL`, `RABBITMQ_INTERNAL_PORT` и `RABBITMQ_ONEC_PORT` ведут на
+  новые порты. Порты самого сервиса (`8080`, `8081`) не менялись.
 
 ### Безопасность
 
@@ -42,12 +55,20 @@
   применяет сам при старте.
 - **Брокеры:** учётные записи сервиса на межсервисном брокере контура и на брокере 1С:УСК с правами на очереди из
   `application.yml`; сами очереди заводят сервис Заявок и 1С:УСК. Свойства `spring.rabbitmq.*` сервис не читает.
+- **Сервис справочных данных:** сетевой доступ от сервиса Договоров к внутреннему API data-reference (`/internal/v1`,
+  порт его API); аутентификации между сервисами нет, доступ ограничивает сетевая политика контура. Адрес —
+  `REFERENCE_URL`, умолчание ведёт только на локальный контур.
 - **Переменные окружения.** Обязательные, без умолчания: `DB_PASSWORD`, `RABBITMQ_INTERNAL_PASSWORD`,
   `RABBITMQ_ONEC_PASSWORD`. Остальные необязательны:
 
   | Переменная | Умолчание |
   |---|---|
-  | `DB_URL` | `jdbc:postgresql://localhost:5432/contract_service?logServerErrorDetail=false` |
+  | `DB_URL` | `jdbc:postgresql://localhost:5433/contract_service?logServerErrorDetail=false` |
+  | `REFERENCE_URL` | `http://localhost:8080/internal/v1` |
+  | `REFERENCE_CONNECT_TIMEOUT` | `2s` |
+  | `REFERENCE_READ_TIMEOUT` | `7s` |
+  | `REFERENCE_MAX_RETRIES` | `3` |
+  | `REFERENCE_RETRY_DELAY` | `1s` |
   | `DB_USERNAME` | `contract_service` |
   | `DB_CONNECTION_TIMEOUT_MS` | `2000` |
   | `DB_SOCKET_TIMEOUT_SECONDS` | `60` |
@@ -56,7 +77,7 @@
   | `DB_IDLE_IN_TRANSACTION_TIMEOUT` | `1min` |
   | `MANAGEMENT_PORT` | `8081` |
   | `RABBITMQ_INTERNAL_HOST` / `RABBITMQ_ONEC_HOST` | `localhost` |
-  | `RABBITMQ_INTERNAL_PORT` / `RABBITMQ_ONEC_PORT` | `5672` / `5673` |
+  | `RABBITMQ_INTERNAL_PORT` / `RABBITMQ_ONEC_PORT` | `5674` / `5675` (локальные брокеры; в контуре задаются явно) |
   | `RABBITMQ_INTERNAL_VHOST` / `RABBITMQ_ONEC_VHOST` | `/` |
   | `RABBITMQ_INTERNAL_USERNAME` / `RABBITMQ_ONEC_USERNAME` | `contract_service` |
   | `RABBITMQ_INTERNAL_SSL_ENABLED` / `RABBITMQ_ONEC_SSL_ENABLED` | `false` |
