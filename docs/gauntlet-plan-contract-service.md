@@ -86,7 +86,9 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   К1: для contract-service добавит К2, для data-reference — вопрос координатору data-reference через владельца. Пункты (2)
   порты локального compose совпадают с data-reference и (3) `DB_URL` профиля `app` с `logServerErrorDetail=false` — владельцу,
   рекомендация «принять». Эквивалентный мутант `spring.liquibase.url` принят: при заданном `spring.liquibase.user` Boot
-  4.0.7 и так строит отдельное соединение без свойств Hikari (`javap` `LiquibaseAutoConfiguration`).
+  4.0.7 и так строит отдельное соединение без свойств Hikari (`javap` `LiquibaseAutoConfiguration`). **Ответ владельца
+  «1) да 2) да 3) да»** (~07:50 UTC): порты локального compose остаются как в образце (развести в К2a), `DB_URL` профиля
+  `app` с `logServerErrorDetail=false` принят, мерж после зелёного CI; сессия дописала ответы в описание PR.
 - 2026-10-07, **PR #138 смержен владельцем 20:04 UTC** (`main` `8a287da`): документы Договоров перенесены в
   `project_files/contract-service/` (поручение владельца через PR #137 координатора data-reference). Проверка после
   мержа: 24 файла — перемещения через `git mv` без изменения содержимого, один побайтовый дубль «Точек интеграции РВЛ и
