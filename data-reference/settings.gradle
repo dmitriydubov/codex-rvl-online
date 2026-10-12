@@ -1,3 +1,8 @@
+/*
+ * Свойство publicRepositories выбирает репозитории: по умолчанию, в рабочем контуре, — только Nexus контура,
+ * со значением true — портал плагинов Gradle и Maven Central. Переключатель объявлен внутри pluginManagement {},
+ * потому что этот блок вычисляется отдельно от остального файла; по той же причине адрес Nexus повторён ниже.
+ */
 pluginManagement {
     gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
             .getOrElse(false)
