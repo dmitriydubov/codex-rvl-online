@@ -1,0 +1,21 @@
+# contract-service - replaces gauntlet/config/pit-runerror-allowlist.txt for this module (same format). HUMAN-OWNED.
+# Human-verified RUN_ERROR mutants. One line per method and mutator:  fully.qualified.Class#method  Mutator   # which test kills it
+# PIT 1.22.1 counts RUN_ERROR as detected, but the test JVM crashed on redefineClasses (records) before any
+# test ran, so nothing proved the mutant dead. A line here says a human read the tests and named the
+# assertion that fails for the mutant. The key is the method and the mutator, not the line number: RUN_ERROR
+# is not deterministic (another run crashes on another mutant, or on none), and line numbers go stale.
+# A line covers every RUN_ERROR of that mutator in that method - keep the mutator explicit and reread the
+# tests when the method grows a new conditional, return or lambda. Agents cannot edit this file.
+#
+# Before adding a line: run the tests, read the mutated line, find the assertion that fails for exactly
+# this mutation. A mutant with no such assertion is a weak test, not an allowlist entry.
+
+# InboxPropertiesTest: ladder_givesPauseAfterEachFailedAttemptAndNothingBeyondIt (attempt 1 -> contains 1m,
+# attempt 3 -> contains 15m, attempt 4 -> isEmpty, attempt 0 -> isEmpty). Verified by the coordinator 2026-10-12
+# (RUN_ERROR on these record methods appeared in one of three full runs of the step).
+ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  RemoveConditionalMutator_ORDER_ELSE  # attempt 0 -> get(-1), attempt 4 -> get(3): IndexOutOfBoundsException instead of isEmpty()
+ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  ConditionalsBoundaryMutator          # index <= 0: attempt 1 gets empty, contains(1m) fails; index > size: attempt 4 -> get(3) throws
+ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  EmptyObjectReturnValsMutator         # always empty: attempt 1 contains(1m) fails
+
+# PersonOwnerTest: contract_ownsPersonsThroughContractIdOnly (isEqualTo(new PersonOwner(ID, null)) fails on a null actual).
+ru.projectx.contracts.entity.PersonOwner#contract                            NullReturnValsMutator                # contract_owns...: isEqualTo(new PersonOwner(ID, null)) on null
