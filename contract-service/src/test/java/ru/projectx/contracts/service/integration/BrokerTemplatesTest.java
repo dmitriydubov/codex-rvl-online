@@ -9,10 +9,6 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-/**
- * Шаблон публикации отправляет сообщения как mandatory на своём подключении: без этого публикация в несуществующую
- * очередь получила бы подтверждение брокера и выглядела бы доставкой.
- */
 class BrokerTemplatesTest {
 
     private final CachingConnectionFactory connectionFactory = new CachingConnectionFactory("broker.example");

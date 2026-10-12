@@ -18,10 +18,6 @@ import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
-/**
- * Политика повторов берёт число попыток и паузу из настроек и повторяет ровно то, что имеет смысл повторять.
- * Пауза проверяется по расписанию политики, без ожидания.
- */
 class ReferenceRetryPoliciesTest {
 
     private static final ReferenceProperties.Retry SETTINGS =
@@ -71,7 +67,6 @@ class ReferenceRetryPoliciesTest {
         assertThat(byExternalId.shouldRetry(unexpected)).isFalse();
     }
 
-    /** Три повтора через полторы секунды каждый, потом стоп: пауза не растёт и не сокращается. */
     @Test
     void backOff_pausesTheConfiguredDelayExactlyMaxRetriesTimes() {
         BackOffExecution schedule = byId.getBackOff().start();

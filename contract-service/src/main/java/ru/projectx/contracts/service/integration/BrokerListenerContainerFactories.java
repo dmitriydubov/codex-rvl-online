@@ -6,11 +6,6 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
 import ru.projectx.contracts.config.BrokerProperties;
 
-/**
- * Фабрика контейнеров слушателей одного брокера. У слушателя одно решение — что ответить брокеру, поэтому
- * подтверждение ручное, потребитель один с одним неподтверждённым сообщением (порядок потока), а отсутствие очереди
- * останавливает запуск: нет очереди — неверно имя или контур.
- */
 final class BrokerListenerContainerFactories {
 
     private static final int SINGLE_CONSUMER = 1;
@@ -28,7 +23,6 @@ final class BrokerListenerContainerFactories {
         factory.setPrefetchCount(ONE_MESSAGE_IN_FLIGHT);
         factory.setMissingQueuesFatal(true);
         factory.setAutoStartup(broker.listenerAutoStartup());
-        // Как у автонастройки Boot при включённых виртуальных потоках: потребители не занимают платформенные потоки.
         factory.setTaskExecutor(new VirtualThreadTaskExecutor("rabbit-" + brokerName + "-"));
         return factory;
     }

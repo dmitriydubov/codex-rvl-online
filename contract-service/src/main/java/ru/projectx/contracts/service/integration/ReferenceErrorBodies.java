@@ -9,15 +9,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Код ошибки из единого формата ответа справочника: {@code error.code}. Тело, которое в этот формат не укладывается
- * (страница ошибки прокси, обрезанный ответ) или длиннее нескольких килобайт, кода не несёт; само тело в журнал не пишется.
- */
 final class ReferenceErrorBodies {
 
     private static final Logger log = LoggerFactory.getLogger(ReferenceErrorBodies.class);
 
-    /** Ошибка справочника — сотни байт; больше присылает только чужая страница ошибки, читать её целиком незачем. */
     static final int MAX_BODY_BYTES = 16 * 1024;
 
     private static final String ERROR = "error";

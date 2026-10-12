@@ -8,11 +8,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/**
- * Один контекст Spring на все сценарии приёмки: настоящий PostgreSQL той же версии, что в контуре. Своя обвязка,
- * а не классы из src/test, потому что приёмка в контур не переносится. Брокера у приёмки пока нет: пароли
- * вымышленные, слушатели и компоненты здоровья подключений выключены — до первого сценария с очередями.
- */
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "management.health.brokers.enabled=false",
@@ -23,7 +18,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Import(CucumberSpringConfiguration.Containers.class)
 public class CucumberSpringConfiguration {
 
-    /** Контейнеры приёмки: адрес и учётные данные подставляет {@link ServiceConnection}. */
     @TestConfiguration(proxyBeanMethods = false)
     static class Containers {
 

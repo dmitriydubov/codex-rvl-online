@@ -12,11 +12,6 @@ import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
-/**
- * Ограниченные повторы чтения справочника. Исчерпанные повторы — недоступность справочника: задача выпуска
- * повторит чтение позже по своим правилам. Ответ, который повторять бессмысленно (нет записи, архив, отказ с кодом),
- * выходит наружу как есть, с первой же попытки.
- */
 final class ReferenceRetries {
 
     private static final Logger log = LoggerFactory.getLogger(ReferenceRetries.class);
@@ -50,7 +45,6 @@ final class ReferenceRetries {
         }
     }
 
-    /** Повторяемая причина после исчерпания — недоступность; неповторяемая выходит наружу как есть. */
     private static RuntimeException finalFailure(
             RetryPolicy policy, RetryException outcome, ReferenceKind kind, UUID key) {
         Throwable last = outcome.getCause();

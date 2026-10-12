@@ -33,10 +33,6 @@ import ru.projectx.contracts.support.StandExample;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Сетевая сторона клиента: сквозной {@code X-Request-Id} в каждом запросе и перевод сетевых отказов в недоступность
- * справочника с причиной — таймаут отдельно от обрыва соединения, чтобы в журнале было видно, что именно случилось.
- */
 class ReferenceTransportTest {
 
     private static final String BASE = "http://reference.example/internal/v1";

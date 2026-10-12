@@ -15,15 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.contracts.support.IntegrationTest;
 
-/**
- * Таймауты PostgreSQL заданы пулу приложения, но не миграциям, а текст ошибки базы не несёт значений строки.
- * База подключается свойствами, как в контуре, поэтому проверяются умолчания {@code application.yml}.
- */
 @IntegrationTest
 class DatabaseConnectionSettingsTest {
 
     private static final String DISABLED = "0";
-    /** Вымышленное значение строки, которое не должно попасть в текст ошибки. */
     private static final String ROW_VALUE = "Тестовое значение строки";
 
     @Autowired
@@ -42,7 +37,6 @@ class DatabaseConnectionSettingsTest {
         }
     }
 
-    /** Ожидание соединения короткое, чтобы при недоступной базе отказ приходил за секунды. */
     @Test
     void applicationPool_waitsForConnectionTwoSeconds() throws SQLException {
         HikariDataSource pool = dataSource.unwrap(HikariDataSource.class);
@@ -52,7 +46,6 @@ class DatabaseConnectionSettingsTest {
         assertThat(pool.getValidationTimeout()).isEqualTo(Duration.ofSeconds(1).toMillis());
     }
 
-    /** Долгая миграция на живой базе не должна обрываться ни по одному из таймаутов пула. */
     @Test
     void migrationConnection_hasNoTimeouts() throws SQLException {
         assertThat(liquibase.getDataSource()).isNotSameAs(dataSource);
@@ -64,7 +57,6 @@ class DatabaseConnectionSettingsTest {
         }
     }
 
-    /** Нарушение уникальности называет ключ, но значение строки, где бывают персональные данные, в текст не идёт. */
     @Test
     void databaseError_doesNotCarryRowValues() throws SQLException {
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {

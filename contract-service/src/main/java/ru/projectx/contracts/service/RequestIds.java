@@ -5,11 +5,6 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import org.slf4j.MDC;
 
-/**
- * Сквозной идентификатор запроса {@code X-Request-Id}: тот, под которым идёт текущая обработка, уходит соседям,
- * чтобы одну операцию можно было найти в журналах всех сервисов. Ограничение на символы и длину не пускает в журнал
- * переводы строк и мегабайты; негодное значение заменяется новым.
- */
 public final class RequestIds {
 
     public static final String HEADER = "X-Request-Id";
@@ -20,7 +15,6 @@ public final class RequestIds {
     private RequestIds() {
     }
 
-    /** Идентификатор текущей обработки из MDC, если он годен, иначе новый UUID. */
     public static String current() {
         return Optional.ofNullable(MDC.get(MDC_KEY))
                 .filter(RequestIds::acceptable)

@@ -3,10 +3,6 @@ package ru.projectx.contracts.exception;
 import java.util.Arrays;
 import java.util.Optional;
 
-/**
- * Справочник сервиса справочных данных, который читает сервис Договоров, и код, которым тот отвечает на отсутствие
- * записи. Живёт рядом с исключениями, потому что они его несут, а зависеть от других пакетов исключениям нельзя.
- */
 public enum ReferenceKind {
 
     PROGRAM("PROGRAM_NOT_FOUND"),

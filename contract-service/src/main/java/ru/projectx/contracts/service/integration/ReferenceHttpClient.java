@@ -18,10 +18,6 @@ import ru.projectx.contracts.service.reference.LiveRecords;
 import ru.projectx.contracts.service.reference.PolicyReads;
 import ru.projectx.contracts.service.reference.ProgramReads;
 
-/**
- * Чтение справочников по внутреннему API сервиса справочных данных. Единственное место, которое знает, как справочник
- * выглядит по HTTP: пути, формат ошибки, сетевые отказы. Наружу выходят только живые записи и исключения домена.
- */
 public final class ReferenceHttpClient implements ProgramReads, InsuranceContractReads, PolicyReads {
 
     private static final String PROGRAM = "/programs/{id}";
@@ -78,10 +74,6 @@ public final class ReferenceHttpClient implements ProgramReads, InsuranceContrac
         }
     }
 
-    /**
-     * Пустое тело или запись без идентификаторов при успешном статусе — такой же неожиданный ответ, как чужой статус:
-     * разбор JSON не замечает чужих имён полей, и без этой проверки пустая запись ушла бы в выпуск как настоящая.
-     */
     private static <T extends ReferenceRecord> T requireIdentified(@Nullable T record) {
         if (record == null || !identified(record)) {
             throw new ReferenceUnavailableException(Reason.UNEXPECTED_RESPONSE);

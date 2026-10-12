@@ -14,10 +14,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import ru.projectx.contracts.support.FixedClockConfig;
 import ru.projectx.contracts.support.IntegrationTest;
 
-/**
- * Контекст поднимается без брокеров, и Liquibase накатывает схему. Так ловятся поломки, которые иначе видны только
- * на стенде: несогласованные бины, невалидная конфигурация, неприменимый changeSet, подключение, которое роняет старт.
- */
 @IntegrationTest
 class ContractServiceApplicationTest {
 
@@ -33,7 +29,6 @@ class ContractServiceApplicationTest {
     @Autowired
     private HealthContributorRegistry healthContributors;
 
-    /** Недоступный брокер не мешает старту: подключения и шаблоны есть, но соединяться на старте им не нужно. */
     @Test
     void brokerBeans_existWithoutReachableBroker() {
         Map<String, ConnectionFactory> connectionFactories = context.getBeansOfType(ConnectionFactory.class);
@@ -44,7 +39,6 @@ class ContractServiceApplicationTest {
         assertThat(templates).containsOnlyKeys("internalBrokerTemplate", "onecBrokerTemplate");
     }
 
-    /** Без брокера компоненты здоровья подключений выключены свойством, иначе каждый health ждал бы таймаут. */
     @Test
     void brokerHealth_isSwitchedOffInThisContext() {
         assertThat(healthContributors.getContributor("internalBroker")).isNull();
@@ -52,7 +46,6 @@ class ContractServiceApplicationTest {
         assertThat(healthContributors.getContributor("rabbit")).isNull();
     }
 
-    /** Журнал миграций появляется, только если Liquibase действительно прошёл по оглавлению на этой базе. */
     @Test
     void migrations_runOnStartup() {
         Integer journals = jdbc.queryForObject(

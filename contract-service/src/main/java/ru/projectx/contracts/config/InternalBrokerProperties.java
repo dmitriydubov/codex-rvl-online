@@ -6,10 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * Межсервисный брокер контура: по нему сервис Заявок присылает задачи на выпуск и их отмены, а сервис Договоров
- * отвечает состоянием выпуска. Имена очередей — адреса контура, умолчаний в коде у них нет.
- */
 @Validated
 @ConfigurationProperties("projectx.brokers.internal")
 public record InternalBrokerProperties(
@@ -17,7 +13,6 @@ public record InternalBrokerProperties(
         boolean listenerAutoStartup,
         @Valid @NotNull Queues queues) implements BrokerProperties {
 
-    /** Очереди межсервисного брокера: приём задач и отмен, публикация состояния выпуска. Имена должны быть разными. */
     public record Queues(@NotBlank String taskChanges, @NotBlank String statusChanges) {
 
         public Queues {

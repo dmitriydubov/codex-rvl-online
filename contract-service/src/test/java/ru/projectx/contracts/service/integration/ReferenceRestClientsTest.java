@@ -18,10 +18,6 @@ import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Настоящие таймауты клиента на локальном сокете: сервер, который принял соединение и молчит, обрывается по таймауту
- * чтения, а закрытый порт — отказ соединения. Без таймаута чтения клиент JDK ждал бы ответ без предела.
- */
 class ReferenceRestClientsTest {
 
     private static final Duration READ_TIMEOUT = Duration.ofMillis(300);
@@ -57,7 +53,6 @@ class ReferenceRestClientsTest {
                 .hasRootCauseInstanceOf(IOException.class);
     }
 
-    /** Вычитывает запрос и молчит; конец потока наступает только когда клиент сам закрывает соединение. */
     private static void acceptAndStaySilent(ServerSocket silent, AtomicBoolean closedByClient) {
         try (Socket connection = silent.accept()) {
             connection.getInputStream().transferTo(OutputStream.nullOutputStream());
