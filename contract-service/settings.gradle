@@ -1,0 +1,55 @@
+/*
+ * Свойство publicRepositories выбирает репозитории: по умолчанию, в рабочем контуре, — только Nexus контура,
+ * со значением true — портал плагинов Gradle и Maven Central. Переключатель объявлен внутри pluginManagement {},
+ * потому что этот блок вычисляется отдельно от остального файла; по той же причине адрес Nexus повторён ниже.
+ */
+pluginManagement {
+    gradle.ext.publicRepositories = providers.gradleProperty('publicRepositories').map { it.isEmpty() || it.toBoolean() }
+            .getOrElse(false)
+    repositories {
+        if (gradle.ext.publicRepositories) {
+            gradlePluginPortal()
+            mavenCentral()
+        } else {
+            maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        if (gradle.ext.publicRepositories) {
+            mavenCentral()
+        } else {
+            maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+        }
+    }
+}
+
+/*
+ * Рабочий контур без переключателя — только Nexus. Чтобы переключить вручную, замените
+ * оба блока выше этими. Строку gradle.ext.gauntletEnabled ниже оставьте как есть: без
+ * gradle.ext.publicRepositories она даёт false, и набор проверок не подключается:
+ *
+ * pluginManagement {
+ *     repositories {
+ *         maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+ *     }
+ * }
+ *
+ * dependencyResolutionManagement {
+ *     repositories {
+ *         maven { url = uri('https://nexus.sogaz.ru/repository/maven-group/') }
+ *     }
+ * }
+ */
+
+/*
+ * Внешний набор проверок качества подключается, только когда его каталог лежит рядом с модулем и репозитории
+ * публичные: плагин мутаций PIT есть только на портале плагинов Gradle. В рабочий контур каталог не переносится.
+ */
+gradle.ext.gauntletEnabled = file('../gauntlet/gauntlet.gradle').isFile() &&
+        providers.gradleProperty('gauntlet').map { it.isEmpty() || it.toBoolean() }
+                .getOrElse(gradle.ext.has('publicRepositories') && gradle.ext.publicRepositories)
+
+rootProject.name = 'contract-service'
