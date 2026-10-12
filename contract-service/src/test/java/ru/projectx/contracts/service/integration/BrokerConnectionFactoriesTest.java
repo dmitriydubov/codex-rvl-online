@@ -10,11 +10,6 @@ import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 
-/**
- * Подключение к брокеру собирается ровно из своих настроек, иначе ошибка в одном брокере выглядела бы как ошибка
- * в другом. Флаги TLS и стратегия имени у библиотеки геттеров не имеют и читаются из полей: наблюдаемы они только
- * на настоящем брокере с TLS.
- */
 class BrokerConnectionFactoriesTest {
 
     private static final int PORT = 5671;
@@ -39,7 +34,6 @@ class BrokerConnectionFactoriesTest {
         }
     }
 
-    /** Клиент инициализируется при сборке подключения: иначе TLS из настроек не дошёл бы до клиента. */
     @Test
     void connectionFactory_appliesTlsToInitialisedClient() {
         CachingConnectionFactory factory = BrokerConnectionFactories.create("onec", properties(tls(true, true, true)));
@@ -51,7 +45,6 @@ class BrokerConnectionFactoriesTest {
         }
     }
 
-    /** Имя видно администратору брокера в списке подключений: по нему ясно, какой сервис и к какому брокеру пришёл. */
     @Test
     void connectionName_namesServiceAndBroker() {
         CachingConnectionFactory factory = BrokerConnectionFactories.create("onec", properties(tls(false, true, true)));
@@ -87,7 +80,6 @@ class BrokerConnectionFactoriesTest {
         assertThat(client.getRabbitConnectionFactory().isSSL()).isTrue();
     }
 
-    /** Самоподписанный сертификат тестового контура: проверки выключают явно, и клиент это получает. */
     @Test
     void tlsChecksOff_reachTheClient() {
         RabbitConnectionFactoryBean client = BrokerConnectionFactories.clientFactory(properties(tls(true, false, false)));

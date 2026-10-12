@@ -37,11 +37,6 @@ import ru.projectx.contracts.support.StandExample;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Клиент читает справочники по контракту сервиса справочных данных на его же примерах ответов: поля разбираются как
- * есть, 404 с кодом — окончательный ответ без повтора, 503 и чужие ответы повторяются ограниченно, а полис по
- * идентификатору 1С:УСК ищется повторно и после «не найден». Сети нет: ответы отдаёт MockRestServiceServer.
- */
 class ReferenceHttpClientTest {
 
     private static final String BASE = "http://reference.example/internal/v1";
@@ -147,7 +142,6 @@ class ReferenceHttpClientTest {
         assertThat(policy.number()).isEqualTo("СТЕНД-0001");
     }
 
-    /** 404 по своему идентификатору — окончательный ответ: записи нет, повторять нечего. */
     @Test
     void policyNotFoundById_isFinalWithoutRetry() {
         reference.expect(once(), requestTo(BASE + "/policies/" + POLICY_ID + "/contract-view"))
@@ -159,7 +153,6 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** Полис, о котором сообщила 1С:УСК, может ещё идти в справочник: «не найден» повторяется, затем — недоступность. */
     @Test
     void policyNotFoundByExternalId_isRetriedThenReportedAsNotReceived() {
         reference.expect(times(ATTEMPTS), requestTo(BASE + "/policies/contract-view?external_id=" + POLICY_EXTERNAL_ID))
@@ -207,7 +200,6 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** Договор по архивной записи выпускать нельзя: это ошибка выпуска, а не повод перечитать справочник. */
     @Test
     void archivedRecord_isRejectedWithoutRetry() {
         String archived = StandExample.load("10-policy-contract-view.json")
@@ -224,7 +216,6 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** 400 с кодом справочника повторится на тот же запрос: окончательный отказ с кодом, без повтора. */
     @Test
     void clientErrorWithCode_isRejectedWithoutRetry() {
         reference.expect(once(), requestTo(BASE + "/programs/" + PROGRAM_ID))
@@ -238,7 +229,6 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** Обрезанный JSON при успешном статусе — ответ, которому нельзя верить: недоступность с повтором. */
     @Test
     void truncatedJsonBody_isUnexpectedResponse() {
         reference.expect(times(ATTEMPTS), requestTo(BASE + "/programs/" + PROGRAM_ID))
@@ -273,7 +263,6 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** Разбор JSON не замечает чужих имён полей: запись без идентификаторов — ответ не по контракту, а не пустая запись. */
     @ParameterizedTest
     @ValueSource(strings = {
         "{}",

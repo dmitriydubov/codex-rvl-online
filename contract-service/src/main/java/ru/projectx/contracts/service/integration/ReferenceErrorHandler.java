@@ -13,11 +13,6 @@ import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
-/**
- * Переводит ответ справочника со статусом ошибки в исключение домена. Статус 4xx с кодом справочника — окончательный
- * ответ на этот запрос: «не найдено» или отказ с кодом. Всё остальное — временная недоступность: 503 при отказе его
- * базы, другой 5xx, тело не из контракта (страница прокси), потому что верить такому ответу нельзя.
- */
 final class ReferenceErrorHandler implements RestClient.ResponseSpec.ErrorHandler {
 
     private static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";

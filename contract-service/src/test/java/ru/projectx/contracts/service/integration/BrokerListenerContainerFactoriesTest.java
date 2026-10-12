@@ -15,11 +15,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 import ru.projectx.contracts.config.InternalBrokerProperties;
 
-/**
- * Контейнер слушателя получает правила приёма сервиса; соединение здесь не открывается, контейнер только создаётся.
- * Число потребителей, prefetch, отказ без очереди и исполнитель у фабрики и контейнера геттеров не имеют, поэтому
- * читаются из полей: наблюдаемы они только на запущенном брокере.
- */
 class BrokerListenerContainerFactoriesTest {
 
     private static final int PORT = 5672;
@@ -43,7 +38,6 @@ class BrokerListenerContainerFactoriesTest {
                 .hasFieldOrPropertyWithValue("missingQueuesFatal", true);
     }
 
-    /** Фабрика задаёт потребителя и отказ без очереди явно: умолчания библиотеки совпадают, но могут измениться. */
     @Test
     void factory_setsConsumerCountAndMissingQueuesExplicitly() {
         SimpleRabbitListenerContainerFactory factory = factory(true);

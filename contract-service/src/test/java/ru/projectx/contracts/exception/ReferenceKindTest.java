@@ -8,10 +8,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * Код «не найдено» из ответа справочника однозначно называет справочник: по нему задача выпуска сообщает сервису
- * Заявок, чего именно нет. Чужой код справочником не считается.
- */
 class ReferenceKindTest {
 
     @ParameterizedTest

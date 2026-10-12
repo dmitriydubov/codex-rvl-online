@@ -7,11 +7,6 @@ import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 
-/**
- * Что повторяется при чтении справочника. Временная недоступность повторяется всегда. «Не найден» повторяется только
- * у поиска полиса по идентификатору 1С:УСК: о выпущенном полисе 1С сообщает сразу, а до справочника он может ещё идти.
- * Пауза между попытками постоянная, попыток столько, сколько задано в настройках.
- */
 final class ReferenceRetryPolicies {
 
     private ReferenceRetryPolicies() {

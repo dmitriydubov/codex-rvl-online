@@ -6,10 +6,6 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Программа страхования из справочника с перечнем учреждений и условий обслуживания. Поле {@code services} названо
- * как в ответе справочника и в сообщении 1С:УСК.
- */
 public record ReferenceProgram(
         UUID id,
         UUID externalId,
@@ -18,7 +14,6 @@ public record ReferenceProgram(
         boolean isArchive,
         List<Service> services) implements ReferenceRecord {
 
-    /** Строка перечня программы: учреждение и условия обслуживания в нём; вид покрытия — буквой, как в 1С:УСК. */
     public record Service(
             UUID lpuId,
             UUID lpuExternalId,

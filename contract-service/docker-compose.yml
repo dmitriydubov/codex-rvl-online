@@ -1,9 +1,3 @@
-# Локальный контур вне тестов: база, два брокера и сам сервис (профиль app).
-# Пароли здесь известны всем, поэтому порты открыты только на 127.0.0.1. Брокеры — не брокеры контура: очередей
-# сервиса Заявок и 1С:УСК в них нет, и слушатели по умолчанию выключены. Команды и настройка через .env — в README модуля.
-# Опубликованные порты сдвинуты относительно локального контура сервиса справочных данных (5432, 5672/15672, 8080, 8081),
-# чтобы оба контура поднимались на одной машине; внутри сети compose порты штатные.
-
 name: contract-service
 
 services:
@@ -25,7 +19,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # Межсервисный брокер контура (сервис Заявок). Та же версия, что у брокеров контура.
   rabbitmq-internal:
     image: rabbitmq:4.1.2-management-alpine
     container_name: contract-service-rabbitmq-internal
@@ -33,10 +26,7 @@ services:
       RABBITMQ_DEFAULT_USER: contract_service
       RABBITMQ_DEFAULT_PASS: contract_service
     ports:
-      # Локально без TLS.
       - "127.0.0.1:5674:5672"
-      # Панель брокера. Локально очереди заводятся здесь: сервис их не создаёт,
-      # в рабочем контуре их заводит сервис Заявок.
       - "127.0.0.1:15674:15672"
     volumes:
       - rabbitmq-internal-data:/var/lib/rabbitmq
@@ -46,8 +36,6 @@ services:
       timeout: 10s
       retries: 10
 
-  # Брокер 1С:УСК: отдельный контейнер, как отдельный брокер в контуре. Порты сдвинуты на один,
-  # чтобы не занимать порты межсервисного.
   rabbitmq-onec:
     image: rabbitmq:4.1.2-management-alpine
     container_name: contract-service-rabbitmq-onec
@@ -56,7 +44,6 @@ services:
       RABBITMQ_DEFAULT_PASS: contract_service
     ports:
       - "127.0.0.1:5675:5672"
-      # Панель брокера; очереди 1С заводятся здесь вручную, в рабочем контуре их заводит 1С:УСК.
       - "127.0.0.1:15675:15672"
     volumes:
       - rabbitmq-onec-data:/var/lib/rabbitmq
@@ -66,14 +53,10 @@ services:
       timeout: 10s
       retries: 10
 
-  # Сервис из Dockerfile. В профиле, чтобы обычный up не собирал образ каждый раз.
-  # Внутри контейнера localhost — он сам, поэтому база и брокеры указаны по именам сервисов.
   contract-service:
     profiles: [ app ]
     build:
       context: .
-      # Без значений: compose передаёт только заданные в .env или окружении аргументы,
-      # остальные берут умолчания из Dockerfile. Запись ${ИМЯ:-умолчание} их бы перекрыла.
       args:
         - JAR_SOURCE
         - PUBLIC_REPOSITORIES
@@ -84,7 +67,6 @@ services:
     env_file:
       - path: .env
         required: false
-    # Пароли заданы явно: в application.yml умолчаний у них нет. У локальных брокеров нет TLS.
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/contract_service?logServerErrorDetail=false
       DB_PASSWORD: contract_service
@@ -93,22 +75,17 @@ services:
       RABBITMQ_INTERNAL_SSL_ENABLED: "false"
       RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP: ${RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP:-false}
       RABBITMQ_ONEC_HOST: rabbitmq-onec
-      # Внутри сети compose брокер 1С слушает свой штатный порт.
       RABBITMQ_ONEC_PORT: "5672"
       RABBITMQ_ONEC_PASSWORD: contract_service
       RABBITMQ_ONEC_SSL_ENABLED: "false"
       RABBITMQ_ONEC_LISTENER_AUTO_STARTUP: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:-false}
-      # Справочники — стенд сервиса справочных данных из его локального compose, по его сети (networks ниже):
-      # на машине он слушает только 127.0.0.1, и из контейнера туда не достучаться. Другой адрес задаётся в .env.
       REFERENCE_URL: ${REFERENCE_URL:-http://data-reference-stand:8080/internal/v1}
-      # Порт актуатора внутри контейнера; снаружи он опубликован как 8083.
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     networks:
       - default
       - data-reference
     ports:
       - "${SERVICE_BIND_ADDRESS:-127.0.0.1}:8082:8080"
-      # Актуатор (health, info, prometheus).
       - "127.0.0.1:8083:${MANAGEMENT_PORT:-8081}"
     depends_on:
       postgres:
@@ -123,8 +100,6 @@ volumes:
   rabbitmq-internal-data:
   rabbitmq-onec-data:
 
-# Сеть локального контура сервиса справочных данных: её создаёт его compose, поэтому профиль app поднимается
-# только после `docker compose --profile stand up -d` в каталоге data-reference.
 networks:
   data-reference:
     name: data-reference_default
