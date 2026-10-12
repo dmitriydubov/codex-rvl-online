@@ -1,0 +1,23 @@
+{
+  "description": "Полис для сервиса Договоров по id data-reference, без персональных данных: номер, external_id и период действия — то, что сервис Договоров берёт по полису, — плюс наш id и признак архива.",
+  "placeholders": {
+    "policy_id": "UUID, id полиса у data-reference; из примера 09"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/internal/v1/policies/{policy_id}/contract-view",
+    "headers": { "X-Request-Id": "stand-10" }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "X-Request-Id": "stand-10" },
+    "body": {
+      "id": "{policy_id}",
+      "external_id": "9e6ee30d-2275-417d-a44c-039d3b8c2ac5",
+      "number": "СТЕНД-0001",
+      "begin_date": "2026-01-01",
+      "end_date": "2099-12-31",
+      "is_archive": false
+    }
+  }
+}
