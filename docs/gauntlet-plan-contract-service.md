@@ -26,7 +26,7 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
 | 6 | О11 Подключение к набору | правка набора (координатор в gauntlet-admin, решение владельца 4) | вне итога | **сделан: PR #147 смержен 2026-10-12 07:58 UTC** |
 | 6 | К1b Красное каркаса по итогам О11 | условный | вне итога (0–3) | О11 — **не нужен**: прогон по всем файлам каркаса зелёный |
 | 6 | К2 Два брокера RabbitMQ | инфраструктура, без спецификации | 8–10 | **сделан: PR #148 смержен 2026-10-12 09:00 UTC** |
-| 6 | К2a Клиент REST `data-reference` (и развод портов локального compose) | инфраструктура, без спецификации | 8 | К2 (сделан); РК1 (а); ответы О8 по 503/таймаутам — **следующий** |
+| 6 | К2a Клиент REST `data-reference` (и развод портов локального compose) | инфраструктура, без спецификации | 8 | К2 (сделан); РК1 (а); ответы О8 по 503/таймаутам (нет — умолчание 7 с) — **сессия открыта 2026-10-12** |
 | 6 | К3 ДГ-01, ДГ-02: задача на выпуск и её прекращение | со спецификацией | 22–24 | К2, К2a; Р65, Р49; ОВД-03 |
 | 6 | К4 Outbox и ДГ-03 | со спецификацией | 12 | К3 |
 | 6 | К5 ДГ-06, ДГ-07: полисы ЛМ через 1С | со спецификацией | 12–14 | К4, К2a; ОВД-02 |
@@ -126,6 +126,23 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   К2 «1) да 2) перешли 3) перешли 4) перешли 5) перешли»**: readiness от брокеров не зависит, конфигурация без изменений
   (записано сессией в описание PR #148). Факт сессии ~3,5 ч против 8–10 ч плана: один контейнер с двумя vhost
   сработал сразу, API `RabbitMQContainer` свёлся к `rabbitmqctl`. Сессия К2 заархивирована.
+- 2026-10-12, **PR #149 координатора смержен владельцем 09:06 UTC** (`main` fc5ddb7; план и комментарий маски `*Config` в
+  оверлее). **Ответ владельца «1) да 2) да»** (~09:07 UTC): задача для Jira К2a утверждена, комментарий оверлея принят.
+  **Сессия К2a открыта 09:09 UTC** (session_01CHKXgVVCCyx4VdA2auiSRk, `claude/k2a-contract-service-reference-client`,
+  Fable 5.1 xhigh по рекомендации — таймауты, ретраи, предикаты исключений; окружение Default, репозиторий явно, `main`
+  fc5ddb7). В задании: порт в `service.reference` и адаптер на `RestClient` в `service.integration` (РК1 а), настройки
+  `projectx.reference.*` (`REFERENCE_URL` без умолчания на чужой контур, чтение 7 с, соединение 2 с, повторы), повторы
+  механизмом resilience Spring Framework 7.0 на 503/таймаут и на 404 `POLICY_NOT_FOUND` только при поиске по
+  `external_id`; развод портов compose (предложение: база 5433, брокеры 5674/15674 и 5675/15675, сервис 8082, актуатор
+  8083); readiness без изменений; тесты на `MockRestServiceServer` по примерам стенда без ПДн.
+- 2026-10-12, **К2a: политика архитектуры блокировала `RestClient`** (триггер сессии 09:27 UTC). Пробел О11:
+  `forbidden.service=org.springframework.web..` в `gauntlet/config/contract-service/architecture.properties` запрещал
+  всему `service..`, включая `service.integration`, исходящий клиент `org.springframework.web.client` — а именно там по
+  РК1 (а) и `contract-service/CLAUDE.md` лежит адаптер к data-reference. Правка координатора в gauntlet-admin (PR
+  координатора, владелец утверждает мержем): запрет сужен до серверной части —
+  `org.springframework.web.servlet..,org.springframework.web.bind..,org.springframework.web.filter..,jakarta.servlet..`;
+  `archTest` в contract-service на `main` зелёный. Сессия К2a продолжает работу, её `architectureGate` красный до мержа и
+  слияния `main` в её ветку; координатор data-reference предупреждён.
 - 2026-10-07, **PR #138 смержен владельцем 20:04 UTC** (`main` `8a287da`): документы Договоров перенесены в
   `project_files/contract-service/` (поручение владельца через PR #137 координатора data-reference). Проверка после
   мержа: 24 файла — перемещения через `git mv` без изменения содержимого, один побайтовый дубль «Точек интеграции РВЛ и
@@ -591,6 +608,8 @@ Opus 5.5 xhigh.
 | — | план contract-service, ревизия 1 | `claude/contract-service-coordinator` (координатор) | #142 | смержен 2026-10-08 13:53 UTC | ~1,5 | Grok не комментировал; решения 1–13 получены 2026-10-12 |
 | 6 | О11 Подключение contract-service к набору, CI по модулям | `claude/o11-contract-service-gauntlet` (координатор, gauntlet-admin) | #147 | смержен 2026-10-12 07:58 UTC | ~0,7 | прогоны: contract-service `gauntlet` и `scope=all` зелёные, data-reference зелёный, selftest 574/574; ответы владельца «1) да 2) да» |
 | 6 | К2 Два брокера RabbitMQ | `claude/k2-contract-service-brokers`, session_01LbtQGoTbVzVaCU5ZwXF7PX | #148 | смержен 2026-10-12 09:00 UTC (сессия открыта 07:59, Fable 5.1, Default, `main` 6d3fc56); CI зелёный; сессия заархивирована | ~3,5 ч сессии | оценка 8–10 ч; без спецификации; 34 файла, 68 тестов, 32/32 мутанта, CRAP max 3.0; reviewer 2 раунда (2 major + 10 minor исправлены); 5 пунктов: 1 — владелец («да», readiness без брокеров), 2–5 — координатор; контрольный `gauntletFast -Pgauntlet.scope=all` на `main` a0d3ca9 зелёный (68 тестов, 0 пропущено; Checkstyle OK, PMD OK, CRAP 15 методов OK, CPD 0, archTest) |
+| — | план: К1, О11, К2 сделаны; задача К2a; комментарий оверлея | `claude/contract-service-coordinator` (координатор) | #149 | смержен 2026-10-12 09:06 UTC | ~0,5 | ответы владельца «1) да 2) да» |
+| 6 | К2a Клиент REST data-reference, развод портов compose | `claude/k2a-contract-service-reference-client`, session_01CHKXgVVCCyx4VdA2auiSRk | — | открыта 2026-10-12 09:09 UTC (Fable 5.1, Default, `main` fc5ddb7) | | оценка 8 ч; без спецификации; задача утверждена «1) да» |
 | — | `contract-service/CLAUDE.md`, ответы на решения 1–13 | `claude/contract-service-coordinator` (координатор) | #145 | смержен 2026-10-12 06:54 UTC | ~1 | CI зелёный; Grok не ревьюит (владелец 2026-10-12) |
 | 6 | К1 Каркас модуля | `claude/k1-contract-service-skeleton`, session_01Lh5GCUpN7rWMDs9WMCqvMW | #146 | смержен 2026-10-12 07:49 UTC (сессия открыта 07:08, Opus 5.5, Default, `main` aaff7d8); сессия заархивирована | ~1,5 ч сессии | оценка 8 ч; без спецификации; 29 файлов, 26 тестов; reviewer 2 раунда (1 major + 9 minor исправлены); 13 ручных мутантов конфигурации убиты, 1 эквивалентный (`spring.liquibase.url`); 4 пункта: 1 и 4 — координатор, 2 и 3 — владелец |
 
