@@ -5,10 +5,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.LpuContract;
 
-/**
- * Прайсовый договор ЛПУ в ответах. Вид договора нужен вызывающему: при разборе расхождений в суммах первым
- * делом выясняют, взяты цены с допсоглашения или с главного договора.
- */
 public record PriceContractRef(
         UUID id,
         UUID externalId,
@@ -18,7 +14,6 @@ public record PriceContractRef(
         boolean uploadedToSob,
         Kind kind) {
 
-    /** {@code MAIN} — главный договор, {@code DOPS} — допсоглашение со своими ценами. */
     public enum Kind {
         MAIN, DOPS
     }

@@ -20,10 +20,6 @@ import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Замещает прейскурант по одной услуге полным срезом из 1С:УСК, собранным из нескольких сообщений. Пустой срез
- * штатен: так 1С сообщает, что цен больше нет, а неполную передачу сюда не отдают.
- */
 @Component
 public class PriceListMapper {
 
@@ -43,21 +39,11 @@ public class PriceListMapper {
         this.clock = clock;
     }
 
-    /**
-     * Строки разбираются до снятия прежних цен, чтобы битая строка их не задела.
-     *
-     * @throws OneCFieldException если в передаче нет GUID услуги или строка без цены или даты начала
-     */
     public ImportResult apply(ObjectNode transfer) {
         return services.applyIfKnown(OneCValues.requiredUuid(transfer, "keyValue"),
                 service -> replacePrices(service, transfer));
     }
 
-    /**
-     * Проверяет строку, ничего не записывая, чтобы отклонить её, когда пришёл её пакет, а не вся передача.
-     *
-     * @throws OneCFieldException если в строке нет цены или даты начала
-     */
     public void checkRow(JsonNode row) {
         rowOf(row);
     }
@@ -80,10 +66,6 @@ public class PriceListMapper {
                 .toList();
     }
 
-    /**
-     * Начало периода обязательно, а конец {@code 3000-01-01} значит «пока цену не заменят» и читается пустым. Цена
-     * и дата начала читаются первыми, чтобы отказ называл их, а не другое поле.
-     */
     private static PriceListItem.Row rowOf(JsonNode row) {
         BigDecimal price = priceOf(row);
         LocalDate validFrom = validFromOf(row);

@@ -7,18 +7,11 @@ import java.util.Set;
 import ru.projectx.datareference.entity.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Числа за пределом колонки денег, процента или целого так, как их называет спецификация; они стоят здесь, а не в
- * «Примерах», потому что мутация цифры порядка оставила бы значение за пределом незамеченной. Порядок не больше
- * {@code 1e131071}: число в {@code jsonb} хранится как {@code numeric}, и большее сырьё ушло бы в карантин до разбора.
- */
 final class OneCMoneyLimitMessages {
 
     static final BigDecimal ONE_HUNDREDTH = new BigDecimal("0.01");
 
-    /** Поля процента: у них колонка {@code numeric(5,2)}, у остальных денежных полей — {@code numeric(15,2)}. */
     private static final Set<String> PERCENT_FIELDS = Set.of("copayment", "percentCopayment");
-    /** Числовые поля строки услуги программы РВЛ: процент сооплаты и номер слоя. */
     private static final Set<String> PROGRAM_FIELDS = Set.of("percentCopayment", "numberLayer");
     private static final Map<String, BigDecimal> AMOUNT_RECORDS = Map.of(
             "экспонента с огромным порядком", new BigDecimal("1e500"),
@@ -39,7 +32,6 @@ final class OneCMoneyLimitMessages {
             "экспонента с наибольшим порядком, который примет база", new BigDecimal("1e131071"),
             "отрицательный порядок сразу за прежним пределом длины", new BigDecimal("1e-1000"));
 
-    /** Целочисленные поля: номера, уровни иерархии и счётчики передачи прайса. */
     private static final Set<String> INTEGER_FIELDS = Set.of(
             "layerNumber", "numberLayer", "rowNumber", "hierarchyLevels", "hierarchyLevel", "countMessages", "countRows");
     private static final Map<String, BigDecimal> INTEGER_RECORDS = Map.of(
@@ -54,7 +46,6 @@ final class OneCMoneyLimitMessages {
     private OneCMoneyLimitMessages() {
     }
 
-    /** Число поля в записи, которую называет спецификация; у процента, у целого и у денег записи свои. */
     static BigDecimal recorded(String field, String record) {
         return Optional.ofNullable(recordsOf(field).get(record))
                 .orElseThrow(() -> new IllegalArgumentException("шаг не знает записи числа: " + record));
@@ -67,7 +58,6 @@ final class OneCMoneyLimitMessages {
         return PERCENT_FIELDS.contains(field) ? PERCENT_RECORDS : AMOUNT_RECORDS;
     }
 
-    /** Та же программа под новым наименованием; поле строки услуги — число в заданной записи. Разбор её отклоняет. */
     static OneCMessage program(OneCMessage program, String field, String record) {
         if (!PROGRAM_FIELDS.contains(field)) {
             throw new IllegalArgumentException("шаг не знает поля строки услуги программы: " + field);

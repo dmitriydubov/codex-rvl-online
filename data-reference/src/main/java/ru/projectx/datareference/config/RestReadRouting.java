@@ -6,11 +6,6 @@ import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.request.RequestContextHolder;
 
-/**
- * Выбор пула: транзакция «только чтение», начатая при обработке HTTP-запроса, идёт в пул REST-чтений, остальное в пул
- * приложения. Признака транзакции мало, потому что такие транзакции открывает Spring Data и для разбора, а запроса
- * мало, потому что проверка здоровья идёт без транзакции. Долгому служебному чтению по HTTP нужна обычная транзакция.
- */
 public final class RestReadRouting extends AbstractRoutingDataSource {
 
     enum Pool { APPLICATION, REST_READ }

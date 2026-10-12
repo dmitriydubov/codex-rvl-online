@@ -31,11 +31,6 @@ import ru.projectx.datareference.service.FinalRejectionJournal;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
-/**
- * Защищает закрытие зависшей передачи прайса: она пропускается, только если по её услуге уже применена передача,
- * которую она по порядку не может обогнать. Закрыть лишнее значит потерять прайс, который ещё мог прийти; не закрыть
- * — оставить передачу в буфере и в предупреждении навсегда.
- */
 class SupersededTransferClosureTest {
 
     private static final UUID SERVICE = UUID.fromString("2a6f0c3e-9b18-4d57-8e41-c5d2a7f9b063");
@@ -73,7 +68,6 @@ class SupersededTransferClosureTest {
                 .isEqualTo(2.0);
     }
 
-    /** GUID услуги в сырье с пробелами по краям — та же услуга, как и при разборе части: передача закрывается. */
     @Test
     void serviceWrittenWithSpacesAround_isTheSameService() {
         InboundMessage stuck = part(APPLIED_FINAL.minusSeconds(60), null);
@@ -85,7 +79,6 @@ class SupersededTransferClosureTest {
         verify(finalizations).lockByService(SERVICE);
     }
 
-    /** Строка услуги блокируется раньше, чем читаются части: иначе решение принималось бы по устаревшим статусам. */
     @Test
     void serviceRowIsLocked_beforeTransferPartsAreRead() {
         part(APPLIED_FINAL.minusSeconds(60), null);
@@ -99,7 +92,6 @@ class SupersededTransferClosureTest {
         steps.verify(inbound).findByCorrelationId(STUCK_CID);
     }
 
-    /** Часть пришла после финала применённой, а своего финала нет: передача ещё может стать последней. */
     @Test
     void stuckTransferThatMayStillBecomeTheLast_staysInBuffer() {
         InboundMessage late = part(APPLIED_FINAL.plusSeconds(60), null);
@@ -111,7 +103,6 @@ class SupersededTransferClosureTest {
         verify(inbound, never()).save(any());
     }
 
-    /** Только части в буфере: исход остальных уже записан, и закрытие их не трогает. */
     @Test
     void partsWithOutcome_areLeftAsTheyAre() {
         InboundMessage buffered = part(APPLIED_FINAL.minusSeconds(60), null);
@@ -137,7 +128,6 @@ class SupersededTransferClosureTest {
         assertThat(stuck.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
     }
 
-    /** Услугу не узнать — сравнивать не с чем: передача остаётся, о ней предупредит проверка зависших. */
     @Test
     void transferWithoutReadableService_staysInBuffer() {
         when(inbound.findBufferedTransferService(STUCK_CID)).thenReturn(Optional.of("не GUID"));

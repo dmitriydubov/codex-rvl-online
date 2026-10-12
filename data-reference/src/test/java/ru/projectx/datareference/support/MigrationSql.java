@@ -7,20 +7,11 @@ import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
 import org.yaml.snakeyaml.Yaml;
 
-/**
- * Операторы {@code sql} набора изменений ровно тем текстом, что лежит в миграции Liquibase, чтобы тесты заполнения
- * выполняли саму миграцию, а не её копию. Узлы YAML проверяются по типу: миграция неожиданного вида роняет тест
- * с понятным сообщением.
- */
 public final class MigrationSql {
 
     private MigrationSql() {
     }
 
-    /**
-     * Тексты операторов {@code sql} из раздела {@code changes} в порядке миграции, например из
-     * {@code db/changelog/017-….yaml}. Если набора нет или он устроен иначе, бросает {@code IllegalStateException}.
-     */
     public static List<String> statementsOf(String changelog, String changeSetId) {
         List<String> statements = sequence(field(read(changelog), "databaseChangeLog")).stream()
                 .map(entry -> field(entry, "changeSet"))

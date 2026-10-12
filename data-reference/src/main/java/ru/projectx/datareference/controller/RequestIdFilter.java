@@ -12,11 +12,6 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Сквозной {@code X-Request-Id}: из запроса в ответ, в MDC и в тело ошибки, чтобы ошибку можно было найти в журнале.
- * Отсутствующий или недопустимый идентификатор заменяется новым UUID, а не отклоняется: отказ из-за трассировки
- * остановил бы соседям работу. Ограничение на символы и длину не пускает в журнал переводы строк и мегабайты.
- */
 @Component
 public class RequestIdFilter extends OncePerRequestFilter {
 

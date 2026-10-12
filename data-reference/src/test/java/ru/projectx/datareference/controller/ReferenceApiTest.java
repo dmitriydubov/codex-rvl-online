@@ -15,7 +15,6 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
@@ -26,11 +25,6 @@ import ru.projectx.datareference.repository.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Проверяет то, на что опираются соседние сервисы при чтении программ и договоров страхования: поля в snake_case,
- * оба идентификатора в ответе, формат ошибки и сквозной {@code X-Request-Id}. Запросы идут через настоящий стек MVC
- * поверх настоящей базы; названия, номера договоров и реквизиты страхователя вымышленные.
- */
 @IntegrationTest
 class ReferenceApiTest {
 
@@ -127,7 +121,6 @@ class ReferenceApiTest {
         assertThat(noKey).bodyJson().extractingPath("$.error.details[0].field").isEqualTo("external_id");
     }
 
-    /** Страхователя-физического лица в справочнике нет, но договор всё равно отдаётся, только без страхователя. */
     @Test
     void insuranceContract_withoutInsurerInReference_hasNullInsurer() {
         InsuranceContract contract = insuranceContractRepository.save(InsuranceContract.create(CONTRACT_EXT,
@@ -174,7 +167,6 @@ class ReferenceApiTest {
         assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("NOT_FOUND");
     }
 
-    /** Без идентификатора запроса ошибку не найти в журнале, поэтому, если вызывающий его не прислал, его выдаёт сервис. */
     @Test
     void requestId_isIssuedWhenCallerSendsNone() {
         MvcTestResult result = mvc.get().uri(BASE + "/policies/{id}", UUID.randomUUID()).exchange();

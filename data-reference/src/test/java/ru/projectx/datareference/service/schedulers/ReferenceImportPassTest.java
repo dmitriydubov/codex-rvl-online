@@ -58,11 +58,6 @@ import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Проход планировщика разбора без базы: что он берёт, кому отдаёт и как классифицирует отказ. Запись о временной ошибке
- * несёт тип и SQLSTATE без текста, потому что текст ошибки вставки печатает параметры с данными полисов. На время
- * разбора в MDC лежат {@code message-id} и поток под теми же именами, что при приёме из брокера.
- */
 @ExtendWith(MockitoExtension.class)
 class ReferenceImportPassTest {
 
@@ -70,7 +65,6 @@ class ReferenceImportPassTest {
     private static final int BATCH_SIZE = 7;
     private static final String QUEUE = "1c-usk_to_rvl-online_mkb10-changes";
 
-    /** Ключ MDC, который положил не планировщик, а, например, трассировка. */
     private static final String FOREIGN_MDC_KEY = "traceId";
     private static final String FOREIGN_MDC_VALUE = "0af7651916cd43dd8448eb211c80319c";
 
@@ -94,7 +88,6 @@ class ReferenceImportPassTest {
         schedulerLog().addAppender(logged);
     }
 
-    /** Сервис исходов сообщает, с каким статусом осталось сообщение; здесь — обычные статусы отказов. */
     @BeforeEach
     void recordFailuresAsUsual() {
         lenient().when(inboundMessageService.recordTemporaryFailure(any(), any(), any()))
@@ -110,7 +103,6 @@ class ReferenceImportPassTest {
         MDC.remove(FOREIGN_MDC_KEY);
     }
 
-    /** Пачка дозревших на момент прохода, не больше заданного размера, — и каждое сообщение в разбор. */
     @Test
     void everyDueMessage_isImported() {
         InboundMessage first = received();
@@ -141,7 +133,6 @@ class ReferenceImportPassTest {
         });
     }
 
-    /** Пропуск — с причиной: без неё «данных не было» и «данные не прошли фильтр» в журнале не различить. */
     @Test
     void skippedMessage_isReportedInJournalWithReason() {
         InboundMessage message = received();
@@ -158,10 +149,6 @@ class ReferenceImportPassTest {
         });
     }
 
-    /**
-     * Отклонённое при разборе сообщение — предупреждение с причиной, а не пропуск: например, передача прайса, части
-     * которой не сошлись со счётчиками, отклонена целиком.
-     */
     @Test
     void rejectedMessage_isReportedInJournalAsWarningWithReason() {
         InboundMessage message = received();
@@ -178,10 +165,6 @@ class ReferenceImportPassTest {
         });
     }
 
-    /**
-     * На время разбора в MDC — {@code message-id} и поток: строки журнала, которые пишут разбор и маппер,
-     * находят своё сообщение. Чужой ключ, положенный до прохода, переживает его.
-     */
     @Test
     void messageIdAndStream_areInMdcDuringImportOnly() {
         InboundMessage message = received();
@@ -202,7 +185,6 @@ class ReferenceImportPassTest {
         assertThat(MDC.get(FOREIGN_MDC_KEY)).isEqualTo(FOREIGN_MDC_VALUE);
     }
 
-    /** Запись отказа идёт ещё под ключами сообщения, а после неё ключи сняты, хотя разбор упал. */
     @Test
     void failedImport_recordsFailureUnderMessageKeysAndThenClearsThem() {
         InboundMessage message = received();
@@ -224,10 +206,6 @@ class ReferenceImportPassTest {
         assertThat(MDC.get(OneCLogContext.STREAM)).isNull();
     }
 
-    /**
-     * Нарушение контракта постоянно: строка сразу в окончательный отказ со своим текстом разбора. Запись ERROR
-     * об этом пишет сервис исходов, сам проход журнал не дублирует.
-     */
     @Test
     void contractViolation_isRecordedAsPermanentFailure() {
         InboundMessage message = received();
@@ -242,7 +220,6 @@ class ReferenceImportPassTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /** Значение, которое база не принимает, при повторе не примет и через полчаса: сразу окончательный отказ. */
     @Test
     void valueRejectedByDatabase_isRecordedAsPermanentFailureWithoutItsText() {
         InboundMessage message = received();
@@ -260,7 +237,6 @@ class ReferenceImportPassTest {
         verify(inboundMessageService, never()).recordTemporaryFailure(any(), any(), any());
     }
 
-    /** Ошибка в коде разбора повтором не лечится: сразу окончательный отказ, в причине только тип. */
     @Test
     void unexpectedFailure_isRecordedAsPermanentFailureNamedByType() {
         InboundMessage message = received();
@@ -274,10 +250,6 @@ class ReferenceImportPassTest {
                         "IllegalStateException", "нет"));
     }
 
-    /**
-     * Сервис исходов получает исход, каким сообщение было до попытки, а не после: разбор мог поменять сообщение, и по
-     * сравнению с ним сервис отличает откаченную попытку от зафиксированной.
-     */
     @Test
     void failedImport_reportsTheOutcomeReadBeforeTheAttempt() {
         InboundMessage message = received();
@@ -294,7 +266,6 @@ class ReferenceImportPassTest {
                 eq(beforeAttempt), any());
     }
 
-    /** Временный отказ базы идёт на повтор: в причину и в журнал — тип и SQLSTATE, без текста отказа. */
     @Test
     void databaseOutage_isRecordedAsTemporaryWithoutItsText() {
         InboundMessage message = received();
@@ -316,7 +287,6 @@ class ReferenceImportPassTest {
         });
     }
 
-    /** Ожидание родителя — не отказ: запись INFO с причиной, которая называет родителя. */
     @Test
     void messageAwaitingItsParent_isReportedInJournalWithReason() {
         InboundMessage message = received();
@@ -333,10 +303,6 @@ class ReferenceImportPassTest {
         });
     }
 
-    /**
-     * Сообщения, не дождавшиеся родителя, отклоняются после разбора пачки: сообщение, родитель которого пришёл в этом
-     * проходе, разбор возьмёт на следующем, и срок его не отклонит.
-     */
     @Test
     void overdueWaits_areRejectedAfterThePass() {
         InboundMessage message = received();

@@ -13,10 +13,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Части передачи прайса по услуге (ТЗ-9) с заданными сценарием {@code message-id} и идентификатором передачи:
- * финальное сообщение со счётчиками и пакеты строк, в том числе с испорченной строкой. Все значения вымышлены.
- */
 final class OneCPriceTransferMessages {
 
     private static final String BATCH_QUEUE = "1c-usk_to_rvl-online_pricelists-contragents-changes";
@@ -26,14 +22,11 @@ final class OneCPriceTransferMessages {
     private static final String CID = "cid";
     private static final Set<String> COUNTERS = Set.of("countMessages", "countRows");
     private static final String KEY_VALUE = "keyValue";
-    /** Так сценарий называет часть, в которой поля GUID услуги нет вовсе. */
     private static final String NO_SERVICE = "нет";
 
-    /** Строка пакета из одной строки, от которой сценарий отличает испорченную: номер 2, цена 6000.00. */
     private static final Map<String, String> SINGLE_ROW = Map.of(
             "начало", "2026-05-01", "окончание", "3000-01-01", "цена", "6000.00", "цена со скидкой", "нет");
 
-    /** Дефекты строки так, как их называет спецификация; незнакомое слово роняет шаг. */
     private static final Map<String, Consumer<ObjectNode>> DEFECTS = Map.of(
             "нет цены", row -> row.remove("price"),
             "цена больше допустимого", row -> row.put("price", new BigDecimal("10000000000000.00")),
@@ -53,7 +46,6 @@ final class OneCPriceTransferMessages {
         return new OneCMessage(OneCStream.PRICE_LISTS, FINAL_QUEUE, data, InboundStatus.PROCESSED, messageId);
     }
 
-    /** Финальное сообщение, у которого счётчик {@code field} — число {@code value}, а второй счётчик равен 1. */
     static OneCMessage finalMessageWithCounter(UUID messageId, UUID cid, String service, String field, BigDecimal value) {
         if (!COUNTERS.contains(field)) {
             throw new IllegalArgumentException("шаг не знает счётчика финального сообщения: " + field);
@@ -62,14 +54,12 @@ final class OneCPriceTransferMessages {
         return new OneCMessage(OneCStream.PRICE_LISTS, FINAL_QUEUE, data, InboundStatus.FAILED, messageId);
     }
 
-    /** Пакет со строками таблицы; номер строки в таблице — число. */
     static OneCMessage batch(UUID messageId, UUID cid, String service, List<Map<String, String>> rows) {
         ArrayNode recordSet = JSON.createArrayNode();
         rows.forEach(row -> recordSet.add(numberedRow(row)));
         return batchMessage(messageId, transferData(cid, service), recordSet, InboundStatus.PROCESSED);
     }
 
-    /** Пакет из одной строки с номером 2, испорченной дефектом. */
     static OneCMessage defectiveBatch(UUID messageId, UUID cid, String service, String defect) {
         if (!DEFECTS.containsKey(defect)) {
             throw new IllegalArgumentException("дефект строки, которого шаг не знает: " + defect);
@@ -79,14 +69,12 @@ final class OneCPriceTransferMessages {
         return batchMessage(messageId, transferData(cid, service), JSON.createArrayNode().add(row), InboundStatus.FAILED);
     }
 
-    /** Пакет со строками таблицы, но без идентификатора передачи. */
     static OneCMessage batchWithoutTransfer(UUID messageId, String service, List<Map<String, String>> rows) {
         ArrayNode recordSet = JSON.createArrayNode();
         rows.forEach(row -> recordSet.add(numberedRow(row)));
         return batchMessage(messageId, JSON.createObjectNode().put(KEY_VALUE, service), recordSet, InboundStatus.FAILED);
     }
 
-    /** Услуга кладётся в keyValue как есть, в том числе не GUID; «нет» — поля keyValue в части нет. */
     private static ObjectNode transferData(UUID cid, String service) {
         ObjectNode data = JSON.createObjectNode().put(CID, cid.toString());
         return NO_SERVICE.equals(service) ? data : data.put(KEY_VALUE, service);

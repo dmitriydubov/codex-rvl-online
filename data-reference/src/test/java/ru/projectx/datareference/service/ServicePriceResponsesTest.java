@@ -15,10 +15,6 @@ import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.PriceSegment;
 import ru.projectx.datareference.service.price.StayPeriod;
 
-/**
- * Основной суммой для сооплаты ответ называет сумму со скидкой, только когда цена со скидкой есть у каждого
- * отрезка; иначе основная — сумма без скидки, а итога со скидкой нет.
- */
 class ServicePriceResponsesTest {
 
     private static final LocalDate APRIL_10 = LocalDate.of(2026, 4, 10);

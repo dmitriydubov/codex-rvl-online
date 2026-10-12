@@ -11,24 +11,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.PriceListFinalization;
 
-/** Последняя применённая передача прайса по каждой услуге, таблица {@code price_list_finalization}. */
 @Repository
 public interface PriceListFinalizationRepository extends JpaRepository<PriceListFinalization, UUID> {
 
-    /**
-     * Строка услуги, заблокированная до конца транзакции вызывающего. Сборка передачи и закрытие зависших передач
-     * берут её первой, поэтому за одну услугу они решают по очереди. Блокировку ждут не дольше таймаута блокировок
-     * пула, после него отказ временный.
-     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select finalization from PriceListFinalization finalization "
             + "where finalization.serviceExternalId = :serviceExternalId")
     Optional<PriceListFinalization> lockByService(@Param("serviceExternalId") UUID serviceExternalId);
 
-    /**
-     * Записывает финальное сообщение последней применённой передачи по услуге: добавляет строку услуги или заменяет
-     * её финал. Одним оператором, без предварительного чтения.
-     */
     @Modifying
     @Query(nativeQuery = true, value = """
             insert into price_list_finalization (service_external_id, final_message_id)

@@ -35,11 +35,6 @@ import ru.projectx.datareference.repository.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Проверяет каталог ЛПУ (лечебно-профилактических учреждений) по договору страхования, карточку ЛПУ и услуги
- * с ценами через настоящий стек MVC и базу. «Сегодня» — 14.03.2026. Виды обращения РВЛ в справочнике записаны
- * с лишними пробелами и в другом регистре, чтобы проверить, что сравнение это переживает.
- */
 @IntegrationTest
 class LpuCatalogApiTest {
 
@@ -127,7 +122,6 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.skipped[0].reason").isEqualTo("AMBIGUOUS_PRICE_CONTRACT");
     }
 
-    /** Полис с истёкшим сроком, с условием без доступности или по неизвестной программе учреждений не даёт. */
     @Test
     void catalog_isEmptyWithoutActiveRvlPolicies_andNeedsAnActiveContract() {
         Lpu lpu = saveLpu("Сосновый бор", false);
@@ -229,7 +223,6 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.price_contract.kind").isEqualTo("DOPS");
     }
 
-    /** Допсоглашение, берущее цены с главного, кандидатом не считается; договор будущего года — ещё нет. */
     @Test
     void card_fallsBackToMain_ignoringSupplementOnMainPricesAndFutureContracts() {
         Lpu lpu = saveLpu("Сосновый бор", false);
@@ -304,7 +297,6 @@ class LpuCatalogApiTest {
         assertThat(result).bodyJson().extractingPath("$.services[1]").asMap().doesNotContainKey("prices");
     }
 
-    /** Прошедший период не отдаётся, будущий — да; услуга без цен остаётся с пустым массивом. */
     @Test
     void services_withPrices_returnsCurrentAndFuturePeriodsByValidFrom() {
         Lpu lpu = saveLpu("Сосновый бор", false);
@@ -388,7 +380,6 @@ class LpuCatalogApiTest {
                 new Policy.Snapshot(details, List.of(program), List.of(service)), NOW));
     }
 
-    /** Учреждение программы и действующий полис, чья строка условий начинается с {@code lineBegin}. */
     private void lpuOfProgramWithServiceLineFrom(@Nullable LocalDate lineBegin) {
         Lpu lpu = saveLpu("Сосновый бор", false);
         saveContract(lpu, "M-1", null, false, TODAY.minusYears(1), null);

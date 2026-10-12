@@ -11,11 +11,6 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 
-/**
- * Spring берёт первый по порядку обработчик ошибок с подходящим методом, даже если у следующего метод точнее.
- * Без явного {@code @Order} обработчик любого исключения мог бы ответить 500 на 404 или 405, поэтому здесь
- * обработчики зарегистрированы в обратном порядке.
- */
 class ErrorAdviceOrderTest {
 
     private final FailingController controller = new FailingController();

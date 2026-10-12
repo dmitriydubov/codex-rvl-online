@@ -18,16 +18,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.test.web.servlet.client.ExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-/**
- * Сервис Договоров в роли потребителя: настоящие HTTP-запросы к Дата-референсу и память сценария между шагами.
- * Клиент собран вручную (автонастройки Boot для него нет в Nexus контура) поверх JDK {@link HttpClient}: сценарии
- * шлют PATCH, а {@code HttpURLConnection} его не умеет. Явные таймауты не дают зависшему запросу держать прогон.
- */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
 public class ContractsService {
 
-    /** Переменная URI-шаблона: id, полученный на шаге «Дано». */
     private static final String OBTAINED_ID = "{id}";
     private static final String PATH_ROOT = "/";
     private static final String QUERY_START = "?";
@@ -55,7 +49,6 @@ public class ContractsService {
         return exchange(HttpMethod.GET, path, headers -> { });
     }
 
-    /** Мониторинг ходит на порт актуатора: на порту API актуатора нет. */
     public ServiceResponse monitor(String path) {
         requireAbsolutePath(path);
         return remember(monitoringClient.get().uri(path).exchange().returnResult());
@@ -65,11 +58,6 @@ public class ContractsService {
         return exchange(HttpMethod.GET, path, headers -> headers.set(ServiceResponse.REQUEST_ID, requestId));
     }
 
-    /**
-     * Запрос с ещё одним параметром, значение которого уходит переменной URI-шаблона. Клиент кодирует такое
-     * значение целиком: пробел становится {@code %20}, запятая — {@code %2C}, кириллица — байтами UTF-8, и
-     * сервер получает ровно ту строку, которую собрал шаг.
-     */
     public ServiceResponse requestWithParameter(String path, String parameter, String value) {
         String separator = path.contains(QUERY_START) ? PARAMETER_SEPARATOR : QUERY_START;
         String template = path + separator + parameter + "={" + parameter + "}";
@@ -107,17 +95,11 @@ public class ContractsService {
         return remember(client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
     }
 
-    /** Ответ любого из двух портов — последний ответ сценария: его проверяют одни и те же шаги. */
     private ServiceResponse remember(ExchangeResult result) {
         lastResponse = ServiceResponse.of(result);
         return lastResponse;
     }
 
-    /**
-     * Путь из сценария уходит потребителем как есть. Клиент сам дописал бы «/» между адресом сервера
-     * и относительным путём, и сценарий с путём без ведущего «/» проверял бы не тот запрос, что в нём
-     * написан. Цель HTTP-запроса к серверу всегда начинается с «/».
-     */
     private static void requireAbsolutePath(String path) {
         if (!path.startsWith(PATH_ROOT)) {
             throw new IllegalArgumentException("путь запроса в сценарии должен начинаться с «/»: " + path);

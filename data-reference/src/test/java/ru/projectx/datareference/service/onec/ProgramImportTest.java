@@ -28,11 +28,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает разбор страховых программ восстановительного лечения и перечня учреждений, куда по ним можно записаться.
- * {@code @Transactional} нужен не ради отката, а чтобы проверки догружали ленивую связь «программа → учреждения»
- * при выключенном {@code open-in-view}; в работающем сервисе она читается внутри его транзакции.
- */
 @Transactional
 @IntegrationTest
 class ProgramImportTest {
@@ -95,11 +90,6 @@ class ProgramImportTest {
         assertThat(programRepository.count()).isZero();
     }
 
-    /**
-     * Табличная часть замещается целиком. Дописывать нельзя: источник присылает
-     * актуальный состав, и «дописать» означало бы навсегда сохранить учреждения,
-     * которых в программе уже нет.
-     */
     @Test
     void tablePart_isReplacedEntirely() {
         importOne(OneCStream.PROGRAMS, program(true, row(SANATORIUM_ID, "r")));
@@ -109,10 +99,6 @@ class ProgramImportTest {
         assertThat(programRepository.findByExternalId(PROGRAM_ID).orElseThrow().availableLpu()).isEmpty();
     }
 
-    /**
-     * Учреждение, не прошедшее фильтр РВЛ, в перечне доступных не появляется: строка
-     * отбрасывается, а не сохраняется со ссылкой в никуда.
-     */
     @Test
     void rowWithUnknownSanatorium_isDropped() {
         importOne(OneCStream.PROGRAMS, program(true, row(STRANGER_ID, "r")));
@@ -120,11 +106,6 @@ class ProgramImportTest {
         assertThat(programRepository.findByExternalId(PROGRAM_ID).orElseThrow().availableLpu()).isEmpty();
     }
 
-    /**
-     * Флаги рисковой и депозитной части взаимоисключающие, но источник не гарантирует,
-     * что хоть один выставлен. Строка без типа покрытия не имеет смысла и отбрасывается,
-     * а не сохраняется с придуманным значением.
-     */
     @Test
     void rowWithoutCoverageType_isDropped() {
         importOne(OneCStream.PROGRAMS, program(true, row(SANATORIUM_ID, null)));
@@ -132,11 +113,6 @@ class ProgramImportTest {
         assertThat(programRepository.findByExternalId(PROGRAM_ID).orElseThrow().availableLpu()).isEmpty();
     }
 
-    /**
-     * Отброшенные строки считаются по причинам порознь: общий счётчик «2 отброшено» не сказал бы, чинить порядок
-     * загрузки справочников или спрашивать 1С про флаги. Проверяется текст журнала, потому что другого следа у
-     * отброшенной строки нет: сообщение остаётся {@code PROCESSED}.
-     */
     @Test
     void droppedRows_areCountedByReasonSeparately() {
         String bothReasons = row(STRANGER_ID, "r") + "," + row(SANATORIUM_ID, null);
@@ -150,10 +126,6 @@ class ProgramImportTest {
                         .contains("1 без типа покрытия"));
     }
 
-    /**
-     * Программа потеряла признак РВЛ. Она архивируется, а не удаляется,
-     * и перечень учреждений очищается — по не-РВЛ программе нельзя никуда.
-     */
     @Test
     void programLosingRvl_isArchivedAndLosesItsSanatoriums() {
         importOne(OneCStream.PROGRAMS, program(true, row(SANATORIUM_ID, "r")));
@@ -165,10 +137,6 @@ class ProgramImportTest {
         assertThat(stored.availableLpu()).isEmpty();
     }
 
-    /**
-     * Аппендер вешается на логгер маппера, а не на корневой: иначе в список попадут
-     * строки Hibernate и Liquibase, и утверждение станет проверять чужой вывод.
-     */
     private static ch.qos.logback.classic.Logger mapperLog() {
         return ((LoggerContext) LoggerFactory.getILoggerFactory()).getLogger(ProgramMapper.class);
     }
@@ -191,7 +159,6 @@ class ProgramImportTest {
                 .formatted(PROGRAM_ID, rvl, rows);
     }
 
-    /** @param coverage {@code r} — рисковая часть, {@code d} — депозитная, {@code null} — не задана */
     private static String row(UUID sanatoriumId, String coverage) {
         String flag = coverage == null ? "" : ",\"%s\":true".formatted(coverage);
         return """

@@ -25,15 +25,9 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Чтение, которое ждёт базу, обрывается по лимиту REST-чтений (3 с) и отвечает 503, не дожидаясь {@code lock_timeout}
- * пула (5 с). Иначе потребитель оборвал бы запрос сам, а соединение осталось бы занятым до конца ожидания блокировки.
- * Базу «вешает» другой сеанс, держащий таблицу под ACCESS EXCLUSIVE: её ждёт даже SELECT.
- */
 @IntegrationTest
 class RestReadTimeoutTest {
 
-    /** {@code lock_timeout} пула: без лимита чтения ответ пришёл бы не раньше. */
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     private static final String UNKNOWN_ID = "f662d1c4-5b26-4248-8ba1-47954abd301a";
     private static final String POLICY_EXTERNAL_ID_TEXT = "f662d1c4-5b26-4248-8ba1-47954abd3002";
@@ -82,10 +76,6 @@ class RestReadTimeoutTest {
         assertCutByReadLimit(lockedTable, path);
     }
 
-    /**
-     * Табличные части полиса догружаются лениво, уже после того, как полис найден, и отказ приходит из Hibernate,
-     * а не из репозитория. Он тоже должен давать 503 раньше {@code lock_timeout}, а не внутреннюю ошибку.
-     */
     @ParameterizedTest
     @CsvSource({
             "policy_programs, /internal/v1/policies/{id}",
@@ -120,7 +110,6 @@ class RestReadTimeoutTest {
         }
     }
 
-    /** Застрахованный вымышленный: персональных данных в тестовых данных нет. */
     private static Policy policyWithOneProgram() {
         var details = new Policy.Details(CONTRACT_EXTERNAL_ID, "П-0001", "Тестов", "Тест", null,
                 LocalDate.of(1990, 1, 1), null, null, BEGIN, null, true, false);

@@ -15,11 +15,6 @@ import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.service.SqlStates;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 
-/**
- * Проверка передач прайсов, которые ждут своих частей дольше положенного: обогнанные закрываются пропуском, об
- * остальных пишется одно предупреждение. Без него зависшая передача ничем себя не проявляет: ошибок нет, а прайс по
- * услуге остаётся прежним, и дособрать её может только источник.
- */
 @Component
 public class StuckTransferAlert {
 
@@ -47,10 +42,6 @@ public class StuckTransferAlert {
         report(agedMessages.transfersBufferedLongerThan(threshold, properties.stuckTransferReportLimit()));
     }
 
-    /**
-     * Отказ базы при закрытии одной передачи не останавливает проверку: передача остаётся в буфере, о ней
-     * предупредят, а следующая проверка попробует снова.
-     */
     private void closeIfSuperseded(UUID cid) {
         try {
             closure.closeIfSuperseded(cid);
@@ -80,7 +71,6 @@ public class StuckTransferAlert {
                 Duration.between(transfer.getFirstPartReceivedAt(), now), transfer.getParts());
     }
 
-    /** Предупреждение называет не больше заданного числа передач и говорит, когда за пределом могут быть ещё. */
     private String limitNote(int reported) {
         int limit = properties.stuckTransferReportLimit();
         return reported < limit ? "" : ". Названы %d самых давних, зависших может быть больше".formatted(limit);

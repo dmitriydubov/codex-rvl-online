@@ -21,11 +21,6 @@ import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 
-/**
- * Полис целиком для сервиса Заявок: застрахованный, договор страхования и программы РВЛ с условиями обслуживания.
- * Ответ собирается внутри транзакции, потому что табличные части грузятся лениво; отказ базы на ленивой догрузке
- * переводит в 503 обработчик ошибок REST.
- */
 @Service
 public class PolicyQueryService implements PolicyReads {
 
@@ -57,10 +52,6 @@ public class PolicyQueryService implements PolicyReads {
                 .orElseThrow(() -> ReferenceNotFoundException.policyByExternalId(externalId));
     }
 
-    /**
-     * Договор не читается: полис может прийти из 1С раньше договора, поэтому неизвестный договор означает то же,
-     * что и отсутствие полиса. Номер уникален только в договоре, и два полиса с ним означают конфликт данных 1С.
-     */
     @Override
     @RestReadTransaction
     public PolicyResponse byNumber(String number, UUID contractExternalId) {
@@ -73,14 +64,12 @@ public class PolicyQueryService implements PolicyReads {
                 .orElseThrow(() -> ReferenceNotFoundException.policyByNumber(contractExternalId));
     }
 
-    /** Договор и программы связаны логически, по GUID 1С, и отсутствие записи в справочнике не ошибка. */
     private PolicyResponse assemble(Policy policy) {
         InsuranceContract contract = insuranceContracts.findByExternalId(policy.details().externalContractId())
                 .orElse(null);
         return PolicyResponse.of(policy, contract, rvlPrograms(policy));
     }
 
-    /** Программы читаются одним запросом на все строки полиса; архивная в ответ не попадает. */
     private Map<UUID, Program> rvlPrograms(Policy policy) {
         Set<UUID> referenced = Stream.concat(
                         policy.programs().stream().map(PolicyProgram::externalProgramId),

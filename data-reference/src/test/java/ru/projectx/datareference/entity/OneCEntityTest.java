@@ -6,10 +6,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Защищает общую часть записей из 1С: собственный идентификатор, пометку удаления как признак архивности
- * и время создания, которое не меняется при применении сообщения.
- */
 class OneCEntityTest {
 
     private static final UUID EXTERNAL_ID = UUID.fromString("0b0c1d2e-3f40-4a51-8b62-000000000001");
@@ -65,7 +61,6 @@ class OneCEntityTest {
         assertThat(record.updatedAt()).isEqualTo(UPDATED);
     }
 
-    /** Сама общая часть не сохраняется, её создают только наследники. */
     private static OneCEntity record(Instant now) {
         return new OneCEntity(EXTERNAL_ID, now) {
         };

@@ -45,7 +45,3 @@ databaseChangeLog:
                   type: timestamptz
                   constraints: { nullable: false }
               - column: { name: processed_at, type: timestamptz }
-
-# Индекс под выборку «что пора разобрать» заведён отдельно (003-outbox-index), под настоящий запрос планировщика:
-# только по запросу видно, какие колонки и в каком порядке индексировать. Частичный индекс создаётся сырым sql,
-# потому что createIndex в Liquibase ключ where молча игнорирует.

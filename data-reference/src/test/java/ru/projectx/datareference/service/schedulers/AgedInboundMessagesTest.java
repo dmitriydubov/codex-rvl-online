@@ -18,10 +18,6 @@ import ru.projectx.datareference.repository.BufferedTransfer;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
-/**
- * Порог давности превращается в момент по часам сервиса: «старше тридцати суток» значит принято раньше, чем «сейчас
- * минус тридцать суток». Сами запросы проверяет {@link AgedInboundMessagesQueryTest}, здесь только момент и предел.
- */
 @ExtendWith(MockitoExtension.class)
 class AgedInboundMessagesTest {
 
@@ -55,7 +51,6 @@ class AgedInboundMessagesTest {
         assertThat(agedMessages().transfersBufferedLongerThan(Duration.ofHours(1), 20)).isSameAs(stuck);
     }
 
-    /** Закрытию нужны все зависшие передачи, без предела числа названных в предупреждении. */
     @Test
     void allTransfersBufferedLongerThan_asksWithoutLimit() {
         List<BufferedTransfer> stuck = List.of(mock(BufferedTransfer.class));

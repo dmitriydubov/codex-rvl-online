@@ -18,11 +18,6 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.MigrationSql;
 
-/**
- * Миграция срока хранения ставит архивным полисам момент перевода в архив, а проверки в базе требуют ФИО и дату
- * рождения у нестёртого полиса и момент перевода ровно у архивного. Заполнение проверяется текстом из миграции
- * на копии таблицы без проверок: в настоящей таблице архивный полис без момента перевода уже не сохранить.
- */
 @IntegrationTest
 class PolicyPersonalDataStorageTest {
 
@@ -102,7 +97,6 @@ class PolicyPersonalDataStorageTest {
         return id;
     }
 
-    /** Операторы заполнения ровно тем текстом, что лежит в миграции. */
     private static List<String> fillSql() {
         return MigrationSql.statementsOf("db/changelog/019-policy-personal-data-retention.yaml",
                 "019-policy-archived-at-fill");

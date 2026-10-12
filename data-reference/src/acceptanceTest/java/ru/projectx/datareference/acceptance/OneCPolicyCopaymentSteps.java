@@ -8,11 +8,6 @@ import java.util.function.Consumer;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Шаг «1С:УСК прислала тот же полис под новым номером, а поле "copayment" — "V"»: процент сооплаты строки условий
- * обслуживания прислан не числом или не прислан вовсе. Полис строится из присланного сценарием раньше; разбор его
- * отклоняет. Словарь закрытый: незнакомое слово или поле роняет шаг.
- */
 public class OneCPolicyCopaymentSteps {
 
     private static final String COPAYMENT = "copayment";

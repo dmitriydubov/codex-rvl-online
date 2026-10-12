@@ -8,10 +8,6 @@ import java.util.List;
 import java.util.Map;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
-/**
- * Шаги «1С:УСК прислала …» и шаги разбора присланного. Разбор вызывает штатный проход планировщика, чтобы справочники
- * заполнялись тем же путём, что из 1С, а не записью прямо в их таблицы.
- */
 public class OneCSteps {
 
     private final OneCInbox inbox;
@@ -77,10 +73,6 @@ public class OneCSteps {
         inbox.receive(inbox.asNewDelivery(OneCMessages.policy(policy)));
     }
 
-    /**
-     * «Разобрано» значит, что каждое сообщение закончилось своим ожидаемым исходом в порядке приёма, в том числе
-     * пропуском (страхователь не стал санаторием), и чужих строк сырья в базе нет.
-     */
     @Дано("Дата-референс разобрал присланные сообщения")
     public void receivedMessagesImported() {
         scheduler.importPendingMessages();
@@ -90,7 +82,6 @@ public class OneCSteps {
                 .containsExactlyElementsOf(inbox.expectedStatuses());
     }
 
-    /** Запускает тот же штатный проход разбора, но исход проверяют шаги «Тогда», а не этот шаг. */
     @Когда("Дата-референс разбирает присланные сообщения")
     public void receivedMessagesBeingImported() {
         scheduler.importPendingMessages();

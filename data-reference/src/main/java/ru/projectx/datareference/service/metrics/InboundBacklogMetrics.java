@@ -16,11 +16,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Метрики накопления в таблице сырых сообщений 1С из снимка в памяти, который обновляет расписание: скрейп не ждёт
- * недоступную базу. Отставание снимка видно отдельной метрикой; пустой снимок помечен 1970 годом. Ряды заведены
- * на каждый поток и статус заранее, потому что пропавший ряд неотличим от сломанного экспорта.
- */
 @Component
 public class InboundBacklogMetrics implements MeterBinder {
 
@@ -32,7 +27,6 @@ public class InboundBacklogMetrics implements MeterBinder {
     static final String OVERDUE_POLICIES = "policies.retention.overdue.personal.data";
     static final String STALENESS = "onec.inbound.backlog.staleness";
 
-    /** Всё, что ещё не разобрано, и отказ, который ждёт человека. */
     private static final List<InboundStatus> GAUGED_STATUSES =
             List.of(InboundStatus.NEW, InboundStatus.RETRY, InboundStatus.BUFFERED, InboundStatus.AWAITING_PARENT,
                     InboundStatus.FAILED);
@@ -49,7 +43,6 @@ public class InboundBacklogMetrics implements MeterBinder {
         this.backlog = InboundBacklog.empty(Instant.EPOCH);
     }
 
-    /** Отказ базы не роняет задачу и оставляет прежний снимок; в журнал идёт только тип исключения. */
     public void refresh() {
         try {
             backlog = reads.read();
@@ -100,7 +93,6 @@ public class InboundBacklogMetrics implements MeterBinder {
                 .register(registry);
     }
 
-    /** Возраст считается на момент скрейпа, а не снимка, чтобы давность росла и между обновлениями. */
     private double oldestPendingAge(OneCStream stream) {
         return backlog.oldestPending(stream).map(this::secondsSince).orElse(0.0);
     }

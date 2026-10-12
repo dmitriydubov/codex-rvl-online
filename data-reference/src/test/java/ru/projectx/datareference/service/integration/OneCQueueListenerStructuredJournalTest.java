@@ -36,11 +36,6 @@ import ru.projectx.datareference.service.onec.OneCIngestService;
 import ru.projectx.datareference.support.StructuredJournal;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Защищает поля {@code stream} и {@code queue} в записях слушателя, по которым настроены оповещения о паузе,
- * карантине и потере сообщения: по ним дежурный сразу видит, какой поток стоит. Тела в записи нет, потому что через
- * слушатель идут полисы с персональными данными; подменены только запись в базу и канал брокера.
- */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class OneCQueueListenerStructuredJournalTest {
 
@@ -48,7 +43,6 @@ class OneCQueueListenerStructuredJournalTest {
     private static final UUID MESSAGE_ID = UUID.fromString("9f1c0f2e-0000-4000-8000-00000000000c");
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
 
-    /** Похоже на персональные данные из полиса, то есть ровно на то, чего в журнале быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна";
 
     @Mock
@@ -108,7 +102,6 @@ class OneCQueueListenerStructuredJournalTest {
         assertThat(output.getAll()).doesNotContain(PERSONAL_DATA);
     }
 
-    /** У потерянного сообщения нет пригодного {@code message-id}, поэтому и поля с ним в записи нет. */
     @Test
     void lostMessage_carriesStreamAndQueueWithoutMessageId(CapturedOutput output) throws IOException {
         listener().receive(OneCStream.POLICIES, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);

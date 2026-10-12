@@ -17,10 +17,6 @@ import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 
-/**
- * GUID вида деятельности «РВЛ» не в канонической форме останавливает старт с понятным текстом, а само значение
- * в отчёт об ошибке не попадает. Контекст маленький, но настройки читаются тем же механизмом Spring Boot.
- */
 class RvlActivitySettingStartupTest {
 
     private static final String SETTING = "projectx.onec.contract.rvl-activity-id";
@@ -38,7 +34,6 @@ class RvlActivitySettingStartupTest {
         });
     }
 
-    /** Нулевой GUID в сообщениях 1С:УСК означает пустое значение, поэтому как настройка он не годится. */
     @Test
     void nilGuidSetting_stopsTheStart() {
         context.withPropertyValues(SETTING + "=00000000-0000-0000-0000-000000000000").run(started -> {

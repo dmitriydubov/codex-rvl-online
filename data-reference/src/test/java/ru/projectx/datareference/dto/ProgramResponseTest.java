@@ -12,10 +12,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 
-/**
- * Перечень услуг программы отдаёт сервису Договоров по каждой строке и учреждение, и условия обслуживания
- * в нём ровно так, как их прислала 1С: по этим условиям считается, на что застрахованный может рассчитывать.
- */
 class ProgramResponseTest {
 
     private static final Instant NOW = Instant.parse("2026-10-01T09:00:00Z");

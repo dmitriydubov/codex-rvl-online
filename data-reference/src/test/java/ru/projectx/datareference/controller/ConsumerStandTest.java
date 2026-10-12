@@ -22,7 +22,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
-import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
@@ -33,11 +32,6 @@ import ru.projectx.datareference.support.StandPlaceholders;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Проверяет стенд потребителя для сервиса Договоров на его же файлах: {@code stand/seed.sql} и {@code stand/examples}.
- * Пример, разошедшийся с ответом сервиса хоть одним полем, роняет тест: так примеры остаются контрактом,
- * а не устаревшей документацией.
- */
 @IntegrationTest
 class ConsumerStandTest {
 
@@ -63,7 +57,6 @@ class ConsumerStandTest {
             "10-policy-contract-view.json",
             "11-policy-contract-view-not-found.json",
             "12-service-unavailable.json");
-    /** Таблицы, которые пример может держать под блокировкой: имя таблицы в SQL берётся только отсюда, не из файла. */
     private static final Set<String> LOCKABLE_TABLES = Set.of("policies", "insurance_contracts", "programs");
     private static final List<String> REQUIRED_SECTIONS = List.of(
             "/description", "/placeholders", "/request/method", "/request/path", "/request/headers",
@@ -91,10 +84,6 @@ class ConsumerStandTest {
         scheduler.importPendingMessages();
     }
 
-    /**
-     * Страхователь в потоке контрагентов записывается пропуском с причиной, а не ошибкой: так видно,
-     * что контрагент пришёл, но санаторием не оказался. Строка в {@code insurers} при этом создаётся.
-     */
     @Test
     void seed_isImportedByScheduler() {
         assertThat(inboundMessages.findAll())
@@ -122,7 +111,6 @@ class ConsumerStandTest {
                 .noneMatch(message -> message.outcome().status() == InboundStatus.NEW);
     }
 
-    /** Набор закреплён поимённо: пропавший или переименованный пример иначе просто перестал бы проверяться. */
     @Test
     void examples_coverTheConsumerContract() {
         assertThat(StandExample.loadAll())
@@ -130,10 +118,6 @@ class ConsumerStandTest {
                 .containsExactlyElementsOf(EXAMPLES);
     }
 
-    /**
-     * Пример без запроса или ответа сравнивать не с чем: отсутствующее тело сошлось бы с пустым ответом.
-     * Раздел {@code placeholders} — описание для читателя, и оно обязано быть полным.
-     */
     @Test
     void examples_areComplete() {
         assertThat(StandExample.loadAll()).allSatisfy(example -> {
@@ -170,10 +154,6 @@ class ConsumerStandTest {
         assertThat(body).isEqualTo(placeholders.resolve(example.body()));
     }
 
-    /**
-     * Условие примера держит другой сеанс базы: блокировка взята до запроса и снимается откатом
-     * сразу после ответа, чтобы следующие примеры шли по доступной базе.
-     */
     private MvcTestResult exchangeUnderCondition(StandExample example, StandPlaceholders placeholders)
             throws SQLException {
 

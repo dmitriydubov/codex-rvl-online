@@ -15,11 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
-/**
- * Компонент здоровья приёма из 1С:УСК: UP, только когда у каждой ожидаемой очереди есть подписанный потребитель.
- * На паузе из-за базы — DOWN с её причиной: код SQLSTATE и тип отказа, без текста ошибки. Вне паузы очередь без
- * потребителя — DOWN с перечнем таких очередей, в том числе пока потребители ещё не запущены.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCIngestHealthIndicatorTest {
 

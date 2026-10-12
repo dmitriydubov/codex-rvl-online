@@ -6,18 +6,12 @@ import jakarta.persistence.MappedSuperclass;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Общая часть записи из 1С: наш идентификатор, GUID в 1С и признак архивности. Версии сообщения нет, её присылают
- * не все потоки: применяется последнее полученное сообщение, а порядок держит доставка. Наследники заполняют поля
- * в статической фабрике, потому что переопределяемый метод из конструктора сработал бы до их инициализации.
- */
 @MappedSuperclass
 public class OneCEntity {
 
     @Id
     private UUID id;
 
-    /** GUID объекта в 1С. Именно по нему идёт upsert, а не по нашему {@link #id}. */
     @Column(name = "external_id", nullable = false, unique = true, updatable = false)
     private UUID externalId;
 
@@ -31,7 +25,6 @@ public class OneCEntity {
     private Instant updatedAt;
 
     protected OneCEntity() {
-        // JPA
     }
 
     protected OneCEntity(UUID externalId, Instant now) {
@@ -42,19 +35,11 @@ public class OneCEntity {
         this.updatedAt = now;
     }
 
-    /**
-     * Общий хвост применения сообщения: наследник вызывает его последним действием. Метод не публичный:
-     * вызванный сам по себе, он пометил бы запись обновлённой, не изменив ни одного поля.
-     */
     protected void applyCommon(boolean deleteMark, Instant now) {
         this.archive = deleteMark;
         this.updatedAt = now;
     }
 
-    /**
-     * Запись перестала подходить под отбор потока, например программа больше не относится к РВЛ.
-     * Запись уходит в архив, а не удаляется; связанные строки не трогаются.
-     */
     protected void archiveCommon(Instant now) {
         applyCommon(true, now);
     }

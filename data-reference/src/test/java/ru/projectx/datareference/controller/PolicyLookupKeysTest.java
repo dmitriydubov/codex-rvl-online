@@ -21,11 +21,6 @@ import ru.projectx.datareference.service.PolicyContractViews;
 import ru.projectx.datareference.service.PolicyReads;
 import ru.projectx.datareference.service.PolicySearchReads;
 
-/**
- * Полис читается ровно одним ключом, поэтому запрос, где рядом с {@code external_id} стоит номер или договор,
- * отклоняется целиком, а не читается молча по одному из ключей. Старый ключ {@code contract_id} сервис называет
- * в отказе, иначе вызывающий со старым ключом получил бы непонятный отказ по другому полю.
- */
 @ExtendWith(MockitoExtension.class)
 class PolicyLookupKeysTest {
 
@@ -90,7 +85,6 @@ class PolicyLookupKeysTest {
         verifyNoInteractions(policies, policySearch, contractViews);
     }
 
-    /** Условие «ключа другого способа нет» смотрит только на ключи полиса: посторонний параметр ему не мешает. */
     @Test
     void externalIdWithUnrelatedParameter_isStillLookupByExternalId() {
         when(policies.byExternalId(POLICY_EXTERNAL_ID)).thenReturn(policy());

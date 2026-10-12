@@ -9,10 +9,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Защищает общий шаг разбора справочников 1С: новая запись создаётся из снимка, известная получает новый.
- * Перепутать ветки значило бы плодить дубли по одному GUID 1С или терять реквизиты, пришедшие последними.
- */
 class SnapshotUpsertTest {
 
     private static final UUID EXTERNAL_ID = UUID.fromString("5b0d2c1e-3f4a-4b5c-8d6e-7f8091a2b3c4");
@@ -53,7 +49,6 @@ class SnapshotUpsertTest {
                 stored::add);
     }
 
-    /** Запись справочника в миниатюре: GUID 1С, последний снимок и момент его применения. */
     private static final class Card {
 
         private final UUID externalId;

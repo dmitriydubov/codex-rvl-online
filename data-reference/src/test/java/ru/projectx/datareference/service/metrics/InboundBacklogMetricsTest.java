@@ -28,10 +28,6 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Метрики накопления в таблице сырья: читаются из снимка, ряды заведены на каждый поток и статус, давность
- * считается по часам в момент чтения, неудачное обновление оставляет прежний снимок.
- */
 @ExtendWith(MockitoExtension.class)
 class InboundBacklogMetricsTest {
 
@@ -59,7 +55,6 @@ class InboundBacklogMetricsTest {
         metricsLog().detachAppender(logged);
     }
 
-    /** Ряды есть до первого чтения базы, по каждому потоку и каждому из пяти статусов, и они нулевые. */
     @Test
     void beforeFirstRefresh_everyStreamAndStatusIsZero() {
         assertThat(registry.find(InboundBacklogMetrics.MESSAGES).gauges())
@@ -74,7 +69,6 @@ class InboundBacklogMetricsTest {
         assertThat(gauge(InboundBacklogMetrics.STUCK_TRANSFERS).value()).isZero();
     }
 
-    /** До первого чтения снимок помечен 1970 годом: отставание сразу показывает, что данных ещё нет. */
     @Test
     void beforeFirstRefresh_stalenessCountsFromEpoch() {
         assertThat(timeGauge(InboundBacklogMetrics.STALENESS).value(TimeUnit.SECONDS))
@@ -99,7 +93,6 @@ class InboundBacklogMetricsTest {
         assertThat(gauge(InboundBacklogMetrics.OVERDUE_POLICIES).value()).isEqualTo(6.0);
     }
 
-    /** Давность растёт и между обновлениями: она считается от часов в момент чтения, а не в момент снимка. */
     @Test
     void oldestPendingAge_growsWithTheClock() {
         when(reads.read()).thenReturn(new InboundBacklog(List.of(
@@ -123,7 +116,6 @@ class InboundBacklogMetricsTest {
         assertThat(timeGauge(InboundBacklogMetrics.STALENESS).value(TimeUnit.SECONDS)).isEqualTo(45.0);
     }
 
-    /** База недоступна: прежний снимок остаётся, отставание растёт, в журнале — тип отказа без текста. */
     @Test
     void failedRefresh_keepsPreviousSnapshotAndLogsFailureType() {
         when(reads.read()).thenReturn(new InboundBacklog(List.of(
@@ -173,7 +165,6 @@ class InboundBacklogMetricsTest {
         return (Logger) LoggerFactory.getLogger(InboundBacklogMetrics.class);
     }
 
-    /** Часы, которые тест переводит сам: давность считается при чтении, и её нужно видеть в разные моменты. */
     private static final class MovableClock extends Clock {
 
         private volatile Instant now;

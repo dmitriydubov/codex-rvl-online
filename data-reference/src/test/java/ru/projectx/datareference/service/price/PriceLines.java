@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/** Строки прайса для тестов расчёта: даты и цены задаются строкой, идентификатор каждый раз новый. */
 final class PriceLines {
 
     private PriceLines() {

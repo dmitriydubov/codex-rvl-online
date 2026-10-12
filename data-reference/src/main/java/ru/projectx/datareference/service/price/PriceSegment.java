@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 
-/** Подряд идущие ночи от {@code from} включительно до {@code to} не включительно, оплачиваемые по одной строке. */
 public record PriceSegment(LocalDate from, LocalDate to, PriceLine line) {
 
     public int nights() {

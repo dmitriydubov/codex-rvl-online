@@ -20,8 +20,6 @@ databaseChangeLog:
         задним числом заставила бы Liquibase считать их новыми.
       changes:
         - renameTable: { oldTableName: outbox, newTableName: inbound_message }
-        # Имена индексов и ограничений PostgreSQL при переименовании таблицы
-        # не трогает — они так и остались бы с приставкой outbox.
         - sql:
             sql: ALTER TABLE inbound_message RENAME CONSTRAINT pk_outbox TO pk_inbound_message
         - sql:

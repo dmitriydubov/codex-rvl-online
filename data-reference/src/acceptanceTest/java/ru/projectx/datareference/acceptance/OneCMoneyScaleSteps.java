@@ -7,11 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Шаги «1С:УСК прислала …» о знаках после запятой у денежных полей прайса, программы и полиса. Программа и полис
- * строятся из присланных сценарием раньше, прайс — заново. Сырьё ложится так, как его сохранил бы приём из очереди;
- * ожидаемый исход разбора несёт само сообщение.
- */
 public class OneCMoneyScaleSteps {
 
     private static final Map<String, BigDecimal> STEPS = Map.of(

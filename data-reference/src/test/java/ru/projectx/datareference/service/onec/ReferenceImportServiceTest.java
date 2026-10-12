@@ -19,11 +19,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает путь одного сообщения 1С через разбор: сохранённое тело разбирается, данные попадают в справочник,
- * а исход записывается в строку сообщения. Справочник МКБ-10 взят как самый простой: проверяется механизм разбора,
- * а не правила конкретного потока.
- */
 @IntegrationTest
 class ReferenceImportServiceTest {
 
@@ -62,7 +57,6 @@ class ReferenceImportServiceTest {
         assertThat(stored.isArchive()).isFalse();
     }
 
-    /** Разбор и статус сырья коммитятся вместе — иначе сообщение применится дважды. */
     @Test
     void appliedMessage_isMarkedProcessed() {
         UUID messageId = store(OneCStream.MKB10, mkb10("A00", "Холера"));
@@ -83,10 +77,6 @@ class ReferenceImportServiceTest {
                 .isEqualTo("Холера уточнённая");
     }
 
-    /**
-     * Версий у сообщений нет, и порядок разбор не проверяет: действует последнее применённое. Порядок держится
-     * на пути доставки: очередь одна, потребитель один, выборка идёт по возрастанию {@code received_at}.
-     */
     @Test
     void lastAppliedMessageWins() {
         importService.importMessage(message(store(OneCStream.MKB10, mkb10("A00", "Холера уточнённая"))));
@@ -99,7 +89,6 @@ class ReferenceImportServiceTest {
                 .isEqualTo("Холера");
     }
 
-    /** У пропуска обязательна причина: без неё непонятно, почему справочник пуст. */
     @Test
     void skippedMessage_keepsReasonInRawRow() {
         UUID skippedId = store(OneCStream.CONTRAGENTS, insurer());
@@ -111,7 +100,6 @@ class ReferenceImportServiceTest {
         assertThat(skipped.outcome().lastError()).isNotBlank();
     }
 
-    /** Конверт без data — постоянная ошибка: повтор даст ровно то же самое. */
     @Test
     void envelopeWithoutData_isContractViolation() {
         UUID messageId = UUID.randomUUID();
@@ -132,7 +120,6 @@ class ReferenceImportServiceTest {
         return inboundMessageRepository.findById(messageId).orElseThrow();
     }
 
-    /** Контрагент-страхователь: сохраняется, но исход разбора — пропуск с причиной. */
     private static String insurer() {
         return """
                 {"guid":"3f0a9c11-0000-4000-8000-000000000002","thisIsLPU":false,\

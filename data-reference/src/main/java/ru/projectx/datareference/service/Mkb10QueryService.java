@@ -13,11 +13,6 @@ import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
-/**
- * МКБ-10 для сервиса Заявок: подсказка по коду или наименованию и раскрытие перечня кодов. Здесь только проверка
- * входа, без транзакции, чтобы неверный параметр отклонялся и при недоступной базе. Фильтра по учреждению нет:
- * связь кодов с учреждениями ни один поток 1С не присылает.
- */
 @Service
 public class Mkb10QueryService implements Mkb10Reads {
 
@@ -62,10 +57,6 @@ public class Mkb10QueryService implements Mkb10Reads {
         return lookup.byCodes(codes);
     }
 
-    /**
-     * Запятая в коде значит, что перечень через запятую пришёл в одном из нескольких параметров {@code codes}:
-     * делится только единственный параметр. Молча искать такой код значило бы вернуть неполный ответ.
-     */
     private static void requireOneCodePerValue(List<String> codes) {
         if (codes.stream().anyMatch(code -> code.contains(CODE_SEPARATOR))) {
             throw new InvalidRequestException(CODES, "коды через запятую передаются одним параметром codes");

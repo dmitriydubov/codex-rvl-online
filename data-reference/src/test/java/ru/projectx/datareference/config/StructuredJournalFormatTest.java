@@ -14,11 +14,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import ru.projectx.datareference.support.StructuredJournal;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Сборщик журналов контура разбирает записи по полям, поэтому журнал пишется в формате ECS (Elastic Common Schema).
- * Без него ключи MDC вроде {@code messageId} и {@code requestId}, по которым находится история сообщения или
- * запроса, в строку журнала не выводятся.
- */
 @ExtendWith(OutputCaptureExtension.class)
 class StructuredJournalFormatTest {
 
@@ -40,7 +35,6 @@ class StructuredJournalFormatTest {
         MDC.remove(MDC_KEY);
     }
 
-    /** Строки запуска тоже JSON: заставка Spring Boot в консоль не выводится и разбор журнала не ломает. */
     @Test
     void everyLine_isEcsJsonRecord(CapturedOutput output) {
         log.info("проверка формата");

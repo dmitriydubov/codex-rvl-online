@@ -36,22 +36,15 @@ import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Поиск полисов договора до базы: нормализация строки, выбор режима (номер или ФИО), шаблоны, пределы и
- * отказы. Отбор, ранжирование и предел выдачи в SQL проверяет PolicyApiTest на настоящем PostgreSQL.
- */
 @ExtendWith(MockitoExtension.class)
 class PolicySearchServiceTest {
 
     private static final UUID CONTRACT = UUID.fromString("c0000000-0000-4000-8000-000000000001");
-    /** 2026-03-14 09:15 UTC — в Москве тот же день. */
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 3, 14);
     private static final PolicyScope DEFAULT_SCOPE = new PolicyScope(CONTRACT, TODAY, 10);
     private static final int MAX_QUERY_LENGTH = 100;
-    /** Предел, который не совпадает ни с одним другим пределом в настройках. */
     private static final int CONFIGURED_MAX_QUERY_LENGTH = 7;
-    /** Эмодзи U+1F600: один символ, но в строке Java занимает две единицы UTF-16 (суррогатную пару). */
     private static final String OUTSIDE_BMP = Character.toString(0x1F600);
 
     @Mock
@@ -67,7 +60,6 @@ class PolicySearchServiceTest {
         service = serviceWith(TestApiProperties.defaults());
     }
 
-    /** Обрезка, схлопывание пробелов, нижний регистр и ё → е — до того, как строка станет шаблоном. */
     @ParameterizedTest
     @ValueSource(strings = {"иван петр", "  Иван    ПЁТР  ", "ИВАН\tпётр"})
     void nameTokens_areNormalizedPrefixes_inOneQuery(String query) {
@@ -109,7 +101,6 @@ class PolicySearchServiceTest {
         assertThat(service.search(CONTRACT, "ив", 3).items()).isEmpty();
     }
 
-    /** Длина — в символах того, что прислано: эмодзи и «İ» по одному символу, хотя в нижнем регистре «İ» — два. */
     @ParameterizedTest
     @ValueSource(strings = {"", "и", "  и  ", "ё", "\uD83D\uDE00", "\u0130"})
     void queryShorterThanMinimum_isValidationError_namingRuleNotValue(String query) {
@@ -121,7 +112,6 @@ class PolicySearchServiceTest {
         verifyNoInteractions(policies, insuranceContracts);
     }
 
-    /** Нижний предел тоже считается в символах: два эмодзи — два символа, строка ищется. */
     @Test
     void twoCharactersOutsideBmp_areSearched() {
         knownContract();
@@ -131,7 +121,6 @@ class PolicySearchServiceTest {
         assertThat(service.search(CONTRACT, query, null).items()).isEmpty();
     }
 
-    /** Длина считается по строке как пришла, вместе с пробелами по краям: предел защищает от объёма. */
     @Test
     void queryAtMaximumLength_isSearched() {
         knownContract();
@@ -154,10 +143,6 @@ class PolicySearchServiceTest {
         verifyNoInteractions(policies, insuranceContracts);
     }
 
-    /**
-     * Длина считается в символах, а не в единицах UTF-16: строка ровно в предел символов ищется, хотя её последний
-     * символ лежит вне основной плоскости Юникода и по {@code length()} она на единицу длиннее предела.
-     */
     @Test
     void queryAtMaximumLength_withCharacterOutsideBmp_isSearched() {
         knownContract();
@@ -170,7 +155,6 @@ class PolicySearchServiceTest {
                 .extracting(PolicySearchResponse.Item::lastName).containsExactly("Петров");
     }
 
-    /** Длина проверяется первой: строка сверх предела отклоняется по полю query, даже когда неверен и limit. */
     @Test
     void queryLongerThanMaximum_withLimitOutOfBounds_isValidationErrorOnQuery() {
         String query = "ж".repeat(MAX_QUERY_LENGTH + 1);
@@ -181,10 +165,6 @@ class PolicySearchServiceTest {
         verifyNoInteractions(policies, insuranceContracts);
     }
 
-    /**
-     * Предел длины строки — своя настройка поиска полисов. В умолчаниях он равен пределу строки МКБ-10, поэтому
-     * здесь он другой: строка ровно в него ищется, на букву длиннее — нет.
-     */
     @Test
     void queryLength_isLimitedByPolicySearchSetting() {
         PolicySearchService configured =

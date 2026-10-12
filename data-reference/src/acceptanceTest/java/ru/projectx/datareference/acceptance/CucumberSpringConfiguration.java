@@ -20,11 +20,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/**
- * Один контекст Spring на все сценарии приёмки: настоящие PostgreSQL и RabbitMQ тех же версий, что в контуре. Своя
- * обвязка, а не классы из src/test, потому что приёмка в контур не переносится. Расписания выключены, чтобы проходы не
- * меняли статусы посреди сценария; TLS и слушатели заданы явно, чтобы не зависеть от окружения запускающего.
- */
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "projectx.scheduling.enabled=false",
@@ -33,15 +28,12 @@ import ru.projectx.datareference.config.OneCQueueProperties;
 @Import(CucumberSpringConfiguration.Containers.class)
 public class CucumberSpringConfiguration {
 
-    /** Контейнеры приёмки: адрес и учётные данные подставляет {@link ServiceConnection}. */
     @TestConfiguration(proxyBeanMethods = false)
     static class Containers {
 
         private static final String POSTGRES_IMAGE = "postgres:16.10-alpine";
-        /** Та же версия, что у брокера 1С:УСК на контуре. */
         private static final String RABBITMQ_IMAGE = "rabbitmq:4.1.2-alpine";
         private static final String DATA_SOURCE_BEAN = "dataSource";
-        /** Свойство с «сегодня» стенда; при запуске — переменная окружения {@code ACCEPTANCE_TODAY}. */
         static final String TODAY = "acceptance.today";
 
         @Bean
@@ -56,10 +48,6 @@ public class CucumberSpringConfiguration {
             return new RabbitMQContainer(RABBITMQ_IMAGE);
         }
 
-        /**
-         * Часы сервиса, которыми управляют шаги сценария; {@code @Primary} побеждает часы из конфигурации сервиса.
-         * Со свойством {@value #TODAY} идущие часы показывают этот день по Москве: так приёмка проверяется на любую дату.
-         */
         @Bean
         @Primary
         StandClock standClock(Environment environment) {
@@ -78,16 +66,11 @@ public class CucumberSpringConfiguration {
             }
         }
 
-        /** Справки об очередях для шагов сценария; очередей сам не объявляет — бинов очередей в контексте нет. */
         @Bean
         RabbitAdmin rabbitAdmin(ConnectionFactory connectionFactory) {
             return new RabbitAdmin(connectionFactory);
         }
 
-        /**
-         * Очереди контура объявляет стенд, как на контуре их заводит 1С:УСК, и раньше старта потребителей: забытая
-         * очередь уронила бы контекст, а не прошла молча.
-         */
         @Bean
         OneCStandQueues oneCStandQueues(ConnectionFactory connectionFactory, OneCQueueProperties queues) {
             OneCStandQueues standQueues = new OneCStandQueues(connectionFactory);
@@ -98,11 +81,6 @@ public class CucumberSpringConfiguration {
             return standQueues;
         }
 
-        /**
-         * Оборачивает пул сервиса переключателем до того, как его получат JPA и остальные: «база недоступна» в сценарии
-         * значит отказ соединения у всех, кто ходит через пул, а саму общую базу остановить нельзя. Статический, чтобы
-         * Spring создал обработчик раньше остальных бинов.
-         */
         @Bean
         static BeanPostProcessor switchableDataSource() {
             return new BeanPostProcessor() {

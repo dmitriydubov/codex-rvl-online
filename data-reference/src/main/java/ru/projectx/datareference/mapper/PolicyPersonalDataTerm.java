@@ -6,10 +6,6 @@ import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.entity.PersonalDataCutoff;
 
-/**
- * Срок хранения персональных данных в полисах после окончания или перевода в архив. Граница нужна разбору полиса,
- * стиранию и метрике, поэтому считается в одном месте.
- */
 @Component
 public class PolicyPersonalDataTerm {
 

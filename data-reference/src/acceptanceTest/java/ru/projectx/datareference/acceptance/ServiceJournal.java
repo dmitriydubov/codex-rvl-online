@@ -13,11 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
 
-/**
- * Записи журнала Дата-референса за время сценария. Сервис запущен в том же процессе, что и приёмка, поэтому его
- * записи собираются в память через корневой журнал Logback. Сбор включают и выключают хуки {@link ServiceLog}, а
- * читают записи шаги о журнале разных фич.
- */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
 public class ServiceJournal {
@@ -38,7 +33,6 @@ public class ServiceJournal {
         return List.copyOf(events.list);
     }
 
-    /** Записи, в тексте, контексте или тексте приложенного исключения которых встречается {@code text}. */
     List<ILoggingEvent> mentioning(String text) {
         return events().stream().filter(event -> texts(event).anyMatch(value -> value.contains(text))).toList();
     }

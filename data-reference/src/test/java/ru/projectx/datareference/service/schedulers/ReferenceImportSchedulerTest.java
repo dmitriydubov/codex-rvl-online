@@ -18,11 +18,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Проход планировщика на настоящей базе. Он вызывается напрямую, потому что тест, ждущий таймера, плавает. Проверяются
- * только строки, созданные тестом, по их идентификаторам: проход забирает всё дозревшее сырьё, и проверка всей таблицы
- * падала бы от соседних строк.
- */
 @IntegrationTest
 class ReferenceImportSchedulerTest {
 
@@ -68,10 +63,6 @@ class ReferenceImportSchedulerTest {
         assertThat(mkb10Repository.findByExternalId(TYPHOID)).isPresent();
     }
 
-    /**
-     * Разобранное второй раз не разбирается. Проверяется сама выборка, а не число строк справочника: повторное
-     * применение идемпотентно, и по счётчику его не отличить от отсутствия.
-     */
     @Test
     void processedMessages_areNotPickedUpAgain() {
         UUID messageId = store(mkb10(PARATYPHOID, "A02"));
@@ -82,10 +73,6 @@ class ReferenceImportSchedulerTest {
                 .doesNotContain(messageId);
     }
 
-    /**
-     * Сообщение, которое не соответствует контракту, — постоянная ошибка. Повторять его бессмысленно, поэтому
-     * оно сразу завершается отказом и не расходует попытки повторов.
-     */
     @Test
     void contractViolation_endsWithFailedWithoutSpendingRetries() {
         UUID messageId = store("{\"id\":\"a4f1c2d3-0000-4000-8000-000000000004\",\"name\":\"Без кода\"}");

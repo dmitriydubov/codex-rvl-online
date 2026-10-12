@@ -39,21 +39,14 @@ import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
-/**
- * Защищает журнал слушателя очередей 1С:УСК: на время обработки в MDC лежат {@code messageId}, {@code stream} и
- * {@code queue}, а тела сообщения и текста чужого исключения в журнале нет, потому что через слушатель идут полисы
- * с персональными данными, а ошибка вставки печатает параметры запроса.
- */
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerJournalTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_policies";
     private static final UUID MESSAGE_ID = UUID.fromString("9f1c0f2e-0000-4000-8000-00000000000c");
 
-    /** Похоже на персональные данные из полиса, то есть ровно на то, чего в журнале быть не должно. */
     private static final String PERSONAL_DATA = "Иванова Мария Петровна";
 
-    /** Ключ MDC, который положил не слушатель, а, например, трассировка. */
     private static final String FOREIGN_MDC_KEY = "traceId";
     private static final String FOREIGN_MDC_VALUE = "0af7651916cd43dd8448eb211c80319c";
 
@@ -105,7 +98,6 @@ class OneCQueueListenerJournalTest {
                 .containsEntry(OneCLogContext.QUEUE, QUEUE);
     }
 
-    /** Поток контейнера обработает следующее сообщение, и ключи этого сообщения ему не достаются. */
     @Test
     void mdc_isClearedAfterProcessing() throws IOException {
         listener().receive(OneCStream.POLICIES, delivery(envelope(MESSAGE_ID)), channel);
@@ -115,7 +107,6 @@ class OneCQueueListenerJournalTest {
         assertThat(MDC.get(OneCLogContext.QUEUE)).isNull();
     }
 
-    /** В журнал попадает тип исключения, но не его текст: текст ошибки вставки печатает параметры запроса. */
     @Test
     void storageFailure_logsExceptionTypeButNotItsText() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
@@ -133,7 +124,6 @@ class OneCQueueListenerJournalTest {
                 .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
     }
 
-    /** Отказ хранилища, ставящий приём на паузу: WARN с типом и кодом SQLSTATE, без текста ошибки. */
     @Test
     void storageOutage_logsTypeAndSqlStateButNotText() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
@@ -151,10 +141,6 @@ class OneCQueueListenerJournalTest {
                 .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
     }
 
-    /**
-     * Карантин оставляет ERROR с кодом отказа и размером тела, но без самого тела и без текста ошибки базы:
-     * оба несут значения строки.
-     */
     @Test
     void quarantine_logsReasonAndSizeButNoBody() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
@@ -173,7 +159,6 @@ class OneCQueueListenerJournalTest {
                 .containsEntry(OneCLogContext.MESSAGE_ID, MESSAGE_ID.toString());
     }
 
-    /** Повтор уже карантинного сообщения — не событие: ни ERROR, ни WARN. */
     @Test
     void redeliveredQuarantinedMessage_leavesNoJournalEntry() throws IOException {
         when(ingestService.receive(any(), any(), any(), any())).thenThrow(
@@ -185,10 +170,6 @@ class OneCQueueListenerJournalTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /**
-     * От потерянного сообщения остаётся только строка журнала, поэтому она несёт поток и очередь. Тела
-     * в ней нет: у нечитаемого конверта внутри может оказаться полис.
-     */
     @Test
     void unreadableEnvelope_logsStreamAndQueueButNoBody() throws IOException {
         listener().receive(OneCStream.POLICIES, delivery("{\"data\":{\"fio\":\"" + PERSONAL_DATA + "\""), channel);
@@ -202,10 +183,6 @@ class OneCQueueListenerJournalTest {
                 .doesNotContainKey(OneCLogContext.MESSAGE_ID);
     }
 
-    /**
-     * Сообщение, потерянное из-за message-id не в канонической записи, оставляет ERROR «потеряно» с
-     * причиной, но без самого значения и без тела.
-     */
     @Test
     void nonCanonicalMessageId_isLoggedAsLostWithoutItsValue() throws IOException {
         String messageId = "9f1c0f2e-0000-4000-8000-+0000000000c";
@@ -220,10 +197,6 @@ class OneCQueueListenerJournalTest {
         assertThat(error.getMDCPropertyMap()).doesNotContainKey(OneCLogContext.MESSAGE_ID);
     }
 
-    /**
-     * Сообщение с нулевым message-id потеряно так же громко, как сообщение без message-id: в журнале
-     * остаётся ERROR «потеряно» с причиной, а не DEBUG о дубле.
-     */
     @Test
     void zeroMessageId_isLoggedAsLost() throws IOException {
         listener().receive(OneCStream.POLICIES, delivery(envelope("00000000-0000-0000-0000-000000000000")), channel);
@@ -253,11 +226,6 @@ class OneCQueueListenerJournalTest {
         assertThat(logged.list).isEmpty();
     }
 
-    /**
-     * Канал может отказать и на подтверждении, если оборвалось соединение с брокером. Ошибка уходит
-     * контейнеру, но ключи сообщения с потока всё равно снимаются. Иначе следующее сообщение этого
-     * потока писало бы в журнал чужой {@code messageId}.
-     */
     @Test
     void mdc_isClearedWhenAcknowledgementFails() throws IOException {
         doThrow(new IOException("канал закрыт")).when(channel).basicAck(anyLong(), anyBoolean());
@@ -290,10 +258,6 @@ class OneCQueueListenerJournalTest {
         assertNoMessageKeysInMdc();
     }
 
-    /**
-     * Слушатель снимает только свои ключи. То, что положили в MDC до него контейнер или трассировка,
-     * остаётся на месте.
-     */
     @Test
     void foreignMdcKeys_surviveProcessing() throws IOException {
         MDC.put(FOREIGN_MDC_KEY, FOREIGN_MDC_VALUE);
@@ -327,7 +291,6 @@ class OneCQueueListenerJournalTest {
                 metrics);
     }
 
-    /** Журнал всего пакета приёма: слушатель и его помощник по отказам записи пишут в свои категории. */
     private static Logger listenerLog() {
         return (Logger) LoggerFactory.getLogger(OneCQueueListener.class.getPackageName());
     }

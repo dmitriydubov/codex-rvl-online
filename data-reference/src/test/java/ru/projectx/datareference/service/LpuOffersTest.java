@@ -25,10 +25,6 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.support.TestApiProperties;
 
-/**
- * Предложение ЛПУ (лечебно-профилактического учреждения) для перечня его услуг: прайсовый договор на сегодняшний
- * день контура и его услуги по видам обращения РВЛ.
- */
 @ExtendWith(MockitoExtension.class)
 class LpuOffersTest {
 

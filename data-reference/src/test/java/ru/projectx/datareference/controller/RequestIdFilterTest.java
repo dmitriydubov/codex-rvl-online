@@ -14,7 +14,6 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/** Присланный X-Request-Id: допустимый возвращается как есть, иначе — новый UUID, запрос не отклоняется. */
 class RequestIdFilterTest {
 
     private static final String SIXTY_FOUR =
@@ -56,7 +55,6 @@ class RequestIdFilterTest {
                 .isNotEqualTo(filter("a b").getHeader(RequestIdFilter.HEADER));
     }
 
-    /** В MDC на время обработки — то же значение, что в заголовке ответа; после — ничего. */
     @Test
     void requestIdIsInMdcDuringChain_andRemovedAfter() throws ServletException, IOException {
         AtomicReference<String> seenInChain = new AtomicReference<>();

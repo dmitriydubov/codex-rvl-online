@@ -7,10 +7,6 @@ import ru.projectx.datareference.entity.QuarantinedMessage;
 import ru.projectx.datareference.entity.RejectedMessage;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
-/**
- * Карантин сообщений 1С:УСК, тела которых база не принимает в сырьё. Запись идёт в своей транзакции, и брокеру
- * подтверждают только после её фиксации, иначе сообщение пропало бы без следа.
- */
 @Service
 public class QuarantineService {
 
@@ -22,10 +18,6 @@ public class QuarantineService {
         this.clock = clock;
     }
 
-    /**
-     * Возвращает {@code false} при повторной доставке: сообщение уже в карантине, хватит подтверждения. Причина —
-     * только SQLSTATE, потому что текст ошибки базы печатает значения строки.
-     */
     @Transactional
     public boolean quarantine(RejectedMessage rejected, String reason) {
         if (repository.existsById(rejected.messageId())) {

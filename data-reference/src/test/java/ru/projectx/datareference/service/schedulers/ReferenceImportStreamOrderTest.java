@@ -40,11 +40,6 @@ import ru.projectx.datareference.service.ParseFailures;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Сообщение, ушедшее в этом проходе на повтор, держит более поздние сообщения своего потока до следующего прохода:
- * применённые раньше головы, они были бы затёрты её повтором. Окончательный отказ и исход, зафиксированный до обрыва
- * соединения, поток не держат.
- */
 @ExtendWith(MockitoExtension.class)
 class ReferenceImportStreamOrderTest {
 
@@ -78,7 +73,6 @@ class ReferenceImportStreamOrderTest {
         logged.stop();
     }
 
-    /** Голова ушла на повтор: более позднее сообщение её потока ждёт, сообщение другого потока применяется. */
     @Test
     void messageLeftForRetry_holdsLaterMessagesOfItsStreamInThisPass() {
         InboundMessage head = received(OneCStream.MKB10);
@@ -94,7 +88,6 @@ class ReferenceImportStreamOrderTest {
         verify(importService).importMessage(otherStream);
     }
 
-    /** Удержанное сообщение видно в журнале: почему оно не разобрано, хотя попало в пачку. */
     @Test
     void heldMessage_isReportedInJournal() {
         InboundMessage head = received(OneCStream.MKB10);
@@ -112,7 +105,6 @@ class ReferenceImportStreamOrderTest {
         });
     }
 
-    /** Повторы кончились, голова отклонена окончательно — поток свободен. */
     @Test
     void messageFailedAfterLastRetry_doesNotHoldItsStream() {
         InboundMessage head = received(OneCStream.MKB10);
@@ -126,10 +118,6 @@ class ReferenceImportStreamOrderTest {
         verify(importService).importMessage(next);
     }
 
-    /**
-     * Разбор зафиксирован, а соединение оборвалось после фиксации: исход сообщения остался прежним, повтора не будет,
-     * и поток свободен.
-     */
     @Test
     void failureAfterCommittedOutcome_doesNotHoldItsStream() {
         InboundMessage head = received(OneCStream.MKB10);
@@ -143,7 +131,6 @@ class ReferenceImportStreamOrderTest {
         verify(importService).importMessage(next);
     }
 
-    /** Окончательный отказ поток не держит: одно битое сообщение не останавливает справочник. */
     @Test
     void permanentFailure_doesNotHoldItsStream() {
         InboundMessage head = received(OneCStream.MKB10);
@@ -159,7 +146,6 @@ class ReferenceImportStreamOrderTest {
         verify(importService).importMessage(next);
     }
 
-    /** Удержание живёт один проход: следующий проход берёт сообщения потока заново из выборки. */
     @Test
     void heldStream_isFreeInTheNextPass() {
         InboundMessage head = received(OneCStream.MKB10);

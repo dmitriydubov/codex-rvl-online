@@ -8,11 +8,6 @@ import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 
-/**
- * Программа страхования для сервиса Договоров с перечнем учреждений и условий; поле {@code services} названо
- * как в сообщении 1С, чтобы читаться с ним как одно. Признак архива отдаётся без запроса: договор по программе,
- * помеченной в 1С на удаление, — ошибка, которую потребитель без него не заметит.
- */
 public record ProgramResponse(
         UUID id,
         UUID externalId,
@@ -21,7 +16,6 @@ public record ProgramResponse(
         boolean isArchive,
         List<Service> services) {
 
-    /** Ответ по программе и её строкам перечня, уже упорядоченным; чужие строки сюда не передаются. */
     public static ProgramResponse of(Program program, List<ProgramLpu> orderedRows) {
         List<Service> services = orderedRows.stream().map(Service::of).toList();
         return new ProgramResponse(
@@ -29,7 +23,6 @@ public record ProgramResponse(
                 program.isArchive(), services);
     }
 
-    /** Строка перечня: учреждение и условия обслуживания по нему. */
     public record Service(
             UUID lpuId,
             UUID lpuExternalId,

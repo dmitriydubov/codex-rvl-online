@@ -16,11 +16,6 @@ import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
 
-/**
- * Брокер 1С:УСК в сценарии: публикация в очереди контура и память о том, что и куда опубликовано, байт в байт.
- * Имя очереди берётся из той же конфигурации, что читает сервис, поэтому сценарий публикует ровно туда, откуда
- * сервис читает.
- */
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
 public class OneCBroker {
@@ -38,7 +33,6 @@ public class OneCBroker {
                 "полисы", queues.policies());
     }
 
-    /** Имя очереди брокера по имени потока из сценария; неизвестное имя — ошибка сценария. */
     public String queueOf(String stream) {
         assertThat(queuesByStream).as("очереди, в которые умеет публиковать шаг").containsKey(stream);
         return queuesByStream.get(stream);
@@ -57,7 +51,6 @@ public class OneCBroker {
                 .orElseThrow(() -> new IllegalStateException("сценарий не публиковал сообщение " + messageId));
     }
 
-    /** Все сообщения, опубликованные в очередь, в порядке публикации; повторы считаются отдельно. */
     public List<UUID> publishedTo(String queue) {
         return published.stream().filter(message -> message.queue().equals(queue)).map(Published::messageId).toList();
     }

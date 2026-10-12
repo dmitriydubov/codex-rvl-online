@@ -25,11 +25,6 @@ import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 
-/**
- * Чтение полиса вместе с договором и программами РВЛ. Связи логические, по GUID 1С, поэтому договора или программы
- * в справочнике может не быть, а архивная программа в ответ не идёт. Полиса с таким номером в договоре нет — ответ
- * 404, таких полисов несколько — ответ 409.
- */
 @ExtendWith(MockitoExtension.class)
 class PolicyQueryServiceTest {
 
@@ -114,7 +109,6 @@ class PolicyQueryServiceTest {
         assertThat(service.byNumber(NUMBER, CONTRACT_EXTERNAL_ID).number()).isEqualTo(NUMBER);
     }
 
-    /** Связь полиса с договором логическая: полис, пришедший из 1С раньше договора, находится и без него. */
     @Test
     void byNumber_policyArrivedBeforeItsContract_isFound_withoutContract() {
         when(insuranceContracts.findByExternalId(CONTRACT_EXTERNAL_ID)).thenReturn(Optional.empty());
@@ -140,7 +134,6 @@ class PolicyQueryServiceTest {
                 });
     }
 
-    /** Нет полиса или ещё нет договора — для вызывающего одно и то же: полиса с таким номером в договоре нет. */
     @Test
     void byNumber_none_isPolicyNotFound_namingContractNotNumber_withoutLookingUpContract() {
         when(policies.findAllByNumberAndExternalContractId(NUMBER, CONTRACT_EXTERNAL_ID)).thenReturn(List.of());

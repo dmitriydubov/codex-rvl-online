@@ -8,10 +8,6 @@ import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.InsuranceContractReads;
 
-/**
- * Договор страхования со страхователем (R-08) по нашему {@code id} или по {@code external_id}. Запрос без ключа
- * получает отказ «нет параметра», а не «не найдено», как и у полисов.
- */
 @InternalApi
 public class InsuranceContractController {
 

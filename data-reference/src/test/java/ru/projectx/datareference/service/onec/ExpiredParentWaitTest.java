@@ -12,11 +12,6 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 
-/**
- * Защищает запись об отказе по сроку ожидания: она называет поток сообщения и родителя, которого оно не дождалось,
- * а сообщение, которое ничего не ждало, такой записи не даёт — это ошибка вызывающего, а не отказ по сроку.
- * Данные вымышленные.
- */
 class ExpiredParentWaitTest {
 
     private static final Instant RECEIVED = Instant.parse("2026-10-06T09:00:00Z");

@@ -20,11 +20,6 @@ import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
-/**
- * Выборка для прохода разбора на настоящем PostgreSQL: сообщение, отложенное до повтора, держит более поздние сообщения
- * своего потока, но не чужих, а удержанные не занимают места в пачке. Часы остановлены, поэтому момент приёма, статус
- * и срок повтора выставляются запросом.
- */
 @IntegrationTest
 class DueForImportQueryTest {
 
@@ -48,7 +43,6 @@ class DueForImportQueryTest {
         databaseCleaner.clear();
     }
 
-    /** Повтор ещё не наступил: более позднее сообщение того же потока ждёт, сообщение другого потока — нет. */
     @Test
     void retryNotYetDue_holdsLaterMessagesOfItsStreamOnly() {
         UUID held = UUID.randomUUID();
@@ -59,10 +53,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).containsExactly(otherStream);
     }
 
-    /**
-     * Срок повтора наступил: голова идёт в пачку первой, а за ней более поздние сообщения её потока. Если голова снова
-     * не удастся, их удержит сам проход.
-     */
     @Test
     void dueRetry_isTakenAheadOfLaterMessagesOfItsStream() {
         UUID head = retrying(OneCStream.MKB10, ago(60), NOW.minusSeconds(1));
@@ -71,7 +61,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).containsExactly(head, later);
     }
 
-    /** Срок повтора, равный текущему моменту, уже наступил: поток не держится. */
     @Test
     void retryDueExactlyNow_isTakenWithLaterMessages() {
         UUID head = retrying(OneCStream.MKB10, ago(60), NOW);
@@ -80,7 +69,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).containsExactly(head, later);
     }
 
-    /** Срок повтора наступит через миг: голова ещё ждёт, и поток держится. */
     @Test
     void retryDueJustAfterNow_holdsItsStream() {
         retrying(OneCStream.MKB10, ago(60), NOW.plusMillis(1));
@@ -89,7 +77,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).isEmpty();
     }
 
-    /** Более позднее сообщение, чей срок повтора наступил, ждёт, пока не наступит срок более раннего. */
     @Test
     void laterDueRetry_waitsForEarlierRetryNotYetDue() {
         retrying(OneCStream.MKB10, ago(60), NOW.plusSeconds(30));
@@ -98,7 +85,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).isEmpty();
     }
 
-    /** Держит только более раннее: отложенное сообщение, принятое позже, не мешает тому, что принято раньше. */
     @Test
     void laterRetry_doesNotHoldEarlierMessage() {
         UUID earlier = pending(UUID.randomUUID(), OneCStream.MKB10, ago(60));
@@ -107,10 +93,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).containsExactly(earlier);
     }
 
-    /**
-     * Окончательный отказ, разобранные сообщения и части передачи, ждущие остальных частей, поток не держат: держит
-     * только отложенное до повтора. Пачка — по возрастанию момента приёма, через все потоки.
-     */
     @Test
     void finishedAndBufferedMessages_doNotHoldTheirStream() {
         inStatus(OneCStream.MKB10, ago(90), InboundStatus.FAILED);
@@ -123,7 +105,6 @@ class DueForImportQueryTest {
         assertThat(due(WHOLE_BATCH)).containsExactly(price, code);
     }
 
-    /** Удержанные сообщения в пачку не попадают: иначе ждущий поток занял бы всю пачку и остановил остальные. */
     @Test
     void heldMessages_doNotTakeTheBatch() {
         retrying(OneCStream.MKB10, ago(100), NOW.plusSeconds(30));

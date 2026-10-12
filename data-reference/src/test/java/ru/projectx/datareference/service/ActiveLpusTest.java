@@ -15,7 +15,6 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.LpuRepository;
 
-/** ЛПУ точечных ручек: архивное равносильно отсутствующему — 404 с кодом ЛПУ. */
 @ExtendWith(MockitoExtension.class)
 class ActiveLpusTest {
 

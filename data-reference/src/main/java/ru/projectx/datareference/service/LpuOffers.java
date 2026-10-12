@@ -10,10 +10,6 @@ import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 
-/**
- * Собирает предложение учреждения на сегодня. Если в справочнике нет ни одного вида обращения РВЛ,
- * услуг нет, и запрос за ними не идёт.
- */
 @Component
 public class LpuOffers {
 

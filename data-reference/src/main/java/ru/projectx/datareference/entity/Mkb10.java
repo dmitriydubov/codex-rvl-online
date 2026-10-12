@@ -7,10 +7,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Код диагноза по Международной классификации болезней (МКБ-10) из 1С. Родитель хранится GUID'ом источника,
- * а не ссылкой: коды приходят в любом порядке, и ссылку на ещё не пришедшего родителя пришлось бы отвергнуть.
- */
 @Entity
 @Table(name = "mkb10")
 public class Mkb10 extends OneCEntity {
@@ -34,14 +30,12 @@ public class Mkb10 extends OneCEntity {
     private Integer hierarchyLevel;
 
     protected Mkb10() {
-        // JPA
     }
 
     private Mkb10(UUID externalId, Instant now) {
         super(externalId, now);
     }
 
-    /** Новая запись из первого сообщения 1С. */
     public static Mkb10 create(UUID externalId, Details details, Instant now) {
         Mkb10 code = new Mkb10(externalId, now);
         code.applySnapshot(details, now);
@@ -57,7 +51,6 @@ public class Mkb10 extends OneCEntity {
         applyCommon(details.deleteMark(), now);
     }
 
-    /** Разобранные поля сообщения о коде МКБ-10. */
     public record Details(
             @Nullable UUID externalParentId,
             String code,

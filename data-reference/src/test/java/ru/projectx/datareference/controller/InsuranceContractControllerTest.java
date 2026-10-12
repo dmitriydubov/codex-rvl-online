@@ -17,7 +17,6 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.service.InsuranceContractReads;
 
-/** Ручки договора страхования выбирают сервис чтения по ключу: {@code id}, {@code external_id} или отказ без ключа. */
 @ExtendWith(MockitoExtension.class)
 class InsuranceContractControllerTest {
 
@@ -66,7 +65,6 @@ class InsuranceContractControllerTest {
         verifyNoInteractions(insuranceContracts);
     }
 
-    /** {@code produces} отсекает запрос ещё при выборе обработчика; тело 406 проверяет {@code RequestErrorAdviceTest}. */
     @Test
     void contractById_acceptingOnlyXml_isNotAcceptable_withoutAskingService() {
         MvcTestResult result = mvc.get().uri(CONTRACTS + "/{id}", CONTRACT_ID).accept(MediaType.APPLICATION_XML)

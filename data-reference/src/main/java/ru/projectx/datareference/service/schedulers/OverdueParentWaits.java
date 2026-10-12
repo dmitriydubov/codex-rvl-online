@@ -15,11 +15,6 @@ import ru.projectx.datareference.service.metrics.ParentWaitMetrics;
 import ru.projectx.datareference.service.onec.ExpiredParentWait;
 import ru.projectx.datareference.service.onec.ParentWaitExpiry;
 
-/**
- * Шаг прохода разбора: отклоняет сообщения 1С, не дождавшиеся родителя, и после фиксации пишет журнал и метрику.
- * При массовой выгрузке таких сообщений тысячи, поэтому журнал получает одну сводную запись на поток за проход,
- * а у передачи прайса запись своя, потому что дежурный разбирает её целиком.
- */
 @Component
 public class OverdueParentWaits {
 
@@ -35,15 +30,10 @@ public class OverdueParentWaits {
         this.properties = properties;
     }
 
-    /**
-     * Отклоняет просроченные ожидания своей транзакцией, затем пишет журнал и считает отклонённые сообщения: запись
-     * появляется, только когда отказ зафиксирован.
-     */
     public void rejectAndReport() {
         report(expiry.expireOverdue());
     }
 
-    /** Обычный цикл, а не стрим: каждый шаг увеличивает счётчик. */
     private void report(List<ExpiredParentWait> expired) {
         for (ExpiredParentWait message : expired) {
             metrics.expired(message.stream());

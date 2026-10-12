@@ -12,10 +12,6 @@ import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Разбирает услуги санаториев из 1С:УСК; принимаются только услуги по договорам из справочника. Услуга чужого договора
- * запоминается как не наша, чтобы прайс по ней тоже пропускался, а не ждал её.
- */
 @Component
 public class ContragentServiceMapper
         extends OwnedCatalogStreamMapper<ContragentService, LpuContract, ContragentService.Details> {

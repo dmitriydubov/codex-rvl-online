@@ -17,11 +17,6 @@ import ru.projectx.datareference.repository.InboundMessageRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает правило «передача прайса — это прайс одной услуги»: часть, которая называет другую услугу, чем части
- * передачи в буфере, или не называет её читаемым GUID, — ошибка части; поздняя часть передачи с записанным исходом
- * не проверяется.
- */
 class PriceTransferServiceCheckTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -71,7 +66,6 @@ class PriceTransferServiceCheckTest {
                 EnumSet.of(InboundStatus.PROCESSED, InboundStatus.SKIPPED, InboundStatus.FAILED));
     }
 
-    /** GUID услуги в сырье части читается по тому же правилу, что и в пришедшей: пробелы по краям не в счёт. */
     @Test
     void bufferedServiceWithSpacesAround_isTheSameService() {
         bufferedParts(" " + SERVICE + " ");

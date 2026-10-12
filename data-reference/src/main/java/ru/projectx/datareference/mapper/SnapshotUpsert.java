@@ -6,10 +6,6 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-/**
- * Общий шаг разбора справочника 1С: создать запись или целиком заменить её реквизиты снимком, потому что версий
- * у сообщений нет и действует последнее. Операции передаются функциями, так как общего предка у сущностей нет.
- */
 final class SnapshotUpsert<E, S> {
 
     private final Function<UUID, Optional<E>> finder;

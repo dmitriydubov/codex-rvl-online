@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Отказ 422 называет ЛПУ (лечебно-профилактическое учреждение) без договора с ценами, чтобы исправить данные в 1С. */
 class IncompleteReferenceExceptionTest {
 
     private static final UUID LPU = UUID.fromString("0a9e0000-0000-4000-8000-000000000004");

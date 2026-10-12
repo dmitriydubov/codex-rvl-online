@@ -4,11 +4,6 @@ import java.util.Map;
 import java.util.Optional;
 import ru.projectx.datareference.entity.InboundStatus;
 
-/**
- * Значения ИНН и КПП для сценариев о составе реквизитов: ИНН предельной длины с одним чужим символом в середине и КПП,
- * собранный из цифр 770101001 так, как его называют слова сценария. Словари закрытые: незнакомое слово роняет шаг,
- * иначе испорченное мутацией слово молча дало бы другое сообщение. Все значения вымышлены.
- */
 final class OneCRequisiteMessages {
 
     private static final String INN_DIGITS = "770123456789";
@@ -43,14 +38,12 @@ final class OneCRequisiteMessages {
     private OneCRequisiteMessages() {
     }
 
-    /** Контрагент с ИНН из 12 символов, седьмой из которых заменён названным символом. Разбор его отклоняет. */
     static OneCMessage contragentWithSpoiledInn(boolean sanatorium, String intruder) {
         String inn = INN_DIGITS.substring(0, INN_SPOILED_POSITION) + lookup(INN_INTRUDERS, intruder)
                 + INN_DIGITS.substring(INN_SPOILED_POSITION + 1);
         return OneCFailureMessages.contragent(sanatorium, "ИНН", inn, InboundStatus.FAILED);
     }
 
-    /** Контрагент с КПП, названным словами; исход разбора — по правилу формата. */
     static OneCMessage contragentWithKpp(boolean sanatorium, String kind) {
         return Optional.ofNullable(ACCEPTED_KPP.get(kind))
                 .map(kpp -> OneCFailureMessages.contragent(sanatorium, "КПП", kpp, accepted(sanatorium)))
@@ -58,7 +51,6 @@ final class OneCRequisiteMessages {
                         sanatorium, "КПП", lookup(REJECTED_KPP, kind), InboundStatus.FAILED));
     }
 
-    /** Санаторий РВЛ разбор применяет, страхователя сохраняет и помечает пропуском. */
     private static InboundStatus accepted(boolean sanatorium) {
         return sanatorium ? InboundStatus.PROCESSED : InboundStatus.SKIPPED;
     }

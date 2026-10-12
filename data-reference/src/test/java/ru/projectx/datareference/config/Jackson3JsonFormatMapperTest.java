@@ -4,10 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Мост к Jackson 3 переводит объект в JSON и обратно без потерь. Hibernate вызывает эти методы для колонки
- * {@code jsonb}, когда в ней хранится объект, а не строка.
- */
 class Jackson3JsonFormatMapperTest {
 
     private final Jackson3JsonFormatMapper mapper = new Jackson3JsonFormatMapper();

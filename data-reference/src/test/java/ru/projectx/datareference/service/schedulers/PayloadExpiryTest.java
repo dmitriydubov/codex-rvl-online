@@ -27,11 +27,6 @@ import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Проход срока хранения без базы: сколько пачек он стирает в сырье и в карантине и что пишет в журнал. Каждая пачка
- * стирается в своей транзакции, а сам проход транзакцию не держит, иначе он блокировал бы строки, которые в это время
- * читает разбор. Сами запросы проверяет на настоящей базе {@link PersonalDataRetentionTest}.
- */
 @ExtendWith(MockitoExtension.class)
 class PayloadExpiryTest {
 
@@ -61,7 +56,6 @@ class PayloadExpiryTest {
         logged.stop();
     }
 
-    /** Полные пачки — повод для следующей; неполная означает, что остаток исчерпан, и проход заканчивается. */
     @Test
     void remainderLargerThanBatch_isErasedInSeveralBatches() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE))
@@ -75,7 +69,6 @@ class PayloadExpiryTest {
         verifyNoMoreInteractions(agedMessages);
     }
 
-    /** Карантин стирается тем же правилом пачек и со своим сроком, независимо от остатка в сырье. */
     @Test
     void quarantineRemainder_isErasedInItsOwnBatchesWithItsOwnTtl() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
@@ -88,7 +81,6 @@ class PayloadExpiryTest {
                 .isEqualTo("стёрты тела 9 карантинных сообщений старше PT168H: срок хранения персональных данных"));
     }
 
-    /** Полисы обезличиваются теми же пачками, а журнал называет их число и запас, но не данные. */
     @Test
     void policyRemainder_isErasedInBatches_andReportedOnceWithGrace() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
@@ -105,7 +97,6 @@ class PayloadExpiryTest {
         });
     }
 
-    /** Каждая пачка — в своей транзакции, и ни один запрос не идёт вне транзакции. */
     @Test
     void everyBatch_runsInItsOwnTransaction() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenAnswer(invocation -> {
@@ -126,7 +117,6 @@ class PayloadExpiryTest {
         assertThat(transactions.erasuresPerTransaction()).containsExactly(1, 1, 1, 1);
     }
 
-    /** Остаток ровно в пачку: ещё один короткий запрос, который ничего не находит, — и проход окончен. */
     @Test
     void remainderOfExactlyOneBatch_endsOnEmptyBatch() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 0);
@@ -137,7 +127,6 @@ class PayloadExpiryTest {
         verify(agedMessages, times(2)).forgetPayloads(PAYLOAD_TTL, BATCH_SIZE);
     }
 
-    /** В журнал — сколько тел стёрто за весь проход и какой срок, без единого значения из стёртых тел. */
     @Test
     void erasure_isReportedOnceWithTotalAndTtl() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(BATCH_SIZE, 3);
@@ -152,7 +141,6 @@ class PayloadExpiryTest {
         });
     }
 
-    /** Стирать нечего — по одному запросу на сырьё и карантин, по одной транзакции и молчание в журнале. */
     @Test
     void nothingExpired_oneQueryEachAndNothingLogged() {
         when(agedMessages.forgetPayloads(PAYLOAD_TTL, BATCH_SIZE)).thenReturn(0);
@@ -176,11 +164,6 @@ class PayloadExpiryTest {
         return (Logger) LoggerFactory.getLogger(PersonalDataRetention.class);
     }
 
-    /**
-     * Транзакции, которые запоминают, сколько стираний случилось внутри каждой. Если проход перестанет
-     * останавливаться на неполной пачке, тест не зависнет: после {@link #MAX_TRANSACTIONS} транзакций подмена уронит
-     * его с понятной причиной.
-     */
     private static final class RecordingTransactions implements TransactionOperations {
 
         private static final int MAX_TRANSACTIONS = 10;

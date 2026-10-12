@@ -10,10 +10,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Защищает правило номера строки прайса: по нему восстанавливается порядок строк передачи, поэтому номер
- * обязателен и целый, а причина отказа называет поле, но не значение.
- */
 class PriceListRowNumberTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -32,7 +28,6 @@ class PriceListRowNumberTest {
                 .hasMessage("нет обязательного поля rowNumber");
     }
 
-    /** Текст и дробь, в том числе за пределом {@code int}, — не номер строки; значение в причину не попадает. */
     @ParameterizedTest
     @ValueSource(strings = {"\"вторая\"", "\"2\"", "2.5", "2.0", "10000000000.5", "true"})
     void nonIntegralRowNumber_isNotAnInteger(String value) {
@@ -41,7 +36,6 @@ class PriceListRowNumberTest {
                 .hasMessage("поле rowNumber не является целым числом");
     }
 
-    /** Целое шире {@code int} — номер строки больше допустимого; значение в причину не попадает. */
     @ParameterizedTest
     @ValueSource(strings = {"2147483648", "10000000000", "-2147483649"})
     void rowNumberBeyondInt_isTooLarge(String value) {

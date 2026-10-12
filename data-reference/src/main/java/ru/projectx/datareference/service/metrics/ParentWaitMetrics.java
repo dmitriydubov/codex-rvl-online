@@ -9,10 +9,6 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.OneCStream;
 
-/**
- * Счётчик сообщений 1С, отклонённых потому, что родитель не пришёл за срок ожидания, по потокам. Ряды заводятся
- * нулями заранее, чтобы оповещение видело первое же увеличение.
- */
 @Component
 public class ParentWaitMetrics {
 
@@ -28,7 +24,6 @@ public class ParentWaitMetrics {
                         .register(registry)));
     }
 
-    /** Вызывается после фиксации отказа. */
     public void expired(OneCStream stream) {
         expired.get(stream).increment();
     }

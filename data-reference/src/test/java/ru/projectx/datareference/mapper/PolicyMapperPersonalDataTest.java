@@ -22,11 +22,6 @@ import ru.projectx.datareference.support.TestApiProperties;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Полис, присланный уже после срока хранения его персональных данных, сохраняется сразу без них: иначе они
- * пролежали бы в базе до ближайшего прохода стирания. Граница — начало московских суток после дня окончания
- * плюс тридцать суток запаса.
- */
 class PolicyMapperPersonalDataTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();

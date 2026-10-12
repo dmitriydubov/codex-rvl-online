@@ -14,19 +14,12 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Зависшую базу (контейнер на паузе) лимит REST-чтения не спасает: отмену драйвер шлёт отдельным соединением.
- * Ответ 503 даёт сетевой тайм-аут пула REST-чтений (5 с). Контекст и контейнер свои, чтобы базу на паузе
- * не увидел ни один другой тест.
- */
 @IntegrationTest
 @TestPropertySource(properties = "spring.application.name=data-reference-hung-database")
 @DirtiesContext
 class HungDatabaseRestReadTest {
 
-    /** Недавно использованное соединение пул выдаёт без проверки; тест растягивает это окно, чтобы путь был самым долгим. */
     private static final String ALIVE_BYPASS_WINDOW = "com.zaxxer.hikari.aliveBypassWindowMs";
-    /** Сетевой тайм-аут пула REST-чтений по умолчанию (5 с) с запасом на медленную машину сборки. */
     private static final Duration SOCKET_TIMEOUT_WITH_MARGIN = Duration.ofSeconds(10);
     private static final String UNKNOWN_POLICY = "/internal/v1/policies/f662d1c4-5b26-4248-8ba1-47954abd301b";
 

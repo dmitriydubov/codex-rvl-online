@@ -21,10 +21,6 @@ import ru.projectx.datareference.mapper.PriceListMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает то, что отклоняет одну часть передачи прайса, ещё до сборки: строку без номера, цены или даты, пакет,
- * пришедший к уже применённой передаче, и второе финальное сообщение. Такая часть отклоняется своей причиной, остальные — ссылкой на неё.
- */
 class PriceListPartCheckTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
@@ -67,7 +63,6 @@ class PriceListPartCheckTest {
                 .hasMessage("в строке прайса нет цены");
     }
 
-    /** Применённая передача уже получила все обещанные пакеты: ещё один — лишний. */
     @Test
     void batchOfAppliedTransfer_isSurplus() {
         ObjectNode data = batch("{\"rowNumber\":1}");
@@ -85,7 +80,6 @@ class PriceListPartCheckTest {
                 .doesNotThrowAnyException();
     }
 
-    /** Передача уже отклонена: опоздавшая часть разделяет её отказ, даже если испорчена сама. */
     @Test
     void partOfRejectedTransfer_isNotChecked() {
         ObjectNode data = batch("{\"price\":1}");
@@ -97,7 +91,6 @@ class PriceListPartCheckTest {
         verifyNoInteractions(priceList);
     }
 
-    /** Отказ лишнего пакета не делает применённую передачу отклонённой: следующий лишний пакет — тоже лишний. */
     @Test
     void secondSurplusBatchOfAppliedTransfer_isSurplus() {
         ObjectNode data = batch("{\"rowNumber\":1}");
@@ -109,7 +102,6 @@ class PriceListPartCheckTest {
                 .hasMessage("лишний пакет: передача " + CID + " уже применена");
     }
 
-    /** У финального сообщения строк нет: правилам прайса проверять нечего. */
     @Test
     void finalMessage_hasNoRowsToCheck() {
         ObjectNode data = finalData();
@@ -119,7 +111,6 @@ class PriceListPartCheckTest {
         verifyNoInteractions(priceList);
     }
 
-    /** Финальное сообщение уже лежит в буфере среди частей своей передачи: само себе оно не второе. */
     @Test
     void finalMessage_amongPartsOfItsTransfer_isNotSecond() {
         ObjectNode data = finalData();
@@ -128,7 +119,6 @@ class PriceListPartCheckTest {
                 .doesNotThrowAnyException();
     }
 
-    /** Финальное сообщение у передачи ровно одно: второе к ещё не применённой передаче — ошибка этой части. */
     @Test
     void secondFinalMessage_ofTransferInBuffer_rejectsThePart() {
         ObjectNode data = finalData();
@@ -149,7 +139,6 @@ class PriceListPartCheckTest {
                 .hasMessage("второе финальное сообщение: передача " + CID + " уже применена");
     }
 
-    /** Передача уже пропущена: опоздавшая часть разделяет пропуск, даже если испорчена сама или это второй финал. */
     @Test
     void partOfSkippedTransfer_isNotChecked() {
         ObjectNode batch = batch("{\"price\":1}");
@@ -163,7 +152,6 @@ class PriceListPartCheckTest {
         verifyNoInteractions(priceList);
     }
 
-    /** Второй финал к отклонённой передаче разделяет её отказ, а не получает свой. */
     @Test
     void secondFinalMessage_ofRejectedTransfer_isNotChecked() {
         ObjectNode data = finalData();

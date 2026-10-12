@@ -27,10 +27,6 @@ import ru.projectx.datareference.repository.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import ru.projectx.datareference.support.ImportSettings;
 
-/**
- * Защищает отказ по сроку ожидания: срок отсчитывается от начала ожидания, выборка ограничена пачкой разбора,
- * передача прайса отклоняется целиком, а каждое отклонённое сообщение возвращается для журнала и метрики.
- */
 class ParentWaitExpiryTest {
 
     private static final Instant NOW = Instant.parse("2026-10-07T12:00:00Z");
@@ -63,7 +59,6 @@ class ParentWaitExpiryTest {
         verify(inbound, never()).findByCorrelationId(any());
     }
 
-    /** Части одной передачи отклоняются вместе, даже если выборка нашла только одну из них, и каждая — один раз. */
     @Test
     void overduePartOfATransfer_rejectsTheWholeTransferOnce() {
         InboundMessage batch = waitingPart(null);
@@ -83,7 +78,6 @@ class ParentWaitExpiryTest {
         assertThat(failedTransitions("PRICE_LISTS")).isEqualTo(2);
     }
 
-    /** Часть передачи с уже записанным исходом не трогается: отклоняются только ждущие. */
     @Test
     void partWithRecordedOutcome_isLeftAsItIs() {
         InboundMessage waitingPart = waitingPart(1);

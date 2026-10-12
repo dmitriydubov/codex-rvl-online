@@ -25,11 +25,6 @@ import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 
-/**
- * Защищает цепочку «договор с санаторием и услуги по нему»: обрыв любого звена означает, что до цен дело не дойдёт.
- * {@code @Transactional} нужен не ради отката, а чтобы проверки догружали ленивые связи при выключенном
- * {@code open-in-view}; в работающем сервисе эти связи читаются внутри его транзакции.
- */
 @Transactional
 @IntegrationTest
 class ContractAndServiceImportTest {
@@ -79,10 +74,6 @@ class ContractAndServiceImportTest {
         assertThat(stored.beginDate()).isEqualTo(LocalDate.of(2024, 1, 1));
     }
 
-    /**
-     * Договор отделения принадлежит отделению, а не головной
-     * организации — отделение у нас отдельный санаторий.
-     */
     @Test
     void contractOfBranch_belongsToBranchNotHeadOffice() {
         importOne(OneCStream.LPU_CONTRACTS, contract(HEAD_OFFICE_ID, BRANCH_ID, null, false));
@@ -101,10 +92,6 @@ class ContractAndServiceImportTest {
         assertThat(contractRepository.count()).isZero();
     }
 
-    /**
-     * Ребёнок приезжает раньше родителя: 1С присылает справочники многими очередями сразу и порядок не гарантирует.
-     * Договор контрагента, о котором сервис ещё ничего не знает, ждёт его, и строка сырья говорит, кого именно.
-     */
     @Test
     void contractOfContragentNotYetReceived_waitsForIt() {
         UUID messageId = UUID.randomUUID();
@@ -117,10 +104,6 @@ class ContractAndServiceImportTest {
         assertThat(contractRepository.count()).isZero();
     }
 
-    /**
-     * Нулевой GUID головного договора — это «договор сам по себе», а не ссылка
-     * на несуществующую запись.
-     */
     @Test
     void standaloneContract_hasNoMainContract() {
         importOne(OneCStream.LPU_CONTRACTS, contract(HEAD_OFFICE_ID, HEAD_OFFICE_ID, null, false));
@@ -130,10 +113,6 @@ class ContractAndServiceImportTest {
         assertThat(stored.usePricesMainContract()).isFalse();
     }
 
-    /**
-     * Оба поля источника сохраняются как есть, а признак ценообразующего договора считается при расчёте цены:
-     * сохранённое вычисление молча устарело бы при смене правила.
-     */
     @Test
     void subordinateContract_keepsBothSourceFields() {
         importOne(OneCStream.LPU_CONTRACTS,
@@ -144,10 +123,6 @@ class ContractAndServiceImportTest {
         assertThat(stored.usePricesMainContract()).isTrue();
     }
 
-    /**
-     * Головной договор ссылкой не проверяется: он мог не приехать или принадлежать
-     * чужому контрагенту, и жёсткий внешний ключ превратил бы обычную строку в отказ применения.
-     */
     @Test
     void unknownMainContract_isStoredAnyway() {
         importOne(OneCStream.LPU_CONTRACTS,
@@ -157,7 +132,6 @@ class ContractAndServiceImportTest {
                 .isEqualTo(MAIN_CONTRACT_ID);
     }
 
-    /** Признак выгрузки в систему онлайн-бронирования (СОБ) приходит свойством в {@code extProperties}. */
     @Test
     void sobExportProperty_isStored() {
         importOne(OneCStream.LPU_CONTRACTS, contract(HEAD_OFFICE_ID, HEAD_OFFICE_ID, null, false, true));
@@ -165,7 +139,6 @@ class ContractAndServiceImportTest {
         assertThat(contractRepository.findByExternalId(CONTRACT_ID).orElseThrow().uploadedToSob()).isTrue();
     }
 
-    /** Свойства в сообщении нет — договор в СОБ не выгружается, а не «неизвестно». */
     @Test
     void contractWithoutSobProperty_isNotUploadedToSob() {
         importOne(OneCStream.LPU_CONTRACTS, contract(HEAD_OFFICE_ID, HEAD_OFFICE_ID, null, false));
@@ -184,10 +157,6 @@ class ContractAndServiceImportTest {
         assertThat(stored.contract().externalId()).isEqualTo(CONTRACT_ID);
     }
 
-    /**
-     * Тот самый риск, о котором контракт предупреждает отдельно: ребёнок приезжает раньше родителя. Это ожидание, а
-     * не отказ и не пропуск: сообщение остаётся в базе целиком и применится, когда договор приедет.
-     */
     @Test
     void serviceArrivingBeforeItsContract_waitsForIt() {
         ImportOutcome result = importOne(OneCStream.CONTRAGENT_SERVICES, service(CONTRACT_ID));
@@ -210,7 +179,6 @@ class ContractAndServiceImportTest {
         return contract(ownerId, branchId, mainContractId, useHeadOfficePrices, null);
     }
 
-    /** @param sobExport {@code null} — свойства в сообщении нет вовсе, а не «false» */
     private static String contract(
             UUID ownerId, UUID branchId, String mainContractId, boolean useHeadOfficePrices,
             @Nullable Boolean sobExport) {

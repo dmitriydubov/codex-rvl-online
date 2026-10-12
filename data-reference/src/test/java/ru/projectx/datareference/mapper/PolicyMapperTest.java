@@ -33,11 +33,6 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Защищает разбор полиса застрахованного: срок из актуальной строки шапки, почту из дополнительных свойств
- * и замену полиса целиком последним сообщением. Данные застрахованного вымышленные, и ни одно значение поля
- * не попадает в текст ошибки, потому что это персональные данные.
- */
 class PolicyMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -132,7 +127,6 @@ class PolicyMapperTest {
         assertThat(saved().details().availability()).isFalse();
     }
 
-    /** Единственная строка шапки с номером за пределом целого: полис отклоняется с именем поля, без значения. */
     @Test
     void onlyHeaderRowNumberBeyondInt_isRejectedNamingField() {
         ObjectNode data = policy();
@@ -141,7 +135,6 @@ class PolicyMapperTest {
         assertRejectedForHeaderRowNumber(data);
     }
 
-    /** Недействующая строка с номером за пределом целого тоже отклоняет полис: неверное значение не пропускается. */
     @Test
     void inactiveHeaderRowNumberBeyondInt_isRejectedNamingField() {
         ObjectNode data = policy();
@@ -237,7 +230,6 @@ class PolicyMapperTest {
         assertThat(line.availability()).isTrue();
     }
 
-    /** Процент сооплаты — от 0 до 100 включительно: обе границы принимаются как есть. */
     @ParameterizedTest
     @ValueSource(strings = {"0", "100.00", "100"})
     void copaymentAtRangeBound_isStored(String sent) {
@@ -250,7 +242,6 @@ class PolicyMapperTest {
         assertThat(saved().serviceLines().getFirst().copayment()).isEqualByComparingTo(sent);
     }
 
-    /** Диапазон строже колонки процента, поэтому и значение за пределом колонки отклоняется диапазоном. */
     @ParameterizedTest
     @ValueSource(strings = {"-0.01", "100.01", "999.99", "1000.00", "-1000.00", "1E+3", "1e500", "1e999999999"})
     void copaymentOutOfRange_isContractViolationNamingFieldButNotValue(String sent) {

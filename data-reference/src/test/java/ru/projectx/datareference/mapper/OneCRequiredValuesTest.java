@@ -10,11 +10,6 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Обязательные поля 1С:УСК читаются строго по типу JSON: отсутствие, null или значение другого типа, например
- * строка {@code "1"}, — нарушение контракта, а не ноль и не false. Иначе разбор подставлял бы условия,
- * которых источник не присылал.
- */
 class OneCRequiredValuesTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
