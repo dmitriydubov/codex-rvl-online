@@ -4,6 +4,10 @@ name: gauntlet
 
 on:
   pull_request:
+    paths-ignore:                           # documents never change what the gates check; CI minutes are metered
+      - 'docs/**'
+      - 'project_files/**'
+      - '**.md'
   workflow_dispatch:
 
 concurrency:
@@ -36,10 +40,20 @@ jobs:
           if [ -z "$base" ]; then
             base=$(sed -n 's#^[[:space:]]*baseRef[[:space:]]*=[[:space:]]*origin/##p' gauntlet/config/gauntlet.properties | tail -1)
           fi
-          modules=$(sed -n 's#^[[:space:]]*module[[:space:]]*=[[:space:]]*##p' gauntlet/config/gauntlet.properties | tail -1 | tr ',' ' ')
+          all=$(sed -n 's#^[[:space:]]*module[[:space:]]*=[[:space:]]*##p' gauntlet/config/gauntlet.properties | tail -1 | tr ',' ' ')
+          git fetch --no-tags origin "${base:-main}"
+          # Only the modules the PR touches run; a change to the kit or the workflow itself runs all of them.
+          changed=$(git diff --name-only "origin/${base:-main}...HEAD")
+          modules=""
+          if ! echo "$changed" | grep -qE '^(gauntlet/|\.github/)'; then
+            for dir in $all; do
+              echo "$changed" | grep -q "^$dir/" && modules="$modules $dir"
+            done
+          fi
+          modules=${modules:-$all}
           echo "ref=origin/${base:-main}" >> "$GITHUB_OUTPUT"
           echo "modules=${modules:-.}" >> "$GITHUB_OUTPUT"
-          git fetch --no-tags origin "${base:-main}"
+          echo "gauntlet runs in: ${modules:-.}"
 
       - name: Run the gauntlet in every guarded build
         run: |

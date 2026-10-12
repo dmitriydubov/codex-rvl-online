@@ -5,11 +5,12 @@ Gradle-сборка в своём каталоге; корневой сборк�
 
 - `data-reference/` — сервис справочных данных: справочники и полисы из 1С:УСК (RabbitMQ 1С),
   REST-чтение справочников для сервисов Заявок и Договоров. Java 21, Spring Boot 4.0, PostgreSQL.
-  Охраняется gauntlet (`module=data-reference` в `gauntlet/config/gauntlet.properties`). Его правила и
+  Охраняется gauntlet (`module=` в `gauntlet/config/gauntlet.properties`). Его правила и
   предметная область — в `data-reference/CLAUDE.md`: прочитай перед задачей в `data-reference`.
-- `contract-service/` — сервис Договоров, он же бэкенд ЛК застрахованного. Каталога пока нет: код
-  появится с его каркасом, под gauntlet подключается, когда появится его сборка. Его правила будут в
-  `contract-service/CLAUDE.md`, документы лежат в `project_files/contract-service/`.
+- `contract-service/` — сервис Договоров, он же бэкенд ЛК застрахованного: договоры КМ и полисы ЛМ по
+  задачам сервиса Заявок, обмен с 1С:УСК, печатные формы, акцепт. Java 21, Spring Boot 4.0, PostgreSQL.
+  Охраняется gauntlet с 2026-10-12. Его правила — в `contract-service/CLAUDE.md`: прочитай перед задачей
+  в `contract-service`; документы — в `project_files/contract-service/`.
 - `project_files/` — ТЗ, схемы и структуры данных контура: источник бизнес-правил. Разложен по сервисам:
   `common/`, `data-reference/`, `contract-service/` (см. `project_files/README.md`).
 
