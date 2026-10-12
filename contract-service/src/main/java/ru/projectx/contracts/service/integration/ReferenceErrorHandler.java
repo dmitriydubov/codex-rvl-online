@@ -33,7 +33,7 @@ final class ReferenceErrorHandler implements RestClient.ResponseSpec.ErrorHandle
         throw failure(response.getStatusCode(), bodies.code(response.getBody()));
     }
 
-    static RuntimeException failure(HttpStatusCode status, Optional<String> code) {
+    private static RuntimeException failure(HttpStatusCode status, Optional<String> code) {
         if (status.is4xxClientError()) {
             return code.<RuntimeException>map(known -> finalAnswer(status, known))
                     .orElseGet(() -> new ReferenceUnavailableException(Reason.UNEXPECTED_RESPONSE));

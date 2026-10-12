@@ -7,7 +7,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -129,12 +128,20 @@ class ReferenceErrorHandlerTest {
         assertThat(bodies.code(failing)).isEmpty();
     }
 
+    /** Страница ошибки прокси бывает любого размера; код справочника в ней не ищут и целиком её не читают. */
     @Test
-    void failure_isComputedFromStatusAndCodeAlone() {
-        assertThat(ReferenceErrorHandler.failure(HttpStatus.NOT_FOUND, Optional.of("POLICY_NOT_FOUND")))
-                .isInstanceOf(ReferenceNotFoundException.class);
-        assertThat(ReferenceErrorHandler.failure(HttpStatus.NOT_FOUND, Optional.empty()))
-                .isInstanceOf(ReferenceUnavailableException.class);
+    void oversizedBody_hasNoCodeEvenIfItStartsWithTheContourFormat() {
+        String padding = " ".repeat(ReferenceErrorBodies.MAX_BODY_BYTES);
+
+        assertThat(bodies.code(stream(error("POLICY_NOT_FOUND") + padding))).isEmpty();
+    }
+
+    @Test
+    void bodyAtTheSizeLimit_isStillRead() {
+        String contourError = error("POLICY_NOT_FOUND");
+        String padding = " ".repeat(ReferenceErrorBodies.MAX_BODY_BYTES - contourError.getBytes(StandardCharsets.UTF_8).length);
+
+        assertThat(bodies.code(stream(padding + contourError))).contains("POLICY_NOT_FOUND");
     }
 
     private static String error(String code) {

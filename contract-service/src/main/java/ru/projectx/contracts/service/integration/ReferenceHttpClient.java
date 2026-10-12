@@ -63,12 +63,12 @@ public final class ReferenceHttpClient implements ProgramReads, InsuranceContrac
     }
 
     private <T extends ReferenceRecord> T read(ReferenceKind kind, String uriTemplate, UUID key, Class<T> type) {
-        return LiveRecords.requireLive(kind, fetch(uriTemplate, key, type));
+        return LiveRecords.requireLive(kind, requireIdentified(fetch(uriTemplate, key, type)));
     }
 
-    private <T> T fetch(String uriTemplate, UUID key, Class<T> type) {
+    private <T> @Nullable T fetch(String uriTemplate, UUID key, Class<T> type) {
         try {
-            return requireBody(http.get().uri(uriTemplate, key).retrieve().body(type));
+            return http.get().uri(uriTemplate, key).retrieve().body(type);
         }
         catch (ResourceAccessException io) {
             throw new ReferenceUnavailableException(transportReason(io), io);
@@ -78,12 +78,19 @@ public final class ReferenceHttpClient implements ProgramReads, InsuranceContrac
         }
     }
 
-    /** Пустое тело при успешном статусе — такой же неожиданный ответ, как чужой статус. */
-    private static <T> T requireBody(@Nullable T body) {
-        if (body == null) {
+    /**
+     * Пустое тело или запись без идентификаторов при успешном статусе — такой же неожиданный ответ, как чужой статус:
+     * разбор JSON не замечает чужих имён полей, и без этой проверки пустая запись ушла бы в выпуск как настоящая.
+     */
+    private static <T extends ReferenceRecord> T requireIdentified(@Nullable T record) {
+        if (record == null || !identified(record)) {
             throw new ReferenceUnavailableException(Reason.UNEXPECTED_RESPONSE);
         }
-        return body;
+        return record;
+    }
+
+    private static boolean identified(ReferenceRecord record) {
+        return record.id() != null && record.externalId() != null;
     }
 
     private static Reason transportReason(ResourceAccessException io) {

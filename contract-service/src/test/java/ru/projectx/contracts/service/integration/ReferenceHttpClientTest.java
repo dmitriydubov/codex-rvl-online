@@ -15,6 +15,8 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -266,6 +268,23 @@ class ReferenceHttpClientTest {
                 .andRespond(withSuccess("<html>proxy</html>", MediaType.TEXT_HTML));
 
         assertThatThrownBy(() -> client.program(PROGRAM_ID))
+                .isInstanceOfSatisfying(ReferenceUnavailableException.class,
+                        unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.UNEXPECTED_RESPONSE));
+        reference.verify();
+    }
+
+    /** Разбор JSON не замечает чужих имён полей: запись без идентификаторов — ответ не по контракту, а не пустая запись. */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "{}",
+        "{\"id\":\"1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f\",\"externalId\":\"9e6ee30d-2275-417d-a44c-039d3b8c2ac5\","
+            + "\"number\":\"СТЕНД-0001\",\"beginDate\":\"2026-01-01\",\"isArchive\":false}",
+        "{\"external_id\":\"9e6ee30d-2275-417d-a44c-039d3b8c2ac5\",\"number\":\"СТЕНД-0001\",\"is_archive\":false}"})
+    void recordWithoutIdentifiers_isUnexpectedResponse(String body) {
+        reference.expect(times(ATTEMPTS), requestTo(BASE + "/policies/" + POLICY_ID + "/contract-view"))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.policy(POLICY_ID))
                 .isInstanceOfSatisfying(ReferenceUnavailableException.class,
                         unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.UNEXPECTED_RESPONSE));
         reference.verify();
