@@ -81,6 +81,12 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   другого бота-ревьюера отвечать по тому же правилу. **Сессия К1 открыта 07:08 UTC** (session_01Lh5GCUpN7rWMDs9WMCqvMW,
   `claude/k1-contract-service-skeleton`, Opus 5.5 xhigh по рекомендации, окружение Default, репозиторий явно, `main`
   aaff7d8).
+- 2026-10-12, **К1: PR #146 открыт сессией 07:39 UTC** (отчёт в описании; CI идёт). Ответы координатора триггером: (1)
+  комментарии `Dockerfile` о брокере — оставить, копия образца, брокеры придут в К2; (4) `.gitignore` модуля — да, но не в
+  К1: для contract-service добавит К2, для data-reference — вопрос координатору data-reference через владельца. Пункты (2)
+  порты локального compose совпадают с data-reference и (3) `DB_URL` профиля `app` с `logServerErrorDetail=false` — владельцу,
+  рекомендация «принять». Эквивалентный мутант `spring.liquibase.url` принят: при заданном `spring.liquibase.user` Boot
+  4.0.7 и так строит отдельное соединение без свойств Hikari (`javap` `LiquibaseAutoConfiguration`).
 - 2026-10-07, **PR #138 смержен владельцем 20:04 UTC** (`main` `8a287da`): документы Договоров перенесены в
   `project_files/contract-service/` (поручение владельца через PR #137 координатора data-reference). Проверка после
   мержа: 24 файла — перемещения через `git mv` без изменения содержимого, один побайтовый дубль «Точек интеграции РВЛ и
@@ -514,7 +520,7 @@ Opus 5.5 xhigh.
 | — | документы Договоров — в `project_files/contract-service/` | `claude/contract-service-project-files` (координатор) | #138 | смержен 2026-10-07 20:04 UTC | ~0,3 | поручение владельца через PR #137; selftest 574/574; Grok не комментировал |
 | — | план contract-service, ревизия 1 | `claude/contract-service-coordinator` (координатор) | #142 | смержен 2026-10-08 13:53 UTC | ~1,5 | Grok не комментировал; решения 1–13 получены 2026-10-12 |
 | — | `contract-service/CLAUDE.md`, ответы на решения 1–13 | `claude/contract-service-coordinator` (координатор) | #145 | смержен 2026-10-12 06:54 UTC | ~1 | CI зелёный; Grok не ревьюит (владелец 2026-10-12) |
-| 6 | К1 Каркас модуля | `claude/k1-contract-service-skeleton`, session_01Lh5GCUpN7rWMDs9WMCqvMW | — | открыта 2026-10-12 07:08 UTC (Opus 5.5, Default, `main` aaff7d8) | | оценка 8 ч; без спецификации; задача утверждена «1) да» |
+| 6 | К1 Каркас модуля | `claude/k1-contract-service-skeleton`, session_01Lh5GCUpN7rWMDs9WMCqvMW | #146 | PR открыт 2026-10-12 07:39 UTC (сессия открыта 07:08, Opus 5.5, Default, `main` aaff7d8) | ~1,5 ч сессии | оценка 8 ч; без спецификации; 29 файлов, 26 тестов; reviewer 2 раунда (1 major + 9 minor исправлены); 13 ручных мутантов конфигурации убиты, 1 эквивалентный (`spring.liquibase.url`); 4 пункта: 1 и 4 — координатор, 2 и 3 — владелец |
 
 ---
 
