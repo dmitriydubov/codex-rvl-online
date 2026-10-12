@@ -1,7 +1,3 @@
-/*
- * Плагин мутаций PIT нужен только внешнему набору проверок и есть только на портале плагинов Gradle. Поэтому он
- * объявлен здесь, а не в plugins {}: без набора, в том числе в рабочем контуре, сборка к порталу не обращается.
- */
 buildscript {
     if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
         repositories {
@@ -86,10 +82,6 @@ dependencies {
     mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }
 
-/*
- * Внешний набор проверок качества, приёмочных и мутационных тестов подключается только во внешней сборке
- * с публичными репозиториями. ./gradlew build он не меняет: все его проверки — отдельные задачи.
- */
 if (gradle.ext.has('gauntletEnabled') && gradle.ext.gauntletEnabled) {
     apply plugin: 'info.solidsoft.pitest'
     apply from: '../gauntlet/gauntlet.gradle'
