@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
@@ -35,6 +36,9 @@ public class InboxMessageHandling {
     }
 
     private void handle(InboxMessage message, Instant now) {
+        if (message.status() != InboxStatus.NEW) {
+            return;
+        }
         InboxReceipt receipt = message.receipt();
         Optional<Integer> processed = messages.maxProcessedVersion(receipt.correlationId())
                 .filter(version -> version >= receipt.entityVersion());

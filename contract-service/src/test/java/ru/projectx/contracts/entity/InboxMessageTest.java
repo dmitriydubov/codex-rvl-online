@@ -1,6 +1,7 @@
 package ru.projectx.contracts.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -28,6 +29,18 @@ class InboxMessageTest {
         assertThat(message).hasFieldOrPropertyWithValue("receivedAt", RECEIVED)
                 .hasFieldOrPropertyWithValue("processedAt", null)
                 .hasFieldOrPropertyWithValue("nextAttemptAt", null);
+    }
+
+    @Test
+    void finishedMessage_refusesEveryFurtherTransition() {
+        message.markProcessed(LATER);
+
+        assertThatThrownBy(() -> message.markFailed("отказ")).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("PROCESSED");
+        assertThatThrownBy(() -> message.markRetry("отказ", LATER)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> message.markSkipped("пропуск", LATER)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> message.markProcessed(LATER)).isInstanceOf(IllegalStateException.class);
+        assertThat(message.attempts()).isZero();
     }
 
     @Test

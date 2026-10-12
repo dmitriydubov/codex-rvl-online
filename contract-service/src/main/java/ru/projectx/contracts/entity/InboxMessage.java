@@ -86,12 +86,14 @@ public class InboxMessage {
     }
 
     public void markProcessed(Instant now) {
+        requirePending();
         this.status = InboxStatus.PROCESSED;
         this.processedAt = now;
         this.nextAttemptAt = null;
     }
 
     public void markSkipped(String reason, Instant now) {
+        requirePending();
         this.status = InboxStatus.SKIPPED;
         this.errorMessage = reason;
         this.processedAt = now;
@@ -99,16 +101,24 @@ public class InboxMessage {
     }
 
     public void markRetry(String reason, Instant nextAttemptAt) {
+        requirePending();
         this.attempts += 1;
         this.errorMessage = reason;
         this.nextAttemptAt = nextAttemptAt;
     }
 
     public void markFailed(String reason) {
+        requirePending();
         this.attempts += 1;
         this.status = InboxStatus.FAILED;
         this.errorMessage = reason;
         this.nextAttemptAt = null;
+    }
+
+    private void requirePending() {
+        if (status != InboxStatus.NEW) {
+            throw new IllegalStateException("исход сообщения " + messageId + " уже зафиксирован: " + status);
+        }
     }
 
     public UUID id() {

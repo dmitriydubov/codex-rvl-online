@@ -41,7 +41,7 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     }
 
     @Override
-    protected void reviseTerms(Contract contract, Issue issue, Instant now) {
-        contract.revise(new ContractTerms(issue.period(), issue.participant().amountDue()), now);
+    protected boolean reviseTerms(Contract contract, Issue issue) {
+        return contract.revise(new ContractTerms(issue.period(), issue.participant().amountDue()));
     }
 }

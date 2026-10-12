@@ -40,41 +40,47 @@ class ContractTest {
     }
 
     @Test
-    void revise_withSameTerms_keepsVersion() {
-        contract.revise(new ContractTerms(PERIOD, new BigDecimal("34000.000")), LATER);
+    void revise_withSameTerms_changesNothing() {
+        assertThat(contract.revise(new ContractTerms(PERIOD, new BigDecimal("34000.000")))).isFalse();
+        assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");
+        assertThat(contract.state().period()).isEqualTo(PERIOD);
+    }
 
-        assertThat(contract.state().entityVersion()).isEqualTo(1);
+    @Test
+    void revise_withNewPremium_changesPremiumAndReportsChange() {
+        assertThat(contract.revise(new ContractTerms(PERIOD, new BigDecimal("36000.00")))).isTrue();
+        assertThat(contract.premiumAmount()).isEqualByComparingTo("36000.00");
+    }
+
+    @Test
+    void revise_withNewPeriodOnly_movesPeriodAndReportsChange() {
+        assertThat(contract.revise(new ContractTerms(OTHER_PERIOD, new BigDecimal("34000.00")))).isTrue();
+        assertThat(contract.state().period()).isEqualTo(OTHER_PERIOD);
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");
     }
 
     @Test
-    void revise_withNewPremium_changesPremiumAndBumpsVersionOnce() {
-        contract.revise(new ContractTerms(PERIOD, new BigDecimal("36000.00")), LATER);
-
-        assertThat(contract.premiumAmount()).isEqualByComparingTo("36000.00");
-        assertThat(contract.state().entityVersion()).isEqualTo(2);
-    }
-
-    @Test
-    void revise_withNewPeriodAndPremium_bumpsVersionTwice() {
-        contract.revise(new ContractTerms(OTHER_PERIOD, new BigDecimal("36000.00")), LATER);
-
+    void revise_withNewPeriodAndPremium_changesBoth() {
+        assertThat(contract.revise(new ContractTerms(OTHER_PERIOD, new BigDecimal("36000.00")))).isTrue();
         assertThat(contract.state().period()).isEqualTo(OTHER_PERIOD);
-        assertThat(contract.state().entityVersion()).isEqualTo(3);
+        assertThat(contract.premiumAmount()).isEqualByComparingTo("36000.00");
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
     }
 
     @Test
-    void movePeriod_reportsWhetherPeriodChanged() {
-        assertThat(contract.movePeriod(PERIOD, LATER)).isFalse();
-        assertThat(contract.movePeriod(OTHER_PERIOD, LATER)).isTrue();
-        assertThat(contract.state().entityVersion()).isEqualTo(2);
+    void movePeriod_reportsWhetherPeriodChangedWithoutTouchingVersion() {
+        assertThat(contract.movePeriod(PERIOD)).isFalse();
+        assertThat(contract.movePeriod(OTHER_PERIOD)).isTrue();
+        assertThat(contract.state().period()).isEqualTo(OTHER_PERIOD);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
     }
 
     @Test
-    void markPersonsReplaced_bumpsVersion() {
-        contract.markPersonsReplaced(LATER);
+    void markRevised_bumpsVersionOnce() {
+        contract.markRevised(LATER);
 
         assertThat(contract.state().entityVersion()).isEqualTo(2);
+        assertThat(contract).hasFieldOrPropertyWithValue("updatedAt", LATER);
     }
 
     @Test

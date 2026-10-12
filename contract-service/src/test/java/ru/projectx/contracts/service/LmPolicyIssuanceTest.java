@@ -66,7 +66,19 @@ class LmPolicyIssuanceTest {
 
         verify(policies, never()).save(any());
         assertThat(existing.state().period()).isEqualTo(new TripPeriod(Tasks.FROM.plusDays(1), Tasks.TO));
-        assertThat(existing.state().entityVersion()).isEqualTo(3);
+        assertThat(existing.state().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void existingPolicy_withNewDatesOnly_bumpsVersionOnce() {
+        LmPolicy existing = existing();
+        given(parties.replaceIfChanged(eq(PersonOwner.lmPolicy(existing.id())), anyList(), eq(NOW))).willReturn(false);
+        ContractTask moved = Tasks.task(Tasks.FROM.plusDays(1), Tasks.TO, Tasks.insured("0.00"), Tasks.child("0.00"));
+
+        issuance.reconcile(new Issue(moved, Tasks.child("0.00")), Optional.of(existing), NOW);
+
+        assertThat(existing.state().period()).isEqualTo(new TripPeriod(Tasks.FROM.plusDays(1), Tasks.TO));
+        assertThat(existing.state().entityVersion()).isEqualTo(2);
     }
 
     @Test

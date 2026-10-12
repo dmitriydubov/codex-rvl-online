@@ -18,6 +18,8 @@ public class TaskEnvelopeParser {
     private static final String TOPIC = "topic";
     private static final String EVENT_TYPE = "event_type";
     private static final String ENTITY_VERSION = "entity_version";
+    private static final int TOPIC_MAX_LENGTH = 100;
+    private static final int EVENT_TYPE_MAX_LENGTH = 50;
 
     private final JsonMapper json;
 
@@ -27,8 +29,8 @@ public class TaskEnvelopeParser {
 
     public InboxReceipt parse(byte[] body) {
         JsonNode meta = root(body).path(META);
-        return new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID), text(meta, TOPIC),
-                text(meta, EVENT_TYPE), version(meta));
+        return new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID),
+                bounded(meta, TOPIC, TOPIC_MAX_LENGTH), bounded(meta, EVENT_TYPE, EVENT_TYPE_MAX_LENGTH), version(meta));
     }
 
     private JsonNode root(byte[] body) {
@@ -42,6 +44,14 @@ public class TaskEnvelopeParser {
 
     private static UUID uuid(JsonNode meta, String field) {
         return Guids.canonical(text(meta, field)).orElseThrow(() -> InboxEnvelopeException.unusableField(field));
+    }
+
+    private static String bounded(JsonNode meta, String field, int maxLength) {
+        String value = text(meta, field);
+        if (value.isBlank() || value.length() > maxLength) {
+            throw InboxEnvelopeException.unusableField(field);
+        }
+        return value;
     }
 
     private static String text(JsonNode meta, String field) {

@@ -91,6 +91,17 @@ class InboxOutcomesTest {
     }
 
     @Test
+    void failureRecordedAfterAnotherPassFinishedTheMessage_changesNothing() {
+        message.markProcessed(NOW);
+
+        outcomes.recordFailure(message.id(), LOCKED);
+
+        assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
+        assertThat(message.attempts()).isZero();
+        verify(metrics, never()).countFailed(anyString());
+    }
+
+    @Test
     void unknownId_isIllegalState() {
         UUID unknown = UUID.fromString("00000000-0000-4000-8000-000000000001");
         given(messages.findById(unknown)).willReturn(Optional.empty());

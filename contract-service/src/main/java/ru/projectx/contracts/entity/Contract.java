@@ -44,12 +44,13 @@ public class Contract extends IssuanceRecord {
         return new Contract(draft, now);
     }
 
-    public void revise(ContractTerms terms, Instant now) {
-        movePeriod(terms.period(), now);
-        if (premiumAmount.compareTo(terms.premium()) != 0) {
-            this.premiumAmount = terms.premium();
-            bump(now);
+    public boolean revise(ContractTerms terms) {
+        boolean periodMoved = movePeriod(terms.period());
+        if (premiumAmount.compareTo(terms.premium()) == 0) {
+            return periodMoved;
         }
+        this.premiumAmount = terms.premium();
+        return true;
     }
 
     @Override

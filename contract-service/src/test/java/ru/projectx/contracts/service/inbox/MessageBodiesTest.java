@@ -20,10 +20,17 @@ class MessageBodiesTest {
     }
 
     @Test
-    void bodyWithoutDataObject_isViolation() {
-        assertThatThrownBy(() -> bodies.data("{\"data\":\"Тестов\"}"))
+    void bodyWithoutData_isViolation() {
+        assertThatThrownBy(() -> bodies.data("{\"meta\":{}}"))
                 .isInstanceOf(ContractViolationException.class)
                 .hasMessage("нет обязательного поля data");
+    }
+
+    @Test
+    void bodyWithDataThatIsNotAnObject_isViolationWithoutTheValue() {
+        assertThatThrownBy(() -> bodies.data("{\"data\":\"Тестов\"}"))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data");
     }
 
     @Test

@@ -84,16 +84,15 @@ public abstract class IssuanceRecord {
         bump(now);
     }
 
-    public boolean movePeriod(TripPeriod newPeriod, Instant now) {
+    public boolean movePeriod(TripPeriod newPeriod) {
         if (period.equals(newPeriod)) {
             return false;
         }
         this.period = newPeriod;
-        bump(now);
         return true;
     }
 
-    public void markPersonsReplaced(Instant now) {
+    public void markRevised(Instant now) {
         bump(now);
     }
 

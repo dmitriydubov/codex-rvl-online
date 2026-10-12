@@ -37,12 +37,13 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
 
     protected abstract PersonOwner owner(R record);
 
-    protected abstract void reviseTerms(R record, Issue issue, Instant now);
+    protected abstract boolean reviseTerms(R record, Issue issue);
 
     private void revise(R record, Issue issue, List<Party> snapshot, Instant now) {
-        reviseTerms(record, issue, now);
-        if (parties.replaceIfChanged(owner(record), snapshot, now)) {
-            record.markPersonsReplaced(now);
+        boolean termsChanged = reviseTerms(record, issue);
+        boolean partiesChanged = parties.replaceIfChanged(owner(record), snapshot, now);
+        if (termsChanged || partiesChanged) {
+            record.markRevised(now);
         }
     }
 }

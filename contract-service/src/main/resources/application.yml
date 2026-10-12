@@ -9,6 +9,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+  task:
+    scheduling:
+      pool:
+        size: 2
+
   jackson:
     property-naming-strategy: SNAKE_CASE
 

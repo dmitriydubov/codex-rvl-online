@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -36,14 +38,17 @@ class TaskQueueListenerTest {
     private static final InboxReceipt RECEIPT = new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
             UUID.fromString(TaskBodies.REQUEST_ID), "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
 
+    private static final Duration REQUEUE_DELAY = Duration.ofSeconds(5);
+
     private final InboxReceiver receiver = mock();
     private final Channel channel = mock();
+    private final Pauses pauses = mock();
     private final TaskQueueListener listener = new TaskQueueListener(
             new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
             new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
                     new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
-                    Duration.ZERO));
+                    REQUEUE_DELAY), pauses);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
     private final Logger log = (Logger) LoggerFactory.getLogger(TaskQueueListener.class);
 
@@ -98,13 +103,15 @@ class TaskQueueListenerTest {
     }
 
     @Test
-    void storageFailure_returnsMessageToQueueAndLogsTypeAndSqlStateOnly() throws IOException {
+    void storageFailure_returnsMessageToQueueAfterThePauseAndLogsTypeAndSqlStateOnly() throws IOException {
         String body = TaskBodies.upserted().toJson();
         given(receiver.receive(RECEIPT, body))
                 .willThrow(new IllegalStateException("Тестова", new SQLException("locked", "55P03")));
+        given(pauses.hold(REQUEUE_DELAY)).willReturn(true);
 
         listener.onMessage(message(body), channel);
 
+        verify(pauses).hold(REQUEUE_DELAY);
         verify(channel).basicNack(7L, false, true);
         verify(channel, never()).basicAck(7L, false);
         assertThat(journal.list).singleElement().satisfies(event -> {
@@ -117,33 +124,54 @@ class TaskQueueListenerTest {
         });
     }
 
-    @Test
-    void storageFailure_waitsTheRequeueDelayBeforeReturningTheMessage() throws IOException {
-        TaskQueueListener slow = new TaskQueueListener(new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
-                new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
-                        new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
-                        new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
-                        Duration.ofMillis(300)));
-        String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("база"));
-        long started = System.nanoTime();
-
-        slow.onMessage(message(body), channel);
-
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(300));
-        verify(channel).basicNack(7L, false, true);
-    }
 
     @Test
-    void interruptedPause_stillReturnsMessageAndKeepsInterruptFlag() throws IOException {
+    void interruptedPause_leavesMessageUnacknowledgedForTheBrokerToRequeue() throws IOException {
         String body = TaskBodies.upserted().toJson();
         given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("база"));
-        Thread.currentThread().interrupt();
+        given(pauses.hold(REQUEUE_DELAY)).willReturn(false);
 
         listener.onMessage(message(body), channel);
 
-        assertThat(Thread.interrupted()).isTrue();
-        verify(channel).basicNack(7L, false, true);
+        verify(channel, never()).basicNack(7L, false, true);
+        verify(channel, never()).basicAck(7L, false);
+    }
+
+    @Test
+    void bodyTheDatabaseNeverAccepts_isAcknowledgedLostAndLoggedWithoutTheBody() throws IOException {
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body))
+                .willThrow(new IllegalStateException("Тестова", new SQLException("нулевой символ", "22P05")));
+
+        listener.onMessage(message(body), channel);
+
+        verify(channel).basicAck(7L, false);
+        verify(channel, never()).basicNack(7L, false, true);
+        verifyNoInteractions(pauses);
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage())
+                    .contains("потеряно: база не принимает тело сообщения " + TaskBodies.MESSAGE_ID + ", SQLSTATE 22P05")
+                    .doesNotContain("Тестова");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void closedChannel_isLoggedWithoutTheBodyAndNothingIsThrown() throws IOException {
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body)).willReturn(ReceiptOutcome.STORED);
+        willThrow(new IOException("Тестова: канал закрыт")).given(channel).basicAck(7L, false);
+
+        listener.onMessage(message(body), channel);
+
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage())
+                    .contains("ответ брокеру по сообщению очереди task-changes не отправлен: java.io.IOException")
+                    .doesNotContain("Тестова");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
     }
 
     private static Message message(String body) {

@@ -75,7 +75,7 @@ class KmContractIssuanceTest {
         verify(numbers, never()).next(any());
         assertThat(existing.premiumAmount()).isEqualByComparingTo("36000.00");
         assertThat(existing.state().period()).isEqualTo(new TripPeriod(Tasks.FROM.plusDays(1), Tasks.TO.plusDays(1)));
-        assertThat(existing.state().entityVersion()).isEqualTo(3);
+        assertThat(existing.state().entityVersion()).isEqualTo(2);
     }
 
     @Test

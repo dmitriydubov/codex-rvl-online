@@ -107,6 +107,17 @@ class InboxMessageHandlingTest {
     }
 
     @Test
+    void messageAlreadyFinished_isLeftAlone() {
+        message.markProcessed(NOW.minusSeconds(1));
+
+        handling.process(message.id());
+
+        verify(handler, never()).handle(anyString(), any());
+        verify(messages, never()).maxProcessedVersion(any());
+        assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
+    }
+
+    @Test
     void unknownId_isIllegalState() {
         UUID unknown = UUID.fromString("00000000-0000-4000-8000-000000000001");
         given(messages.findById(unknown)).willReturn(Optional.empty());

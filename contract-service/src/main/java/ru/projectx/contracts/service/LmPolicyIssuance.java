@@ -37,7 +37,7 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
     }
 
     @Override
-    protected void reviseTerms(LmPolicy policy, Issue issue, Instant now) {
-        policy.movePeriod(issue.period(), now);
+    protected boolean reviseTerms(LmPolicy policy, Issue issue) {
+        return policy.movePeriod(issue.period());
     }
 }

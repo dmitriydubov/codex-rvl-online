@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
 
@@ -40,9 +41,13 @@ public class InboxOutcomes {
     }
 
     private void record(InboxMessage message, InboxFailure failure) {
+        if (message.status() != InboxStatus.NEW) {
+            log.warn("исход сообщения {} уже зафиксирован другим проходом: {}",
+                    message.receipt().messageId(), message.status());
+            return;
+        }
         int attempt = message.attempts() + 1;
-        Optional<Duration> delay = failure instanceof InboxFailure.Transient
-                ? properties.retry().delayAfterFailedAttempt(attempt) : Optional.empty();
+        Optional<Duration> delay = retryDelay(failure, attempt);
         if (delay.isPresent()) {
             message.markRetry(failure.reason(), clock.instant().plus(delay.get()));
             log.warn("сообщение {} отложено до повтора после попытки {}: {}",
@@ -50,6 +55,11 @@ public class InboxOutcomes {
             return;
         }
         reject(message, failure, attempt);
+    }
+
+    private Optional<Duration> retryDelay(InboxFailure failure, int attempt) {
+        return failure instanceof InboxFailure.Transient
+                ? properties.retry().delayAfterFailedAttempt(attempt) : Optional.empty();
     }
 
     private void reject(InboxMessage message, InboxFailure failure, int attempt) {

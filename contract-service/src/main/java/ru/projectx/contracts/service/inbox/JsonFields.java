@@ -27,7 +27,7 @@ record JsonFields(JsonNode node, String path) {
     JsonFields requiredObject(String name) {
         JsonFields child = child(name);
         if (!child.node.isObject()) {
-            throw ContractViolationException.missingField(child.path);
+            throw absentOrInvalid(name);
         }
         return child;
     }
@@ -35,7 +35,7 @@ record JsonFields(JsonNode node, String path) {
     JsonFields requiredArray(String name) {
         JsonFields child = child(name);
         if (!child.node.isArray()) {
-            throw ContractViolationException.missingField(child.path);
+            throw absentOrInvalid(name);
         }
         return child;
     }
@@ -45,7 +45,14 @@ record JsonFields(JsonNode node, String path) {
     }
 
     String text(String name) {
-        return optionalText(name).orElseThrow(() -> ContractViolationException.missingField(pathOf(name)));
+        return optionalText(name).orElseThrow(() -> absentOrInvalid(name));
+    }
+
+    private ContractViolationException absentOrInvalid(String name) {
+        JsonNode value = node.path(name);
+        return value.isMissingNode() || value.isNull()
+                ? ContractViolationException.missingField(pathOf(name))
+                : ContractViolationException.invalidValue(pathOf(name));
     }
 
     Optional<String> optionalText(String name) {
@@ -77,7 +84,7 @@ record JsonFields(JsonNode node, String path) {
     BigDecimal decimal(String name) {
         JsonNode value = node.path(name);
         if (!value.isNumber()) {
-            throw ContractViolationException.missingField(pathOf(name));
+            throw absentOrInvalid(name);
         }
         return value.decimalValue();
     }
@@ -85,7 +92,7 @@ record JsonFields(JsonNode node, String path) {
     boolean bool(String name) {
         JsonNode value = node.path(name);
         if (!value.isBoolean()) {
-            throw ContractViolationException.missingField(pathOf(name));
+            throw absentOrInvalid(name);
         }
         return value.booleanValue();
     }

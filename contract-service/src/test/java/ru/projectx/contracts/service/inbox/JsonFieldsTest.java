@@ -14,7 +14,7 @@ class JsonFieldsTest {
 
     private static final String BODY = """
             {"data": {"id": "61a7982c-a0b4-4bbf-9527-60b40b752803", "date": "2026-04-10", "amount": 34000.00,
-                      "flag": true, "name": "Тестов", "number": 5, "items": [{"n": 1}], "nested": {}}}
+                      "flag": true, "name": "Тестов", "number": 5, "items": [{"n": 1}], "nested": {}, "nothing": null}}
             """;
 
     private final JsonFields root = new JsonFields(JsonMapper.builder().build().readTree(BODY), "");
@@ -49,15 +49,25 @@ class JsonFieldsTest {
     }
 
     @Test
-    void missingRequiredFields_areViolationsNamingTheFullPath() {
+    void missingOrNullRequiredFields_areViolationsNamingTheFullPath() {
         assertThatThrownBy(() -> data.text("missing")).isInstanceOf(ContractViolationException.class)
                 .hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.text("number")).hasMessage("нет обязательного поля data.number");
-        assertThatThrownBy(() -> data.decimal("name")).hasMessage("нет обязательного поля data.amount".replace("amount", "name"));
-        assertThatThrownBy(() -> data.bool("name")).hasMessage("нет обязательного поля data.name");
-        assertThatThrownBy(() -> data.requiredObject("name")).hasMessage("нет обязательного поля data.name");
-        assertThatThrownBy(() -> data.requiredArray("nested")).hasMessage("нет обязательного поля data.nested");
+        assertThatThrownBy(() -> data.decimal("missing")).hasMessage("нет обязательного поля data.missing");
+        assertThatThrownBy(() -> data.bool("missing")).hasMessage("нет обязательного поля data.missing");
+        assertThatThrownBy(() -> data.requiredObject("missing")).hasMessage("нет обязательного поля data.missing");
+        assertThatThrownBy(() -> data.requiredArray("missing")).hasMessage("нет обязательного поля data.missing");
+        assertThatThrownBy(() -> data.text("nothing")).hasMessage("нет обязательного поля data.nothing");
         assertThatThrownBy(() -> root.requiredObject("missing")).hasMessage("нет обязательного поля missing");
+    }
+
+    @Test
+    void presentFieldsOfWrongType_areInvalidValuesNamingTheFullPath() {
+        assertThatThrownBy(() -> data.text("number")).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.number");
+        assertThatThrownBy(() -> data.decimal("name")).hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.bool("name")).hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.requiredObject("name")).hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.requiredArray("nested")).hasMessage("недопустимое значение поля data.nested");
     }
 
     @Test

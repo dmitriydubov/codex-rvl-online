@@ -46,6 +46,19 @@ class TaskEnvelopeParserTest {
     }
 
     @Test
+    void topicOrEventTypeBeyondTheJournalColumn_isUnusableEnvelope() {
+        byte[] longTopic = TaskBodies.upserted().withMetaField("topic", "t".repeat(101)).toBytes();
+        byte[] longType = TaskBodies.upserted().withMetaField("event_type", "e".repeat(51)).toBytes();
+        byte[] blankType = TaskBodies.upserted().withMetaField("event_type", " ").toBytes();
+
+        assertThatThrownBy(() -> parser.parse(longTopic)).hasMessage("в конверте нет пригодного topic");
+        assertThatThrownBy(() -> parser.parse(longType)).hasMessage("в конверте нет пригодного event_type");
+        assertThatThrownBy(() -> parser.parse(blankType)).hasMessage("в конверте нет пригодного event_type");
+        assertThat(parser.parse(TaskBodies.upserted().withMetaField("topic", "t".repeat(100)).toBytes()).topic())
+                .hasSize(100);
+    }
+
+    @Test
     void bodyWithoutMeta_isUnusableEnvelope() {
         assertThatThrownBy(() -> parser.parse("{\"data\":{}}".getBytes(StandardCharsets.UTF_8)))
                 .isInstanceOf(InboxEnvelopeException.class)
