@@ -1,0 +1,42 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 005-inbox-messages
+      author: contract-service
+      comment: >
+        Журнал входящих сообщений сервиса Заявок. Сообщение сохраняется целиком при приёме и
+        обрабатывается отдельным проходом; повторная доставка отсекается уникальным индексом по
+        message_id. Срок следующей попытки держит лестницу повторов; тело стирается по сроку хранения,
+        запись остаётся ради истории и идемпотентности.
+      changes:
+        - createTable:
+            tableName: inbox_messages
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_inbox_messages, nullable: false } }
+              - column: { name: message_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: correlation_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: topic, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: event_type, type: varchar(50), constraints: { nullable: false } }
+              - column: { name: entity_version, type: int, constraints: { nullable: false } }
+              - column: { name: payload, type: jsonb }
+              - column: { name: status, type: inbox_status, constraints: { nullable: false } }
+              - column: { name: attempts, type: int, constraints: { nullable: false } }
+              - column: { name: error_message, type: text }
+              - column: { name: next_attempt_at, type: timestamptz }
+              - column: { name: received_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: processed_at, type: timestamptz }
+        - addUniqueConstraint:
+            tableName: inbox_messages
+            columnNames: message_id
+            constraintName: uq_inbox_messages_message_id
+        - createIndex:
+            tableName: inbox_messages
+            indexName: ix_inbox_messages_correlation_id
+            columns:
+              - column: { name: correlation_id }
+        - sql:
+            sql: >
+              CREATE INDEX ix_inbox_messages_pending ON inbox_messages (received_at) WHERE status = 'NEW';
+              CREATE INDEX ix_inbox_messages_retention ON inbox_messages (received_at) WHERE payload IS NOT NULL;
+      rollback:
+        - dropTable: { tableName: inbox_messages }
