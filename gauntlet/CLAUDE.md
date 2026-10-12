@@ -13,7 +13,7 @@
 | Каталог | Что это | Под гейтами |
 |---|---|---|
 | `data-reference/` | сервис справочных данных: справочники и полисы из 1С:УСК (RabbitMQ), REST-чтение для соседних сервисов; пакет `ru.projectx.datareference` | да (`module=data-reference`) |
-| `contract-service/` | сервис Договоров, он же бэкенд ЛК застрахованного; каталога пока нет — появится с каркасом (К1 плана `docs/gauntlet-plan-contract-service.md`) | нет: подключается, когда появится его сборка (`gauntlet/INSTALL.md`, решение владельца) |
+| `contract-service/` | сервис Договоров, он же бэкенд ЛК застрахованного: договоры КМ и полисы ЛМ по задачам сервиса Заявок, обмен с 1С:УСК, печатные формы, акцепт; пакет `ru.projectx.contracts`; правила — `contract-service/CLAUDE.md`, план — `docs/gauntlet-plan-contract-service.md` | да (`module=data-reference,contract-service`, с 2026-10-12) |
 | `project_files/` | ТЗ, схемы и структуры данных — источники предметной области (раздел «Источники документации»). Разложен по сервисам: `common/` — документы контура целиком и соседей, `data-reference/` — документы справочного сервиса, `contract-service/` — документы сервиса Договоров (контракты с Заявками и 1С, ТЗ ЛК, Ordering; до 2026-10-07 лежали в `contract-service/project_files/` и корне `project_files/`) | — |
 
 Сервис Заявок (он же сервис HR), BFF и фронтенд пишут другие разработчики в своих репозиториях.
@@ -34,10 +34,10 @@
 | `./gradlew gauntlet` | всё вместе |
 
 Область проверки — diff относительно базовой ветки плюс незакоммиченные файлы (`baseRef` в
-`gauntlet/config/gauntlet.properties`). Охраняемые сборки перечислены в `module` (сейчас `data-reference`):
-`./gradlew …` запускай из каталога модуля (`cd data-reference && ./gradlew …`), `src/` и `build/` — его,
-фичи — в `data-reference/src/acceptanceTest/resources/features/`, настройки модуля — в
-`gauntlet/config/data-reference/` (`./gradlew gauntletInfo` покажет, что подхватилось), а `gauntlet/`
+`gauntlet/config/gauntlet.properties`). Охраняемые сборки перечислены в `module` (`data-reference` и
+`contract-service`): `./gradlew …` запускай из каталога модуля (`cd data-reference && ./gradlew …`), `src/` и
+`build/` — его, фичи — в `<module>/src/acceptanceTest/resources/features/`, настройки модуля — в
+`gauntlet/config/<module>/` (`./gradlew gauntletInfo` покажет, что подхватилось), а `gauntlet/`
 остаётся в корне. Задача, затрагивающая два модуля, — одна спецификация (фичи в обоих) и один PR. Stop-хук сам
 запускает `gauntletFast` в каждом модуле, где ход менял код, и возвращает тебе падения. `--continue`
 показывает все красные гейты за один прогон. Отчёты: `<module>/build/reports/`.
