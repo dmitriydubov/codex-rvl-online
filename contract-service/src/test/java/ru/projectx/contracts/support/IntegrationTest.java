@@ -11,13 +11,19 @@ import org.springframework.core.annotation.AliasFor;
 
 /**
  * Приложение целиком на настоящем PostgreSQL с остановленными часами и без брокеров: бины подключений есть, но на
- * старте не соединяются, а их компоненты здоровья выключены, иначе health ждал бы несуществующий брокер.
+ * старте не соединяются, слушатели не стартуют, а компоненты здоровья подключений выключены, иначе health ждал бы
+ * несуществующий брокер. Пароли брокеров вымышленные: без них проверка настроек не дала бы контексту подняться.
  * Мутационное тестирование эти тесты не запускает (тег {@code no-mutate}), поэтому логику классов покрывают unit-тесты.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("no-mutate")
-@SpringBootTest(properties = "management.health.brokers.enabled=false")
+@SpringBootTest(properties = {
+        "management.health.brokers.enabled=false",
+        "projectx.brokers.internal.connection.password=no-broker",
+        "projectx.brokers.onec.connection.password=no-broker",
+        "projectx.brokers.internal.listener-auto-startup=false",
+        "projectx.brokers.onec.listener-auto-startup=false"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class})
 public @interface IntegrationTest {
 

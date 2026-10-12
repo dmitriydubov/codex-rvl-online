@@ -12,8 +12,9 @@ import ru.projectx.contracts.config.BrokerConnectionProperties;
 
 /**
  * Подключение к брокеру собирается ровно из своих настроек: адрес, учётные данные, таймаут и TLS доходят до клиента,
- * подтверждения издателя включены, а имя подключения называет сервис и брокер. Без этого ошибка в одном брокере
- * выглядела бы как ошибка в другом.
+ * подтверждения и возвраты включены, а имя подключения называет сервис и брокер. Без этого ошибка в одном брокере
+ * выглядела бы как ошибка в другом. Флаги TLS и стратегия имени у библиотеки геттеров не имеют и читаются из полей:
+ * наблюдаемы они только на настоящем брокере с TLS.
  */
 class BrokerConnectionFactoriesTest {
 
@@ -21,7 +22,7 @@ class BrokerConnectionFactoriesTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(7);
 
     @Test
-    void connectionFactory_carriesAddressCredentialsAndCorrelatedConfirms() {
+    void connectionFactory_carriesAddressCredentialsConfirmsAndReturns() {
         CachingConnectionFactory factory = BrokerConnectionFactories.create("onec", properties(tls(false, true, true)));
         try {
             assertThat(factory.getHost()).isEqualTo("broker.example");
@@ -32,6 +33,7 @@ class BrokerConnectionFactoriesTest {
             assertThat(factory.getRabbitConnectionFactory().getConnectionTimeout()).isEqualTo(TIMEOUT.toMillis());
             assertThat(factory.isPublisherConfirms()).isTrue();
             assertThat(factory.isSimplePublisherConfirms()).isFalse();
+            assertThat(factory.isPublisherReturns()).isTrue();
         }
         finally {
             factory.destroy();

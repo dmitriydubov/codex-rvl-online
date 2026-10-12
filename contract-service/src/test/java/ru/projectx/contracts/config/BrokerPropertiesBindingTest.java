@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -77,9 +78,20 @@ class BrokerPropertiesBindingTest {
 
     @ParameterizedTest
     @ValueSource(strings = {INTERNAL, ONEC})
-    void missingPassword_failsStartup(String prefix) {
+    void emptyPassword_failsStartup(String prefix) {
         contexts.withPropertyValues(both()).withPropertyValues(prefix + ".connection.password=")
                 .run(context -> assertThat(context).hasFailed());
+    }
+
+    /** Пароль не задан вовсе, как при забытой переменной окружения: отказ на старте, а не от брокера. */
+    @ParameterizedTest
+    @ValueSource(strings = {INTERNAL, ONEC})
+    void absentPassword_failsStartup(String prefix) {
+        String[] withoutPassword = Arrays.stream(both())
+                .filter(value -> !value.startsWith(prefix + ".connection.password="))
+                .toArray(String[]::new);
+
+        contexts.withPropertyValues(withoutPassword).run(context -> assertThat(context).hasFailed());
     }
 
     @ParameterizedTest

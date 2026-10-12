@@ -48,12 +48,15 @@ class ApplicationDefaultsTest {
         assertThat(application.getProperty("management.health.rabbit.enabled")).asString().isEqualTo("false");
     }
 
-    /** Известный пароль из репозитория подошёл бы к любому брокеру с таким же. */
+    /**
+     * Известный пароль из репозитория подошёл бы к любому брокеру с таким же. Умолчание пустое, а не отсутствует:
+     * неразрешённый плейсхолдер Boot оставляет строкой, и проверка настроек приняла бы её за пароль.
+     */
     @ParameterizedTest
     @ValueSource(strings = {"internal", "onec"})
-    void brokerPassword_hasNoDefault(String broker) {
+    void brokerPassword_hasEmptyDefault(String broker) {
         assertThat(application.getProperty("projectx.brokers." + broker + ".connection.password")).asString()
-                .isEqualTo("${RABBITMQ_" + broker.toUpperCase(Locale.ROOT) + "_PASSWORD}");
+                .isEqualTo("${RABBITMQ_" + broker.toUpperCase(Locale.ROOT) + "_PASSWORD:}");
     }
 
     /** Имена очередей — из документа контура «Точки интеграций»; менять их можно только вместе со списком брокера. */

@@ -11,7 +11,7 @@ import org.springframework.boot.health.contributor.HealthIndicator;
  * Проверка сама открывает соединение, поэтому брокер, недоступный на старте, виден в health, а не роняет сервис.
  * В деталях адрес брокера без учётных данных.
  */
-public class BrokerHealthIndicator implements HealthIndicator {
+final class BrokerHealthIndicator implements HealthIndicator {
 
     private static final String BROKER = "broker";
     private static final String HOST = "host";
@@ -22,7 +22,7 @@ public class BrokerHealthIndicator implements HealthIndicator {
     private final String broker;
     private final ConnectionFactory connectionFactory;
 
-    public BrokerHealthIndicator(String broker, ConnectionFactory connectionFactory) {
+    BrokerHealthIndicator(String broker, ConnectionFactory connectionFactory) {
         this.broker = broker;
         this.connectionFactory = connectionFactory;
     }

@@ -125,7 +125,9 @@ projectx:
         port: ${RABBITMQ_INTERNAL_PORT:5672}
         virtual-host: ${RABBITMQ_INTERNAL_VHOST:/}
         username: ${RABBITMQ_INTERNAL_USERNAME:contract_service}
-        password: ${RABBITMQ_INTERNAL_PASSWORD}
+        # Пустое умолчание нарочно: без переменной проверка настроек останавливает старт с именем поля,
+        # а без умолчания в поле осталась бы строка плейсхолдера и отказ пришёл бы только от брокера.
+        password: ${RABBITMQ_INTERNAL_PASSWORD:}
         # Без таймаута попытка соединиться с недоступным брокером висела бы минутами; столько же ждёт health.
         connection-timeout: 10s
         tls:
@@ -151,7 +153,7 @@ projectx:
         port: ${RABBITMQ_ONEC_PORT:5673}
         virtual-host: ${RABBITMQ_ONEC_VHOST:/}
         username: ${RABBITMQ_ONEC_USERNAME:contract_service}
-        password: ${RABBITMQ_ONEC_PASSWORD}
+        password: ${RABBITMQ_ONEC_PASSWORD:}
         connection-timeout: 10s
         tls:
           enabled: ${RABBITMQ_ONEC_SSL_ENABLED:false}

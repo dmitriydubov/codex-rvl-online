@@ -4,6 +4,7 @@ import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
+import ru.projectx.contracts.config.BrokerProperties;
 
 /**
  * Фабрика контейнеров слушателей одного брокера. У слушателя одно решение — что ответить брокеру, поэтому
@@ -19,14 +20,14 @@ final class BrokerListenerContainerFactories {
     }
 
     static SimpleRabbitListenerContainerFactory create(
-            String brokerName, ConnectionFactory connectionFactory, boolean autoStartup) {
+            String brokerName, ConnectionFactory connectionFactory, BrokerProperties broker) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         factory.setConcurrentConsumers(SINGLE_CONSUMER);
         factory.setPrefetchCount(ONE_MESSAGE_IN_FLIGHT);
         factory.setMissingQueuesFatal(true);
-        factory.setAutoStartup(autoStartup);
+        factory.setAutoStartup(broker.listenerAutoStartup());
         // Как у автонастройки Boot при включённых виртуальных потоках: потребители не занимают платформенные потоки.
         factory.setTaskExecutor(new VirtualThreadTaskExecutor("rabbit-" + brokerName + "-"));
         return factory;

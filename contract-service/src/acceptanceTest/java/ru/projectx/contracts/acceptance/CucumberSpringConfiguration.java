@@ -10,10 +10,16 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Один контекст Spring на все сценарии приёмки: настоящий PostgreSQL той же версии, что в контуре. Своя обвязка,
- * а не классы из src/test, потому что приёмка в контур не переносится.
+ * а не классы из src/test, потому что приёмка в контур не переносится. Брокера у приёмки пока нет: пароли
+ * вымышленные, слушатели и компоненты здоровья подключений выключены — до первого сценария с очередями.
  */
 @CucumberContextConfiguration
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "management.health.brokers.enabled=false",
+        "projectx.brokers.internal.connection.password=no-broker",
+        "projectx.brokers.onec.connection.password=no-broker",
+        "projectx.brokers.internal.listener-auto-startup=false",
+        "projectx.brokers.onec.listener-auto-startup=false"})
 @Import(CucumberSpringConfiguration.Containers.class)
 public class CucumberSpringConfiguration {
 

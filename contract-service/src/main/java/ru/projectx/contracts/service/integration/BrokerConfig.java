@@ -21,8 +21,8 @@ import ru.projectx.contracts.config.OneCBrokerProperties;
 @EnableRabbit
 public class BrokerConfig {
 
-    static final String INTERNAL = "internal";
-    static final String ONEC = "onec";
+    private static final String INTERNAL = "internal";
+    private static final String ONEC = "onec";
     private static final String HEALTH_KEY = "brokers";
 
     @Bean
@@ -34,14 +34,14 @@ public class BrokerConfig {
     @Bean
     @InternalBroker
     public RabbitTemplate internalBrokerTemplate(@InternalBroker ConnectionFactory connectionFactory) {
-        return new RabbitTemplate(connectionFactory);
+        return BrokerTemplates.create(connectionFactory);
     }
 
     @Bean
     @InternalBroker
     public SimpleRabbitListenerContainerFactory internalBrokerListenerContainerFactory(
             @InternalBroker ConnectionFactory connectionFactory, InternalBrokerProperties properties) {
-        return BrokerListenerContainerFactories.create(INTERNAL, connectionFactory, properties.listenerAutoStartup());
+        return BrokerListenerContainerFactories.create(INTERNAL, connectionFactory, properties);
     }
 
     @Bean
@@ -59,14 +59,14 @@ public class BrokerConfig {
     @Bean
     @OneCBroker
     public RabbitTemplate onecBrokerTemplate(@OneCBroker ConnectionFactory connectionFactory) {
-        return new RabbitTemplate(connectionFactory);
+        return BrokerTemplates.create(connectionFactory);
     }
 
     @Bean
     @OneCBroker
     public SimpleRabbitListenerContainerFactory onecBrokerListenerContainerFactory(
             @OneCBroker ConnectionFactory connectionFactory, OneCBrokerProperties properties) {
-        return BrokerListenerContainerFactories.create(ONEC, connectionFactory, properties.listenerAutoStartup());
+        return BrokerListenerContainerFactories.create(ONEC, connectionFactory, properties);
     }
 
     @Bean

@@ -6,8 +6,9 @@ import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 
 /**
- * Собирает подключение к брокеру из его настроек. Подтверждения издателя включены на каждом подключении: Outbox
- * считает сообщение доставленным, только когда брокер подтвердил приём, иначе сбой брокера терял бы сообщения молча.
+ * Собирает подключение к брокеру из его настроек. Подтверждения издателя и возвраты включены на каждом подключении:
+ * брокер подтверждает и сообщение, которое никуда не маршрутизируется, и только возврат отличает доставку
+ * от публикации в несуществующую очередь.
  */
 final class BrokerConnectionFactories {
 
@@ -23,6 +24,7 @@ final class BrokerConnectionFactories {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory(
                 clientFactory.getRabbitConnectionFactory());
         connectionFactory.setPublisherConfirmType(ConfirmType.CORRELATED);
+        connectionFactory.setPublisherReturns(true);
         connectionFactory.setConnectionNameStrategy(factory -> SERVICE_NAME + ":" + brokerName);
         return connectionFactory;
     }

@@ -70,6 +70,7 @@ public class RabbitTestcontainer {
         registry.add(prefix + "password", address::password);
     }
 
+    /** Командой брокера, потому что у контейнера Testcontainers 2.0 методов для vhost и прав больше нет. */
     private static void addVirtualHost(RabbitMQContainer container, String virtualHost)
             throws IOException, InterruptedException {
         execute(container, "rabbitmqctl", "add_vhost", virtualHost);
