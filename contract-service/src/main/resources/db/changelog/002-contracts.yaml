@@ -1,0 +1,70 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 002-contracts
+      author: contract-service
+      comment: >
+        Договоры КМ: одна запись на участника поездки с доплатой. Номер присваивается при создании
+        записи из счётчика года: счёт сквозной внутри года и начинается заново с новым годом.
+        Программа страхования заполняется, когда появится правило её подбора. Уникальность участника
+        действует только среди незавершённых записей: после прекращения по участнику создаётся новая.
+      changes:
+        - createTable:
+            tableName: contracts
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_contracts, nullable: false } }
+              - column: { name: number, type: varchar(50), constraints: { nullable: false } }
+              - column: { name: status, type: contract_status, constraints: { nullable: false } }
+              - column: { name: individual_request_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: insured_participant_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: policyholder_participant_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: insurance_contract_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: insurer_policy_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: program_id, type: uuid }
+              - column: { name: date_from, type: date, constraints: { nullable: false } }
+              - column: { name: date_to, type: date, constraints: { nullable: false } }
+              - column: { name: insured_amount, type: "numeric(15,2)" }
+              - column: { name: premium_amount, type: "numeric(15,2)", constraints: { nullable: false } }
+              - column: { name: issued_policy_id, type: uuid }
+              - column: { name: issued_policy_number, type: varchar(50) }
+              - column: { name: contract_usk_id, type: uuid }
+              - column: { name: contract_usk_number, type: varchar(50) }
+              - column: { name: error_code, type: varchar(50) }
+              - column: { name: error_message, type: text }
+              - column: { name: cancel_reason, type: contract_cancel_reason }
+              - column: { name: cancel_comment, type: text }
+              - column: { name: cancelled_at, type: timestamptz }
+              - column: { name: entity_version, type: int, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: contracts
+            columnNames: number
+            constraintName: uq_contracts_number
+        - createIndex:
+            tableName: contracts
+            indexName: ix_contracts_individual_request_id
+            columns:
+              - column: { name: individual_request_id }
+        - createIndex:
+            tableName: contracts
+            indexName: ix_contracts_status
+            columns:
+              - column: { name: status }
+        - createIndex:
+            tableName: contracts
+            indexName: ix_contracts_contract_usk_id
+            columns:
+              - column: { name: contract_usk_id }
+        - sql:
+            sql: >
+              CREATE UNIQUE INDEX uq_contracts_active_insured_participant ON contracts (insured_participant_id)
+                WHERE status NOT IN ('ISSUED', 'ERROR', 'CANCELLED');
+        - createTable:
+            tableName: contract_number_counters
+            columns:
+              - column: { name: year, type: int, constraints: { primaryKey: true, primaryKeyName: pk_contract_number_counters, nullable: false } }
+              - column: { name: last_number, type: int, constraints: { nullable: false } }
+      rollback:
+        - dropTable: { tableName: contract_number_counters }
+        - dropTable: { tableName: contracts }

@@ -9,6 +9,11 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+  task:
+    scheduling:
+      pool:
+        size: 2
+
   jackson:
     property-naming-strategy: SNAKE_CASE
 
@@ -36,6 +41,10 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+    properties:
+      hibernate:
+        type:
+          json_format_mapper: ru.projectx.contracts.config.Jackson3JsonFormatMapper
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
@@ -118,8 +127,24 @@ projectx:
       statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
       idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
 
+  inbox:
+    processing:
+      interval: ${INBOX_PROCESSING_INTERVAL:10s}
+      batch-size: ${INBOX_PROCESSING_BATCH_SIZE:100}
+    retry:
+      backoff: ${INBOX_RETRY_BACKOFF:1m,5m,15m}
+    retention:
+      payload: ${INBOX_PAYLOAD_RETENTION:30d}
+      interval: ${INBOX_RETENTION_INTERVAL:1h}
+      batch-size: ${INBOX_RETENTION_BATCH_SIZE:500}
+    requeue-delay: ${INBOX_REQUEUE_DELAY:5s}
+
+  contracts:
+    numbering:
+      zone: ${CONTRACT_NUMBERING_ZONE:Europe/Moscow}
+
   reference:
-    url: ${REFERENCE_URL:http://localhost:8080/internal/v1}
+    url: ${REFERENCE_URL:}
     connect-timeout: ${REFERENCE_CONNECT_TIMEOUT:2s}
     read-timeout: ${REFERENCE_READ_TIMEOUT:7s}
     retry:

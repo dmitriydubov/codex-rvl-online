@@ -9,9 +9,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-final class ReferenceErrorBodies {
+final class ReferenceErrorCodes {
 
-    private static final Logger log = LoggerFactory.getLogger(ReferenceErrorBodies.class);
+    private static final Logger log = LoggerFactory.getLogger(ReferenceErrorCodes.class);
 
     static final int MAX_BODY_BYTES = 16 * 1024;
 
@@ -20,7 +20,7 @@ final class ReferenceErrorBodies {
 
     private final JsonMapper json;
 
-    ReferenceErrorBodies(JsonMapper json) {
+    ReferenceErrorCodes(JsonMapper json) {
         this.json = json;
     }
 

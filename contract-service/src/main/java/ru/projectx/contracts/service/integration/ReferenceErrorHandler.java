@@ -17,9 +17,9 @@ final class ReferenceErrorHandler implements RestClient.ResponseSpec.ErrorHandle
 
     private static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
 
-    private final ReferenceErrorBodies bodies;
+    private final ReferenceErrorCodes bodies;
 
-    ReferenceErrorHandler(ReferenceErrorBodies bodies) {
+    ReferenceErrorHandler(ReferenceErrorCodes bodies) {
         this.bodies = bodies;
     }
 
