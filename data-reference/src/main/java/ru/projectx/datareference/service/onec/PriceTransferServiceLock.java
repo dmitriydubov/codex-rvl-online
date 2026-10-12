@@ -2,7 +2,6 @@ package ru.projectx.datareference.service.onec;
 
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import tools.jackson.databind.node.ObjectNode;

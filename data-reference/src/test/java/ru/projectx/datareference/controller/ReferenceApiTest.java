@@ -15,7 +15,6 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.repository.InsuranceContractRepository;

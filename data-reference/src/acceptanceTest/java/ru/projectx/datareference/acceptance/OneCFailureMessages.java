@@ -1,6 +1,5 @@
 package ru.projectx.datareference.acceptance;
 
-import java.math.BigDecimal;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import tools.jackson.core.StreamReadConstraints;

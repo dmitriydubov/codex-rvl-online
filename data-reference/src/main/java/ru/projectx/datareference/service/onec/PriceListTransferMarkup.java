@@ -3,7 +3,6 @@ package ru.projectx.datareference.service.onec;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
