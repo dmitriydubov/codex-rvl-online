@@ -21,10 +21,9 @@ spring:
     exclude:
       - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
 
-  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml: порт 5433, чтобы рядом
-  # поднимался локальный контур сервиса справочных данных со своей базой на 5432.
-  # У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой базе с таким же.
-  # Если переменную забыли, запуск падает на миграциях с «password authentication failed».
+  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml (порт 5433: 5432 занят локальным
+  # контуром сервиса справочных данных). У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой
+  # базе с таким же, а без переменной запуск падает на миграциях с «password authentication failed».
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/contract_service?logServerErrorDetail=false}
     username: ${DB_USERNAME:contract_service}

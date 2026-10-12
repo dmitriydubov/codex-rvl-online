@@ -4,6 +4,7 @@ import java.util.UUID;
 import ru.projectx.contracts.dto.ReferencePolicy;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;
+import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 
 /**
@@ -17,6 +18,7 @@ public interface PolicyReads {
      *
      * @throws ReferenceNotFoundException полиса с таким идентификатором нет
      * @throws ReferenceArchivedException полис помечен в 1С:УСК на удаление
+     * @throws ReferenceRejectedException справочник отклонил запрос своим кодом ошибки, повторять бессмысленно
      * @throws ReferenceUnavailableException справочник не ответил и после повторов
      */
     ReferencePolicy policy(UUID id);
@@ -26,6 +28,7 @@ public interface PolicyReads {
      * повторяется ограниченное число раз и после исчерпания повторов считается недоступностью справочника.
      *
      * @throws ReferenceArchivedException полис помечен в 1С:УСК на удаление
+     * @throws ReferenceRejectedException справочник отклонил запрос своим кодом ошибки, повторять бессмысленно
      * @throws ReferenceUnavailableException справочник не ответил или полис не дошёл до него за отведённые попытки
      */
     ReferencePolicy policyByExternalId(UUID externalId);

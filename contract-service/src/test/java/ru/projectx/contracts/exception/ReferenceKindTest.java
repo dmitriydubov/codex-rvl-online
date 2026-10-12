@@ -3,6 +3,7 @@ package ru.projectx.contracts.exception;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -49,6 +50,15 @@ class ReferenceKindTest {
         assertThat(archived.kind()).isEqualTo(kind);
         assertThat(archived.id()).isEqualTo(id);
         assertThat(archived).hasMessageContaining(kind.name()).hasMessageContaining(id.toString());
+    }
+
+    @Test
+    void rejectedException_carriesStatusAndCodeOfTheReference() {
+        ReferenceRejectedException rejected = new ReferenceRejectedException(400, "VALIDATION_ERROR");
+
+        assertThat(rejected.status()).isEqualTo(400);
+        assertThat(rejected.code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(rejected).hasMessageContaining("400").hasMessageContaining("VALIDATION_ERROR");
     }
 
     @ParameterizedTest

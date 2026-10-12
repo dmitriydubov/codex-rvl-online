@@ -16,14 +16,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.client.MockClientHttpResponse;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;
+import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Ответ справочника со статусом ошибки читается по его единому формату: 404 с кодом справочника — «не найдено»,
- * 503 с кодом недоступности — временная недоступность, всё остальное, включая тело не в формате, — неожиданный ответ,
- * которому не верят.
+ * другой 4xx с кодом — окончательный отказ с этим кодом, 503 с кодом недоступности — временная недоступность, всё
+ * остальное, включая тело не в формате, — неожиданный ответ, которому не верят.
  */
 class ReferenceErrorHandlerTest {
 
@@ -41,16 +42,33 @@ class ReferenceErrorHandlerTest {
                         notFound -> assertThat(notFound.kind()).isEqualTo(kind));
     }
 
+    /** 404 с чужим кодом — тоже окончательный ответ справочника на этот запрос, но не «записи нет». */
     @Test
-    void notFoundWithForeignCode_isUnexpectedResponse() {
+    void notFoundWithForeignCode_isRejectedWithThatCode() {
         assertThatThrownBy(() -> handler.handle(null, response(HttpStatus.NOT_FOUND, error("LPU_NOT_FOUND"))))
-                .isInstanceOfSatisfying(ReferenceUnavailableException.class,
-                        unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.UNEXPECTED_RESPONSE));
+                .isInstanceOfSatisfying(ReferenceRejectedException.class, rejected -> {
+                    assertThat(rejected.status()).isEqualTo(404);
+                    assertThat(rejected.code()).isEqualTo("LPU_NOT_FOUND");
+                });
     }
 
-    @Test
-    void notFoundWithoutJsonBody_isUnexpectedResponse() {
-        assertThatThrownBy(() -> handler.handle(null, response(HttpStatus.NOT_FOUND, "<html>404</html>")))
+    /** Статус 4xx с кодом справочника повторится на тот же запрос: это постоянная ошибка, не недоступность. */
+    @ParameterizedTest
+    @ValueSource(ints = {400, 409, 422})
+    void clientErrorWithCode_isRejectedWithStatusAndCode(int status) {
+        assertThatThrownBy(() -> handler.handle(null, response(HttpStatus.valueOf(status), error("VALIDATION_ERROR"))))
+                .isInstanceOfSatisfying(ReferenceRejectedException.class, rejected -> {
+                    assertThat(rejected.status()).isEqualTo(status);
+                    assertThat(rejected.code()).isEqualTo("VALIDATION_ERROR");
+                })
+                .hasMessageContaining(String.valueOf(status)).hasMessageContaining("VALIDATION_ERROR");
+    }
+
+    /** 4xx без кода справочника (страница прокси) — ответ не из контракта, ему не верят и повторяют. */
+    @ParameterizedTest
+    @ValueSource(ints = {400, 404})
+    void clientErrorWithoutContourBody_isUnexpectedResponse(int status) {
+        assertThatThrownBy(() -> handler.handle(null, response(HttpStatus.valueOf(status), "<html>error</html>")))
                 .isInstanceOfSatisfying(ReferenceUnavailableException.class,
                         unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.UNEXPECTED_RESPONSE));
     }
@@ -71,9 +89,10 @@ class ReferenceErrorHandlerTest {
                         unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.UNEXPECTED_RESPONSE));
     }
 
+    /** Другие 5xx — сбой на стороне справочника или прокси, которому не верят и который повторяют. */
     @ParameterizedTest
-    @ValueSource(ints = {400, 409, 500, 502, 504})
-    void otherErrorStatus_isUnexpectedResponseWhateverTheCode(int status) {
+    @ValueSource(ints = {500, 502, 504})
+    void otherServerError_isUnexpectedResponseWhateverTheCode(int status) {
         assertThatThrownBy(
                 () -> handler.handle(null, response(HttpStatus.valueOf(status), error("SERVICE_UNAVAILABLE"))))
                 .isInstanceOfSatisfying(ReferenceUnavailableException.class,

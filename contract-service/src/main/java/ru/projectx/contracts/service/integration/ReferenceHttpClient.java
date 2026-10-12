@@ -39,24 +39,27 @@ public final class ReferenceHttpClient implements ProgramReads, InsuranceContrac
 
     @Override
     public ReferenceProgram program(UUID id) {
-        return retries.byId(() -> read(ReferenceKind.PROGRAM, PROGRAM, id, ReferenceProgram.class));
+        return readById(ReferenceKind.PROGRAM, PROGRAM, id, ReferenceProgram.class);
     }
 
     @Override
     public ReferenceInsuranceContract insuranceContract(UUID id) {
-        return retries.byId(() -> read(ReferenceKind.INSURANCE_CONTRACT, INSURANCE_CONTRACT, id,
-                ReferenceInsuranceContract.class));
+        return readById(ReferenceKind.INSURANCE_CONTRACT, INSURANCE_CONTRACT, id, ReferenceInsuranceContract.class);
     }
 
     @Override
     public ReferencePolicy policy(UUID id) {
-        return retries.byId(() -> read(ReferenceKind.POLICY, POLICY, id, ReferencePolicy.class));
+        return readById(ReferenceKind.POLICY, POLICY, id, ReferencePolicy.class);
     }
 
     @Override
     public ReferencePolicy policyByExternalId(UUID externalId) {
-        return retries.byExternalId(
+        return retries.byExternalId(ReferenceKind.POLICY, externalId,
                 () -> read(ReferenceKind.POLICY, POLICY_BY_EXTERNAL_ID, externalId, ReferencePolicy.class));
+    }
+
+    private <T extends ReferenceRecord> T readById(ReferenceKind kind, String uriTemplate, UUID id, Class<T> type) {
+        return retries.byId(kind, id, () -> read(kind, uriTemplate, id, type));
     }
 
     private <T extends ReferenceRecord> T read(ReferenceKind kind, String uriTemplate, UUID key, Class<T> type) {

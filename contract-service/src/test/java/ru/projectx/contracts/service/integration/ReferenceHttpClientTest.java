@@ -28,6 +28,7 @@ import ru.projectx.contracts.dto.ReferenceProgram;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;
+import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 import ru.projectx.contracts.support.StandExample;
@@ -221,11 +222,25 @@ class ReferenceHttpClientTest {
         reference.verify();
     }
 
-    /** Ответ не из контракта (здесь 400 с кодом валидации) — справочнику не верим и повторяем ограниченно. */
+    /** 400 с кодом справочника повторится на тот же запрос: окончательный отказ с кодом, без повтора. */
     @Test
-    void foreignErrorStatus_isUnexpectedResponseRetried() {
-        reference.expect(times(ATTEMPTS), requestTo(BASE + "/programs/" + PROGRAM_ID))
+    void clientErrorWithCode_isRejectedWithoutRetry() {
+        reference.expect(once(), requestTo(BASE + "/programs/" + PROGRAM_ID))
                 .andRespond(example("07-malformed-id.json", Map.of("issued_request_id", "stand-07")));
+
+        assertThatThrownBy(() -> client.program(PROGRAM_ID))
+                .isInstanceOfSatisfying(ReferenceRejectedException.class, rejected -> {
+                    assertThat(rejected.status()).isEqualTo(400);
+                    assertThat(rejected.code()).isEqualTo("VALIDATION_ERROR");
+                });
+        reference.verify();
+    }
+
+    /** Обрезанный JSON при успешном статусе — ответ, которому нельзя верить: недоступность с повтором. */
+    @Test
+    void truncatedJsonBody_isUnexpectedResponse() {
+        reference.expect(times(ATTEMPTS), requestTo(BASE + "/programs/" + PROGRAM_ID))
+                .andRespond(withSuccess("{\"id\":", MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.program(PROGRAM_ID))
                 .isInstanceOfSatisfying(ReferenceUnavailableException.class,

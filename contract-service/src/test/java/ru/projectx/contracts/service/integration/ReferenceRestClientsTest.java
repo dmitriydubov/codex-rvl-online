@@ -4,13 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.config.ReferenceProperties;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
@@ -29,8 +30,8 @@ class ReferenceRestClientsTest {
     @Test
     void silentServer_isCutOffByTheReadTimeout() throws IOException, InterruptedException {
         try (ServerSocket silent = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            AtomicInteger accepted = new AtomicInteger();
-            Thread acceptor = Thread.ofVirtual().start(() -> acceptAndStaySilent(silent, accepted));
+            AtomicBoolean closedByClient = new AtomicBoolean();
+            Thread acceptor = Thread.ofVirtual().start(() -> acceptAndStaySilent(silent, closedByClient));
             ReferenceHttpClient client = client(silent.getLocalPort(), 0);
 
             assertThatThrownBy(() -> client.policy(POLICY_ID))
@@ -38,7 +39,7 @@ class ReferenceRestClientsTest {
                             unavailable -> assertThat(unavailable.reason()).isEqualTo(Reason.TIMEOUT))
                     .hasRootCauseInstanceOf(HttpTimeoutException.class);
             acceptor.join(READ_TIMEOUT.multipliedBy(10));
-            assertThat(accepted).hasValue(1);
+            assertThat(closedByClient).isTrue();
         }
     }
 
@@ -56,17 +57,14 @@ class ReferenceRestClientsTest {
                 .hasRootCauseInstanceOf(IOException.class);
     }
 
-    private static void acceptAndStaySilent(ServerSocket silent, AtomicInteger accepted) {
+    /** Вычитывает запрос и молчит; конец потока наступает только когда клиент сам закрывает соединение. */
+    private static void acceptAndStaySilent(ServerSocket silent, AtomicBoolean closedByClient) {
         try (Socket connection = silent.accept()) {
-            accepted.incrementAndGet();
-            // Читаем запрос и молчим, пока клиент сам не закроет соединение по таймауту.
-            while (connection.getInputStream().read() >= 0) {
-                continue;
-            }
+            connection.getInputStream().transferTo(OutputStream.nullOutputStream());
+            closedByClient.set(true);
         }
-        catch (IOException closed) {
-            // Клиент оборвал соединение: именно этого тест и ждёт.
-            accepted.compareAndSet(0, 0);
+        catch (IOException abruptlyClosed) {
+            closedByClient.set(true);
         }
     }
 

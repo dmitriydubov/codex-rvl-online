@@ -11,8 +11,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Настройки клиента справочников читаются и проверяются на старте: без адреса, с адресом не по HTTP, с нулевым
- * таймаутом или отрицательным числом повторов сервис не поднимается, а отказ называет поле.
+ * Настройки клиента справочников читаются и проверяются на старте: без адреса, с адресом не по HTTP или со слэшем на
+ * конце, с нулевым таймаутом или отрицательным числом повторов сервис не поднимается, а отказ называет поле.
  */
 class ReferencePropertiesBindingTest {
 
@@ -57,6 +57,7 @@ class ReferencePropertiesBindingTest {
         "url, '', url",
         "url, reference.example:8080/internal/v1, url",
         "url, ftp://reference.example/internal/v1, url",
+        "url, http://reference.example/internal/v1/, url",
         "connect-timeout, 0s, connectTimeout",
         "read-timeout, 0ms, readTimeout",
         "retry.max-retries, -1, maxRetries"})

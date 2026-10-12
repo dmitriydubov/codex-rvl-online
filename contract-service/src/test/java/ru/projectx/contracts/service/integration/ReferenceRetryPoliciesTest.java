@@ -14,6 +14,7 @@ import ru.projectx.contracts.config.ReferenceProperties;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;
+import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
@@ -56,13 +57,16 @@ class ReferenceRetryPoliciesTest {
     }
 
     @Test
-    void archivedAndUnexpectedFailures_areNeverRetried() {
+    void archivedRejectedAndUnexpectedFailures_areNeverRetried() {
         ReferenceArchivedException archived = new ReferenceArchivedException(ReferenceKind.PROGRAM,
                 UUID.fromString("7d1f1a26-3a0f-4a4e-8d7f-5a2b3c4d5e6f"));
+        ReferenceRejectedException rejected = new ReferenceRejectedException(400, "VALIDATION_ERROR");
         IllegalStateException unexpected = new IllegalStateException("сбой");
 
         assertThat(byId.shouldRetry(archived)).isFalse();
         assertThat(byExternalId.shouldRetry(archived)).isFalse();
+        assertThat(byId.shouldRetry(rejected)).isFalse();
+        assertThat(byExternalId.shouldRetry(rejected)).isFalse();
         assertThat(byId.shouldRetry(unexpected)).isFalse();
         assertThat(byExternalId.shouldRetry(unexpected)).isFalse();
     }

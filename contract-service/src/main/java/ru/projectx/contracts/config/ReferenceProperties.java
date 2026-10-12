@@ -11,14 +11,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Клиент сервиса справочных данных: адрес его внутреннего API, таймауты и повторы. Таймаут чтения держится не меньше
- * семи секунд: при отказе своей базы справочник отвечает 503 примерно за пять, и клиент не должен обрывать запрос
- * раньше этого ответа.
+ * Клиент сервиса справочных данных: адрес его внутреннего API без завершающего слэша (пути ресурсов начинаются с него),
+ * таймауты и повторы. Таймаут чтения держится не меньше семи секунд: при отказе своей базы справочник отвечает 503
+ * примерно за пять, и клиент не должен обрывать запрос раньше этого ответа.
  */
 @Validated
 @ConfigurationProperties("projectx.reference")
 public record ReferenceProperties(
-        @NotBlank @Pattern(regexp = "https?://.+") String url,
+        @NotBlank @Pattern(regexp = "https?://.+[^/]") String url,
         @NotNull @DurationMin(millis = 1) Duration connectTimeout,
         @NotNull @DurationMin(millis = 1) Duration readTimeout,
         @Valid @NotNull Retry retry) {

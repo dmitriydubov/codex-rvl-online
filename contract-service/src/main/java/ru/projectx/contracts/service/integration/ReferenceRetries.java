@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.integration;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,13 +8,14 @@ import org.springframework.core.retry.RetryException;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import ru.projectx.contracts.config.ReferenceProperties;
+import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException.Reason;
 
 /**
  * Ограниченные повторы чтения справочника. Исчерпанные повторы — недоступность справочника: задача выпуска
- * повторит чтение позже по своим правилам. Ответ, который повторять бессмысленно (нет записи, архив), выходит наружу
- * как есть, с первой же попытки.
+ * повторит чтение позже по своим правилам. Ответ, который повторять бессмысленно (нет записи, архив, отказ с кодом),
+ * выходит наружу как есть, с первой же попытки.
  */
 final class ReferenceRetries {
 
@@ -31,30 +33,35 @@ final class ReferenceRetries {
         return new ReferenceRetries(ReferenceRetryPolicies.byId(settings), ReferenceRetryPolicies.byExternalId(settings));
     }
 
-    <T> T byId(Supplier<T> read) {
-        return run(byId, read);
+    <T> T byId(ReferenceKind kind, UUID id, Supplier<T> read) {
+        return run(byId, kind, id, read);
     }
 
-    <T> T byExternalId(Supplier<T> read) {
-        return run(byExternalId, read);
+    <T> T byExternalId(ReferenceKind kind, UUID externalId, Supplier<T> read) {
+        return run(byExternalId, kind, externalId, read);
     }
 
-    private static <T> T run(RetryTemplate template, Supplier<T> read) {
+    private static <T> T run(RetryTemplate template, ReferenceKind kind, UUID key, Supplier<T> read) {
         try {
             return template.execute(read::get);
         }
         catch (RetryException outcome) {
-            throw finalFailure(template.getRetryPolicy(), outcome);
+            throw finalFailure(template.getRetryPolicy(), outcome, kind, key);
         }
     }
 
     /** Повторяемая причина после исчерпания — недоступность; неповторяемая выходит наружу как есть. */
-    private static RuntimeException finalFailure(RetryPolicy policy, RetryException outcome) {
+    private static RuntimeException finalFailure(
+            RetryPolicy policy, RetryException outcome, ReferenceKind kind, UUID key) {
         Throwable last = outcome.getCause();
+        if (last instanceof Error error) {
+            throw error;
+        }
         if (!policy.shouldRetry(last)) {
             return asRuntime(last);
         }
-        log.warn("справочник недоступен, повторов сделано {}: {}", outcome.getRetryCount(), last.getMessage());
+        log.warn("справочник недоступен: {} {}, повторов {}, причина: {}",
+                kind, key, outcome.getRetryCount(), last.getMessage());
         return exhausted(last);
     }
 
@@ -66,12 +73,6 @@ final class ReferenceRetries {
     }
 
     private static RuntimeException asRuntime(Throwable failure) {
-        if (failure instanceof RuntimeException runtime) {
-            return runtime;
-        }
-        if (failure instanceof Error error) {
-            throw error;
-        }
-        return new IllegalStateException(failure);
+        return failure instanceof RuntimeException runtime ? runtime : new IllegalStateException(failure);
     }
 }

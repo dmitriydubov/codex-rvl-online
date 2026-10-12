@@ -28,6 +28,8 @@ class ReferenceRetriesTest {
 
     private static final int RETRIES = 2;
     private static final int ATTEMPTS = RETRIES + 1;
+    private static final ReferenceKind KIND = ReferenceKind.POLICY;
+    private static final UUID KEY = UUID.fromString("1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f");
 
     private final ReferenceRetries retries = ReferenceRetries.of(new ReferenceProperties.Retry(RETRIES, Duration.ZERO));
 
@@ -35,7 +37,7 @@ class ReferenceRetriesTest {
     void successfulRead_isReturnedFromTheFirstAttempt() {
         AtomicInteger attempts = new AtomicInteger();
 
-        String read = retries.byId(() -> "ответ " + attempts.incrementAndGet());
+        String read = retries.byId(KIND, KEY, () -> "ответ " + attempts.incrementAndGet());
 
         assertThat(read).isEqualTo("ответ 1");
         assertThat(attempts).hasValue(1);
@@ -46,7 +48,7 @@ class ReferenceRetriesTest {
         ReferenceUnavailableException unavailable = new ReferenceUnavailableException(Reason.SERVICE_UNAVAILABLE);
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byId(() -> {
+        assertThatThrownBy(() -> retries.byId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw unavailable;
         })).isSameAs(unavailable);
@@ -58,7 +60,7 @@ class ReferenceRetriesTest {
         Supplier<String> read = answers(new ReferenceUnavailableException(Reason.TIMEOUT),
                 new ReferenceUnavailableException(Reason.CONNECTION_FAILED), "готово");
 
-        assertThat(retries.byId(read)).isEqualTo("готово");
+        assertThat(retries.byId(KIND, KEY, read)).isEqualTo("готово");
     }
 
     @Test
@@ -66,7 +68,7 @@ class ReferenceRetriesTest {
         ReferenceNotFoundException notFound = new ReferenceNotFoundException(ReferenceKind.POLICY);
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byId(() -> {
+        assertThatThrownBy(() -> retries.byId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw notFound;
         })).isSameAs(notFound);
@@ -78,7 +80,7 @@ class ReferenceRetriesTest {
         ReferenceNotFoundException notFound = new ReferenceNotFoundException(ReferenceKind.POLICY);
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byExternalId(() -> {
+        assertThatThrownBy(() -> retries.byExternalId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw notFound;
         })).isInstanceOfSatisfying(ReferenceUnavailableException.class,
@@ -91,7 +93,7 @@ class ReferenceRetriesTest {
     void policyByExternalId_isReturnedOnceItArrives() {
         Supplier<String> read = answers(new ReferenceNotFoundException(ReferenceKind.POLICY), "полис");
 
-        assertThat(retries.byExternalId(read)).isEqualTo("полис");
+        assertThat(retries.byExternalId(KIND, KEY, read)).isEqualTo("полис");
     }
 
     /** По идентификатору 1С ищут только полис; чужой «не найден» там — окончательный ответ. */
@@ -100,7 +102,7 @@ class ReferenceRetriesTest {
         ReferenceNotFoundException notFound = new ReferenceNotFoundException(ReferenceKind.PROGRAM);
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byExternalId(() -> {
+        assertThatThrownBy(() -> retries.byExternalId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw notFound;
         })).isSameAs(notFound);
@@ -117,8 +119,8 @@ class ReferenceRetriesTest {
             throw archived;
         };
 
-        assertThatThrownBy(() -> retries.byId(read)).isSameAs(archived);
-        assertThatThrownBy(() -> retries.byExternalId(read)).isSameAs(archived);
+        assertThatThrownBy(() -> retries.byId(KIND, KEY, read)).isSameAs(archived);
+        assertThatThrownBy(() -> retries.byExternalId(KIND, KEY, read)).isSameAs(archived);
         assertThat(attempts).hasValue(2);
     }
 
@@ -127,7 +129,7 @@ class ReferenceRetriesTest {
         IllegalStateException failure = new IllegalStateException("сбой");
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byId(() -> {
+        assertThatThrownBy(() -> retries.byId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw failure;
         })).isSameAs(failure);
@@ -140,7 +142,7 @@ class ReferenceRetriesTest {
         Error fatal = new Error("ошибка виртуальной машины");
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byExternalId(() -> {
+        assertThatThrownBy(() -> retries.byExternalId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw fatal;
         })).isSameAs(fatal);
@@ -156,7 +158,7 @@ class ReferenceRetriesTest {
         IOException checked = new IOException("обрыв");
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> retries.byId(() -> {
+        assertThatThrownBy(() -> retries.byId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             return throwUndeclared(checked);
         })).isExactlyInstanceOf(IllegalStateException.class).hasCause(checked);
@@ -168,7 +170,7 @@ class ReferenceRetriesTest {
         ReferenceRetries single = ReferenceRetries.of(new ReferenceProperties.Retry(0, Duration.ZERO));
         AtomicInteger attempts = new AtomicInteger();
 
-        assertThatThrownBy(() -> single.byExternalId(() -> {
+        assertThatThrownBy(() -> single.byExternalId(KIND, KEY, () -> {
             attempts.incrementAndGet();
             throw new ReferenceNotFoundException(ReferenceKind.POLICY);
         })).isInstanceOf(ReferenceUnavailableException.class);
