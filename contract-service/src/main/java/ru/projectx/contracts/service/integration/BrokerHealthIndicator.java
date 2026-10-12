@@ -6,11 +6,6 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 
-/**
- * Компонент здоровья одного подключения к брокеру: UP, когда соединение открыто, иначе DOWN с типом отказа.
- * Проверка сама открывает соединение, поэтому брокер, недоступный на старте, виден в health, а не роняет сервис.
- * В деталях адрес брокера без учётных данных.
- */
 final class BrokerHealthIndicator implements HealthIndicator {
 
     private static final String BROKER = "broker";

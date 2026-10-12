@@ -17,10 +17,6 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 
-/**
- * Health подключения говорит правду о брокере: UP только при открытом соединении, DOWN с типом отказа, когда
- * соединиться нельзя, и в обоих случаях адрес брокера без учётных данных — health читает мониторинг.
- */
 class BrokerHealthIndicatorTest {
 
     private static final int PORT = 5672;
@@ -64,7 +60,6 @@ class BrokerHealthIndicatorTest {
         assertThat(health.getDetails().toString()).doesNotContain("secret");
     }
 
-    /** Настоящее подключение к порту, на котором никто не слушает: отказ классифицируется, а не роняет проверку. */
     @Test
     void unreachableBroker_isDownOnRealConnectionFactory() throws IOException {
         int closedPort;

@@ -12,11 +12,6 @@ import org.springframework.context.annotation.Configuration;
 import ru.projectx.contracts.config.InternalBrokerProperties;
 import ru.projectx.contracts.config.OneCBrokerProperties;
 
-/**
- * Два брокера — два набора бинов: межсервисный брокер контура и брокер 1С:УСК. Автонастройка AMQP выключена, чтобы
- * ни один бин не выбирал брокер по умолчанию: слушатель и публикатор называют свой брокер квалификатором.
- * Компоненты здоровья выключаются свойством {@code management.health.brokers.enabled} там, где брокера нет.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableRabbit
 public class BrokerConfig {

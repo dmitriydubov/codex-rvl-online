@@ -12,10 +12,6 @@ import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 
-/**
- * Умолчания {@code application.yml}, на которые опирается развёртывание. Они проверяются в самом файле, без контекста:
- * тесты с базой адрес подменяют, а переменные окружения машины не должны влиять на результат.
- */
 class ApplicationDefaultsTest {
 
     private static PropertySource<?> application;
@@ -26,7 +22,6 @@ class ApplicationDefaultsTest {
                 .load("application", new ClassPathResource("application.yml")).getFirst();
     }
 
-    /** Свойства пула до миграций не доходят: без параметра в адресе их ошибка несла бы значения строки. */
     @Test
     void defaultDatabaseUrl_hidesServerErrorDetail() {
         assertThat(application.getProperty("spring.datasource.url")).asString()
@@ -34,13 +29,40 @@ class ApplicationDefaultsTest {
                 .endsWith("?logServerErrorDetail=false}");
     }
 
-    /** Порт 8081 открывает образ, и на него настроены мониторинг и пробы актуатора. */
+    @Test
+    void localDefaults_doNotCollideWithTheReferenceServiceContour() {
+        assertThat(application.getProperty("spring.datasource.url")).asString().contains("localhost:5433/");
+        assertThat(application.getProperty("projectx.brokers.internal.connection.port")).asString()
+                .isEqualTo("${RABBITMQ_INTERNAL_PORT:5674}");
+        assertThat(application.getProperty("projectx.brokers.onec.connection.port")).asString()
+                .isEqualTo("${RABBITMQ_ONEC_PORT:5675}");
+        assertThat(application.getProperty("projectx.reference.url")).asString()
+                .isEqualTo("${REFERENCE_URL:http://localhost:8080/internal/v1}");
+    }
+
+    @Test
+    void referenceClientDefaults_matchTheReferenceServiceContract() {
+        assertThat(application.getProperty("projectx.reference.connect-timeout")).asString()
+                .isEqualTo("${REFERENCE_CONNECT_TIMEOUT:2s}");
+        assertThat(application.getProperty("projectx.reference.read-timeout")).asString()
+                .isEqualTo("${REFERENCE_READ_TIMEOUT:7s}");
+        assertThat(application.getProperty("projectx.reference.retry.max-retries")).asString()
+                .isEqualTo("${REFERENCE_MAX_RETRIES:3}");
+        assertThat(application.getProperty("projectx.reference.retry.delay")).asString()
+                .isEqualTo("${REFERENCE_RETRY_DELAY:1s}");
+    }
+
+    @Test
+    void jsonFieldNames_areSnakeCaseForTheWholeContour() {
+        assertThat(application.getProperty("spring.jackson.property-naming-strategy")).asString()
+                .isEqualTo("SNAKE_CASE");
+    }
+
     @Test
     void defaultManagementPort_is8081() {
         assertThat(application.getProperty("management.server.port")).asString().isEqualTo("${MANAGEMENT_PORT:8081}");
     }
 
-    /** Подключение из spring.rabbitmq.* не строится: с двумя своими фабриками автонастройка не поднялась бы. */
     @Test
     void rabbitAutoConfiguration_isExcluded() {
         assertThat(application.getProperty("spring.autoconfigure.exclude[0]")).asString()
@@ -48,10 +70,6 @@ class ApplicationDefaultsTest {
         assertThat(application.getProperty("management.health.rabbit.enabled")).asString().isEqualTo("false");
     }
 
-    /**
-     * Известный пароль из репозитория подошёл бы к любому брокеру с таким же. Умолчание пустое, а не отсутствует:
-     * неразрешённый плейсхолдер Boot оставляет строкой, и проверка настроек приняла бы её за пароль.
-     */
     @ParameterizedTest
     @ValueSource(strings = {"internal", "onec"})
     void brokerPassword_hasEmptyDefault(String broker) {
@@ -59,7 +77,6 @@ class ApplicationDefaultsTest {
                 .isEqualTo("${RABBITMQ_" + broker.toUpperCase(Locale.ROOT) + "_PASSWORD:}");
     }
 
-    /** Имена очередей — из документа контура «Точки интеграций»; менять их можно только вместе со списком брокера. */
     @Test
     void queueNames_matchTheContourContract() {
         assertThat(queueDefault("internal", "task-changes")).isEqualTo("rvl_requests_to_rvl_contracts_task-changes");
@@ -73,7 +90,6 @@ class ApplicationDefaultsTest {
         assertThat(queueDefault("onec", "lm-policy-issues")).isEqualTo("1c-usk_to_rvl_contracts_lm-policy-changes");
     }
 
-    /** Умолчание плейсхолдера {@code ${ИМЯ:значение}} — текст после первого двоеточия. */
     private static String queueDefault(String broker, String queue) {
         String placeholder = String.valueOf(application.getProperty("projectx.brokers." + broker + ".queues." + queue));
         return placeholder.substring(placeholder.indexOf(':') + 1, placeholder.length() - 1);

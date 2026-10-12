@@ -2,11 +2,6 @@ package ru.projectx.contracts.support;
 
 import java.net.URI;
 
-/**
- * Откуда тестам взять RabbitMQ: контейнер Testcontainers, а без Docker — отдельный тестовый брокер из
- * {@code TEST_RABBITMQ_URL} (свойство {@value #URL_PROPERTY}, вид {@code amqp://логин:пароль@хост:порт/vhost}).
- * Без Docker и адреса тесты с брокером падают, а не пропускаются: пропущенный тест выглядит в отчёте как проверенный.
- */
 public final class TestBroker {
 
     public static final String URL_PROPERTY = "test.rabbitmq.url";
@@ -16,10 +11,8 @@ public final class TestBroker {
     private TestBroker() {
     }
 
-    /** Адрес одного брокера для подстановки в настройки подключения. */
     public record Address(String host, int port, String virtualHost, String username, String password) {
 
-        /** Адрес без логина, пароля, хоста или порта отклоняется с подсказкой формы; сам адрес в ошибку не идёт. */
         public static Address parse(String url) {
             URI uri = URI.create(url);
             String[] credentials = uri.getUserInfo() == null ? new String[0] : uri.getUserInfo().split(":", 2);

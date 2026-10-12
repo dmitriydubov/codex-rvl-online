@@ -2,95 +2,58 @@ spring:
   application:
     name: contract-service
 
-  # Синхронные вызовы — короткие запросы к базе, держать под каждый платформенный поток незачем.
   threads:
     virtual:
       enabled: true
 
-  # Вместе с server.shutdown: на SIGTERM сервис перестаёт принимать запросы и дорабатывает начатые.
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
-  # Поля JSON в ответах — snake_case, как во всех контрактах контура.
   jackson:
     property-naming-strategy: SNAKE_CASE
 
-  # Брокеров два, и у каждого свои бины (projectx.brokers). Автонастройка AMQP строит одно подключение из
-  # spring.rabbitmq.* и с двумя фабриками не поднимается, поэтому выключена: эти свойства здесь не действуют.
   autoconfigure:
     exclude:
       - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
 
-  # Умолчания адреса и пользователя ведут на локальную базу из docker-compose.yml.
-  # У пароля умолчания нет: известный пароль из репозитория подошёл бы к любой базе с таким же.
-  # Если переменную забыли, запуск падает на миграциях с «password authentication failed».
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/contract_service?logServerErrorDetail=false}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/contract_service?logServerErrorDetail=false}
     username: ${DB_USERNAME:contract_service}
     password: ${DB_PASSWORD}
-    # Таймауты не дают запросу висеть на чужой блокировке или оборванной сети и держать поток.
-    # Отказ по таймауту — временная ошибка. Миграции эти таймауты не получают: у них своё соединение.
     hikari:
-      # Имя — метка pool в метриках hikaricp.
       pool-name: application
-      # При недоступной базе запрос получает отказ через это время, а не через 30 с, которые пул ждёт без настройки.
-      # Меньше 250 пул не принимает, а 0 означает ждать без предела.
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
-      # Проверка соединения перед выдачей из пула; меньше ожидания соединения, иначе зависшая база держит запрос
-      # дольше него. Меньше 250 пул не принимает.
       validation-timeout: 1000
       data-source-properties:
-        # Таймауты сеанса задаются при подключении, чтобы действовать с первого запроса; значения — в projectx.database.
-        # Секунды ожидания блокировки означают чужую долгую транзакцию. Брошенная транзакция закрывается,
-        # потому что держит блокировки и мешает VACUUM.
         options: >-
           -c lock_timeout=${projectx.database.session-timeouts.lock-timeout}
           -c statement_timeout=${projectx.database.session-timeouts.statement-timeout}
           -c idle_in_transaction_session_timeout=${projectx.database.session-timeouts.idle-in-transaction-session-timeout}
-        # Таймаут чтения сокета в секундах — на случай, когда сервер не отвечает вовсе.
-        # Поэтому он больше statement_timeout.
         socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:60}
-        # Без подробностей сервера в тексте ошибки: PostgreSQL называет в них значения строки, а там бывают
-        # персональные данные сторон договора. Миграции свойств пула не получают, поэтому свой DB_URL
-        # сохраняет logServerErrorDetail=false.
         logServerErrorDetail: false
 
   jpa:
-    # Схему ведёт Liquibase: изменения схемы мимо миграций нечем откатить.
     hibernate:
       ddl-auto: none
-    # Сессия закрывается вместе с транзакцией, ленивые поля не догружаются отдельными запросами.
     open-in-view: false
 
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
-    # Своё соединение без пула и его таймаутов, чтобы те не оборвали долгую миграцию.
-    # Пароль из spring.datasource не наследуется, поэтому задан здесь. Параметры драйвера,
-    # нужные и пулу, и миграциям (sslmode и т. п.), задаются в DB_URL.
     url: ${spring.datasource.url}
     user: ${spring.datasource.username}
     password: ${spring.datasource.password}
-    # Иначе Liquibase отправляет сведения об использовании на свой сервер.
     analytics-enabled: false
 
 server:
-  # Без этого Tomcat обрывает соединения в момент SIGTERM.
   shutdown: graceful
 
 logging:
-  # Журнал в JSON (Elastic Common Schema), чтобы сборщик журналов разбирал записи по полям. Все ключи MDC попадают
-  # в запись, поэтому персональные данные в MDC класть нельзя. Локально текстовый формат вернёт пустая
-  # переменная LOGGING_STRUCTURED_FORMAT_CONSOLE.
   structured:
     format:
       console: ecs
   level:
-    # Сюда Hibernate пишет текст SQL-ошибок вместе со значениями строки, то есть с персональными
-    # данными. Кавычки нужны: без них YAML читает off как false.
     org.hibernate.orm.jdbc.error: "off"
 
-# Актуатор — на своём порту без авторизации: этот порт сетевая политика открывает только мониторингу и Kubernetes.
-# Компоненты health показаны, чтобы было видно, чей DOWN. Персональных данных нет ни в health, ни в метриках.
 management:
   server:
     port: ${MANAGEMENT_PORT:8081}
@@ -109,48 +72,31 @@ management:
       show-components: always
       show-details: always
   health:
-    # Общий компонент rabbit показывал бы оба брокера под одним именем; вместо него компоненты internalBroker и
-    # onecBroker (projectx.brokers), их выключает management.health.brokers.enabled=false там, где брокеров нет.
     rabbit:
       enabled: false
 
 projectx:
-  # Два брокера RabbitMQ: межсервисный брокер контура (сервис Заявок) и брокер 1С:УСК. Умолчания адреса и логина
-  # ведут на локальные брокеры из docker-compose.yml. У паролей умолчаний нет по той же причине, что у базы.
   brokers:
     internal:
       connection:
         host: ${RABBITMQ_INTERNAL_HOST:localhost}
-        # Тестовый контур слушает 5671 (TLS), локальный брокер — 5672.
-        port: ${RABBITMQ_INTERNAL_PORT:5672}
+        port: ${RABBITMQ_INTERNAL_PORT:5674}
         virtual-host: ${RABBITMQ_INTERNAL_VHOST:/}
         username: ${RABBITMQ_INTERNAL_USERNAME:contract_service}
-        # Пустое умолчание нарочно: без переменной проверка настроек останавливает старт с именем поля,
-        # а без умолчания в поле осталась бы строка плейсхолдера и отказ пришёл бы только от брокера.
         password: ${RABBITMQ_INTERNAL_PASSWORD:}
-        # Без таймаута попытка соединиться с недоступным брокером висела бы минутами; столько же ждёт health.
         connection-timeout: 10s
         tls:
           enabled: ${RABBITMQ_INTERNAL_SSL_ENABLED:false}
-          # Без проверки сертификата и имени хоста TLS шифрует канал, но не говорит, с кем он. Центр сертификации
-          # брокера кладётся в certs/ при сборке образа, а хост должен быть в сертификате брокера.
-          # На тестовом контуре сертификат самоподписанный, там проверку выключают явно.
           validate-server-certificate: ${RABBITMQ_INTERNAL_SSL_VALIDATE_CERTIFICATE:true}
           verify-hostname: ${RABBITMQ_INTERNAL_SSL_VERIFY_HOSTNAME:true}
-      # Включено по умолчанию: сервис, который молча не читает задачи, хуже упавшего.
-      # Выключают там, где очередей брокера нет, — например, в docker-compose.yml.
       listener-auto-startup: ${RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP:true}
-      # Очереди заводит сервис Заявок, сервис Договоров их не объявляет. Имена — из документа контура,
-      # на новом контуре сверять со списком брокера. Умолчаний в коде нет: опечатка роняет запуск, а не выглядит как
-      # «сообщений нет». Имена должны быть разными, повтор роняет запуск.
       queues:
         task-changes: ${INTERNAL_QUEUE_TASK_CHANGES:rvl_requests_to_rvl_contracts_task-changes}
         status-changes: ${INTERNAL_QUEUE_STATUS_CHANGES:rvl_contracts_to_rvl_requests_status-changes}
     onec:
       connection:
         host: ${RABBITMQ_ONEC_HOST:localhost}
-        # Локальный брокер 1С из docker-compose.yml слушает 5673, чтобы не занимать порт межсервисного.
-        port: ${RABBITMQ_ONEC_PORT:5673}
+        port: ${RABBITMQ_ONEC_PORT:5675}
         virtual-host: ${RABBITMQ_ONEC_VHOST:/}
         username: ${RABBITMQ_ONEC_USERNAME:contract_service}
         password: ${RABBITMQ_ONEC_PASSWORD:}
@@ -160,7 +106,6 @@ projectx:
           validate-server-certificate: ${RABBITMQ_ONEC_SSL_VALIDATE_CERTIFICATE:true}
           verify-hostname: ${RABBITMQ_ONEC_SSL_VERIFY_HOSTNAME:true}
       listener-auto-startup: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:true}
-      # Очереди заводит 1С:УСК: две независимые пары — договор КМ и полис ЛМ, в каждой запрос и ответ.
       queues:
         km-contract-submissions: ${ONEC_QUEUE_KM_CONTRACT_SUBMISSIONS:rvl_contracts_to_1c-usk_km-contract-changes}
         km-contract-registrations: ${ONEC_QUEUE_KM_CONTRACT_REGISTRATIONS:1c-usk_to_rvl_contracts_km-contract-changes}
@@ -168,8 +113,15 @@ projectx:
         lm-policy-issues: ${ONEC_QUEUE_LM_POLICY_ISSUES:1c-usk_to_rvl_contracts_lm-policy-changes}
 
   database:
-    # Запись PostgreSQL (ms, s, min); число без единицы — миллисекунды, так что DB_STATEMENT_TIMEOUT=30 — это 30 мс.
     session-timeouts:
       lock-timeout: ${DB_LOCK_TIMEOUT:5s}
       statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
       idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+
+  reference:
+    url: ${REFERENCE_URL:http://localhost:8080/internal/v1}
+    connect-timeout: ${REFERENCE_CONNECT_TIMEOUT:2s}
+    read-timeout: ${REFERENCE_READ_TIMEOUT:7s}
+    retry:
+      max-retries: ${REFERENCE_MAX_RETRIES:3}
+      delay: ${REFERENCE_RETRY_DELAY:1s}

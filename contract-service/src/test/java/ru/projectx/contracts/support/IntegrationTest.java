@@ -9,11 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AliasFor;
 
-/**
- * Приложение целиком на настоящем PostgreSQL с остановленными часами и без брокеров: слушатели и health подключений
- * выключены, иначе health ждал бы несуществующий брокер, а пароли брокеров вымышленные, иначе проверка настроек не
- * дала бы контексту подняться. Мутационное тестирование эти тесты не запускает ({@code no-mutate}).
- */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("no-mutate")
@@ -26,10 +21,6 @@ import org.springframework.core.annotation.AliasFor;
 @Import({PostgresTestcontainer.class, FixedClockConfig.class})
 public @interface IntegrationTest {
 
-    /**
-     * Без настоящего сервера (по умолчанию) — быстрее, и контекст общий у всех таких тестов. Сервер на случайных
-     * портах нужен тому, кто проверяет сами порты: актуатор отвечает на своём порту, и без сервера его нет вовсе.
-     */
     @AliasFor(annotation = SpringBootTest.class)
     SpringBootTest.WebEnvironment webEnvironment() default SpringBootTest.WebEnvironment.MOCK;
 }

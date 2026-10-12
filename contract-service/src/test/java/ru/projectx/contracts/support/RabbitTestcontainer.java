@@ -10,21 +10,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
-/**
- * Настоящий RabbitMQ для тестов подключений: подтверждения издателя и состояние соединения у мока нет. Один контейнер
- * изображает оба брокера контура двумя виртуальными хостами: межсервисный — {@code /}, 1С:УСК — свой, так что
- * подключения, очереди и права у них раздельные. Без Docker берётся внешний брокер ({@link TestBroker}).
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {
 
-    /** Второй виртуальный хост в контейнере, под брокер 1С:УСК. */
     public static final String ONEC_VHOST = "onec";
 
-    /**
-     * Та же версия, что у брокеров контура (RabbitMQ 4.1.2): подтверждения проверяются на ней, а не на последней
-     * 4.1.x, которую принёс бы плавающий тег.
-     */
     private static final String IMAGE = "rabbitmq:4.1.2-alpine";
     private static final String INTERNAL_VHOST = "/";
     private static final String ALL_PERMISSIONS = ".*";
@@ -35,7 +25,6 @@ public class RabbitTestcontainer {
         return new RabbitMQContainer(IMAGE);
     }
 
-    /** Контейнер к этому моменту запущен: Boot стартует его при создании бина, поэтому второй vhost заводится здесь. */
     @Bean
     @ConditionalOnExpression("'${" + TestBroker.URL_PROPERTY + ":}'.isEmpty()")
     public DynamicPropertyRegistrar containerBrokers(RabbitMQContainer container)
@@ -46,7 +35,6 @@ public class RabbitTestcontainer {
         return brokers(internal, internal.withVirtualHost(ONEC_VHOST));
     }
 
-    /** Внешний брокер один, поэтому оба подключения идут в его vhost: два подключения к одному брокеру. */
     @Bean
     @ConditionalOnExpression("!'${" + TestBroker.URL_PROPERTY + ":}'.isEmpty()")
     public DynamicPropertyRegistrar externalBrokers(Environment environment) {
@@ -70,7 +58,6 @@ public class RabbitTestcontainer {
         registry.add(prefix + "password", address::password);
     }
 
-    /** Командой брокера, потому что у контейнера Testcontainers 2.0 методов для vhost и прав больше нет. */
     private static void addVirtualHost(RabbitMQContainer container, String virtualHost)
             throws IOException, InterruptedException {
         execute(container, "rabbitmqctl", "add_vhost", virtualHost);

@@ -24,17 +24,12 @@ import org.springframework.boot.health.registry.HealthContributorRegistry;
 import org.springframework.core.env.Environment;
 import ru.projectx.contracts.support.AmqpIntegrationTest;
 
-/**
- * Оба подключения на настоящем RabbitMQ: подтверждения, возвраты, состояние соединения и имя подключения у мока
- * нет. Очереди объявляет тест: в контуре их заводят соседи и 1С.
- */
 @AmqpIntegrationTest
 class BrokerConnectionsTest {
 
     private static final Duration CONFIRM_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration RECEIVE_TIMEOUT = Duration.ofSeconds(10);
-    /** Код возврата брокера «нет маршрута»: немаршрутизируемое mandatory-сообщение. */
-    private static final int NO_ROUTE = 312;
+    private static final int REPLY_CODE_NO_ROUTE = 312;
 
     @Autowired
     @InternalBroker
@@ -61,7 +56,6 @@ class BrokerConnectionsTest {
     @Autowired
     private Environment environment;
 
-    /** Виртуальные хосты — те, что подставила тестовая обвязка: у контейнера разные, у внешнего брокера один. */
     @Test
     void connections_openIntoTheirOwnVirtualHostsUnderTheServiceName() {
         Connection internal = internalConnectionFactory.createConnection();
@@ -88,7 +82,6 @@ class BrokerConnectionsTest {
         assertConfirmedDelivery(onecConnectionFactory, onecTemplate, "onec-confirm-test");
     }
 
-    /** Брокер подтверждает и то, что никуда не попало; доставку от потери отличает только возврат. */
     @Test
     void publishToMissingQueue_isConfirmedButReturned()
             throws ExecutionException, InterruptedException, TimeoutException {
@@ -99,7 +92,7 @@ class BrokerConnectionsTest {
 
         assertThat(confirm.ack()).isTrue();
         assertThat(correlation.getReturned()).isNotNull();
-        assertThat(correlation.getReturned().getReplyCode()).isEqualTo(NO_ROUTE);
+        assertThat(correlation.getReturned().getReplyCode()).isEqualTo(REPLY_CODE_NO_ROUTE);
     }
 
     @Test

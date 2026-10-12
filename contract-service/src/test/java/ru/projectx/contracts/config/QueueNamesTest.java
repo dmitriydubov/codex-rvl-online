@@ -5,10 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Одно имя очереди в двух свойствах — ошибка конфигурации, которую нужно увидеть на старте, а не по молчащей
- * очереди через неделю. Пустые имена отклоняет проверка обязательных свойств, здесь они не мешают.
- */
 class QueueNamesTest {
 
     @Test
