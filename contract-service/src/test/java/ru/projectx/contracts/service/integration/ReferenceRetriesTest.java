@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -133,6 +134,35 @@ class ReferenceRetriesTest {
         assertThat(attempts).hasValue(1);
     }
 
+    /** Ошибка виртуальной машины — не отказ справочника: она не повторяется и не заворачивается в другое исключение. */
+    @Test
+    void jvmError_isNotRetriedAndPassesThroughUnwrapped() {
+        Error fatal = new Error("ошибка виртуальной машины");
+        AtomicInteger attempts = new AtomicInteger();
+
+        assertThatThrownBy(() -> retries.byExternalId(() -> {
+            attempts.incrementAndGet();
+            throw fatal;
+        })).isSameAs(fatal);
+        assertThat(attempts).hasValue(1);
+    }
+
+    /**
+     * Механизм повторов ловит любой Throwable, а наружу обещано RuntimeException: проверяемое исключение, прошедшее
+     * мимо объявления Supplier, выходит как IllegalStateException с ним в причине, а не теряется и не повторяется.
+     */
+    @Test
+    void checkedFailure_isWrappedInIllegalStateExceptionWithoutRetry() {
+        IOException checked = new IOException("обрыв");
+        AtomicInteger attempts = new AtomicInteger();
+
+        assertThatThrownBy(() -> retries.byId(() -> {
+            attempts.incrementAndGet();
+            return throwUndeclared(checked);
+        })).isExactlyInstanceOf(IllegalStateException.class).hasCause(checked);
+        assertThat(attempts).hasValue(1);
+    }
+
     @Test
     void zeroRetries_meansASingleAttempt() {
         ReferenceRetries single = ReferenceRetries.of(new ReferenceProperties.Retry(0, Duration.ZERO));
@@ -143,6 +173,12 @@ class ReferenceRetriesTest {
             throw new ReferenceNotFoundException(ReferenceKind.POLICY);
         })).isInstanceOf(ReferenceUnavailableException.class);
         assertThat(attempts).hasValue(1);
+    }
+
+    /** Бросает проверяемое исключение там, где оно не объявлено: так в байткоде может поступить любой Supplier. */
+    @SuppressWarnings("unchecked")
+    private static <T, E extends Throwable> T throwUndeclared(Throwable failure) throws E {
+        throw (E) failure;
     }
 
     /** Ответы по порядку: исключения бросаются, последнее значение возвращается. */
