@@ -1,0 +1,15 @@
+# Gradle: локальный кэш и результаты сборки
+.gradle/
+build/
+
+# IDE и ОС
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Локальные переменные docker compose: шаблон — .env.example
+.env
+
+# Аварийные журналы JVM
+hs_err_pid*.log
