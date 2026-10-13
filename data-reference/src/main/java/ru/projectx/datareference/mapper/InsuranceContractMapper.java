@@ -4,6 +4,7 @@ import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
 import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
@@ -21,8 +22,6 @@ public class InsuranceContractMapper extends CatalogStreamMapper<InsuranceContra
     private static final String DMS_PRODUCT_NOT_SET =
             "не задан projectx.onec.contract.dms-product-type — отличить ДМС от прочих продуктов страхования нечем";
 
-    private static final String INSURER_ROLE = "Страхователь";
-
     private final OneCContractProperties contract;
 
     public InsuranceContractMapper(
@@ -35,20 +34,22 @@ public class InsuranceContractMapper extends CatalogStreamMapper<InsuranceContra
 
     @Override
     public ImportResult apply(ObjectNode data) {
-        return contract.dmsProduct()
-                .map(dmsProduct -> applyIfDms(dmsProduct, data))
-                .orElseGet(() -> ImportResult.skipped(DMS_PRODUCT_NOT_SET));
+        List<String> dmsProducts = contract.dmsProducts();
+        if (dmsProducts.isEmpty()) {
+            return ImportResult.skipped(DMS_PRODUCT_NOT_SET);
+        }
+        return applyIfDms(dmsProducts, data);
     }
 
-    private ImportResult applyIfDms(String dmsProduct, ObjectNode data) {
+    private ImportResult applyIfDms(List<String> dmsProducts, ObjectNode data) {
         String productType = textOrNull(data, "productType");
-        if (!dmsProduct.equals(productType)) {
+        if (!dmsProducts.contains(productType)) {
             return ImportResult.skipped("договор не ДМС: тип продукта " + productType);
         }
         return upsert(OneCValues.requiredUuid(data, "contractId"), detailsOf(data));
     }
 
-    private static InsuranceContract.Details detailsOf(ObjectNode data) {
+    private InsuranceContract.Details detailsOf(ObjectNode data) {
         return new InsuranceContract.Details(
                 OneCValues.requiredText(data, "number"),
                 OneCValues.requiredDate(data, "dateBeginISO"),
@@ -57,15 +58,15 @@ public class InsuranceContractMapper extends CatalogStreamMapper<InsuranceContra
                 OneCValues.flag(data, "notActive"));
     }
 
-    private static Optional<UUID> insurerOf(JsonNode data) {
+    private Optional<UUID> insurerOf(JsonNode data) {
         return StreamSupport.stream(data.path("contragentList").spliterator(), false)
-                .filter(InsuranceContractMapper::isInsurer)
+                .filter(this::isInsurer)
                 .findFirst()
                 .flatMap(party -> OneCValues.uuid(party.path("contragent"), "guid"));
     }
 
-    private static boolean isInsurer(JsonNode party) {
+    private boolean isInsurer(JsonNode party) {
         return StreamSupport.stream(party.path("rolesList").spliterator(), false)
-                .anyMatch(role -> INSURER_ROLE.equals(role.path("roleId").asString(null)));
+                .anyMatch(role -> contract.insurerRole().equals(role.path("roleId").asString(null)));
     }
 }

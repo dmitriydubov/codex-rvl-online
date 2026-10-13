@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +34,9 @@ import tools.jackson.databind.node.ObjectNode;
 class InsuranceContractMapperTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String DMS = "Личное страхование";
+    private static final String DMS = "ЛичноеСтрахование";
+    private static final String DMS_AS_SPECIFIED = "Личное страхование";
+    private static final String INSURER_ROLE = "Страхователь";
     private static final UUID CONTRACT = UUID.fromString("75af8e16-0000-4000-8000-0000000000c1");
     private static final UUID INSURER = UUID.fromString("5e595002-0000-4000-8000-0000000000d1");
     private static final UUID INSURED = UUID.fromString("5e595002-0000-4000-8000-0000000000d2");
@@ -41,7 +44,7 @@ class InsuranceContractMapperTest {
     private static final Instant EARLIER = NOW.minusSeconds(3600);
 
     private final InsuranceContractRepository repository = mock(InsuranceContractRepository.class);
-    private final InsuranceContractMapper mapper = mapper(DMS);
+    private final InsuranceContractMapper mapper = mapper(List.of(DMS, DMS_AS_SPECIFIED), INSURER_ROLE);
 
     @Test
     void streamIsInsuranceContracts() {
@@ -52,11 +55,62 @@ class InsuranceContractMapperTest {
     @NullSource
     @ValueSource(strings = {"", " "})
     void withoutDmsProductSetting_everyContractIsSkipped(String dmsProduct) {
-        ImportResult result = mapper(dmsProduct).apply(contract(DMS, party(INSURER, "Страхователь")));
+        ImportResult result = mapper(Arrays.asList(dmsProduct), INSURER_ROLE)
+                .apply(contract(DMS, party(INSURER, "Страхователь")));
 
         assertThat(result).isEqualTo(ImportResult.skipped("не задан projectx.onec.contract.dms-product-type"
                 + " — отличить ДМС от прочих продуктов страхования нечем"));
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void emptyDmsProductSetting_skipsEveryContract() {
+        ImportResult result = mapper(List.of(), INSURER_ROLE).apply(contract(DMS, party(INSURER, "Страхователь")));
+
+        assertThat(result).isEqualTo(ImportResult.skipped("не задан projectx.onec.contract.dms-product-type"
+                + " — отличить ДМС от прочих продуктов страхования нечем"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {DMS, DMS_AS_SPECIFIED})
+    void dmsContract_isAppliedInEitherSpelling(String productType) {
+        ImportResult result = mapper.apply(contract(productType, party(INSURER, "Страхователь")));
+
+        assertThat(result).isInstanceOf(ImportResult.Applied.class);
+        assertThat(saved().externalId()).isEqualTo(CONTRACT);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"личное страхование", "Личное  страхование", "личноестрахование", "ЛИЧНОЕСТРАХОВАНИЕ"})
+    void otherSpellingOfDms_isSkippedNamingTheSpelling(String productType) {
+        ImportResult result = mapper.apply(contract(productType, party(INSURER, "Страхователь")));
+
+        assertThat(result).isEqualTo(ImportResult.skipped("договор не ДМС: тип продукта " + productType));
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void onlyTheConfiguredSpelling_isDms() {
+        ImportResult result = mapper(List.of(DMS), INSURER_ROLE)
+                .apply(contract(DMS_AS_SPECIFIED, party(INSURER, "Страхователь")));
+
+        assertThat(result).isEqualTo(ImportResult.skipped("договор не ДМС: тип продукта Личное страхование"));
+    }
+
+    @Test
+    void insurer_isPickedByTheConfiguredRole() {
+        ObjectNode insurer = party(INSURER, "РольСтрахователя");
+
+        mapper(List.of(DMS), "РольСтрахователя").apply(contract(DMS, party(INSURED, "Страхователь"), insurer));
+
+        assertThat(saved().externalInsurerId()).isEqualTo(INSURER);
+    }
+
+    @Test
+    void insurerRole_isComparedExactly() {
+        mapper.apply(contract(DMS, party(INSURER, "страхователь"), party(INSURED, "Страхователь ")));
+
+        assertThat(saved().externalInsurerId()).isNull();
     }
 
     @Test
@@ -151,8 +205,8 @@ class InsuranceContractMapperTest {
         verify(repository, never()).save(any());
     }
 
-    private InsuranceContractMapper mapper(String dmsProduct) {
-        var properties = new OneCContractProperties(null, null, dmsProduct, "Адрес", List.of());
+    private InsuranceContractMapper mapper(List<String> dmsProducts, String insurerRole) {
+        var properties = new OneCContractProperties(null, null, dmsProducts, insurerRole, "Адрес", List.of());
         return new InsuranceContractMapper(repository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

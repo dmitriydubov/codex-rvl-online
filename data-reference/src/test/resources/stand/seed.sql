@@ -22,7 +22,7 @@ VALUES
 
     ('16136d1e-39fe-4b1f-9eca-bb90d7f2c5db', 'INSURANCE_CONTRACTS', '1c-usk_to_rvl-online_contracts-changes',
      '{"data": {"contractId": "77ff17b5-e659-4720-b57f-e8a19c00fcea", "number": "СТЕНД-ДМС-0001",
-                "productType": "Личное страхование", "productCode": "000000001",
+                "productType": "ЛичноеСтрахование", "productCode": "000000001",
                 "dateBeginISO": "2026-01-01T00:00:00", "dateEndISO": "3000-01-01T00:00:00", "notActive": false,
                 "contragentList": [{"rolesList": [{"roleName": "Страхователь", "roleId": "Страхователь"}],
                                     "contragent": {"type": "Юридическое лицо",

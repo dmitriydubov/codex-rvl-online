@@ -8,6 +8,7 @@ import static ru.projectx.datareference.acceptance.StepTables.required;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InboundStatus;
@@ -19,8 +20,11 @@ import tools.jackson.databind.node.ObjectNode;
 final class OneCMessages {
 
     private static final String RVL_ACTIVITY = "f3876c53-c7d8-4620-b364-9538164ba5d4";
-    private static final String DMS_PRODUCT = "Личное страхование";
+    private static final String DMS_PRODUCT = "ЛичноеСтрахование";
+    private static final Set<String> DEFAULT_DMS_PRODUCTS = Set.of(DMS_PRODUCT, "Личное страхование");
     private static final String INSURER_ROLE = "Страхователь";
+    private static final String PARTY = "контрагент";
+    private static final String PARTY_ROLE = "роль контрагента";
     private static final BigDecimal POLICY_PROGRAM_LIMIT = new BigDecimal("150000.00");
     private static final String EMAIL_PROPERTY = "Адрес элпочты застрахованного";
     private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
@@ -75,11 +79,15 @@ final class OneCMessages {
     }
 
     static OneCMessage insuranceContractOfProduct(String productType, Map<String, String> table) {
-        return insuranceContract(productType, InboundStatus.SKIPPED, table);
+        InboundStatus expected = DEFAULT_DMS_PRODUCTS.contains(productType)
+                ? InboundStatus.PROCESSED
+                : InboundStatus.SKIPPED;
+        return insuranceContract(productType, expected, table);
     }
 
     private static OneCMessage insuranceContract(String productType, InboundStatus expected, Map<String, String> table) {
-        onlyKnown(table, "external_id", "номер", "страхователь", "начало", "окончание", MESSAGE_ID, BEFORE_ENVELOPE);
+        onlyKnown(table, "external_id", "номер", "страхователь", PARTY, PARTY_ROLE, "начало", "окончание",
+                MESSAGE_ID, BEFORE_ENVELOPE);
         ObjectNode data = JSON.createObjectNode()
                 .put("contractId", required(table, "external_id"))
                 .put("number", required(table, "номер"))
@@ -87,7 +95,8 @@ final class OneCMessages {
                 .put("dateBeginISO", required(table, "начало"))
                 .put("dateEndISO", required(table, "окончание"))
                 .put("notActive", false);
-        Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addInsurer(data, insurer));
+        Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addParty(data, insurer, INSURER_ROLE));
+        Optional.ofNullable(table.get(PARTY)).ifPresent(party -> addParty(data, party, required(table, PARTY_ROLE)));
         return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, expected, fixedMessageId(table));
     }
 
@@ -161,14 +170,14 @@ final class OneCMessages {
                 .putObject("value").put("value", email));
     }
 
-    private static void addInsurer(ObjectNode contract, String insurer) {
+    private static void addParty(ObjectNode contract, String guid, String role) {
         ObjectNode party = contract.putArray("contragentList").addObject();
         party.putArray("rolesList").addObject()
-                .put("roleName", INSURER_ROLE)
-                .put("roleId", INSURER_ROLE);
+                .put("roleName", role)
+                .put("roleId", role);
         party.putObject("contragent")
                 .put("type", "Юридическое лицо")
-                .put("guid", insurer);
+                .put("guid", guid);
     }
 
     private static void addPolicyProgram(ObjectNode policy, String program, Map<String, String> table) {
