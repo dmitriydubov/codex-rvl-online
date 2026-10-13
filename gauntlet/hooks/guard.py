@@ -232,10 +232,11 @@ def command_violation(agent, command, ctx):
             reason = write_violation(agent, token, cwd, ctx, protected, read_only, scope, "this command")
             if reason:
                 return reason
-        # paths the tokens cannot resolve (`python -c ...`, $VAR, `...`, xargs, no path at all): match the text -
+        # paths the tokens cannot resolve (`python -c ...`, $VAR, `...`, xargs, no path at all): match the text
+        # without Gradle task names (`./gradlew gauntlet` next to `python3 -c` names a task, not the directory) -
         # the whole command for inline code, otherwise outside quotes (a commit or stash message is not a path)
         if not tokens or unresolvable(segment, command):
-            text = command if inline_code(words) else without_gradle_tasks(QUOTED.sub("''", command))
+            text = without_gradle_tasks(command if inline_code(words) else QUOTED.sub("''", command))
             hit = next((p for p in protected if mentions(text, p)), None)
             if hit:
                 return protected_reason(agent, hit, ctx)
