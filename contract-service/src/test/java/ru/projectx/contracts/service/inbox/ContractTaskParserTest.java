@@ -24,6 +24,7 @@ class ContractTaskParserTest {
     void completeTask_isParsedWithEveryParticipantInOrder() {
         ContractTask task = parser.parse(TaskBodies.upserted().toJson());
 
+        assertThat(task.entityVersion()).isEqualTo(1);
         assertThat(task.individualRequestId()).isEqualTo(UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"));
         assertThat(task.insuranceContractId()).isEqualTo(UUID.fromString("e12aab1a-1582-4b3a-af36-d30e637953f1"));
         assertThat(task.insurerPolicyId()).isEqualTo(UUID.fromString("a23ba061-f742-4b20-8b95-36a0e525c087"));
@@ -32,7 +33,7 @@ class ContractTaskParserTest {
         assertThat(task.participants()).hasSize(2);
         TaskParticipant spouse = task.participants().get(1);
         assertThat(spouse).isEqualTo(new TaskParticipant(1, UUID.fromString("9275471c-d2fe-484f-97a6-d6d7b1267b5e"),
-                true, new BigDecimal("34000.00"), new ParticipantPerson("Тестова", "Теста", "Тестовна",
+                true, new BigDecimal("34000.00"), null, new ParticipantPerson("Тестова", "Теста", "Тестовна",
                         LocalDate.parse("1988-07-02"), "FEMALE", "SPOUSE",
                         new ParticipantDocument("RF_PASSPORT", "4512", "654321", "Тестовый орган",
                                 LocalDate.parse("2012-08-15"), "770-001"), "Тестовый адрес")));
@@ -55,6 +56,30 @@ class ContractTaskParserTest {
         assertThat(person.address()).isNull();
         assertThat(person.document().series()).isNull();
         assertThat(person.document().issuedAt()).isNull();
+    }
+
+    @Test
+    void programOfParticipant_isParsedWhenPresent() {
+        TaskBodies body = TaskBodies.upserted().withParticipantField(1, "program_id", "2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a");
+
+        assertThat(parser.parse(body.toJson()).participants().get(1).programId())
+                .isEqualTo(UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a"));
+    }
+
+    @Test
+    void unreadableProgramOfParticipant_isViolationNamingTheField() {
+        TaskBodies body = TaskBodies.upserted().withParticipantField(1, "program_id", "1-2-3-4-5");
+
+        assertThatThrownBy(() -> parser.parse(body.toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.participants[1].program_id");
+    }
+
+    @Test
+    void missingEntityVersion_isViolationNamingTheField() {
+        assertThatThrownBy(() -> parser.parse(TaskBodies.upserted().withoutMetaField("entity_version").toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("нет обязательного поля meta.entity_version");
     }
 
     @Test

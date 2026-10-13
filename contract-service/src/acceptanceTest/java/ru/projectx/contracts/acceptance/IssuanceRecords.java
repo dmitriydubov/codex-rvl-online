@@ -18,16 +18,20 @@ public class IssuanceRecords {
 
     private static final String RECORDS = """
             select 'договор КМ' as document, id, status::text as status, number, date_from, date_to, premium_amount,
-                   policyholder_participant_id, insurance_contract_id, insurer_policy_id, entity_version,
-                   cancel_reason::text as cancel_reason, cancel_comment, cancelled_at, error_code, error_message, created_at
+                   policyholder_participant_id, insurance_contract_id, insurer_policy_id, program_id, entity_version,
+                   cancel_reason::text as cancel_reason, cancel_comment, cancelled_at, error_code, error_message,
+                   null::uuid as policy_usk_id, null::text as policy_usk_number, null::text as issued_policy_number,
+                   null::uuid as issued_policy_id, created_at
               from contracts where individual_request_id = :request and insured_participant_id = :participant
             union all
             select 'полис ЛМ', id, status::text, null, date_from, date_to, null,
-                   policyholder_participant_id, insurance_contract_id, insurer_policy_id, entity_version,
-                   cancel_reason::text, cancel_comment, cancelled_at, error_code, error_message, created_at
+                   policyholder_participant_id, insurance_contract_id, insurer_policy_id, program_id, entity_version,
+                   cancel_reason::text, cancel_comment, cancelled_at, error_code, error_message,
+                   policy_usk_id, policy_usk_number, issued_policy_number, issued_policy_id, created_at
               from lm_policies where individual_request_id = :request and participant_id = :participant
             order by created_at, id
             """;
+    private static final String LM_POLICY = "полис ЛМ";
 
     private static final String PERSONS = """
             select role::text as role, participant_id, last_name, first_name, middle_name, birth_date, gender::text as gender,
@@ -44,9 +48,11 @@ public class IssuanceRecords {
     }
 
     record Record(String document, UUID id, String status, @Nullable String number, LocalDate dateFrom, LocalDate dateTo,
-            @Nullable BigDecimal premium, UUID policyholder, UUID insuranceContract, UUID insurerPolicy, int version,
-            @Nullable String cancelReason, @Nullable String cancelComment, @Nullable Instant cancelledAt,
-            @Nullable String errorCode, @Nullable String errorMessage) {
+            @Nullable BigDecimal premium, UUID policyholder, UUID insuranceContract, UUID insurerPolicy,
+            @Nullable UUID program, int version, @Nullable String cancelReason, @Nullable String cancelComment,
+            @Nullable Instant cancelledAt, @Nullable String errorCode, @Nullable String errorMessage,
+            @Nullable UUID policyUskId, @Nullable String policyUskNumber, @Nullable String issuedPolicyNumber,
+            @Nullable UUID issuedPolicyId) {
 
         String summary() {
             return document + " " + status + Optional.ofNullable(cancelReason).map(reason -> " " + reason).orElse("");
@@ -67,15 +73,26 @@ public class IssuanceRecords {
         return jdbc.sql(PERSONS).param("owner", owner).query(this::person).list();
     }
 
+    UUID latestLmPolicyId(String participantId, String requestId) {
+        List<Record> policies = of(participantId, requestId).stream()
+                .filter(record -> LM_POLICY.equals(record.document())).toList();
+        if (policies.isEmpty()) {
+            throw new AssertionError("у участника " + participantId + " заявки " + requestId + " нет полиса ЛМ");
+        }
+        return policies.get(policies.size() - 1).id();
+    }
+
     private Record record(ResultSet row, int index) throws SQLException {
         OffsetDateTime cancelledAt = row.getObject("cancelled_at", OffsetDateTime.class);
         return new Record(row.getString("document"), row.getObject("id", UUID.class), row.getString("status"),
                 row.getString("number"), row.getObject("date_from", LocalDate.class), row.getObject("date_to", LocalDate.class),
                 row.getBigDecimal("premium_amount"), row.getObject("policyholder_participant_id", UUID.class),
                 row.getObject("insurance_contract_id", UUID.class), row.getObject("insurer_policy_id", UUID.class),
-                row.getInt("entity_version"), row.getString("cancel_reason"), row.getString("cancel_comment"),
-                cancelledAt == null ? null : cancelledAt.toInstant(), row.getString("error_code"),
-                row.getString("error_message"));
+                row.getObject("program_id", UUID.class), row.getInt("entity_version"), row.getString("cancel_reason"),
+                row.getString("cancel_comment"), cancelledAt == null ? null : cancelledAt.toInstant(),
+                row.getString("error_code"), row.getString("error_message"), row.getObject("policy_usk_id", UUID.class),
+                row.getString("policy_usk_number"), row.getString("issued_policy_number"),
+                row.getObject("issued_policy_id", UUID.class));
     }
 
     private Person person(ResultSet row, int index) throws SQLException {

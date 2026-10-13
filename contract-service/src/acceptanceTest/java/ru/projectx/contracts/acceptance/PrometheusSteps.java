@@ -40,6 +40,11 @@ public class PrometheusSteps {
         counterGrew(name, "reason", reason, growth);
     }
 
+    @Тогда("счётчик Prometheus {string} с меткой kind {string} вырос за сценарий на {int}")
+    public void counterGrewByKind(String name, String kind, int growth) throws IOException, InterruptedException {
+        counterGrew(name, "kind", kind, growth);
+    }
+
     private void counterGrew(String name, String label, String value, int growth) throws IOException, InterruptedException {
         double now = valueOf(scrape(), name, label, value);
 

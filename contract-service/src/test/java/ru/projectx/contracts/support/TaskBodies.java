@@ -120,6 +120,11 @@ public final class TaskBodies {
         return this;
     }
 
+    public TaskBodies withParticipantField(int index, String name, String value) {
+        participant(index).put(name, value);
+        return this;
+    }
+
     public TaskBodies withoutParticipantField(int index, String path) {
         String[] names = path.split("\\.");
         ObjectNode node = participant(index);

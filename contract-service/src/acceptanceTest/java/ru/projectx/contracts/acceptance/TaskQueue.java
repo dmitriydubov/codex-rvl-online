@@ -7,7 +7,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-public class TaskQueue {
+public class TaskQueue implements StandQueue {
 
     private static final boolean DURABLE = true;
     private static final boolean EXCLUSIVE = false;
@@ -30,7 +30,13 @@ public class TaskQueue {
         return this;
     }
 
-    String name() {
+    @Override
+    public String alias() {
+        return ALIAS;
+    }
+
+    @Override
+    public String name() {
         return queue;
     }
 
@@ -41,11 +47,13 @@ public class TaskQueue {
         broker.send("", queue, MessageBuilder.withBody(body).andProperties(properties).build());
     }
 
-    void purge() {
+    @Override
+    public void purge() {
         broker.execute(channel -> channel.queuePurge(queue));
     }
 
-    AMQP.Queue.DeclareOk state() {
+    @Override
+    public AMQP.Queue.DeclareOk state() {
         return broker.execute(channel -> channel.queueDeclarePassive(queue));
     }
 }

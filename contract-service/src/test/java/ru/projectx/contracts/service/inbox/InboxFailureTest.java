@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.contracts.exception.ContractViolationException;
+import ru.projectx.contracts.exception.TemporaryFailureException;
 
 class InboxFailureTest {
 
@@ -22,7 +23,7 @@ class InboxFailureTest {
     void temporaryDatabaseStates_areTransientWithTheirState(String sqlState) {
         InboxFailure failure = InboxFailure.of(new RuntimeException(new SQLException("база", sqlState)));
 
-        assertThat(failure).isEqualTo(new InboxFailure.Transient(sqlState));
+        assertThat(failure).isEqualTo(InboxFailure.Transient.database(sqlState));
         assertThat(failure.reason()).isEqualTo("временный отказ базы данных, SQLSTATE " + sqlState);
     }
 
@@ -32,6 +33,14 @@ class InboxFailureTest {
         InboxFailure failure = InboxFailure.of(new RuntimeException(new SQLException("база", sqlState)));
 
         assertThat(failure).isEqualTo(new InboxFailure.Permanent("отказ базы данных, SQLSTATE " + sqlState, sqlState));
+    }
+
+    @Test
+    void temporaryFailure_isTransientWithItsReasonAndWithoutSqlState() {
+        InboxFailure failure = InboxFailure.of(new TemporaryFailureException("справочный сервис недоступен",
+                new IllegalStateException("Тестов")));
+
+        assertThat(failure).isEqualTo(new InboxFailure.Transient("справочный сервис недоступен", "нет"));
     }
 
     @Test

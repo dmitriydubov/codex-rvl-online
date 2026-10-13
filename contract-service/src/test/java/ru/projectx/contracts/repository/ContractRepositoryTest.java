@@ -23,6 +23,7 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.Gender;
 import ru.projectx.contracts.entity.IdentityDocument;
 import ru.projectx.contracts.entity.IdentityDocumentType;
+import ru.projectx.contracts.entity.IssuanceTerms;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
@@ -45,6 +46,8 @@ class ContractRepositoryTest {
     private static final RequestReference REFERENCE = new RequestReference(REQUEST,
             UUID.fromString("e12aab1a-1582-4b3a-af36-d30e637953f1"), UUID.fromString("a23ba061-f742-4b20-8b95-36a0e525c087"));
     private static final TripPeriod PERIOD = new TripPeriod(LocalDate.parse("2026-04-10"), LocalDate.parse("2026-04-24"));
+    private static final IssuanceTerms TERMS = new IssuanceTerms(REFERENCE, INSURED,
+            UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a"), PERIOD);
 
     @Autowired
     private ContractRepository contracts;
@@ -74,7 +77,7 @@ class ContractRepositoryTest {
 
     @Test
     void contract_roundTripsNativeEnumsEmbeddedValuesAndAmounts() {
-        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", REFERENCE, SPOUSE, INSURED, PERIOD,
+        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", TERMS, SPOUSE,
                 new BigDecimal("34000.00")), NOW);
         contract.cancel(new Cancellation(CancelReason.REQUEST_CANCELLED, "Стенд: комментарий", NOW), NOW);
         contract.markError(new IssueError("CODE", "текст"), NOW);
@@ -125,13 +128,13 @@ class ContractRepositoryTest {
 
     @Test
     void policy_roundTripsAndKeepsUniqueUnfinishedParticipant() {
-        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(REFERENCE, CHILD, INSURED, PERIOD), NOW);
+        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(TERMS, CHILD), NOW);
         transaction.executeWithoutResult(status -> policies.save(policy));
 
         assertThat(policies.findByRequestIndividualRequestIdAndStatusNotIn(REQUEST, Set.of(LmPolicyStatus.CANCELLED)))
                 .extracting(LmPolicy::participantId).containsExactly(CHILD);
         assertThatThrownBy(() -> transaction.executeWithoutResult(status ->
-                policies.save(LmPolicy.open(new LmPolicyDraft(REFERENCE, CHILD, INSURED, PERIOD), NOW))))
+                policies.save(LmPolicy.open(new LmPolicyDraft(TERMS, CHILD), NOW))))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -190,6 +193,6 @@ class ContractRepositoryTest {
     }
 
     private static Contract contract(UUID participant, String number) {
-        return Contract.open(new ContractDraft(number, REFERENCE, participant, INSURED, PERIOD, new BigDecimal("34000.00")), NOW);
+        return Contract.open(new ContractDraft(number, TERMS, participant, new BigDecimal("34000.00")), NOW);
     }
 }

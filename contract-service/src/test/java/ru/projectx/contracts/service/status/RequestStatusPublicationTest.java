@@ -14,15 +14,19 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRequest;
+import ru.projectx.contracts.entity.IssuedPolicy;
+import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
+import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
 class RequestStatusPublicationTest {
@@ -32,9 +36,9 @@ class RequestStatusPublicationTest {
     private static final RequestParticipant SPOUSE_KM = new RequestParticipant(Tasks.SPOUSE, DocumentKind.KM_CONTRACT);
     private static final RequestParticipant CHILD_LM = new RequestParticipant(Tasks.CHILD, DocumentKind.LM_POLICY);
     private static final IssuanceSnapshot NOTHING = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(), List.of(),
-            List.of());
-    private static final IssuanceSnapshot COMPLETED = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED),
             List.of(), List.of());
+    private static final IssuanceSnapshot COMPLETED = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED),
+            List.of(), List.of(), List.of());
 
     private final IssuanceRequestRepository requests = mock();
     private final IssuanceSnapshots snapshots = mock();
@@ -100,11 +104,46 @@ class RequestStatusPublicationTest {
     }
 
     @Test
+    void recordChange_keepsTheCompositionAndRecordsTheNextSnapshotWhenItBecamePublishable() {
+        IssuanceRequest request = IssuanceRequest.start(Tasks.REQUEST, NOW);
+        request.takeComposition(List.of(INSURED, CHILD_LM), NOW);
+        request.nextSnapshotVersion(NOW);
+        given(requests.findById(Tasks.REQUEST)).willReturn(Optional.of(request));
+        IssuanceSnapshot inProgress = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM), List.of(),
+                List.of(Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD)), List.of());
+        LmPolicy issued = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
+        issued.submit(NOW);
+        issued.markIssued(new IssuedPolicy(UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
+                UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456"), NOW);
+        IssuanceSnapshot completed = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM), List.of(),
+                List.of(issued), List.of());
+        given(snapshots.current(Tasks.REQUEST)).willReturn(completed);
+        given(messages.write(eq(completed), any())).willReturn("{}");
+
+        publication.afterRecordChange(inProgress, NOW);
+
+        assertThat(request.participants()).containsExactly(INSURED, CHILD_LM);
+        ArgumentCaptor<OutboxDraft> draft = ArgumentCaptor.captor();
+        verify(journal).record(draft.capture(), eq(NOW));
+        assertThat(draft.getValue().envelope().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void recordChangeWithoutPublishableChange_recordsNothing() {
+        given(requests.findById(Tasks.REQUEST)).willReturn(Optional.of(IssuanceRequest.start(Tasks.REQUEST, NOW)));
+        given(snapshots.current(Tasks.REQUEST)).willReturn(COMPLETED);
+
+        publication.afterRecordChange(COMPLETED, NOW);
+
+        verify(journal, never()).record(any(), any());
+    }
+
+    @Test
     void cancellation_marksTheRequestCancelledAndAlwaysRecordsTheNextSnapshot() {
         IssuanceRequest request = IssuanceRequest.start(Tasks.REQUEST, NOW);
         request.nextSnapshotVersion(NOW);
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.of(request));
-        IssuanceSnapshot cancelled = new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of());
+        IssuanceSnapshot cancelled = new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of(), List.of());
         given(snapshots.current(Tasks.REQUEST)).willReturn(cancelled);
         given(messages.write(eq(cancelled), any())).willReturn("{}");
 
@@ -121,7 +160,7 @@ class RequestStatusPublicationTest {
     void cancellationBeforeAnyTask_startsTheRequestWithAnEmptyComposition() {
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.empty());
         given(requests.save(any())).willAnswer(invocation -> invocation.getArgument(0));
-        IssuanceSnapshot cancelled = new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of());
+        IssuanceSnapshot cancelled = new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of(), List.of());
         given(snapshots.current(Tasks.REQUEST)).willReturn(cancelled);
         given(messages.write(eq(cancelled), any())).willReturn("{}");
 

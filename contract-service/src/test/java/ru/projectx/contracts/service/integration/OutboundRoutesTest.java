@@ -8,14 +8,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.config.OneCBrokerProperties;
 
 class OutboundRoutesTest {
 
     private final RabbitTemplate internalTemplate = mock();
-    private final OutboundRoutes routes = new OutboundRoutes(internalTemplate, new InternalBrokerProperties(
-            new BrokerConnectionProperties("localhost", 5672, "/", "user", "secret", Duration.ofSeconds(10),
-                    new BrokerConnectionProperties.Tls(false, true, true)),
-            true, new InternalBrokerProperties.Queues("tasks", "status-changes")));
+    private final RabbitTemplate onecTemplate = mock();
+    private final OutboundRoutes routes = new OutboundRoutes(internalTemplate,
+            new InternalBrokerProperties(connection(), true, new InternalBrokerProperties.Queues("tasks", "status-changes")),
+            onecTemplate, new OneCBrokerProperties(connection(), true, new OneCBrokerProperties.Queues(
+                    "km-submissions", "km-registrations", "lm-requests", "lm-issues")));
 
     @Test
     void statusChanges_goToTheStatusQueueOfTheInternalBroker() {
@@ -23,7 +25,17 @@ class OutboundRoutesTest {
     }
 
     @Test
+    void lmPolicyRequests_goToTheRequestQueueOfTheOneCBroker() {
+        assertThat(routes.of("LmPolicyRequested")).contains(new OutboundRoute(onecTemplate, "lm-requests"));
+    }
+
+    @Test
     void unknownEventType_hasNoRoute() {
         assertThat(routes.of("ContractTaskUpserted")).isEmpty();
+    }
+
+    private static BrokerConnectionProperties connection() {
+        return new BrokerConnectionProperties("localhost", 5672, "/", "user", "secret", Duration.ofSeconds(10),
+                new BrokerConnectionProperties.Tls(false, true, true));
     }
 }

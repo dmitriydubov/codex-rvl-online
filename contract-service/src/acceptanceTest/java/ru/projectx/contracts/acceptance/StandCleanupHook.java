@@ -15,20 +15,22 @@ public class StandCleanupHook {
             """;
 
     private final JdbcClient jdbc;
-    private final TaskQueue queue;
+    private final List<StandQueue> queues;
     private final StatusQueue statusQueue;
+    private final ReferenceStub reference;
 
-    public StandCleanupHook(JdbcClient jdbc, TaskQueue queue, StatusQueue statusQueue) {
+    public StandCleanupHook(JdbcClient jdbc, List<StandQueue> queues, StatusQueue statusQueue, ReferenceStub reference) {
         this.jdbc = jdbc;
-        this.queue = queue;
+        this.queues = List.copyOf(queues);
         this.statusQueue = statusQueue;
+        this.reference = reference;
     }
 
     @Before(order = 10)
     public void emptyStand() {
-        queue.purge();
         statusQueue.declare();
-        statusQueue.purge();
+        queues.forEach(StandQueue::purge);
+        reference.reset();
         List<String> tables = jdbc.sql(DOMAIN_TABLES).query(String.class).list();
         jdbc.sql("truncate table " + String.join(", ", tables) + " cascade").update();
     }

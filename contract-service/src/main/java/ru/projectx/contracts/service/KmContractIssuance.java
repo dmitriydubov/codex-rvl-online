@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
@@ -13,6 +14,8 @@ import ru.projectx.contracts.repository.ContractRepository;
 @Component
 public class KmContractIssuance extends RecordIssuance<Contract> {
 
+    static final String KIND = "договор КМ";
+
     private final ContractRepository contracts;
     private final ContractNumbers numbers;
 
@@ -23,6 +26,11 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     }
 
     @Override
+    protected String kind() {
+        return KIND;
+    }
+
+    @Override
     protected List<Party> parties(Issue issue) {
         return List.of(new Party(PersonRole.POLICYHOLDER, PersonSnapshots.of(issue.task().insured())),
                 new Party(PersonRole.INSURED, PersonSnapshots.of(issue.participant())));
@@ -30,8 +38,8 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
 
     @Override
     protected Contract open(Issue issue, Instant now) {
-        ContractDraft draft = new ContractDraft(numbers.next(now), issue.request(), issue.participant().id(),
-                issue.task().insured().id(), issue.period(), issue.participant().amountDue());
+        ContractDraft draft = new ContractDraft(numbers.next(now), issue.terms(), issue.participant().id(),
+                issue.participant().amountDue());
         return contracts.save(Contract.open(draft, now));
     }
 
@@ -41,7 +49,14 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     }
 
     @Override
-    protected boolean reviseTerms(Contract contract, Issue issue) {
-        return contract.revise(new ContractTerms(issue.period(), issue.participant().amountDue()));
+    protected boolean submitted(Contract contract) {
+        return false;
+    }
+
+    @Override
+    protected boolean reviseTerms(Contract contract, Issue issue, UUID program) {
+        boolean termsRevised = contract.revise(new ContractTerms(issue.period(), issue.participant().amountDue()));
+        boolean programMoved = contract.moveProgram(program);
+        return termsRevised || programMoved;
     }
 }

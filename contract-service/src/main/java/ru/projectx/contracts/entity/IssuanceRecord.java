@@ -53,10 +53,11 @@ public abstract class IssuanceRecord {
     protected IssuanceRecord() {
     }
 
-    protected IssuanceRecord(RequestReference request, UUID policyholderParticipantId, TripPeriod period, Instant now) {
-        this.request = request;
-        this.policyholderParticipantId = policyholderParticipantId;
-        this.period = period;
+    protected IssuanceRecord(IssuanceTerms terms, Instant now) {
+        this.request = terms.request();
+        this.policyholderParticipantId = terms.policyholderParticipantId();
+        this.programId = terms.programId();
+        this.period = terms.period();
         this.entityVersion = FIRST_VERSION;
         this.createdAt = now;
         this.updatedAt = now;
@@ -77,13 +78,13 @@ public abstract class IssuanceRecord {
     public void markError(IssueError failure, Instant now) {
         this.error = failure;
         enterError();
-        bump(now);
+        advanceVersion(now);
     }
 
     public void cancel(Cancellation reason, Instant now) {
         this.cancellation = reason;
         enterCancelled();
-        bump(now);
+        advanceVersion(now);
     }
 
     public boolean movePeriod(TripPeriod newPeriod) {
@@ -94,11 +95,15 @@ public abstract class IssuanceRecord {
         return true;
     }
 
-    public void markRevised(Instant now) {
-        bump(now);
+    public boolean moveProgram(UUID newProgramId) {
+        if (newProgramId.equals(programId)) {
+            return false;
+        }
+        this.programId = newProgramId;
+        return true;
     }
 
-    protected void bump(Instant now) {
+    public void advanceVersion(Instant now) {
         this.entityVersion += 1;
         this.updatedAt = now;
     }
@@ -108,7 +113,7 @@ public abstract class IssuanceRecord {
     }
 
     public IssuanceState state() {
-        return new IssuanceState(request, policyholderParticipantId, period, Optional.ofNullable(error),
-                Optional.ofNullable(cancellation), entityVersion);
+        return new IssuanceState(request, policyholderParticipantId, Optional.ofNullable(programId), period,
+                Optional.ofNullable(error), Optional.ofNullable(cancellation), entityVersion);
     }
 }

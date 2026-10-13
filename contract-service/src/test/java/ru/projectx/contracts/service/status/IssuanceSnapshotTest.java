@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
@@ -14,7 +16,10 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.message.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -39,7 +44,7 @@ class IssuanceSnapshotTest {
         LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
 
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, SPOUSE_KM, CHILD_LM),
-                List.of(second, first), List.of(policy));
+                List.of(second, first), List.of(policy), List.of());
 
         assertThat(snapshot.contractOf(Tasks.SPOUSE)).isSameAs(second);
         assertThat(snapshot.policyOf(Tasks.CHILD)).isSameAs(policy);
@@ -61,7 +66,7 @@ class IssuanceSnapshotTest {
         RequestParticipant spouseLm = new RequestParticipant(Tasks.SPOUSE, DocumentKind.LM_POLICY);
 
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(spouseLm),
-                List.of(cancelled), List.of(policy));
+                List.of(cancelled), List.of(policy), List.of());
 
         assertThat(snapshot.statusOf(spouseLm)).contains(LmPolicyStatus.NEW);
         assertThat(snapshot.contractOf(Tasks.SPOUSE)).isSameAs(cancelled);
@@ -74,7 +79,7 @@ class IssuanceSnapshotTest {
         Contract failed = Issuances.contract(LATER, Tasks.SPOUSE, "DKM-2026-000002");
         failed.markError(RELATION_REQUIRED, NOW);
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM),
-                List.of(cancelled, failed), List.of());
+                List.of(cancelled, failed), List.of(), List.of());
         Contract failedAgain = Issuances.contract(LATEST, Tasks.SPOUSE, "DKM-2026-000003");
         failedAgain.markError(RELATION_REQUIRED, NOW);
         Contract failedOtherwise = Issuances.contract(LATEST, Tasks.SPOUSE, "DKM-2026-000003");
@@ -95,7 +100,7 @@ class IssuanceSnapshotTest {
     @Test
     void participantWithoutItsRecord_isAnIllegalState() {
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, CHILD_LM),
-                List.of(), List.of());
+                List.of(), List.of(), List.of());
 
         assertThatThrownBy(() -> snapshot.contractOf(Tasks.SPOUSE)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(Tasks.SPOUSE.toString());
@@ -110,19 +115,47 @@ class IssuanceSnapshotTest {
         failed.markError(new IssueError("UNKNOWN_GENDER", "недопустимое значение поля"), NOW);
         RequestParticipant insuredKm = new RequestParticipant(Tasks.INSURED, DocumentKind.KM_CONTRACT);
 
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, insuredKm), List.of(fresh, failed),
-                List.of()).hasUndraftedKmContract()).isTrue();
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(insuredKm), List.of(fresh, failed),
-                List.of()).hasUndraftedKmContract()).isFalse();
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM), List.of(fresh),
-                List.of(Issuances.policy(POLICY_ID, Tasks.CHILD))).hasUndraftedKmContract()).isFalse();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(SPOUSE_KM, insuredKm), List.of(fresh, failed), List.of(), List.of()))).isTrue();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(insuredKm), List.of(fresh, failed), List.of(), List.of()))).isFalse();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(INSURED, CHILD_LM), List.of(fresh), List.of(Issuances.policy(POLICY_ID, Tasks.CHILD)),
+                List.of()))).isFalse();
+    }
+
+    @Test
+    void formsOfAPolicy_areItsOwnOnesOnly_formsOfContractsAndOtherPoliciesStayOut() {
+        Contract contract = Issuances.contract(EARLIER, Tasks.SPOUSE, "DKM-2026-000001");
+        LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        LmPolicy another = Issuances.policy(LATEST, Tasks.SPOUSE);
+        PrintedForm own = issuedForm(policy.id(), "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf");
+        PrintedForm foreign = issuedForm(another.id(), "https://s3.sogaz.ru/rvl/lm/2026/02/0555123457.pdf");
+        PrintedForm contractForm = formOfContract(contract.id(), "https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf");
+
+        IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, CHILD_LM),
+                List.of(contract), List.of(policy, another), List.of(contractForm, foreign, own));
+
+        assertThat(snapshot.formsOf(policy)).containsExactly(own);
+        assertThat(snapshot.formsOf(another)).containsExactly(foreign);
     }
 
     @Test
     void requestStatus_isComputedByTheRules() {
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of()).requestStatus())
+        assertThat(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.CANCELLED);
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of()).requestStatus())
+        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.COMPLETED);
+    }
+
+    private static PrintedForm issuedForm(UUID policyId, String url) {
+        return PrintedForm.issuedForLmPolicy(policyId, new UskDocument(PrintedFormType.POLICY, url, 96256L), NOW);
+    }
+
+    private static PrintedForm formOfContract(UUID contractId, String url) {
+        PrintedForm form = issuedForm(contractId, url);
+        ReflectionTestUtils.setField(form, "lmPolicyId", null);
+        ReflectionTestUtils.setField(form, "contractId", contractId);
+        return form;
     }
 }

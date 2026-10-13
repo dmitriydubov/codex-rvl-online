@@ -33,7 +33,7 @@ public class Contract extends IssuanceRecord {
     }
 
     private Contract(ContractDraft draft, Instant now) {
-        super(draft.request(), draft.policyholderParticipantId(), draft.period(), now);
+        super(draft.terms(), now);
         this.number = draft.number();
         this.status = ContractStatus.NEW;
         this.insuredParticipantId = draft.insuredParticipantId();

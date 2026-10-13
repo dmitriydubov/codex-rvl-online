@@ -23,19 +23,15 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.LmPolicyStatus;
-import ru.projectx.contracts.entity.RequestReference;
-import ru.projectx.contracts.entity.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
 class IssuanceServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-02-10T07:35:00Z");
-    private static final RequestReference REQUEST =
-            new RequestReference(Tasks.REQUEST, Tasks.INSURANCE_CONTRACT, Tasks.INSURER_POLICY);
-    private static final TripPeriod PERIOD = new TripPeriod(Tasks.FROM, Tasks.TO);
 
     private final ContractRepository contracts = mock();
     private final LmPolicyRepository policies = mock();
@@ -118,8 +114,8 @@ class IssuanceServiceTest {
 
     @Test
     void insuredWhoStopsPaying_hasContractCancelledAndNothingOpened() {
-        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", REQUEST, Tasks.INSURED, Tasks.INSURED,
-                PERIOD, new BigDecimal("12500.00")), NOW);
+        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.INSURED,
+                new BigDecimal("12500.00")), NOW);
         active(List.of(contract), List.of());
 
         service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
@@ -136,11 +132,11 @@ class IssuanceServiceTest {
     }
 
     private static Contract contract() {
-        return Contract.open(new ContractDraft("DKM-2026-000001", REQUEST, Tasks.SPOUSE, Tasks.INSURED, PERIOD,
+        return Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
                 new BigDecimal("34000.00")), NOW);
     }
 
     private static LmPolicy policy() {
-        return LmPolicy.open(new LmPolicyDraft(REQUEST, Tasks.CHILD, Tasks.INSURED, PERIOD), NOW);
+        return LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.CHILD), NOW);
     }
 }

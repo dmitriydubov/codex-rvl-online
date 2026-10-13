@@ -55,7 +55,7 @@ class PersonSnapshotsTest {
     @Test
     void unknownGender_isParticipantErrorWithoutTheValue() {
         ParticipantPerson person = Tasks.person("Тестова", "SPOUSE");
-        TaskParticipant participant = new TaskParticipant(2, Tasks.SPOUSE, true, BigDecimal.ZERO,
+        TaskParticipant participant = new TaskParticipant(2, Tasks.SPOUSE, true, BigDecimal.ZERO, Tasks.PROGRAM,
                 new ParticipantPerson(person.lastName(), person.firstName(), person.middleName(), person.birthDate(),
                         "UNKNOWN", person.relationType(), person.document(), person.address()));
 
@@ -68,7 +68,7 @@ class PersonSnapshotsTest {
     private static TaskParticipant withDocumentType(TaskParticipant participant, String type) {
         ParticipantPerson person = participant.person();
         return new TaskParticipant(participant.index(), participant.id(), participant.relative(),
-                participant.amountDue(), new ParticipantPerson(person.lastName(), person.firstName(),
+                participant.amountDue(), participant.programId(), new ParticipantPerson(person.lastName(), person.firstName(),
                         person.middleName(), person.birthDate(), person.gender(), person.relationType(),
                         Tasks.document(type), person.address()));
     }

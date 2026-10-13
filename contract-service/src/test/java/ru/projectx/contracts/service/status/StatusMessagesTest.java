@@ -7,13 +7,18 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.IssuedPolicy;
 import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -40,7 +45,7 @@ class StatusMessagesTest {
     @Test
     void message_carriesTheEnvelopeAndTheRequestStateInSnakeCase() {
         JsonNode body = json.readTree(messages.write(
-                new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of()), META));
+                new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of(), List.of()), META));
 
         JsonNode meta = body.path("meta");
         assertThat(meta.path("message_id").stringValue()).isEqualTo(MESSAGE_ID.toString());
@@ -63,6 +68,8 @@ class StatusMessagesTest {
         assertThat(participant.path("documents")).isEmpty();
         assertThat(participant.has("km_contract_id")).isFalse();
         assertThat(participant.has("km_contract_number")).isFalse();
+        assertThat(participant.has("policy_id")).isFalse();
+        assertThat(participant.has("policy_number")).isFalse();
         assertThat(participant.has("error_code")).isFalse();
         assertThat(participant.has("error_message")).isFalse();
     }
@@ -74,7 +81,7 @@ class StatusMessagesTest {
                 "поле participants[1].personal_data.relation_type обязательно для родственника"), NOW);
 
         JsonNode participant = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false,
-                List.of(SPOUSE_KM), List.of(failed), List.of()), META)).path("data").path("participants").path(0);
+                List.of(SPOUSE_KM), List.of(failed), List.of(), List.of()), META)).path("data").path("participants").path(0);
 
         assertThat(participant.path("document_kind").stringValue()).isEqualTo("KM_CONTRACT");
         assertThat(participant.path("km_contract_id").stringValue()).isEqualTo(CONTRACT_ID);
@@ -93,7 +100,7 @@ class StatusMessagesTest {
         policy.cancel(new Cancellation(CancelReason.REQUEST_CANCELLED, null, NOW), NOW);
 
         JsonNode body = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(CHILD_LM),
-                List.of(), List.of(policy)), META));
+                List.of(), List.of(policy), List.of()), META));
 
         assertThat(body.path("data").path("status").stringValue()).isEqualTo("CANCELLED");
         JsonNode participant = body.path("data").path("participants").path(0);
@@ -110,10 +117,53 @@ class StatusMessagesTest {
         policy.markError(new IssueError("UNKNOWN_DOCUMENT_TYPE", "недопустимое значение поля"), NOW);
 
         JsonNode participant = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false,
-                List.of(CHILD_LM), List.of(), List.of(policy)), META)).path("data").path("participants").path(0);
+                List.of(CHILD_LM), List.of(), List.of(policy), List.of()), META)).path("data").path("participants").path(0);
 
         assertThat(participant.path("error_code").stringValue()).isEqualTo("UNKNOWN_DOCUMENT_TYPE");
         assertThat(participant.path("error_message").stringValue()).isEqualTo("недопустимое значение поля");
         assertThat(participant.has("km_contract_number")).isFalse();
+        assertThat(participant.has("policy_id")).isFalse();
+        assertThat(participant.path("documents")).isEmpty();
+    }
+
+    @Test
+    void issuedLmPolicy_carriesOurPolicyNumberAndFinalFormsWithTheirIdentifiersAndLinks() {
+        LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        policy.submit(NOW);
+        policy.markIssued(new IssuedPolicy(UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
+                UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456"), NOW);
+        PrintedForm form = PrintedForm.issuedForLmPolicy(policy.id(), new UskDocument(PrintedFormType.POLICY,
+                "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf", 96256L), NOW);
+        ReflectionTestUtils.setField(form, "id", UUID.fromString("01960000-0000-7000-8000-000000000003"));
+
+        JsonNode body = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(CHILD_LM),
+                List.of(), List.of(policy), List.of(form)), META));
+
+        assertThat(body.path("data").path("status").stringValue()).isEqualTo("COMPLETED");
+        JsonNode participant = body.path("data").path("participants").path(0);
+        assertThat(participant.path("document_kind").stringValue()).isEqualTo("LM_POLICY");
+        assertThat(participant.path("km_contract_state").stringValue()).isEqualTo("NOT_REQUIRED");
+        assertThat(participant.path("policy_id").stringValue()).isEqualTo("13ab5388-61ee-4e21-8a46-c325478b78c0");
+        assertThat(participant.path("policy_number").stringValue()).isEqualTo("0555123456");
+        assertThat(participant.path("payment_status").stringValue()).isEqualTo("NOT_REQUIRED");
+        JsonNode document = participant.path("documents").path(0);
+        assertThat(participant.path("documents")).hasSize(1);
+        assertThat(document.path("document_id").stringValue()).isEqualTo("01960000-0000-7000-8000-000000000003");
+        assertThat(document.path("doc_type").stringValue()).isEqualTo("POLICY");
+        assertThat(document.path("kind").stringValue()).isEqualTo("FINAL");
+        assertThat(document.path("url").stringValue()).isEqualTo("https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf");
+        assertThat(participant.has("error_code")).isFalse();
+    }
+
+    @Test
+    void formsOfAnotherPolicy_doNotLeakIntoTheParticipant() {
+        LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        PrintedForm foreign = PrintedForm.issuedForLmPolicy(UUID.fromString("01960000-0000-7000-8000-000000000009"),
+                new UskDocument(PrintedFormType.POLICY, "https://s3.sogaz.ru/rvl/lm/other.pdf", null), NOW);
+
+        JsonNode participant = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(CHILD_LM), List.of(), List.of(policy), List.of(foreign)), META)).path("data").path("participants").path(0);
+
+        assertThat(participant.path("documents")).isEmpty();
     }
 }

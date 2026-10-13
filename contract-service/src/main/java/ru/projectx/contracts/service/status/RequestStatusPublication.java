@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.IssuanceRequest;
-import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
+import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.MessageMeta;
@@ -44,16 +44,24 @@ public class RequestStatusPublication {
     public void afterTask(IssuanceSnapshot before, ContractTask task, Instant now) {
         IssuanceRequest request = requestOf(task.individualRequestId(), now);
         request.takeComposition(composition(task), now);
-        IssuanceSnapshot after = snapshots.current(request.individualRequestId());
-        if (StatusTransitions.publishAfterTask(before, after)) {
-            record(request, after, now);
-        }
+        publishIfChanged(request, before, now);
+    }
+
+    public void afterRecordChange(IssuanceSnapshot before, Instant now) {
+        publishIfChanged(requestOf(before.individualRequestId(), now), before, now);
     }
 
     public void afterCancellation(UUID individualRequestId, Instant now) {
         IssuanceRequest request = requestOf(individualRequestId, now);
         request.cancel(now);
         record(request, snapshots.current(individualRequestId), now);
+    }
+
+    private void publishIfChanged(IssuanceRequest request, IssuanceSnapshot before, Instant now) {
+        IssuanceSnapshot after = snapshots.current(request.individualRequestId());
+        if (StatusTransitions.publishAfterChange(before, after)) {
+            record(request, after, now);
+        }
     }
 
     private IssuanceRequest requestOf(UUID individualRequestId, Instant now) {

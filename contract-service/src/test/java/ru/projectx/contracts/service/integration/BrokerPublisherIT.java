@@ -35,6 +35,7 @@ class BrokerPublisherIT {
     private InternalBrokerProperties broker;
 
     @Autowired
+    @InternalBroker
     private TestQueues queues;
 
     @BeforeEach

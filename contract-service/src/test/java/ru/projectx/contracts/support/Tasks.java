@@ -20,20 +20,26 @@ public final class Tasks {
     public static final UUID CHILD = UUID.fromString("6778e8c2-985a-4d54-9bd3-0f6403b104d6");
     public static final LocalDate FROM = LocalDate.parse("2026-04-10");
     public static final LocalDate TO = LocalDate.parse("2026-04-24");
+    public static final UUID PROGRAM = UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a");
 
     private Tasks() {
     }
 
     public static ContractTask task(TaskParticipant... participants) {
-        return new ContractTask(REQUEST, INSURANCE_CONTRACT, INSURER_POLICY, FROM, TO, List.of(participants));
+        return new ContractTask(1, REQUEST, INSURANCE_CONTRACT, INSURER_POLICY, FROM, TO, List.of(participants));
+    }
+
+    public static ContractTask task(int entityVersion, TaskParticipant... participants) {
+        return new ContractTask(entityVersion, REQUEST, INSURANCE_CONTRACT, INSURER_POLICY, FROM, TO,
+                List.of(participants));
     }
 
     public static ContractTask task(LocalDate from, LocalDate to, TaskParticipant... participants) {
-        return new ContractTask(REQUEST, INSURANCE_CONTRACT, INSURER_POLICY, from, to, List.of(participants));
+        return new ContractTask(1, REQUEST, INSURANCE_CONTRACT, INSURER_POLICY, from, to, List.of(participants));
     }
 
     public static TaskParticipant insured(String amountDue) {
-        return new TaskParticipant(0, INSURED, false, new BigDecimal(amountDue), person("Тестов", null));
+        return new TaskParticipant(0, INSURED, false, new BigDecimal(amountDue), PROGRAM, person("Тестов", null));
     }
 
     public static TaskParticipant spouse(String amountDue) {
@@ -45,7 +51,12 @@ public final class Tasks {
     }
 
     public static TaskParticipant relative(int index, UUID id, String amountDue, @Nullable String relationType) {
-        return new TaskParticipant(index, id, true, new BigDecimal(amountDue), person("Тестова", relationType));
+        return relative(index, id, amountDue, relationType, PROGRAM);
+    }
+
+    public static TaskParticipant relative(int index, UUID id, String amountDue, @Nullable String relationType,
+            @Nullable UUID program) {
+        return new TaskParticipant(index, id, true, new BigDecimal(amountDue), program, person("Тестова", relationType));
     }
 
     public static ParticipantPerson person(String lastName, @Nullable String relationType) {

@@ -6,6 +6,7 @@ import java.util.UUID;
 public record IssuanceState(
         RequestReference request,
         UUID policyholderParticipantId,
+        Optional<UUID> programId,
         TripPeriod period,
         Optional<IssueError> error,
         Optional<Cancellation> cancellation,

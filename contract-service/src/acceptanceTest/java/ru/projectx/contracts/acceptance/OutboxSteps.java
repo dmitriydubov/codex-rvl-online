@@ -8,9 +8,7 @@ import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.awaitility.Awaitility;
 import ru.projectx.contracts.service.outbox.OutboxPublisher;
@@ -21,18 +19,21 @@ public class OutboxSteps {
 
     private final OutboxRecords journal;
     private final StatusQueue queue;
+    private final StandQueues queues;
     private final ReceivedStatusMessages received;
     private final OutboxPublisher publisher;
     private final ErasureStates erasureStates;
-    private final Map<String, UUID> rememberedMessageIds = new HashMap<>();
+    private final RememberedMessageIds rememberedMessageIds;
 
-    public OutboxSteps(OutboxRecords journal, StatusQueue queue, ReceivedStatusMessages received,
-            OutboxPublisher publisher, ErasureStates erasureStates) {
+    public OutboxSteps(OutboxRecords journal, StatusQueue queue, StandQueues queues, ReceivedStatusMessages received,
+            OutboxPublisher publisher, ErasureStates erasureStates, RememberedMessageIds rememberedMessageIds) {
         this.journal = journal;
         this.queue = queue;
+        this.queues = queues;
         this.received = received;
         this.publisher = publisher;
         this.erasureStates = erasureStates;
+        this.rememberedMessageIds = rememberedMessageIds;
     }
 
     @Когда("Договоры публикуют исходящие сообщения")
@@ -55,13 +56,17 @@ public class OutboxSteps {
     public void hasMessageId(int ordinal, String requestId) {
         UUID messageId = journal.number(ordinal, requestId).messageId();
         assertThat(messageId).isNotNull();
-        rememberedMessageIds.put(ordinal + "/" + requestId, messageId);
+        rememberedMessageIds.remember(ordinal, requestId, messageId);
+    }
+
+    @Тогда("тип события исходящего сообщения №{int} по заявке {string} — {string}")
+    public void eventType(int ordinal, String requestId, String eventType) {
+        assertThat(journal.number(ordinal, requestId).eventType()).isEqualTo(eventType);
     }
 
     @Тогда("message_id сообщения о состоянии выпуска №{int} совпадает с message_id исходящего сообщения №{int} по заявке {string}, присвоенным до публикации")
     public void receivedMessageIdMatchesTheRememberedOne(int receivedOrdinal, int ordinal, String requestId) {
-        UUID remembered = rememberedMessageIds.get(ordinal + "/" + requestId);
-        assertThat(remembered).as("message_id записи №%s, запомненный до публикации", ordinal).isNotNull();
+        UUID remembered = rememberedMessageIds.of(ordinal, requestId);
         GetResponse message = received.number(receivedOrdinal);
         assertThat(message.getProps().getMessageId()).isEqualTo(remembered.toString());
         assertThat(journal.number(ordinal, requestId).messageId()).isEqualTo(remembered);
@@ -109,8 +114,8 @@ public class OutboxSteps {
 
     @Тогда("очередь {string} пуста")
     public void queueEmpty(String queueName) {
-        assertThat(queue.called(queueName).state().getMessageCount()).as("сообщений в очереди %s", queue.name())
-                .isZero();
+        StandQueue target = queues.called(queueName);
+        assertThat(target.state().getMessageCount()).as("сообщений в очереди %s", target.name()).isZero();
     }
 
     @Тогда("сервис Заявок получает из очереди {string} сообщения о состоянии выпуска, всего за сценарий — {int}")
