@@ -83,6 +83,17 @@ class OutboxPublisherTest {
     }
 
     @Test
+    void interruptedWait_endsThePassWithoutRecordingAnAttempt() {
+        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(broker.publish(any())).willReturn(new PublishOutcome.Interrupted());
+
+        assertThat(publisher.publishDue()).isZero();
+
+        verify(broker).publish(any());
+        verifyNoInteractions(outcomes);
+    }
+
+    @Test
     void unconfirmedMessage_isRecordedAndEndsThePass() {
         given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
         PublishOutcome unconfirmed = new PublishOutcome.Unconfirmed(Duration.ofSeconds(10));

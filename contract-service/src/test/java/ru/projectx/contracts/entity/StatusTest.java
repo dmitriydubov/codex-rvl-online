@@ -33,6 +33,18 @@ class StatusTest {
 
     @ParameterizedTest
     @EnumSource(ContractStatus.class)
+    void contract_outcomeNamesItsStatusOnceFinished(ContractStatus status) {
+        assertThat(status.outcome().name().equals(status.name())).isEqualTo(status.finished());
+    }
+
+    @ParameterizedTest
+    @EnumSource(LmPolicyStatus.class)
+    void lmPolicy_outcomeNamesItsStatusOnceFinished(LmPolicyStatus status) {
+        assertThat(status.outcome().name().equals(status.name())).isEqualTo(status.finished());
+    }
+
+    @ParameterizedTest
+    @EnumSource(ContractStatus.class)
     void contract_isIssuedOnlyWhenIssuedAndInErrorOnlyWhenError(ContractStatus status) {
         assertThat(status.issued()).isEqualTo(status == ContractStatus.ISSUED);
         assertThat(status.error()).isEqualTo(status == ContractStatus.ERROR);

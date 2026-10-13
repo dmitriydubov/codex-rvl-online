@@ -10,6 +10,10 @@ public sealed interface PublishOutcome {
         return false;
     }
 
+    default boolean attempted() {
+        return true;
+    }
+
     record Delivered() implements PublishOutcome {
 
         @Override
@@ -42,6 +46,29 @@ public sealed interface PublishOutcome {
         @Override
         public boolean endsPass() {
             return true;
+        }
+
+        @Override
+        public boolean attempted() {
+            return false;
+        }
+    }
+
+    record Interrupted() implements PublishOutcome {
+
+        @Override
+        public String reason() {
+            return "ожидание подтверждения брокера прервано остановкой сервиса";
+        }
+
+        @Override
+        public boolean endsPass() {
+            return true;
+        }
+
+        @Override
+        public boolean attempted() {
+            return false;
         }
     }
 }

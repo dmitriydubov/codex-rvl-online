@@ -15,9 +15,9 @@ final class KmContractStates {
     static KmContractState of(ContractStatus status) {
         return switch (status) {
             case NEW -> throw new IllegalStateException("договор КМ без проекта в ответ сервису Заявок не попадает");
-            case ERROR, CANCELLED -> KmContractState.CANCELLED;
+            case DRAFT_READY, ACCEPTED, INVOICE_ISSUED, PAID, SUBMITTED -> KmContractState.DRAFTED;
             case ISSUED -> KmContractState.ISSUED;
-            default -> KmContractState.DRAFTED;
+            case ERROR, CANCELLED -> KmContractState.CANCELLED;
         };
     }
 }

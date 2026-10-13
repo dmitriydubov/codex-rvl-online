@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service;
 
+import ru.projectx.contracts.entity.DocumentKind;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,9 @@ public final class RequestIssuance {
 
     public RequestIssuance(List<Contract> contracts, List<LmPolicy> policies) {
         contracts.forEach(contract -> byParticipant.put(contract.insuredParticipantId(),
-                new ActiveIssuance(IssuanceKind.KM_CONTRACT, contract)));
+                new ActiveIssuance(DocumentKind.KM_CONTRACT, contract)));
         policies.forEach(policy -> byParticipant.put(policy.participantId(),
-                new ActiveIssuance(IssuanceKind.LM_POLICY, policy)));
+                new ActiveIssuance(DocumentKind.LM_POLICY, policy)));
     }
 
     public Optional<ActiveIssuance> of(UUID participantId) {
@@ -25,12 +26,12 @@ public final class RequestIssuance {
     }
 
     public Optional<Contract> contractOf(UUID participantId) {
-        return of(participantId).filter(active -> active.kind() == IssuanceKind.KM_CONTRACT)
+        return of(participantId).filter(active -> active.kind() == DocumentKind.KM_CONTRACT)
                 .map(active -> (Contract) active.record());
     }
 
     public Optional<LmPolicy> policyOf(UUID participantId) {
-        return of(participantId).filter(active -> active.kind() == IssuanceKind.LM_POLICY)
+        return of(participantId).filter(active -> active.kind() == DocumentKind.LM_POLICY)
                 .map(active -> (LmPolicy) active.record());
     }
 

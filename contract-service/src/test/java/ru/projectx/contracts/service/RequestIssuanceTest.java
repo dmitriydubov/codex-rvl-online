@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service;
 
+import ru.projectx.contracts.entity.DocumentKind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
@@ -29,8 +30,8 @@ class RequestIssuanceTest {
 
     @Test
     void activeRecords_areFoundByParticipantWithTheirKind() {
-        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(IssuanceKind.KM_CONTRACT, contract));
-        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(IssuanceKind.LM_POLICY, policy));
+        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, contract));
+        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(DocumentKind.LM_POLICY, policy));
         assertThat(issuance.of(Tasks.INSURED)).isEmpty();
     }
 

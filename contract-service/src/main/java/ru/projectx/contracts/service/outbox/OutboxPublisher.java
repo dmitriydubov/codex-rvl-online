@@ -57,7 +57,7 @@ public class OutboxPublisher {
     }
 
     private int record(OutboxMessage message, PublishOutcome outcome) {
-        if (outcome instanceof PublishOutcome.NotSent) {
+        if (!outcome.attempted()) {
             return 0;
         }
         outcomes.record(message.id(), outcome);

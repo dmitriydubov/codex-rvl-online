@@ -1,11 +1,9 @@
 package ru.projectx.contracts.service.integration;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
-import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.stereotype.Component;
@@ -27,13 +25,15 @@ public class BrokerPublisher implements OutboundPublisher {
 
     @Override
     public PublishOutcome publish(OutboundMessage message) {
-        Optional<OutboundRoute> route = routes.of(message.eventType());
-        if (route.isEmpty()) {
-            return new PublishOutcome.Refused("для типа события " + message.eventType() + " нет очереди");
-        }
+        return routes.of(message.eventType())
+                .map(route -> send(route, message))
+                .orElseGet(() -> new PublishOutcome.Refused("для типа события " + message.eventType() + " нет очереди"));
+    }
+
+    private PublishOutcome send(OutboundRoute route, OutboundMessage message) {
         CorrelationData correlation = new CorrelationData(message.messageId().toString());
         try {
-            route.get().send(amqpMessage(message), correlation);
+            route.send(amqpMessage(message), correlation);
         }
         catch (AmqpException unreachable) {
             return new PublishOutcome.NotSent("брокер недоступен: " + unreachable.getClass().getName());
@@ -47,7 +47,6 @@ public class BrokerPublisher implements OutboundPublisher {
         properties.setCorrelationId(message.correlationId().toString());
         properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         properties.setContentEncoding(StandardCharsets.UTF_8.name());
-        properties.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
         return MessageBuilder.withBody(message.payload().getBytes(StandardCharsets.UTF_8))
                 .andProperties(properties)
                 .build();

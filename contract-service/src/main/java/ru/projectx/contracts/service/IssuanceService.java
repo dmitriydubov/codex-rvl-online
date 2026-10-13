@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service;
 
+import ru.projectx.contracts.entity.DocumentKind;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -53,7 +54,7 @@ public class IssuanceService {
     }
 
     private void reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current, Instant now) {
-        IssuanceKind kind = IssuanceKind.of(participant);
+        DocumentKind kind = DocumentKinds.of(participant);
         current.of(participant.id())
                 .filter(active -> active.kind() != kind)
                 .ifPresent(active -> cancel(active.record(), KIND_CHANGED, now));

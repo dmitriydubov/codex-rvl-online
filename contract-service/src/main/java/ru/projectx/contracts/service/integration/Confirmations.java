@@ -28,7 +28,7 @@ final class Confirmations {
     private static PublishOutcome notConfirmed(Exception failure, Duration timeout) {
         if (failure instanceof InterruptedException) {
             Thread.currentThread().interrupt();
-            return new PublishOutcome.Rejected("ожидание подтверждения брокера прервано");
+            return new PublishOutcome.Interrupted();
         }
         if (failure instanceof TimeoutException) {
             return new PublishOutcome.Unconfirmed(timeout);

@@ -52,8 +52,9 @@ class RequestStatusPublicationTest {
 
     @Test
     void firstTask_startsTheRequestTakesTheCompositionAndRecordsTheFirstSnapshot() {
+        IssuanceRequest managed = IssuanceRequest.start(Tasks.REQUEST, NOW);
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.empty());
-        given(requests.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+        given(requests.save(any())).willReturn(managed);
         given(snapshots.current(Tasks.REQUEST)).willReturn(COMPLETED);
         given(messages.write(eq(COMPLETED), any())).willReturn("{\"data\": {}}");
 
@@ -62,8 +63,10 @@ class RequestStatusPublicationTest {
 
         ArgumentCaptor<IssuanceRequest> started = ArgumentCaptor.captor();
         verify(requests).save(started.capture());
-        assertThat(started.getValue().participants()).containsExactly(INSURED, SPOUSE_KM, CHILD_LM);
-        assertThat(started.getValue().snapshotVersion()).isEqualTo(1);
+        assertThat(started.getValue().individualRequestId()).isEqualTo(Tasks.REQUEST);
+        assertThat(started.getValue().participants()).as("несохранённый экземпляр не меняется").isEmpty();
+        assertThat(managed.participants()).containsExactly(INSURED, SPOUSE_KM, CHILD_LM);
+        assertThat(managed.snapshotVersion()).isEqualTo(1);
         ArgumentCaptor<OutboxDraft> draft = ArgumentCaptor.captor();
         verify(journal).record(draft.capture(), eq(NOW));
         assertThat(draft.getValue().aggregateType()).isEqualTo("INDIVIDUAL_REQUEST");

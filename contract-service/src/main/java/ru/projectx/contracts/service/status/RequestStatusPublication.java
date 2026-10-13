@@ -14,7 +14,7 @@ import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.StatusEvents;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
-import ru.projectx.contracts.service.IssuanceKind;
+import ru.projectx.contracts.service.DocumentKinds;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 
 @Service
@@ -63,7 +63,7 @@ public class RequestStatusPublication {
 
     private static List<RequestParticipant> composition(ContractTask task) {
         return task.participants().stream()
-                .map(participant -> new RequestParticipant(participant.id(), IssuanceKind.of(participant).document()))
+                .map(participant -> new RequestParticipant(participant.id(), DocumentKinds.of(participant)))
                 .toList();
     }
 

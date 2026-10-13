@@ -147,9 +147,11 @@ class OutboxOutcomesTest {
     }
 
     @Test
-    void notSent_isNoOutcomeToRecord() {
+    void notSentAndInterrupted_areNoOutcomesToRecord() {
         assertThatThrownBy(() -> outcomes.record(ID, new PublishOutcome.NotSent("брокер недоступен")))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("брокер недоступен");
+        assertThatThrownBy(() -> outcomes.record(ID, new PublishOutcome.Interrupted()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("прервано остановкой сервиса");
         assertThat(message.attempts()).isZero();
     }
 

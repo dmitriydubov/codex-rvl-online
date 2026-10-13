@@ -1,14 +1,24 @@
 package ru.projectx.contracts.entity;
 
-import java.util.Set;
-
 public enum ContractStatus implements IssuanceStatus {
-    NEW, DRAFT_READY, ACCEPTED, INVOICE_ISSUED, PAID, SUBMITTED, ISSUED, ERROR, CANCELLED;
+    NEW(IssuanceOutcome.PENDING),
+    DRAFT_READY(IssuanceOutcome.PENDING),
+    ACCEPTED(IssuanceOutcome.PENDING),
+    INVOICE_ISSUED(IssuanceOutcome.PENDING),
+    PAID(IssuanceOutcome.PENDING),
+    SUBMITTED(IssuanceOutcome.PENDING),
+    ISSUED(IssuanceOutcome.ISSUED),
+    ERROR(IssuanceOutcome.ERROR),
+    CANCELLED(IssuanceOutcome.CANCELLED);
 
-    private static final Set<ContractStatus> FINISHED = Set.of(ISSUED, ERROR, CANCELLED);
+    private final IssuanceOutcome outcome;
+
+    ContractStatus(IssuanceOutcome outcome) {
+        this.outcome = outcome;
+    }
 
     @Override
-    public boolean finished() {
-        return FINISHED.contains(this);
+    public IssuanceOutcome outcome() {
+        return outcome;
     }
 }

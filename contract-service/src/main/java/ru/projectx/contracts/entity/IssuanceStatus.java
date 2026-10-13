@@ -2,22 +2,21 @@ package ru.projectx.contracts.entity;
 
 public interface IssuanceStatus {
 
-    String ISSUED = "ISSUED";
-    String ERROR = "ERROR";
+    IssuanceOutcome outcome();
 
-    String name();
-
-    boolean finished();
+    default boolean finished() {
+        return outcome() != IssuanceOutcome.PENDING;
+    }
 
     default boolean issued() {
-        return ISSUED.equals(name());
+        return outcome() == IssuanceOutcome.ISSUED;
     }
 
     default boolean error() {
-        return ERROR.equals(name());
+        return outcome() == IssuanceOutcome.ERROR;
     }
 
     default boolean stopped() {
-        return finished() && !issued();
+        return outcome() == IssuanceOutcome.ERROR || outcome() == IssuanceOutcome.CANCELLED;
     }
 }

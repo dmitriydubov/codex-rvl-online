@@ -66,6 +66,8 @@ class BrokerPublisherTest {
         assertThat(properties.getContentType()).isEqualTo(MessageProperties.CONTENT_TYPE_JSON);
         assertThat(properties.getContentEncoding()).isEqualTo("UTF-8");
         assertThat(properties.getDeliveryMode()).isEqualTo(MessageDeliveryMode.PERSISTENT);
+        assertThat(MessageProperties.DEFAULT_DELIVERY_MODE).as("persistent — умолчание Spring AMQP")
+                .isEqualTo(MessageDeliveryMode.PERSISTENT);
     }
 
     @Test
@@ -116,7 +118,7 @@ class BrokerPublisherTest {
         PublishOutcome outcome = publisher.publish(STATUS);
 
         assertThat(Thread.interrupted()).as("флаг прерывания восстановлен").isTrue();
-        assertThat(outcome).isEqualTo(new PublishOutcome.Rejected("ожидание подтверждения брокера прервано"));
+        assertThat(outcome).isEqualTo(new PublishOutcome.Interrupted());
     }
 
     @Test

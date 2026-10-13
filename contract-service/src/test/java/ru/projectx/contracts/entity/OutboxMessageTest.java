@@ -42,6 +42,17 @@ class OutboxMessageTest {
     }
 
     @Test
+    void markPublished_afterRetry_clearsTheScheduleAndCountsBothAttempts() {
+        message.markRetry("подтверждение не получено", NOW.plusSeconds(60));
+        message.markPublished(NOW.plusSeconds(65));
+
+        assertThat(message.status()).isEqualTo(OutboxStatus.PUBLISHED);
+        assertThat(message.attempts()).isEqualTo(2);
+        assertThat(message).hasFieldOrPropertyWithValue("publishedAt", NOW.plusSeconds(65))
+                .hasFieldOrPropertyWithValue("nextAttemptAt", null);
+    }
+
+    @Test
     void markRetry_countsTheAttemptAndSchedulesTheNextOne() {
         message.markRetry("подтверждение не получено", NOW.plusSeconds(60));
 

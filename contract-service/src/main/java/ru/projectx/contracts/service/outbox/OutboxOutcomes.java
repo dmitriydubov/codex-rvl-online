@@ -46,9 +46,13 @@ public class OutboxOutcomes {
             case PublishOutcome.Refused refused -> reject(message, refused.reason());
             case PublishOutcome.Rejected rejected -> retryOrReject(message, rejected.reason());
             case PublishOutcome.Unconfirmed unconfirmed -> retryOrReject(message, unconfirmed.reason());
-            case PublishOutcome.NotSent notSent -> throw new IllegalArgumentException(
-                    "неотправленное сообщение исхода не имеет: " + notSent.reason());
+            case PublishOutcome.NotSent notSent -> throw notAnOutcome(notSent);
+            case PublishOutcome.Interrupted interrupted -> throw notAnOutcome(interrupted);
         }
+    }
+
+    private static IllegalArgumentException notAnOutcome(PublishOutcome outcome) {
+        return new IllegalArgumentException("неотправленное сообщение исхода не имеет: " + outcome.reason());
     }
 
     private void retryOrReject(OutboxMessage message, String reason) {
