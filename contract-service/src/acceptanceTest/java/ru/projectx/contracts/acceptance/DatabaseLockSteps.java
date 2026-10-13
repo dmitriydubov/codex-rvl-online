@@ -17,6 +17,7 @@ public class DatabaseLockSteps {
 
     private static final Map<String, String> TABLES = Map.of(
             "журнал входящих сообщений", "inbox_messages",
+            "журнал исходящих сообщений", "outbox_messages",
             "договоры КМ", "contracts");
 
     private final DataSource dataSource;

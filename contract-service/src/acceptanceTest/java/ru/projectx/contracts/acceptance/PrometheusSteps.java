@@ -31,11 +31,20 @@ public class PrometheusSteps {
     }
 
     @Тогда("счётчик Prometheus {string} с меткой event_type {string} вырос за сценарий на {int}")
-    public void counterGrew(String name, String eventType, int growth) throws IOException, InterruptedException {
-        double now = valueOf(scrape(), name, eventType);
+    public void counterGrewByEventType(String name, String eventType, int growth) throws IOException, InterruptedException {
+        counterGrew(name, "event_type", eventType, growth);
+    }
 
-        assertThat(now - valueOf(beforeScenario, name, eventType))
-                .as("прирост %s{event_type=\"%s\"} за сценарий", name, eventType)
+    @Тогда("счётчик Prometheus {string} с меткой reason {string} вырос за сценарий на {int}")
+    public void counterGrewByReason(String name, String reason, int growth) throws IOException, InterruptedException {
+        counterGrew(name, "reason", reason, growth);
+    }
+
+    private void counterGrew(String name, String label, String value, int growth) throws IOException, InterruptedException {
+        double now = valueOf(scrape(), name, label, value);
+
+        assertThat(now - valueOf(beforeScenario, name, label, value))
+                .as("прирост %s{%s=\"%s\"} за сценарий", name, label, value)
                 .isEqualTo(growth);
     }
 
@@ -46,8 +55,8 @@ public class PrometheusSteps {
         return response.body();
     }
 
-    private static double valueOf(String exposition, String name, String eventType) {
-        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "\\{[^}]*event_type=\"" + Pattern.quote(eventType)
+    private static double valueOf(String exposition, String name, String label, String value) {
+        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "\\{[^}]*" + label + "=\"" + Pattern.quote(value)
                 + "\"[^}]*} (\\S+)$", Pattern.MULTILINE);
         return series.matcher(exposition).results()
                 .mapToDouble(match -> Double.parseDouble(match.group(1)))

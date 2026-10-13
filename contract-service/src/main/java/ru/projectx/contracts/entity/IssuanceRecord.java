@@ -68,6 +68,8 @@ public abstract class IssuanceRecord {
 
     public abstract IssuanceStatus status();
 
+    public abstract UUID participantId();
+
     public boolean finished() {
         return status().finished();
     }

@@ -30,6 +30,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.InboxReceiver;
 import ru.projectx.contracts.service.inbox.ReceiptOutcome;
 import ru.projectx.contracts.support.TaskBodies;
@@ -45,12 +46,13 @@ class TaskQueueListenerTest {
     private final InboxReceiver receiver = mock();
     private final Channel channel = mock();
     private final Pauses pauses = mock();
+    private final InboxMetrics metrics = mock();
     private final TaskQueueListener listener = new TaskQueueListener(
             new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
             new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
                     new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
-                    REQUEUE_DELAY), pauses);
+                    REQUEUE_DELAY), pauses, metrics);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
     private final Logger log = (Logger) LoggerFactory.getLogger(TaskQueueListener.class);
 
@@ -94,6 +96,7 @@ class TaskQueueListenerTest {
 
         verify(channel).basicAck(7L, false);
         verify(receiver, never()).receive(any(), anyString());
+        verify(metrics).countLost("unusable_envelope");
         assertThat(journal.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
             assertThat(event.getFormattedMessage())
@@ -146,6 +149,7 @@ class TaskQueueListenerTest {
 
         verify(channel).basicAck(7L, false);
         verify(receiver, never()).receive(any(), anyString());
+        verify(metrics).countLost("unstorable_text");
         verifyNoInteractions(pauses);
         assertThat(journal.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
@@ -154,6 +158,27 @@ class TaskQueueListenerTest {
                     .doesNotContain("Тест");
             assertThat(event.getThrowableProxy()).isNull();
         });
+    }
+
+    @Test
+    void unreadableBody_isAcknowledgedLostAndCountedByItsOwnReason() throws IOException {
+        listener.onMessage(message("<не JSON> Тестова"), channel);
+
+        verify(channel).basicAck(7L, false);
+        verify(metrics).countLost("unreadable_body");
+        verifyNoInteractions(receiver);
+        assertThat(journal.list).singleElement().satisfies(event ->
+                assertThat(event.getFormattedMessage()).contains("потеряно: тело не читается как JSON").doesNotContain("Тестова"));
+    }
+
+    @Test
+    void storedMessage_countsNoLoss() throws IOException {
+        String body = TaskBodies.upserted().toJson();
+        given(receiver.receive(RECEIPT, body)).willReturn(ReceiptOutcome.STORED);
+
+        listener.onMessage(message(body), channel);
+
+        verifyNoInteractions(metrics);
     }
 
     @Test

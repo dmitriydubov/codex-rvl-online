@@ -11,4 +11,6 @@ public interface LmPolicyRepository extends JpaRepository<LmPolicy, UUID> {
 
     List<LmPolicy> findByRequestIndividualRequestIdAndStatusNotIn(UUID individualRequestId,
             Collection<LmPolicyStatus> statuses);
+
+    List<LmPolicy> findByRequestIndividualRequestId(UUID individualRequestId);
 }

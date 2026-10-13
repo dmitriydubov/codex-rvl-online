@@ -72,7 +72,8 @@ public class Contract extends IssuanceRecord {
         return status;
     }
 
-    public UUID insuredParticipantId() {
+    @Override
+    public UUID participantId() {
         return insuredParticipantId;
     }
 

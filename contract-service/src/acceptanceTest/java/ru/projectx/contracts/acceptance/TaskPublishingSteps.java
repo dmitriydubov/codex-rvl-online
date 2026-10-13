@@ -69,12 +69,10 @@ public class TaskPublishingSteps {
             case "meta.message_id не GUID" -> meta.put("message_id", "1-2-3-4-5");
             case "meta.correlation_id не GUID" -> meta.put("correlation_id", "1-2-3-4-5");
             case "meta.entity_version не число" -> meta.put("entity_version", "три");
-            case "тело не JSON" -> { }
+            case "тело не JSON", "нулевой символ в теле", "непарный суррогат в теле" -> { }
             default -> throw new IllegalArgumentException("неизвестный дефект конверта: " + defect);
         }
-        byte[] bytes = "тело не JSON".equals(defect)
-                ? ("<не JSON> " + new String(messages.bytes(body), StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8)
-                : messages.bytes(body);
+        byte[] bytes = defectiveBytes(defect, new String(messages.bytes(body), StandardCharsets.UTF_8));
         published.rememberDefectiveEnvelope(bytes);
         published.rememberDefectiveEnvelopeSource(messages.bytes(messages.upserted(
                 "b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11", "61a7982c-a0b4-4bbf-9527-60b40b752803", 1,
@@ -85,6 +83,19 @@ public class TaskPublishingSteps {
     @Дано("сервис Заявок публикует в свою очередь прекращение работы {string} по заявке {string} версии {int}:")
     public void cancellationPublished(String messageId, String requestId, int version, Map<String, String> fields) {
         publish(messageId, messages.cancelled(messageId, requestId, version, fields));
+    }
+
+    private static byte[] defectiveBytes(String defect, String json) {
+        String text = switch (defect) {
+            case "тело не JSON" -> "<не JSON> " + json;
+            case "нулевой символ в теле" -> json.replace("Тестовый адрес, 1", "Тестовый адрес, 1 \\u0000");
+            case "непарный суррогат в теле" -> json.replace("Тестовый адрес, 1", "Тестовый адрес, 1 \\ud800");
+            default -> json;
+        };
+        if (text.equals(json) && defect.endsWith(" в теле")) {
+            throw new IllegalStateException("дефект " + defect + " не внесён: в теле нет адреса участника 0");
+        }
+        return text.getBytes(StandardCharsets.UTF_8);
     }
 
     private void publish(String messageId, ObjectNode body) {

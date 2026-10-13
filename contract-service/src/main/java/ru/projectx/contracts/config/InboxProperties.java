@@ -25,11 +25,7 @@ public record InboxProperties(
     public record Retry(@NotEmpty List<@NotNull @DurationMin(millis = 0) Duration> backoff) {
 
         public Optional<Duration> delayAfterFailedAttempt(int attempt) {
-            int index = attempt - 1;
-            if (index < 0 || index >= backoff.size()) {
-                return Optional.empty();
-            }
-            return Optional.of(backoff.get(index));
+            return RetryLadders.delayAfterFailedAttempt(backoff, attempt);
         }
     }
 

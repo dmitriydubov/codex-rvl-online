@@ -2,45 +2,61 @@ package ru.projectx.contracts.service.inbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 import ru.projectx.contracts.service.IssuanceService;
 import ru.projectx.contracts.service.TaskCancellationService;
+import ru.projectx.contracts.service.status.IssuanceSnapshot;
+import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.support.Tasks;
 
 class EventHandlersTest {
 
     private static final Instant NOW = Instant.parse("2026-02-10T07:05:00Z");
+    private static final UUID REQUEST = UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803");
+
+    private final RequestStatusPublication statuses = mock();
 
     @Test
-    void upsertedHandler_parsesTaskAndAppliesIssuance() {
+    void upsertedHandler_watchesTheRequestAppliesTheTaskAndThenReportsTheStatus() {
         ContractTaskParser parser = mock();
         IssuanceService issuance = mock();
-        ContractTask task = mock();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"));
+        IssuanceSnapshot before = new IssuanceSnapshot(REQUEST, false, List.of(), List.of(), List.of());
         given(parser.parse("body")).willReturn(task);
-        ContractTaskUpsertedHandler handler = new ContractTaskUpsertedHandler(parser, issuance);
+        given(statuses.watch(REQUEST)).willReturn(before);
+        ContractTaskUpsertedHandler handler = new ContractTaskUpsertedHandler(parser, issuance, statuses);
 
         handler.handle("body", NOW);
 
         assertThat(handler.eventType()).isEqualTo("ContractTaskUpserted");
-        verify(issuance).apply(task, NOW);
+        InOrder order = inOrder(statuses, issuance);
+        order.verify(statuses).watch(REQUEST);
+        order.verify(issuance).apply(task, NOW);
+        order.verify(statuses).afterTask(before, task, NOW);
     }
 
     @Test
-    void cancelledHandler_parsesCancellationAndAppliesIt() {
+    void cancelledHandler_appliesTheCancellationAndThenReportsTheStatus() {
         TaskCancellationParser parser = mock();
         TaskCancellationService cancellation = mock();
-        ContractTaskCancellation parsed = mock();
+        ContractTaskCancellation parsed = new ContractTaskCancellation(REQUEST, NOW, "EXPIRED", null);
         given(parser.parse("body")).willReturn(parsed);
-        ContractTaskCancelledHandler handler = new ContractTaskCancelledHandler(parser, cancellation);
+        ContractTaskCancelledHandler handler = new ContractTaskCancelledHandler(parser, cancellation, statuses);
 
         handler.handle("body", NOW);
 
         assertThat(handler.eventType()).isEqualTo("ContractTaskCancelled");
-        verify(cancellation).apply(parsed, NOW);
+        InOrder order = inOrder(cancellation, statuses);
+        order.verify(cancellation).apply(parsed, NOW);
+        order.verify(statuses).afterCancellation(REQUEST, NOW);
     }
 }
