@@ -8,11 +8,12 @@ final class StatusTransitions {
     }
 
     static boolean publishAfterChange(IssuanceSnapshot before, IssuanceSnapshot after) {
-        return !KmContractStates.anyUndrafted(after) && (stoppedSince(before, after) || completedSince(before, after));
+        return !KmContractStates.anyUndrafted(after) && (enteredSince(before, after) || completedSince(before, after));
     }
 
-    private static boolean stoppedSince(IssuanceSnapshot before, IssuanceSnapshot after) {
-        return after.records().stream().filter(RecordOutcome::stopped).anyMatch(record -> !before.knows(record));
+    private static boolean enteredSince(IssuanceSnapshot before, IssuanceSnapshot after) {
+        return after.records().stream().filter(RecordOutcome::reportedOnEntry)
+                .anyMatch(record -> !before.knows(record));
     }
 
     private static boolean completedSince(IssuanceSnapshot before, IssuanceSnapshot after) {
