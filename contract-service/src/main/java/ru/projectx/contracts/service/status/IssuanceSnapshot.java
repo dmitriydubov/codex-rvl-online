@@ -21,6 +21,9 @@ import ru.projectx.contracts.message.RequestStatus;
 
 public final class IssuanceSnapshot {
 
+    private static final String KM_CONTRACT = "договора КМ";
+    private static final String LM_POLICY = "полиса ЛМ";
+
     private final UUID individualRequestId;
     private final boolean cancelled;
     private final List<RequestParticipant> composition;
@@ -70,32 +73,25 @@ public final class IssuanceSnapshot {
     }
 
     public Contract contractOf(UUID participantId) {
-        return Optional.ofNullable(latestContracts.get(participantId))
-                .orElseThrow(() -> missing("договора КМ", participantId));
+        return latest(latestContracts, participantId, KM_CONTRACT);
     }
 
     public LmPolicy policyOf(UUID participantId) {
-        return Optional.ofNullable(latestPolicies.get(participantId))
-                .orElseThrow(() -> missing("полиса ЛМ", participantId));
+        return latest(latestPolicies, participantId, LM_POLICY);
     }
 
     public Optional<IssuanceStatus> statusOf(RequestParticipant participant) {
         UUID participantId = participant.participantId();
         return switch (participant.kind()) {
             case NONE -> Optional.empty();
-            case KM_CONTRACT -> Optional.of(contractStatusOf(participantId));
-            case LM_POLICY -> Optional.of(Optional.ofNullable(latestPolicyStatuses.get(participantId))
-                    .orElseThrow(() -> missing("полиса ЛМ", participantId)));
+            case KM_CONTRACT -> Optional.of(latest(latestContractStatuses, participantId, KM_CONTRACT));
+            case LM_POLICY -> Optional.of(latest(latestPolicyStatuses, participantId, LM_POLICY));
         };
     }
 
-    private ContractStatus contractStatusOf(UUID participantId) {
-        return Optional.ofNullable(latestContractStatuses.get(participantId))
-                .orElseThrow(() -> missing("договора КМ", participantId));
-    }
-
-    private static IllegalStateException missing(String record, UUID participantId) {
-        return new IllegalStateException("у участника " + participantId + " нет " + record);
+    private static <V> V latest(Map<UUID, V> byParticipant, UUID participantId, String record) {
+        return Optional.ofNullable(byParticipant.get(participantId))
+                .orElseThrow(() -> new IllegalStateException("у участника " + participantId + " нет " + record));
     }
 
     public RequestStatus requestStatus() {
@@ -105,7 +101,7 @@ public final class IssuanceSnapshot {
     public boolean hasUndraftedKmContract() {
         return composition.stream()
                 .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
-                .map(participant -> contractStatusOf(participant.participantId()))
+                .map(participant -> latest(latestContractStatuses, participant.participantId(), KM_CONTRACT))
                 .anyMatch(KmContractStates::undrafted);
     }
 }
