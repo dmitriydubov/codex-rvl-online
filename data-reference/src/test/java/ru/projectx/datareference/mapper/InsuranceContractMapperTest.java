@@ -54,7 +54,7 @@ class InsuranceContractMapperTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", " "})
-    void withoutDmsProductSetting_everyContractIsSkipped(String dmsProduct) {
+    void dmsProductSettingOfBlankValuesOnly_skipsEveryContract(String dmsProduct) {
         ImportResult result = mapper(Arrays.asList(dmsProduct), INSURER_ROLE)
                 .apply(contract(DMS, party(INSURER, "Страхователь")));
 
@@ -69,6 +69,7 @@ class InsuranceContractMapperTest {
 
         assertThat(result).isEqualTo(ImportResult.skipped("не задан projectx.onec.contract.dms-product-type"
                 + " — отличить ДМС от прочих продуктов страхования нечем"));
+        verifyNoInteractions(repository);
     }
 
     @ParameterizedTest
