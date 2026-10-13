@@ -17,7 +17,8 @@ final class KmContractStates {
     static boolean anyUndrafted(IssuanceSnapshot snapshot) {
         return snapshot.composition().stream()
                 .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
-                .map(participant -> snapshot.statusOf(participant).orElseThrow())
+                .map(participant -> snapshot.statusOf(participant).orElseThrow(() -> new IllegalStateException(
+                        "у участника " + participant.participantId() + " нет записи о выпуске")))
                 .anyMatch(KmContractStates::undrafted);
     }
 

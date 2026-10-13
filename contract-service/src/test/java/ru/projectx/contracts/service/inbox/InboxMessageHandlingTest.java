@@ -172,6 +172,19 @@ class InboxMessageHandlingTest {
     }
 
     @Test
+    void messageFinishedWhileTheWorkWasPrepared_isNotAppliedInTheSecondTransaction() {
+        given(handler.prepare("{\"data\":{}}")).willAnswer(invocation -> {
+            message.markProcessed(NOW.minusSeconds(1));
+            return work;
+        });
+
+        handling.process(message.id());
+
+        verify(work, never()).apply(any());
+        assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
+    }
+
+    @Test
     void messageAlreadyFinished_isLeftAlone() {
         message.markProcessed(NOW.minusSeconds(1));
 

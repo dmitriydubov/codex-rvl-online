@@ -71,6 +71,9 @@ public class InboxMessageHandling {
 
     private void complete(UUID id, InboxWork work) {
         InboxMessage message = load(id);
+        if (message.status() != InboxStatus.NEW) {
+            return;
+        }
         work.apply(clock.instant());
         message.markProcessed(clock.instant());
     }

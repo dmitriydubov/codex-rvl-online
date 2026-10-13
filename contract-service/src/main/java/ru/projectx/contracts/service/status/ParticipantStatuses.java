@@ -26,8 +26,13 @@ final class ParticipantStatuses {
         return switch (participant.kind()) {
             case NONE -> ParticipantStatus.nothingIssued(id);
             case KM_CONTRACT -> kmContract(id, snapshot.contractOf(id));
-            case LM_POLICY -> lmPolicy(id, snapshot.policyOf(id), snapshot.formsOf(snapshot.policyOf(id)));
+            case LM_POLICY -> lmPolicy(id, snapshot);
         };
+    }
+
+    private static ParticipantStatus lmPolicy(UUID id, IssuanceSnapshot snapshot) {
+        LmPolicy policy = snapshot.policyOf(id);
+        return lmPolicy(id, policy, snapshot.formsOf(policy));
     }
 
     private static ParticipantStatus kmContract(UUID id, Contract contract) {

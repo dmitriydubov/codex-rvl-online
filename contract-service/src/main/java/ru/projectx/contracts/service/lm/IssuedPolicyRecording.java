@@ -72,7 +72,6 @@ public class IssuedPolicyRecording {
         statuses.afterRecordChange(before, now);
     }
 
-    @Transactional
     public void recordLate(UUID policyId) {
         warnUnchanged(load(policyId));
     }

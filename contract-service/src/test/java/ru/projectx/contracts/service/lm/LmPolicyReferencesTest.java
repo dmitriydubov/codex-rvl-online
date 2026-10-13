@@ -75,12 +75,21 @@ class LmPolicyReferencesTest {
     }
 
     @Test
+    void unavailableProgram_stopsReadingTheOtherReferences() {
+        given(programs.program(Tasks.PROGRAM))
+                .willThrow(new ReferenceUnavailableException(ReferenceUnavailableException.Reason.TIMEOUT));
+
+        assertThat(references.resolve(state)).isEqualTo(new RequestResolution.Unavailable(ReferenceKind.PROGRAM));
+        verifyNoInteractions(insuranceContracts, policies);
+    }
+
+    @Test
     void policyWithoutProgram_isRefusedWithoutReadingAnything() {
         IssuanceState withoutProgram = new IssuanceState(state.request(), state.policyholderParticipantId(),
                 Optional.empty(), state.period(), Optional.empty(), Optional.empty(), 1);
 
         assertThat(references.resolve(withoutProgram)).isEqualTo(new RequestResolution.Refused(
-                new IssueError("PROGRAM_REQUIRED", "у полиса ЛМ нет программы страхования")));
+                new IssueError("PROGRAM_REQUIRED", "у записи о выпуске нет программы страхования")));
         verifyNoInteractions(programs, insuranceContracts, policies);
     }
 }

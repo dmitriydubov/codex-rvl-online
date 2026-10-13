@@ -2,7 +2,10 @@ package ru.projectx.contracts.service.lm;
 
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.exception.ContractViolationException;
+import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
+import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.TemporaryFailureException;
 import ru.projectx.contracts.service.reference.PolicyReads;
@@ -23,10 +26,24 @@ public class IssuedPolicyLookup {
 
     public UUID find(UUID policyExternalId) {
         try {
-            return policies.policyByExternalId(policyExternalId).id();
+            return finalAnswer(policyExternalId);
         }
         catch (ReferenceUnavailableException unavailable) {
             throw postponed(policyExternalId, unavailable);
+        }
+    }
+
+    private UUID finalAnswer(UUID policyExternalId) {
+        try {
+            return policies.policyByExternalId(policyExternalId).id();
+        }
+        catch (ReferenceArchivedException archived) {
+            throw new ContractViolationException("выпущенный полис " + policyExternalId
+                    + " в архиве справочного сервиса", archived);
+        }
+        catch (ReferenceRejectedException rejected) {
+            throw new ContractViolationException("справочный сервис отклонил поиск полиса " + policyExternalId
+                    + ": " + rejected.code(), rejected);
         }
     }
 

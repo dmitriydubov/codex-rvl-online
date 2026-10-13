@@ -11,6 +11,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.ReferencePolicy;
+import ru.projectx.contracts.exception.ContractViolationException;
+import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
@@ -57,9 +59,21 @@ class IssuedPolicyLookupTest {
     }
 
     @Test
-    void finalRefusal_propagates() {
+    void archivedIssuedPolicy_isContractViolationNamingTheExternalId() {
+        given(policies.policyByExternalId(EXTERNAL_ID))
+                .willThrow(new ReferenceArchivedException(ReferenceKind.POLICY, EXTERNAL_ID));
+
+        assertThatThrownBy(() -> lookup.find(EXTERNAL_ID)).isInstanceOf(ContractViolationException.class)
+                .hasMessage("выпущенный полис " + EXTERNAL_ID + " в архиве справочного сервиса");
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void refusedLookup_isContractViolationNamingTheReferenceCode() {
         given(policies.policyByExternalId(EXTERNAL_ID)).willThrow(new ReferenceRejectedException(400, "VALIDATION_ERROR"));
 
-        assertThatThrownBy(() -> lookup.find(EXTERNAL_ID)).isInstanceOf(ReferenceRejectedException.class);
+        assertThatThrownBy(() -> lookup.find(EXTERNAL_ID)).isInstanceOf(ContractViolationException.class)
+                .hasMessage("справочный сервис отклонил поиск полиса " + EXTERNAL_ID + ": VALIDATION_ERROR");
+        verifyNoInteractions(metrics);
     }
 }
