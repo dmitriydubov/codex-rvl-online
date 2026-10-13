@@ -1,6 +1,5 @@
 package ru.projectx.contracts.service.status;
 
-import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.message.RequestStatus;
 
 final class StatusTransitions {
@@ -18,7 +17,7 @@ final class StatusTransitions {
     }
 
     private static boolean reportedOnEntry(RecordOutcome record) {
-        return record.stopped() || record.status() == ContractStatus.DRAFT_READY;
+        return record.stopped() || KmContractStates.reportedOnEntry(record.status());
     }
 
     private static boolean completedSince(IssuanceSnapshot before, IssuanceSnapshot after) {
