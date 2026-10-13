@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.status;
 
+import java.util.Optional;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceStatus;
@@ -17,8 +18,8 @@ final class KmContractStates {
     static boolean anyUndrafted(IssuanceSnapshot snapshot) {
         return snapshot.composition().stream()
                 .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
-                .map(participant -> snapshot.statusOf(participant).orElseThrow(() -> new IllegalStateException(
-                        "у участника " + participant.participantId() + " нет записи о выпуске")))
+                .map(snapshot::statusOf)
+                .flatMap(Optional::stream)
                 .anyMatch(KmContractStates::undrafted);
     }
 
