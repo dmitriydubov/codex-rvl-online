@@ -2,6 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import static ru.projectx.datareference.acceptance.StepTables.flag;
 import static ru.projectx.datareference.acceptance.StepTables.flagOr;
+import static ru.projectx.datareference.acceptance.StepTables.oneOf;
 import static ru.projectx.datareference.acceptance.StepTables.onlyKnown;
 import static ru.projectx.datareference.acceptance.StepTables.required;
 
@@ -25,6 +26,7 @@ final class OneCMessages {
     private static final String INSURER_ROLE = "Страхователь";
     private static final String PARTY = "контрагент";
     private static final String PARTY_ROLE = "роль контрагента";
+    private static final Set<String> PARTY_ROLES = Set.of(INSURER_ROLE, "Застрахованный");
     private static final BigDecimal POLICY_PROGRAM_LIMIT = new BigDecimal("150000.00");
     private static final String EMAIL_PROPERTY = "Адрес элпочты застрахованного";
     private static final String PLACEHOLDER_LAST_NAME = "Заглушкин";
@@ -96,7 +98,8 @@ final class OneCMessages {
                 .put("dateEndISO", required(table, "окончание"))
                 .put("notActive", false);
         Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addParty(data, insurer, INSURER_ROLE));
-        Optional.ofNullable(table.get(PARTY)).ifPresent(party -> addParty(data, party, required(table, PARTY_ROLE)));
+        Optional.ofNullable(table.get(PARTY))
+                .ifPresent(party -> addParty(data, party, oneOf(table, PARTY_ROLE, PARTY_ROLES)));
         return new OneCMessage(OneCStream.INSURANCE_CONTRACTS, CONTRACTS_QUEUE, data, expected, fixedMessageId(table));
     }
 
