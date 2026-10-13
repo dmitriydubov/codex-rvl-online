@@ -1,6 +1,7 @@
 package ru.projectx.contracts.repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,16 +29,18 @@ public interface InboxMessageRepository extends JpaRepository<InboxMessage, UUID
             """)
     List<InboxMessage> findDueIn(@Param("status") InboxStatus status, @Param("now") Instant now, Limit limit);
 
-    default Optional<Integer> maxProcessedVersion(UUID correlationId) {
-        return maxVersionIn(correlationId, InboxStatus.PROCESSED);
+    default Optional<Integer> maxProcessedVersion(UUID correlationId, Collection<String> eventTypes) {
+        return maxVersionIn(correlationId, eventTypes, InboxStatus.PROCESSED);
     }
 
     @Query("""
             select max(m.entityVersion) from InboxMessage m
              where m.correlationId = :correlationId
+               and m.eventType in :eventTypes
                and m.status = :status
             """)
-    Optional<Integer> maxVersionIn(@Param("correlationId") UUID correlationId, @Param("status") InboxStatus status);
+    Optional<Integer> maxVersionIn(@Param("correlationId") UUID correlationId,
+            @Param("eventTypes") Collection<String> eventTypes, @Param("status") InboxStatus status);
 
     @Modifying
     @Query(value = """

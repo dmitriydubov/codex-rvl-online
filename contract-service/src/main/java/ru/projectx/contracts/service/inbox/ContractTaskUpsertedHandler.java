@@ -1,6 +1,5 @@
 package ru.projectx.contracts.service.inbox;
 
-import java.time.Instant;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskEvents;
@@ -9,15 +8,14 @@ import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 
 @Component
-public class ContractTaskUpsertedHandler implements InboxEventHandler {
+public class ContractTaskUpsertedHandler extends ParsedEventHandler<ContractTask> {
 
-    private final ContractTaskParser parser;
     private final IssuanceService issuance;
     private final RequestStatusPublication statuses;
 
     public ContractTaskUpsertedHandler(ContractTaskParser parser, IssuanceService issuance,
             RequestStatusPublication statuses) {
-        this.parser = parser;
+        super(parser);
         this.issuance = issuance;
         this.statuses = statuses;
     }
@@ -28,10 +26,11 @@ public class ContractTaskUpsertedHandler implements InboxEventHandler {
     }
 
     @Override
-    public void handle(String payload, Instant now) {
-        ContractTask task = parser.parse(payload);
-        IssuanceSnapshot before = statuses.watch(task.individualRequestId());
-        issuance.apply(task, now);
-        statuses.afterTask(before, task, now);
+    protected InboxWork work(ContractTask task) {
+        return now -> {
+            IssuanceSnapshot before = statuses.watch(task.individualRequestId());
+            issuance.apply(task, now);
+            statuses.afterTask(before, task, now);
+        };
     }
 }

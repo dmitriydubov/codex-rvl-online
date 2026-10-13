@@ -20,7 +20,7 @@ import ru.projectx.contracts.support.TaskBodies;
 import ru.projectx.contracts.support.TestQueues;
 
 @AmqpIntegrationTest
-class TaskQueueListenerIT {
+class InboxQueueListenerIT {
 
     private static final Duration PATIENCE = Duration.ofSeconds(15);
 
@@ -35,6 +35,7 @@ class TaskQueueListenerIT {
     private InboxMessageRepository messages;
 
     @Autowired
+    @InternalBroker
     private TestQueues queues;
 
     @BeforeEach

@@ -5,9 +5,11 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.IssuanceRequest;
+import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.PrintedFormRepository;
 
 @Component
 public class IssuanceSnapshots {
@@ -15,20 +17,24 @@ public class IssuanceSnapshots {
     private final IssuanceRequestRepository requests;
     private final ContractRepository contracts;
     private final LmPolicyRepository policies;
+    private final PrintedFormRepository forms;
 
     public IssuanceSnapshots(IssuanceRequestRepository requests, ContractRepository contracts,
-            LmPolicyRepository policies) {
+            LmPolicyRepository policies, PrintedFormRepository forms) {
         this.requests = requests;
         this.contracts = contracts;
         this.policies = policies;
+        this.forms = forms;
     }
 
     public IssuanceSnapshot current(UUID individualRequestId) {
         Optional<IssuanceRequest> request = requests.findById(individualRequestId);
+        List<LmPolicy> requestPolicies = policies.findByRequestIndividualRequestId(individualRequestId);
         return new IssuanceSnapshot(individualRequestId,
                 request.map(IssuanceRequest::cancelled).orElse(false),
                 request.map(IssuanceRequest::participants).orElse(List.of()),
                 contracts.findByRequestIndividualRequestId(individualRequestId),
-                policies.findByRequestIndividualRequestId(individualRequestId));
+                requestPolicies,
+                forms.findByLmPolicyIdInOrderByCreatedAtAscIdAsc(requestPolicies.stream().map(LmPolicy::id).toList()));
     }
 }

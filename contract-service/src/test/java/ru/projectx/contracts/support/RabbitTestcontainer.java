@@ -11,7 +11,9 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.config.OneCBrokerProperties;
 import ru.projectx.contracts.service.integration.InternalBroker;
+import ru.projectx.contracts.service.integration.OneCBroker;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {
@@ -39,10 +41,18 @@ public class RabbitTestcontainer {
     }
 
     @Bean
+    @InternalBroker
     public TestQueues internalBrokerQueues(@InternalBroker ConnectionFactory connections,
             InternalBrokerProperties properties) {
         return new TestQueues(connections).declare(properties.queues().taskChanges())
                 .declare(properties.queues().statusChanges());
+    }
+
+    @Bean
+    @OneCBroker
+    public TestQueues oneCBrokerQueues(@OneCBroker ConnectionFactory connections, OneCBrokerProperties properties) {
+        return new TestQueues(connections).declare(properties.queues().lmPolicyRequests())
+                .declare(properties.queues().lmPolicyIssues());
     }
 
     @Bean

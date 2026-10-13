@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,15 +73,18 @@ class InboxMessageRepositoryTest {
     }
 
     @Test
-    void processedVersion_isTheHighestAmongProcessedMessagesOfTheRequestOnly() {
+    void processedVersion_isTheHighestAmongProcessedMessagesOfTheRequestAndNamedEventTypesOnly() {
         transaction.executeWithoutResult(status -> {
             messages.save(message("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11", 2, NOW)).markProcessed(NOW);
             messages.save(message("0c7d2e4f-6a8b-4c0d-9e1f-2a3b4c5d6e7f", 5, NOW)).markFailed("отказ");
             messages.save(message("c3f80a67-9d12-4b58-8e44-0a7b1f25e903", 4, NOW));
+            messages.save(issued("5b1e7d44-2c09-4a63-8f17-6e0b9a3c1d05", 7, NOW)).markProcessed(NOW);
         });
+        Set<String> tasks = Set.of("ContractTaskUpserted", "ContractTaskCancelled");
 
-        assertThat(messages.maxProcessedVersion(REQUEST)).contains(2);
-        assertThat(messages.maxProcessedVersion(UUID.fromString("7f2c9e4a-1b3d-4e5f-8a6b-9c0d1e2f3a4b"))).isEmpty();
+        assertThat(messages.maxProcessedVersion(REQUEST, tasks)).contains(2);
+        assertThat(messages.maxProcessedVersion(REQUEST, Set.of("LmPolicyIssued"))).contains(7);
+        assertThat(messages.maxProcessedVersion(UUID.fromString("7f2c9e4a-1b3d-4e5f-8a6b-9c0d1e2f3a4b"), tasks)).isEmpty();
     }
 
     @Test
@@ -106,5 +110,10 @@ class InboxMessageRepositoryTest {
     private static InboxMessage message(String messageId, int version, Instant receivedAt) {
         return InboxMessage.receive(new InboxReceipt(UUID.fromString(messageId), REQUEST, "rvl.contract-task.upserted",
                 "ContractTaskUpserted", version), "{\"data\": {\"n\": 1}}", receivedAt);
+    }
+
+    private static InboxMessage issued(String messageId, int version, Instant receivedAt) {
+        return InboxMessage.receive(new InboxReceipt(UUID.fromString(messageId), REQUEST, "sogaz1c.lm-policy.issued",
+                "LmPolicyIssued", version), "{\"data\": {\"n\": 1}}", receivedAt);
     }
 }

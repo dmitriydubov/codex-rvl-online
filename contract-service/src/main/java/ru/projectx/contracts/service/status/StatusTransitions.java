@@ -7,8 +7,8 @@ final class StatusTransitions {
     private StatusTransitions() {
     }
 
-    static boolean publishAfterTask(IssuanceSnapshot before, IssuanceSnapshot after) {
-        return !after.hasUndraftedKmContract() && (stoppedSince(before, after) || completedSince(before, after));
+    static boolean publishAfterChange(IssuanceSnapshot before, IssuanceSnapshot after) {
+        return !KmContractStates.anyUndrafted(after) && (stoppedSince(before, after) || completedSince(before, after));
     }
 
     private static boolean stoppedSince(IssuanceSnapshot before, IssuanceSnapshot after) {

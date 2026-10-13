@@ -7,7 +7,7 @@ import java.util.List;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
-public class StatusQueue {
+public class StatusQueue implements StandQueue {
 
     private static final boolean DURABLE = true;
     private static final boolean EXCLUSIVE = false;
@@ -31,7 +31,13 @@ public class StatusQueue {
         return this;
     }
 
-    String name() {
+    @Override
+    public String alias() {
+        return ALIAS;
+    }
+
+    @Override
+    public String name() {
         return queue;
     }
 
@@ -43,11 +49,13 @@ public class StatusQueue {
         broker.execute(channel -> channel.queueDelete(queue));
     }
 
-    void purge() {
+    @Override
+    public void purge() {
         broker.execute(channel -> channel.queuePurge(queue));
     }
 
-    AMQP.Queue.DeclareOk state() {
+    @Override
+    public AMQP.Queue.DeclareOk state() {
         return broker.execute(channel -> channel.queueDeclarePassive(queue));
     }
 

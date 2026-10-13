@@ -12,7 +12,8 @@ final class ParticipantParser {
 
     static TaskParticipant parse(JsonFields participant, int index) {
         TaskParticipant parsed = new TaskParticipant(index, participant.uuid("id"), participant.bool("is_relative"),
-                participant.decimal("amount_due"), person(participant.requiredObject("personal_data")));
+                participant.decimal("amount_due"), participant.uuidOrNull("program_id"),
+                person(participant.requiredObject("personal_data")));
         if (parsed.amountDue().signum() < 0) {
             throw new ContractViolationException("поле " + participant.path() + ".amount_due отрицательное");
         }

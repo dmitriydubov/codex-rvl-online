@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -26,6 +27,7 @@ import ru.projectx.contracts.entity.RequestReference;
 import ru.projectx.contracts.entity.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
 class KmContractIssuanceTest {
@@ -45,6 +47,11 @@ class KmContractIssuanceTest {
     }
 
     @Test
+    void issuance_namesItsRecordAsAKmContract() {
+        assertThat(issuance.kind()).isEqualTo("договор КМ");
+    }
+
+    @Test
     void newContract_getsNumberTripDatesPremiumPolicyholderAndTwoParties() {
         issuance.reconcile(new Issue(task, Tasks.spouse("34000.00")), Optional.empty(), NOW);
 
@@ -53,6 +60,7 @@ class KmContractIssuanceTest {
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
         assertThat(contract.participantId()).isEqualTo(Tasks.SPOUSE);
         assertThat(contract.state().policyholderParticipantId()).isEqualTo(Tasks.INSURED);
+        assertThat(contract.state().programId()).contains(Tasks.PROGRAM);
         assertThat(contract.state().period()).isEqualTo(new TripPeriod(Tasks.FROM, Tasks.TO));
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");
         assertThat(contract.state().request())
@@ -114,6 +122,34 @@ class KmContractIssuanceTest {
     }
 
     @Test
+    void existingContract_withAnotherProgram_takesItAndBumpsVersion() {
+        Contract existing = existing("34000.00");
+        given(parties.replaceIfChanged(eq(PersonOwner.contract(existing.id())), anyList(), eq(NOW))).willReturn(false);
+        ContractTask reprogrammed = Tasks.task(Tasks.insured("0.00"), Tasks.relative(1, Tasks.SPOUSE, "34000.00", "SPOUSE",
+                UUID.fromString("7b3d9e1f-5a2c-4d8e-b0f6-1c2a3b4d5e6f")));
+
+        issuance.reconcile(new Issue(reprogrammed, reprogrammed.participants().get(1)), Optional.of(existing), NOW);
+
+        assertThat(existing.state().programId()).contains(UUID.fromString("7b3d9e1f-5a2c-4d8e-b0f6-1c2a3b4d5e6f"));
+        assertThat(existing.state().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void payingParticipantWithoutProgram_opensContractInErrorWithNumberAndWithoutProgram() {
+        ContractTask invalid = Tasks.task(Tasks.insured("0.00"), Tasks.relative(1, Tasks.SPOUSE, "34000.00", "SPOUSE", null));
+
+        issuance.reconcile(new Issue(invalid, invalid.participants().get(1)), Optional.empty(), NOW);
+
+        Contract contract = savedContract();
+        assertThat(contract.status()).isEqualTo(ContractStatus.ERROR);
+        assertThat(contract.number()).isEqualTo("DKM-2026-000001");
+        assertThat(contract.state().programId()).isEmpty();
+        assertThat(contract.state().error()).contains(new IssueError("PROGRAM_REQUIRED",
+                "поле participants[1].program_id обязательно для участника, которому выпускается документ"));
+        verify(parties, never()).store(any(), anyList(), any());
+    }
+
+    @Test
     void invalidParticipant_withExistingContract_marksItInError() {
         Contract existing = existing("34000.00");
         ContractTask invalid = Tasks.task(Tasks.insured("0.00"), Tasks.relative(1, Tasks.SPOUSE, "34000.00", null));
@@ -132,8 +168,7 @@ class KmContractIssuanceTest {
     }
 
     private static Contract existing(String premium) {
-        return Contract.open(new ContractDraft("DKM-2026-000001",
-                new RequestReference(Tasks.REQUEST, Tasks.INSURANCE_CONTRACT, Tasks.INSURER_POLICY),
-                Tasks.SPOUSE, Tasks.INSURED, new TripPeriod(Tasks.FROM, Tasks.TO), new BigDecimal(premium)), NOW);
+        return Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
+                new BigDecimal(premium)), NOW);
     }
 }

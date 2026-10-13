@@ -45,6 +45,17 @@ class PartySnapshotStoreTest {
     }
 
     @Test
+    void differ_isFalseForTheSameSnapshotAndTrueForAnotherOne() {
+        given(persons.findByContractIdOrderByRole(CONTRACT)).willReturn(stored(PersonOwner.contract(CONTRACT)));
+        List<Party> changed = List.of(parties.get(0),
+                new Party(PersonRole.INSURED, PersonSnapshots.of(Tasks.child("0.00"))));
+
+        assertThat(store.differ(PersonOwner.contract(CONTRACT), parties)).isFalse();
+        assertThat(store.differ(PersonOwner.contract(CONTRACT), changed)).isTrue();
+        verify(persons, never()).deleteAll(anyList());
+    }
+
+    @Test
     void replaceIfChanged_keepsStoredPersonsWhenSnapshotIsTheSame() {
         given(persons.findByContractIdOrderByRole(CONTRACT)).willReturn(stored(PersonOwner.contract(CONTRACT)));
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,18 +27,21 @@ class EventHandlersTest {
     private final RequestStatusPublication statuses = mock();
 
     @Test
-    void upsertedHandler_watchesTheRequestAppliesTheTaskAndThenReportsTheStatus() {
+    void upsertedHandler_parsesBeforeAndWatchesAppliesAndReportsWhenTheWorkIsApplied() {
         ContractTaskParser parser = mock();
         IssuanceService issuance = mock();
         ContractTask task = Tasks.task(Tasks.insured("0.00"));
-        IssuanceSnapshot before = new IssuanceSnapshot(REQUEST, false, List.of(), List.of(), List.of());
+        IssuanceSnapshot before = new IssuanceSnapshot(REQUEST, false, List.of(), List.of(), List.of(), List.of());
         given(parser.parse("body")).willReturn(task);
         given(statuses.watch(REQUEST)).willReturn(before);
         ContractTaskUpsertedHandler handler = new ContractTaskUpsertedHandler(parser, issuance, statuses);
 
-        handler.handle("body", NOW);
+        InboxWork work = handler.prepare("body");
+        verifyNoInteractions(statuses, issuance);
+        work.apply(NOW);
 
         assertThat(handler.eventType()).isEqualTo("ContractTaskUpserted");
+        assertThat(handler.ordering()).isEqualTo(InboxOrdering.BY_REQUEST_VERSION);
         InOrder order = inOrder(statuses, issuance);
         order.verify(statuses).watch(REQUEST);
         order.verify(issuance).apply(task, NOW);
@@ -45,16 +49,19 @@ class EventHandlersTest {
     }
 
     @Test
-    void cancelledHandler_appliesTheCancellationAndThenReportsTheStatus() {
+    void cancelledHandler_parsesBeforeAndAppliesTheCancellationAndReportsWhenTheWorkIsApplied() {
         TaskCancellationParser parser = mock();
         TaskCancellationService cancellation = mock();
         ContractTaskCancellation parsed = new ContractTaskCancellation(REQUEST, NOW, "EXPIRED", null);
         given(parser.parse("body")).willReturn(parsed);
         ContractTaskCancelledHandler handler = new ContractTaskCancelledHandler(parser, cancellation, statuses);
 
-        handler.handle("body", NOW);
+        InboxWork work = handler.prepare("body");
+        verifyNoInteractions(cancellation, statuses);
+        work.apply(NOW);
 
         assertThat(handler.eventType()).isEqualTo("ContractTaskCancelled");
+        assertThat(handler.ordering()).isEqualTo(InboxOrdering.BY_REQUEST_VERSION);
         InOrder order = inOrder(cancellation, statuses);
         order.verify(cancellation).apply(parsed, NOW);
         order.verify(statuses).afterCancellation(REQUEST, NOW);

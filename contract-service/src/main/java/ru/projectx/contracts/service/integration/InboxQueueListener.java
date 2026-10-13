@@ -18,9 +18,9 @@ import ru.projectx.contracts.service.inbox.InboxReceiver;
 import ru.projectx.contracts.service.inbox.ReceiptOutcome;
 
 @Component
-public class TaskQueueListener implements ChannelAwareMessageListener {
+public class InboxQueueListener implements ChannelAwareMessageListener {
 
-    private static final Logger log = LoggerFactory.getLogger(TaskQueueListener.class);
+    private static final Logger log = LoggerFactory.getLogger(InboxQueueListener.class);
 
     private final TaskEnvelopeParser envelopes;
     private final InboxReceiver receiver;
@@ -28,7 +28,7 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
     private final Pauses pauses;
     private final InboxMetrics metrics;
 
-    public TaskQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxProperties properties,
+    public InboxQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxProperties properties,
             Pauses pauses, InboxMetrics metrics) {
         this.envelopes = envelopes;
         this.receiver = receiver;

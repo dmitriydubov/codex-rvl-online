@@ -1,0 +1,57 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 008-contract-documents
+      author: contract-service
+      comment: >
+        Печатные формы договоров КМ и полисов ЛМ: проекты и финальные документы. Первым таблицу
+        наполняют финальные формы полиса ЛМ, которые выпускает 1С:УСК: у них есть только постоянная
+        ссылка и размер, поэтому ключ файла во внутреннем хранилище, хеш содержимого и MIME-тип
+        необязательны — их заполняет шаг собственных печатных форм. Имена перечислений отличаются от
+        «Структуры данных»: document_kind уже занято видом выпускаемого документа участника.
+      changes:
+        - sql:
+            sql: >
+              CREATE TYPE printed_form_kind AS ENUM ('DRAFT', 'FINAL');
+              CREATE TYPE printed_form_type AS ENUM ('CONTRACT', 'POLICY', 'APPENDIX');
+        - createTable:
+            tableName: contract_documents
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_contract_documents, nullable: false } }
+              - column: { name: contract_id, type: uuid, constraints: { foreignKeyName: fk_contract_documents_contract, references: contracts(id) } }
+              - column: { name: lm_policy_id, type: uuid, constraints: { foreignKeyName: fk_contract_documents_lm_policy, references: lm_policies(id) } }
+              - column: { name: kind, type: printed_form_kind, constraints: { nullable: false } }
+              - column: { name: doc_type, type: printed_form_type, constraints: { nullable: false } }
+              - column: { name: version, type: int, constraints: { nullable: false } }
+              - column: { name: file_key, type: text }
+              - column: { name: file_hash, type: varchar(64) }
+              - column: { name: file_size, type: bigint }
+              - column: { name: content_type, type: varchar(100) }
+              - column: { name: usk_file_url, type: text }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - sql:
+            sql: >
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_single_owner
+                CHECK ((contract_id IS NULL) <> (lm_policy_id IS NULL));
+        - createIndex:
+            tableName: contract_documents
+            indexName: ix_contract_documents_contract_id
+            columns:
+              - column: { name: contract_id }
+        - createIndex:
+            tableName: contract_documents
+            indexName: ix_contract_documents_lm_policy_id
+            columns:
+              - column: { name: lm_policy_id }
+        - createIndex:
+            tableName: contract_documents
+            indexName: ix_contract_documents_contract_version
+            columns:
+              - column: { name: contract_id }
+              - column: { name: doc_type }
+              - column: { name: kind }
+              - column: { name: version }
+      rollback:
+        - dropTable: { tableName: contract_documents }
+        - sql:
+            sql: DROP TYPE printed_form_type; DROP TYPE printed_form_kind;

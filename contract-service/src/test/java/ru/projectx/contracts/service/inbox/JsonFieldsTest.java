@@ -14,7 +14,8 @@ class JsonFieldsTest {
 
     private static final String BODY = """
             {"data": {"id": "61a7982c-a0b4-4bbf-9527-60b40b752803", "date": "2026-04-10", "amount": 34000.00,
-                      "flag": true, "name": "Тестов", "number": 5, "items": [{"n": 1}], "nested": {}, "nothing": null}}
+                      "flag": true, "name": "Тестов", "number": 5, "items": [{"n": 1}], "nested": {}, "nothing": null,
+                      "beyondInt": 99999999999, "beyondLong": 99999999999999999999}}
             """;
 
     private final JsonFields root = new JsonFields(JsonMapper.builder().build().readTree(BODY), "");
@@ -68,6 +69,39 @@ class JsonFieldsTest {
         assertThatThrownBy(() -> data.bool("name")).hasMessage("недопустимое значение поля data.name");
         assertThatThrownBy(() -> data.requiredObject("name")).hasMessage("недопустимое значение поля data.name");
         assertThatThrownBy(() -> data.requiredArray("nested")).hasMessage("недопустимое значение поля data.nested");
+    }
+
+    @Test
+    void arrayPresence_isFalseForAbsentOrNullAndAViolationForAnotherType() {
+        assertThat(data.hasArray("items")).isTrue();
+        assertThat(data.hasArray("missing")).isFalse();
+        assertThat(data.hasArray("nothing")).isFalse();
+        assertThatThrownBy(() -> data.hasArray("name")).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.hasArray("nested")).hasMessage("недопустимое значение поля data.nested");
+    }
+
+    @Test
+    void integerField_isAWholeNumberThatFitsInt() {
+        assertThat(data.integer("number")).isEqualTo(5);
+        assertThatThrownBy(() -> data.integer("amount")).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.amount");
+        assertThatThrownBy(() -> data.integer("beyondInt")).hasMessage("недопустимое значение поля data.beyondInt");
+        assertThatThrownBy(() -> data.integer("name")).hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.integer("missing")).hasMessage("нет обязательного поля data.missing");
+        assertThatThrownBy(() -> data.integer("nothing")).hasMessage("нет обязательного поля data.nothing");
+    }
+
+    @Test
+    void optionalLongField_isNullWhenAbsentOrNullAndOtherwiseAWholeNumberThatFitsLong() {
+        assertThat(data.longOrNull("missing")).isNull();
+        assertThat(data.longOrNull("nothing")).isNull();
+        assertThat(data.longOrNull("number")).isEqualTo(5L);
+        assertThat(data.longOrNull("beyondInt")).isEqualTo(99999999999L);
+        assertThatThrownBy(() -> data.longOrNull("amount")).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.amount");
+        assertThatThrownBy(() -> data.longOrNull("beyondLong")).hasMessage("недопустимое значение поля data.beyondLong");
+        assertThatThrownBy(() -> data.longOrNull("name")).hasMessage("недопустимое значение поля data.name");
     }
 
     @Test

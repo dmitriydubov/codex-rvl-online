@@ -1,5 +1,8 @@
 package ru.projectx.contracts.service;
 
+import java.util.Optional;
+import java.util.UUID;
+import ru.projectx.contracts.entity.IssuanceTerms;
 import ru.projectx.contracts.entity.RequestReference;
 import ru.projectx.contracts.entity.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
@@ -13,5 +16,14 @@ public record Issue(ContractTask task, TaskParticipant participant) {
 
     public TripPeriod period() {
         return new TripPeriod(task.dateFrom(), task.dateTo());
+    }
+
+    public IssuanceTerms terms() {
+        return new IssuanceTerms(request(), task.insured().id(), participant.programId(), period());
+    }
+
+    public UUID program() {
+        return Optional.ofNullable(participant.programId())
+                .orElseThrow(() -> IssueErrors.programRequired(participant.path()));
     }
 }

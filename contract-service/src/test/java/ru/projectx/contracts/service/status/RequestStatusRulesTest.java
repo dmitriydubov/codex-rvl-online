@@ -29,7 +29,7 @@ class RequestStatusRulesTest {
         failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
 
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(INSURED, CHILD_LM),
-                List.of(), List.of(failed)))).isEqualTo(RequestStatus.CANCELLED);
+                List.of(), List.of(failed), List.of()))).isEqualTo(RequestStatus.CANCELLED);
     }
 
     @Test
@@ -38,7 +38,7 @@ class RequestStatusRulesTest {
         failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
 
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM),
-                List.of(), List.of(failed)))).isEqualTo(RequestStatus.ERROR);
+                List.of(), List.of(failed), List.of()))).isEqualTo(RequestStatus.ERROR);
     }
 
     @Test
@@ -48,11 +48,11 @@ class RequestStatusRulesTest {
                 ru.projectx.contracts.entity.ContractStatus.ISSUED);
 
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(),
-                List.of()))).isEqualTo(RequestStatus.COMPLETED);
+                List.of(), List.of()))).isEqualTo(RequestStatus.COMPLETED);
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(), List.of(),
-                List.of()))).isEqualTo(RequestStatus.COMPLETED);
+                List.of(), List.of()))).isEqualTo(RequestStatus.COMPLETED);
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, SPOUSE_KM),
-                List.of(issued), List.of()))).isEqualTo(RequestStatus.COMPLETED);
+                List.of(issued), List.of(), List.of()))).isEqualTo(RequestStatus.COMPLETED);
     }
 
     @Test
@@ -61,8 +61,8 @@ class RequestStatusRulesTest {
         Contract fresh = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
 
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM),
-                List.of(), List.of(pending)))).isEqualTo(RequestStatus.IN_PROGRESS);
+                List.of(), List.of(pending), List.of()))).isEqualTo(RequestStatus.IN_PROGRESS);
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, CHILD_LM),
-                List.of(fresh), List.of(pending)))).isEqualTo(RequestStatus.IN_PROGRESS);
+                List.of(fresh), List.of(pending), List.of()))).isEqualTo(RequestStatus.IN_PROGRESS);
     }
 }

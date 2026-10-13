@@ -8,7 +8,7 @@ import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskParticipant;
 
 @Component
-public class ContractTaskParser {
+public class ContractTaskParser implements PayloadParser<ContractTask> {
 
     private final MessageBodies bodies;
 
@@ -16,9 +16,13 @@ public class ContractTaskParser {
         this.bodies = bodies;
     }
 
+    @Override
     public ContractTask parse(String payload) {
-        JsonFields data = bodies.data(payload);
-        ContractTask task = new ContractTask(data.uuid("individual_request_id"), data.uuid("insurance_contract_id"),
+        JsonFields body = bodies.body(payload);
+        JsonFields data = body.requiredObject(MessageBodies.DATA);
+        int entityVersion = body.requiredObject(MessageBodies.META).integer("entity_version");
+        ContractTask task = new ContractTask(entityVersion, data.uuid("individual_request_id"),
+                data.uuid("insurance_contract_id"),
                 data.uuid("insurer_policy_id"), data.date("date_from"), data.date("date_to"),
                 participants(data.requiredArray("participants")));
         requireSingleInsured(task.participants());

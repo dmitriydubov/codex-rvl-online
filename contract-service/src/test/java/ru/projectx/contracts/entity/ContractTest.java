@@ -18,6 +18,8 @@ class ContractTest {
             new TripPeriod(LocalDate.parse("2026-04-11"), LocalDate.parse("2026-04-25"));
     private static final UUID INSURED = UUID.fromString("9275471c-d2fe-484f-97a6-d6d7b1267b5e");
     private static final UUID POLICYHOLDER = UUID.fromString("ae8312c3-350b-4d0b-806c-5e2460e74dbc");
+    private static final UUID PROGRAM = UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a");
+    private static final UUID OTHER_PROGRAM = UUID.fromString("7b3d9e1f-5a2c-4d8e-b0f6-1c2a3b4d5e6f");
 
     private final Contract contract = Contract.open(draft("34000.00"), OPENED);
 
@@ -28,6 +30,7 @@ class ContractTest {
         assertThat(contract.number()).isEqualTo("DKM-2026-000001");
         assertThat(contract.participantId()).isEqualTo(INSURED);
         assertThat(contract.state().policyholderParticipantId()).isEqualTo(POLICYHOLDER);
+        assertThat(contract.state().programId()).contains(PROGRAM);
         assertThat(contract.state().period()).isEqualTo(PERIOD);
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");
         assertThat(contract.state().request().individualRequestId()).isEqualTo(UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"));
@@ -76,8 +79,8 @@ class ContractTest {
     }
 
     @Test
-    void markRevised_bumpsVersionOnce() {
-        contract.markRevised(LATER);
+    void advanceVersion_bumpsVersionOnce() {
+        contract.advanceVersion(LATER);
 
         assertThat(contract.state().entityVersion()).isEqualTo(2);
         assertThat(contract).hasFieldOrPropertyWithValue("updatedAt", LATER);
@@ -105,10 +108,18 @@ class ContractTest {
         assertThat(contract.finished()).isTrue();
     }
 
+    @Test
+    void moveProgram_changesOnlyAnotherProgram() {
+        assertThat(contract.moveProgram(PROGRAM)).isFalse();
+        assertThat(contract.moveProgram(OTHER_PROGRAM)).isTrue();
+        assertThat(contract.state().programId()).contains(OTHER_PROGRAM);
+    }
+
     private static ContractDraft draft(String premium) {
         RequestReference request = new RequestReference(UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"),
                 UUID.fromString("e12aab1a-1582-4b3a-af36-d30e637953f1"),
                 UUID.fromString("a23ba061-f742-4b20-8b95-36a0e525c087"));
-        return new ContractDraft("DKM-2026-000001", request, INSURED, POLICYHOLDER, PERIOD, new BigDecimal(premium));
+        return new ContractDraft("DKM-2026-000001", new IssuanceTerms(request, POLICYHOLDER, PROGRAM, PERIOD), INSURED,
+                new BigDecimal(premium));
     }
 }

@@ -30,7 +30,7 @@ class InboxOutcomesTest {
             UUID.fromString("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11"),
             UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"),
             "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
-    private static final InboxFailure.Transient LOCKED = new InboxFailure.Transient("55P03");
+    private static final InboxFailure.Transient LOCKED = InboxFailure.Transient.database("55P03");
 
     private final InboxMessageRepository messages = mock();
     private final InboxMetrics metrics = mock();

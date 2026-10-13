@@ -14,10 +14,14 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRequest;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.PrintedFormRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -33,7 +37,8 @@ class IssuanceSnapshotsTest {
     private final IssuanceRequestRepository requests = mock();
     private final ContractRepository contracts = mock();
     private final LmPolicyRepository policies = mock();
-    private final IssuanceSnapshots snapshots = new IssuanceSnapshots(requests, contracts, policies);
+    private final PrintedFormRepository forms = mock();
+    private final IssuanceSnapshots snapshots = new IssuanceSnapshots(requests, contracts, policies, forms);
 
     @Test
     void knownRequest_isSnapshottedWithItsCompositionCancellationAndRecords() {
@@ -43,10 +48,14 @@ class IssuanceSnapshotsTest {
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.of(request));
         given(contracts.findByRequestIndividualRequestId(Tasks.REQUEST)).willReturn(List.of(CONTRACT));
         given(policies.findByRequestIndividualRequestId(Tasks.REQUEST)).willReturn(List.of(POLICY));
+        PrintedForm form = PrintedForm.issuedForLmPolicy(POLICY.id(),
+                new UskDocument(PrintedFormType.POLICY, "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf", 96256L), NOW);
+        given(forms.findByLmPolicyIdInOrderByCreatedAtAscIdAsc(List.of(POLICY.id()))).willReturn(List.of(form));
 
         IssuanceSnapshot snapshot = snapshots.current(Tasks.REQUEST);
 
         assertThat(snapshot.individualRequestId()).isEqualTo(Tasks.REQUEST);
+        assertThat(snapshot.formsOf(POLICY)).containsExactly(form);
         assertThat(snapshot.cancelled()).isTrue();
         assertThat(snapshot.composition()).containsExactly(SPOUSE_KM, CHILD_LM);
         assertThat(snapshot.contractOf(Tasks.SPOUSE)).isSameAs(CONTRACT);
@@ -60,6 +69,7 @@ class IssuanceSnapshotsTest {
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.empty());
         given(contracts.findByRequestIndividualRequestId(Tasks.REQUEST)).willReturn(List.of());
         given(policies.findByRequestIndividualRequestId(Tasks.REQUEST)).willReturn(List.of());
+        given(forms.findByLmPolicyIdInOrderByCreatedAtAscIdAsc(List.of())).willReturn(List.of());
 
         IssuanceSnapshot snapshot = snapshots.current(Tasks.REQUEST);
 

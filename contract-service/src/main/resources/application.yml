@@ -12,7 +12,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 4
+        size: 5
 
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -154,6 +154,10 @@ projectx:
   contracts:
     numbering:
       zone: ${CONTRACT_NUMBERING_ZONE:Europe/Moscow}
+
+  lm-policy-requests:
+    interval: ${LM_POLICY_REQUEST_INTERVAL:10s}
+    batch-size: ${LM_POLICY_REQUEST_BATCH_SIZE:100}
 
   reference:
     url: ${REFERENCE_URL:}
