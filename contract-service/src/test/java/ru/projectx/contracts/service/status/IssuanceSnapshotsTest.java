@@ -65,6 +65,6 @@ class IssuanceSnapshotsTest {
 
         assertThat(snapshot.cancelled()).isFalse();
         assertThat(snapshot.composition()).isEmpty();
-        assertThat(snapshot.recordStatuses()).isEmpty();
+        assertThat(snapshot.records()).isEmpty();
     }
 }

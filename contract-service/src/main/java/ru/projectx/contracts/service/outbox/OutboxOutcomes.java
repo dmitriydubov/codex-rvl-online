@@ -33,7 +33,7 @@ public class OutboxOutcomes {
     }
 
     @Transactional
-    public void record(UUID id, PublishOutcome outcome) {
+    public void record(UUID id, PublishOutcome.Attempted outcome) {
         OutboxMessage message = messages.findById(id)
                 .orElseThrow(() -> new IllegalStateException("в журнале исходящих нет записи " + id));
         if (message.status() != OutboxStatus.NEW) {
@@ -46,13 +46,7 @@ public class OutboxOutcomes {
             case PublishOutcome.Refused refused -> reject(message, refused.reason());
             case PublishOutcome.Rejected rejected -> retryOrReject(message, rejected.reason());
             case PublishOutcome.Unconfirmed unconfirmed -> retryOrReject(message, unconfirmed.reason());
-            case PublishOutcome.NotSent notSent -> throw notAnOutcome(notSent);
-            case PublishOutcome.Interrupted interrupted -> throw notAnOutcome(interrupted);
         }
-    }
-
-    private static IllegalArgumentException notAnOutcome(PublishOutcome outcome) {
-        return new IllegalArgumentException("неотправленное сообщение исхода не имеет: " + outcome.reason());
     }
 
     private void retryOrReject(OutboxMessage message, String reason) {

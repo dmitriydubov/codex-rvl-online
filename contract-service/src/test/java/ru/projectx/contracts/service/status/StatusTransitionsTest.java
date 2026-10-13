@@ -23,6 +23,7 @@ class StatusTransitionsTest {
     private static final RequestParticipant CHILD_LM = new RequestParticipant(Tasks.CHILD, DocumentKind.LM_POLICY);
     private static final String CONTRACT_ID = "01960000-0000-7000-8000-000000000001";
     private static final String POLICY_ID = "01960000-0000-7000-8000-000000000002";
+    private static final String LATER_POLICY_ID = "01960000-0000-7000-8000-000000000003";
     private static final IssuanceSnapshot NOTHING = snapshot(false, List.of(), List.of(), List.of());
 
     @Test
@@ -74,6 +75,31 @@ class StatusTransitionsTest {
 
         assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED), List.of(),
                 List.of(cancelled)))).isTrue();
+    }
+
+    @Test
+    void newRecordInTheSameErrorAsTheParticipantsLastOne_isNotPublished() {
+        IssueError relationRequired = new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно");
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(relationRequired, NOW);
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, CHILD_LM), List.of(), List.of(failed));
+        LmPolicy failedAgain = Issuances.policy(LATER_POLICY_ID, Tasks.CHILD);
+        failedAgain.markError(relationRequired, NOW);
+
+        assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+                List.of(failed, failedAgain)))).isFalse();
+    }
+
+    @Test
+    void newRecordInAnotherError_isPublished() {
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, CHILD_LM), List.of(), List.of(failed));
+        LmPolicy failedOtherwise = Issuances.policy(LATER_POLICY_ID, Tasks.CHILD);
+        failedOtherwise.markError(new IssueError("UNKNOWN_GENDER", "недопустимое значение поля"), NOW);
+
+        assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+                List.of(failed, failedOtherwise)))).isTrue();
     }
 
     @Test

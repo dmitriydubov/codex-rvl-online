@@ -62,7 +62,7 @@ class OutboxPublisherTest {
     @Test
     void refusedMessage_isRecordedAndTheOthersAreStillSent() {
         given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
-        PublishOutcome refused = new PublishOutcome.Refused("брокер вернул сообщение: NO_ROUTE (312)");
+        PublishOutcome.Refused refused = new PublishOutcome.Refused("брокер вернул сообщение: NO_ROUTE (312)");
         given(broker.publish(any())).willReturn(refused, new PublishOutcome.Delivered());
 
         assertThat(publisher.publishDue()).isEqualTo(2);
@@ -96,7 +96,7 @@ class OutboxPublisherTest {
     @Test
     void unconfirmedMessage_isRecordedAndEndsThePass() {
         given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
-        PublishOutcome unconfirmed = new PublishOutcome.Unconfirmed(Duration.ofSeconds(10));
+        PublishOutcome.Unconfirmed unconfirmed = new PublishOutcome.Unconfirmed(Duration.ofSeconds(10));
         given(broker.publish(any())).willReturn(unconfirmed);
 
         assertThat(publisher.publishDue()).isEqualTo(1);

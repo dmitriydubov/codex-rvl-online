@@ -26,7 +26,7 @@ class ContractTest {
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
         assertThat(contract.state().entityVersion()).isEqualTo(1);
         assertThat(contract.number()).isEqualTo("DKM-2026-000001");
-        assertThat(contract.insuredParticipantId()).isEqualTo(INSURED);
+        assertThat(contract.participantId()).isEqualTo(INSURED);
         assertThat(contract.state().policyholderParticipantId()).isEqualTo(POLICYHOLDER);
         assertThat(contract.state().period()).isEqualTo(PERIOD);
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");

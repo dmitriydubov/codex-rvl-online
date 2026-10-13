@@ -19,12 +19,12 @@ class PublishOutcomeTest {
 
     @Test
     void onlyAMessageTheBrokerReceived_countsAsAnAttempt() {
-        assertThat(new PublishOutcome.Delivered().attempted()).isTrue();
-        assertThat(new PublishOutcome.Refused("возврат").attempted()).isTrue();
-        assertThat(new PublishOutcome.Rejected("nack").attempted()).isTrue();
-        assertThat(new PublishOutcome.Unconfirmed(Duration.ofSeconds(10)).attempted()).isTrue();
-        assertThat(new PublishOutcome.NotSent("недоступен").attempted()).isFalse();
-        assertThat(new PublishOutcome.Interrupted().attempted()).isFalse();
+        assertThat(new PublishOutcome.Delivered()).isInstanceOf(PublishOutcome.Attempted.class);
+        assertThat(new PublishOutcome.Refused("возврат")).isInstanceOf(PublishOutcome.Attempted.class);
+        assertThat(new PublishOutcome.Rejected("nack")).isInstanceOf(PublishOutcome.Attempted.class);
+        assertThat(new PublishOutcome.Unconfirmed(Duration.ofSeconds(10))).isInstanceOf(PublishOutcome.Attempted.class);
+        assertThat(new PublishOutcome.NotSent("недоступен")).isNotInstanceOf(PublishOutcome.Attempted.class);
+        assertThat(new PublishOutcome.Interrupted()).isNotInstanceOf(PublishOutcome.Attempted.class);
     }
 
     @Test

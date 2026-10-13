@@ -1,6 +1,5 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.DocumentKind;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -8,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.message.ContractTask;

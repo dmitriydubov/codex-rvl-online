@@ -116,6 +116,10 @@
   `OUTBOX_RETENTION_INTERVAL` (`1h`), `OUTBOX_RETENTION_BATCH_SIZE` (`500`).
 - **Файлы:** переименован `service/integration/ReferenceErrorBodies.java` → `ReferenceErrorCodes.java` — при ручном
   переносе старый файл удаляется.
+- **Файлы:** удалены `service/IssuanceKind.java` (правило вида документа теперь в `service/DocumentKinds.java`) и
+  `service/inbox/InboxPayloadErasure.java` (стирание тел обоих журналов — в `service/retention/`), а также их тесты
+  `service/IssuanceKindTest.java` и `service/inbox/InboxPayloadErasureTest.java` — при ручном переносе старые файлы
+  удаляются, иначе останутся второй экземпляр правила и мёртвый бин.
 - **Оповещение:** правила на счётчики `contracts_inbox_failed_total` (сообщение сервиса Заявок отклонено окончательно —
   разбор по записи журнала входящих), `contracts_inbox_lost_total` (сообщение потеряно без записи в журнал — разбор по
   записи ERROR журнала сервиса) и `contracts_outbox_failed_total` (ответ сервису Заявок не доставлен — разбор по записи

@@ -147,15 +147,6 @@ class OutboxOutcomesTest {
     }
 
     @Test
-    void notSentAndInterrupted_areNoOutcomesToRecord() {
-        assertThatThrownBy(() -> outcomes.record(ID, new PublishOutcome.NotSent("брокер недоступен")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("брокер недоступен");
-        assertThatThrownBy(() -> outcomes.record(ID, new PublishOutcome.Interrupted()))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("прервано остановкой сервиса");
-        assertThat(message.attempts()).isZero();
-    }
-
-    @Test
     void unknownId_isIllegalState() {
         UUID unknown = UUID.fromString("00000000-0000-4000-8000-000000000001");
         given(messages.findById(unknown)).willReturn(Optional.empty());

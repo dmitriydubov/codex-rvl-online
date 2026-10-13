@@ -1,12 +1,12 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.DocumentKind;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.LmPolicy;
 
@@ -15,7 +15,7 @@ public final class RequestIssuance {
     private final Map<UUID, ActiveIssuance> byParticipant = new LinkedHashMap<>();
 
     public RequestIssuance(List<Contract> contracts, List<LmPolicy> policies) {
-        contracts.forEach(contract -> byParticipant.put(contract.insuredParticipantId(),
+        contracts.forEach(contract -> byParticipant.put(contract.participantId(),
                 new ActiveIssuance(DocumentKind.KM_CONTRACT, contract)));
         policies.forEach(policy -> byParticipant.put(policy.participantId(),
                 new ActiveIssuance(DocumentKind.LM_POLICY, policy)));

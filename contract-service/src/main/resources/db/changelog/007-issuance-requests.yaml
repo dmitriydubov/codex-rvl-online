@@ -10,6 +10,8 @@ databaseChangeLog:
         чтобы ответ о состоянии выпуска перечислял всех участников заявки, включая тех, кому ничего
         не выпускается и у кого записей нет.
       changes:
+        - sql:
+            sql: CREATE TYPE document_kind AS ENUM ('NONE', 'KM_CONTRACT', 'LM_POLICY');
         - createTable:
             tableName: issuance_requests
             columns:
@@ -23,7 +25,7 @@ databaseChangeLog:
               - column: { name: individual_request_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_request_participants_request, references: issuance_requests(individual_request_id) } }
               - column: { name: position, type: int, constraints: { nullable: false } }
               - column: { name: participant_id, type: uuid, constraints: { nullable: false } }
-              - column: { name: document_kind, type: varchar(20), constraints: { nullable: false } }
+              - column: { name: document_kind, type: document_kind, constraints: { nullable: false } }
         - addPrimaryKey:
             tableName: request_participants
             columnNames: individual_request_id, position
@@ -31,3 +33,5 @@ databaseChangeLog:
       rollback:
         - dropTable: { tableName: request_participants }
         - dropTable: { tableName: issuance_requests }
+        - sql:
+            sql: DROP TYPE document_kind;

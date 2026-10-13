@@ -10,11 +10,10 @@ public sealed interface PublishOutcome {
         return false;
     }
 
-    default boolean attempted() {
-        return true;
+    sealed interface Attempted extends PublishOutcome {
     }
 
-    record Delivered() implements PublishOutcome {
+    record Delivered() implements Attempted {
 
         @Override
         public String reason() {
@@ -22,13 +21,13 @@ public sealed interface PublishOutcome {
         }
     }
 
-    record Refused(String reason) implements PublishOutcome {
+    record Refused(String reason) implements Attempted {
     }
 
-    record Rejected(String reason) implements PublishOutcome {
+    record Rejected(String reason) implements Attempted {
     }
 
-    record Unconfirmed(Duration timeout) implements PublishOutcome {
+    record Unconfirmed(Duration timeout) implements Attempted {
 
         @Override
         public String reason() {
@@ -47,11 +46,6 @@ public sealed interface PublishOutcome {
         public boolean endsPass() {
             return true;
         }
-
-        @Override
-        public boolean attempted() {
-            return false;
-        }
     }
 
     record Interrupted() implements PublishOutcome {
@@ -64,11 +58,6 @@ public sealed interface PublishOutcome {
         @Override
         public boolean endsPass() {
             return true;
-        }
-
-        @Override
-        public boolean attempted() {
-            return false;
         }
     }
 }

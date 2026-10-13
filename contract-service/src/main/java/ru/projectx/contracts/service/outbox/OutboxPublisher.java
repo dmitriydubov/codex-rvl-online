@@ -57,10 +57,10 @@ public class OutboxPublisher {
     }
 
     private int record(OutboxMessage message, PublishOutcome outcome) {
-        if (!outcome.attempted()) {
-            return 0;
+        if (outcome instanceof PublishOutcome.Attempted attempted) {
+            outcomes.record(message.id(), attempted);
+            return 1;
         }
-        outcomes.record(message.id(), outcome);
-        return 1;
+        return 0;
     }
 }

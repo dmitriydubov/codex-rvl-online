@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.status;
 
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.message.KmContractState;
 
 final class KmContractStates {
@@ -8,7 +9,7 @@ final class KmContractStates {
     private KmContractStates() {
     }
 
-    static boolean undrafted(ContractStatus status) {
+    static boolean undrafted(IssuanceStatus status) {
         return status == ContractStatus.NEW;
     }
 
