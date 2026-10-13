@@ -12,7 +12,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 2
+        size: 4
 
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -138,6 +138,18 @@ projectx:
       interval: ${INBOX_RETENTION_INTERVAL:1h}
       batch-size: ${INBOX_RETENTION_BATCH_SIZE:500}
     requeue-delay: ${INBOX_REQUEUE_DELAY:5s}
+
+  outbox:
+    publishing:
+      interval: ${OUTBOX_PUBLISHING_INTERVAL:5s}
+      batch-size: ${OUTBOX_PUBLISHING_BATCH_SIZE:100}
+    confirm-timeout: ${OUTBOX_CONFIRM_TIMEOUT:10s}
+    retry:
+      backoff: ${OUTBOX_RETRY_BACKOFF:1m,5m,15m}
+    retention:
+      payload: ${OUTBOX_PAYLOAD_RETENTION:30d}
+      interval: ${OUTBOX_RETENTION_INTERVAL:1h}
+      batch-size: ${OUTBOX_RETENTION_BATCH_SIZE:500}
 
   contracts:
     numbering:

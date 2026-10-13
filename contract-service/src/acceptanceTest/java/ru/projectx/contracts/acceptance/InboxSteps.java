@@ -7,14 +7,14 @@ import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.awaitility.Awaitility;
-import ru.projectx.contracts.service.inbox.InboxPayloadErasure;
 import ru.projectx.contracts.service.inbox.InboxProcessor;
+import ru.projectx.contracts.service.retention.InboxPayloadRetention;
+import ru.projectx.contracts.service.retention.OutboxPayloadRetention;
 
 public class InboxSteps {
 
@@ -26,17 +26,23 @@ public class InboxSteps {
     private final TaskMessages messages;
     private final PublishedMessages published;
     private final InboxProcessor processor;
-    private final InboxPayloadErasure erasure;
-    private final Map<UUID, String> statesBeforeErasure = new HashMap<>();
+    private final InboxPayloadRetention erasure;
+    private final OutboxPayloadRetention outboxErasure;
+    private final OutboxRecords outbox;
+    private final ErasureStates statesBeforeErasure;
 
     public InboxSteps(InboxJournal journal, TaskQueue queue, TaskMessages messages, PublishedMessages published,
-            InboxProcessor processor, InboxPayloadErasure erasure) {
+            InboxProcessor processor, InboxPayloadRetention erasure, OutboxPayloadRetention outboxErasure,
+            OutboxRecords outbox, ErasureStates statesBeforeErasure) {
         this.journal = journal;
         this.queue = queue;
         this.messages = messages;
         this.published = published;
         this.processor = processor;
         this.erasure = erasure;
+        this.outboxErasure = outboxErasure;
+        this.outbox = outbox;
+        this.statesBeforeErasure = statesBeforeErasure;
     }
 
     @Тогда("очередь {string} пуста и у неё есть потребитель")
@@ -152,14 +158,17 @@ public class InboxSteps {
     public void erasurePass() {
         statesBeforeErasure.clear();
         journal.inOrderOfReceipt().forEach(entry ->
-                statesBeforeErasure.put(entry.messageId(), entry.status() + "/" + entry.attempts()));
+                statesBeforeErasure.remember(entry.messageId(), entry.status(), entry.attempts()));
+        outbox.all().forEach(entry -> statesBeforeErasure.remember(entry.messageId(), entry.status(), entry.attempts()));
         erasure.eraseExpired();
+        outboxErasure.eraseExpired();
     }
 
     @Тогда("статус и число попыток сообщения {string} те же, что до прохода стирания")
     public void stateUnchangedByErasure(String messageId) {
         InboxJournal.Entry entry = entry(messageId);
-        assertThat(statesBeforeErasure).containsEntry(entry.messageId(), entry.status() + "/" + entry.attempts());
+        assertThat(statesBeforeErasure.unchanged(entry.messageId(), entry.status(), entry.attempts()))
+                .as("статус и попытки сообщения %s до и после стирания", messageId).isTrue();
     }
 
     private void awaitReceipts() {

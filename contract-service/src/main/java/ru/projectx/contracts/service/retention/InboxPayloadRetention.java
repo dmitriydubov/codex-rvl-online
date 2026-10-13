@@ -1,0 +1,17 @@
+package ru.projectx.contracts.service.retention;
+
+import java.time.Clock;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
+import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.repository.InboxMessageRepository;
+
+@Component
+public class InboxPayloadRetention extends PayloadRetention {
+
+    public InboxPayloadRetention(InboxMessageRepository messages, InboxProperties properties,
+            TransactionTemplate transaction, Clock clock) {
+        super(properties.retention().payload(), properties.retention().batchSize(), transaction, clock,
+                messages::erasePayloadsReceivedBefore);
+    }
+}

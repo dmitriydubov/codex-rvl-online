@@ -13,6 +13,7 @@ import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.InboxLogContext;
 import ru.projectx.contracts.service.SqlStates;
+import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.InboxReceiver;
 import ru.projectx.contracts.service.inbox.ReceiptOutcome;
 
@@ -25,13 +26,15 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
     private final InboxReceiver receiver;
     private final InboxProperties properties;
     private final Pauses pauses;
+    private final InboxMetrics metrics;
 
     public TaskQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxProperties properties,
-            Pauses pauses) {
+            Pauses pauses, InboxMetrics metrics) {
         this.envelopes = envelopes;
         this.receiver = receiver;
         this.properties = properties;
         this.pauses = pauses;
+        this.metrics = metrics;
     }
 
     @Override
@@ -52,7 +55,7 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
             receipt = envelopes.parse(delivery.body());
         }
         catch (InboxEnvelopeException unusable) {
-            lose(delivery, unusable.getMessage());
+            lose(delivery, unusable);
             return;
         }
         InboxLogContext.run(receipt, () -> store(delivery, receipt));
@@ -81,8 +84,10 @@ public class TaskQueueListener implements ChannelAwareMessageListener {
         }
     }
 
-    private static void lose(TaskDelivery delivery, String reason) throws IOException {
-        log.error("сообщение очереди {} потеряно: {} ({} байт)", delivery.queue(), reason, delivery.body().length);
+    private void lose(TaskDelivery delivery, InboxEnvelopeException unusable) throws IOException {
+        log.error("сообщение очереди {} потеряно: {} ({} байт)", delivery.queue(), unusable.getMessage(),
+                delivery.body().length);
+        metrics.countLost(unusable.lossReason());
         delivery.acknowledge();
     }
 }

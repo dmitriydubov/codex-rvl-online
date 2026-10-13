@@ -53,6 +53,29 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void outboxDefaults_publishEveryFiveSecondsWithConfirmTimeoutLadderAndRetention() {
+        assertThat(application.getProperty("projectx.outbox.publishing.interval")).asString()
+                .isEqualTo("${OUTBOX_PUBLISHING_INTERVAL:5s}");
+        assertThat(application.getProperty("projectx.outbox.publishing.batch-size")).asString()
+                .isEqualTo("${OUTBOX_PUBLISHING_BATCH_SIZE:100}");
+        assertThat(application.getProperty("projectx.outbox.confirm-timeout")).asString()
+                .isEqualTo("${OUTBOX_CONFIRM_TIMEOUT:10s}");
+        assertThat(application.getProperty("projectx.outbox.retry.backoff")).asString()
+                .isEqualTo("${OUTBOX_RETRY_BACKOFF:1m,5m,15m}");
+        assertThat(application.getProperty("projectx.outbox.retention.payload")).asString()
+                .isEqualTo("${OUTBOX_PAYLOAD_RETENTION:30d}");
+        assertThat(application.getProperty("projectx.outbox.retention.interval")).asString()
+                .isEqualTo("${OUTBOX_RETENTION_INTERVAL:1h}");
+        assertThat(application.getProperty("projectx.outbox.retention.batch-size")).asString()
+                .isEqualTo("${OUTBOX_RETENTION_BATCH_SIZE:500}");
+    }
+
+    @Test
+    void schedulerPool_hasAThreadPerScheduledPass() {
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("4");
+    }
+
+    @Test
     void jsonFieldNames_areSnakeCaseForTheWholeContour() {
         assertThat(application.getProperty("spring.jackson.property-naming-strategy")).asString()
                 .isEqualTo("SNAKE_CASE");

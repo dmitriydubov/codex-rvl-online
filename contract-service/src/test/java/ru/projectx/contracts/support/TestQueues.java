@@ -23,4 +23,12 @@ public final class TestQueues {
     public void purge(String queue) {
         broker.execute(channel -> channel.queuePurge(queue));
     }
+
+    public void delete(String queue) {
+        broker.execute(channel -> channel.queueDelete(queue));
+    }
+
+    public long depth(String queue) {
+        return broker.execute(channel -> channel.messageCount(queue));
+    }
 }

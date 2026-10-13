@@ -20,4 +20,11 @@ class IssuanceKindTest {
 
         assertThat(IssuanceKind.of(participant)).isEqualTo(expected);
     }
+
+    @ParameterizedTest
+    @CsvSource({"NONE, NONE", "KM_CONTRACT, KM_CONTRACT", "LM_POLICY, LM_POLICY"})
+    void document_namesTheSameKindForTheRequestComposition(IssuanceKind kind,
+            ru.projectx.contracts.entity.DocumentKind expected) {
+        assertThat(kind.document()).isEqualTo(expected);
+    }
 }

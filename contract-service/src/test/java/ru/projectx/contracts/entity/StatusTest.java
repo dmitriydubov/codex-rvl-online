@@ -30,4 +30,22 @@ class StatusTest {
     void lmPolicy_isUnfinishedWhileWorkContinues(LmPolicyStatus status) {
         assertThat(status.finished()).isFalse();
     }
+
+    @ParameterizedTest
+    @EnumSource(ContractStatus.class)
+    void contract_isIssuedOnlyWhenIssuedAndInErrorOnlyWhenError(ContractStatus status) {
+        assertThat(status.issued()).isEqualTo(status == ContractStatus.ISSUED);
+        assertThat(status.error()).isEqualTo(status == ContractStatus.ERROR);
+        assertThat(status.stopped())
+                .isEqualTo(status == ContractStatus.ERROR || status == ContractStatus.CANCELLED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(LmPolicyStatus.class)
+    void lmPolicy_isIssuedOnlyWhenIssuedAndInErrorOnlyWhenError(LmPolicyStatus status) {
+        assertThat(status.issued()).isEqualTo(status == LmPolicyStatus.ISSUED);
+        assertThat(status.error()).isEqualTo(status == LmPolicyStatus.ERROR);
+        assertThat(status.stopped())
+                .isEqualTo(status == LmPolicyStatus.ERROR || status == LmPolicyStatus.CANCELLED);
+    }
 }

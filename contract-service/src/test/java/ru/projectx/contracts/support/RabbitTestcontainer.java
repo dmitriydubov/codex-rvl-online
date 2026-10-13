@@ -41,7 +41,8 @@ public class RabbitTestcontainer {
     @Bean
     public TestQueues internalBrokerQueues(@InternalBroker ConnectionFactory connections,
             InternalBrokerProperties properties) {
-        return new TestQueues(connections).declare(properties.queues().taskChanges());
+        return new TestQueues(connections).declare(properties.queues().taskChanges())
+                .declare(properties.queues().statusChanges());
     }
 
     @Bean

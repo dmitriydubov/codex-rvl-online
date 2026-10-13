@@ -16,15 +16,19 @@ public class StandCleanupHook {
 
     private final JdbcClient jdbc;
     private final TaskQueue queue;
+    private final StatusQueue statusQueue;
 
-    public StandCleanupHook(JdbcClient jdbc, TaskQueue queue) {
+    public StandCleanupHook(JdbcClient jdbc, TaskQueue queue, StatusQueue statusQueue) {
         this.jdbc = jdbc;
         this.queue = queue;
+        this.statusQueue = statusQueue;
     }
 
     @Before(order = 10)
     public void emptyStand() {
         queue.purge();
+        statusQueue.declare();
+        statusQueue.purge();
         List<String> tables = jdbc.sql(DOMAIN_TABLES).query(String.class).list();
         jdbc.sql("truncate table " + String.join(", ", tables) + " cascade").update();
     }

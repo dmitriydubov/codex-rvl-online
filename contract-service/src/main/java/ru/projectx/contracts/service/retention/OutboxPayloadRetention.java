@@ -1,0 +1,17 @@
+package ru.projectx.contracts.service.retention;
+
+import java.time.Clock;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
+import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.repository.OutboxMessageRepository;
+
+@Component
+public class OutboxPayloadRetention extends PayloadRetention {
+
+    public OutboxPayloadRetention(OutboxMessageRepository messages, OutboxProperties properties,
+            TransactionTemplate transaction, Clock clock) {
+        super(properties.retention().payload(), properties.retention().batchSize(), transaction, clock,
+                messages::eraseFinishedPayloadsCreatedBefore);
+    }
+}

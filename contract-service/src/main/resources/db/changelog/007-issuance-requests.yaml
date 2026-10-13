@@ -1,0 +1,33 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 007-issuance-requests
+      author: contract-service
+      comment: >
+        Заявки на выпуск, известные сервису Договоров: состав участников последней обработанной
+        задачи без персональных данных (только идентификаторы и вид выпускаемого документа), отметка о
+        прекращении работы и номер последнего снимка состояния, отправленного сервису Заявок. Нужны,
+        чтобы ответ о состоянии выпуска перечислял всех участников заявки, включая тех, кому ничего
+        не выпускается и у кого записей нет.
+      changes:
+        - createTable:
+            tableName: issuance_requests
+            columns:
+              - column: { name: individual_request_id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_issuance_requests, nullable: false } }
+              - column: { name: snapshot_version, type: int, constraints: { nullable: false } }
+              - column: { name: cancelled_at, type: timestamptz }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - createTable:
+            tableName: request_participants
+            columns:
+              - column: { name: individual_request_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_request_participants_request, references: issuance_requests(individual_request_id) } }
+              - column: { name: position, type: int, constraints: { nullable: false } }
+              - column: { name: participant_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: document_kind, type: varchar(20), constraints: { nullable: false } }
+        - addPrimaryKey:
+            tableName: request_participants
+            columnNames: individual_request_id, position
+            constraintName: pk_request_participants
+      rollback:
+        - dropTable: { tableName: request_participants }
+        - dropTable: { tableName: issuance_requests }
