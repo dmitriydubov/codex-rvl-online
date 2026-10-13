@@ -328,7 +328,7 @@ class LpuContractMapperTest {
     }
 
     private LpuContractMapper mapper(String rvlProperty) {
-        var properties = new OneCContractProperties(null, rvlProperty, null, "Адрес", List.of());
+        var properties = new OneCContractProperties(null, rvlProperty, List.of(), "Страхователь", "Адрес", List.of());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         return new LpuContractMapper(repository, new CatalogReferences(lpuRepository, repository,
                 mock(ContragentServiceRepository.class), new ForeignReferences(foreignRepository, clock)), properties, clock);

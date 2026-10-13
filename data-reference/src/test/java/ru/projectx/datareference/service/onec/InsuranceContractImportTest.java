@@ -28,7 +28,7 @@ import tools.jackson.databind.node.ObjectNode;
 class InsuranceContractImportTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_contracts-changes";
-    private static final String DMS = "Личное страхование";
+    private static final String DMS = "ЛичноеСтрахование";
     private static final String CONTRACT_NUMBER = "0000000001";
     private static final UUID CONTRACT_ID = UUID.fromString("7e570000-0000-4000-8000-0000000000c1");
     private static final UUID INSURER_ID = UUID.fromString("7e570000-0000-4000-8000-0000000000d1");
@@ -115,7 +115,7 @@ class InsuranceContractImportTest {
     void productTypeNotConfigured_isSkipped() {
         InsuranceContractMapper withoutDms = new InsuranceContractMapper(
                 repository,
-                new OneCContractProperties(null, null, null, "Адрес", List.of()),
+                new OneCContractProperties(null, null, List.of(), "Страхователь", "Адрес", List.of()),
                 clock);
 
         ImportResult result = withoutDms.apply(dataOf(contract(DMS, insurerParty())));

@@ -21,11 +21,16 @@ final class StepTables {
     }
 
     static boolean flag(Map<String, String> table, String key) {
+        return Boolean.parseBoolean(oneOf(table, key, FLAGS));
+    }
+
+    static String oneOf(Map<String, String> table, String key, Set<String> known) {
         String value = required(table, key);
-        if (!FLAGS.contains(value)) {
-            throw new IllegalArgumentException("строка «" + key + "» — не true и не false: " + value);
+        if (!known.contains(value)) {
+            throw new IllegalArgumentException(
+                    "строка «" + key + "» — не из " + new TreeSet<>(known) + ": " + value);
         }
-        return Boolean.parseBoolean(value);
+        return value;
     }
 
     static boolean flagOr(Map<String, String> table, String key, boolean absent) {

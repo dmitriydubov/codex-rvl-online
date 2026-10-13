@@ -47,7 +47,9 @@ class LpuContactMapperTest {
     private final LpuContactMapper mapper = new LpuContactMapper(repository,
             new CatalogReferences(repository, mock(LpuContractRepository.class), mock(ContragentServiceRepository.class),
                     new ForeignReferences(foreignRepository, clock)),
-            new OneCContractProperties(null, null, null, "Адрес", List.of(ACTUAL, REGISTERED)), clock);
+            new OneCContractProperties(
+                    null, null, List.of(), "Страхователь", "Адрес", List.of(ACTUAL, REGISTERED)),
+            clock);
     private final Lpu sanatorium = Lpu.create(SANATORIUM,
             new Lpu.Details("Санаторий «Тестовый»", null, null, null, null, null, false), EARLIER);
 

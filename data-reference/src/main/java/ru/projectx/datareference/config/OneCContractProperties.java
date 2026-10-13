@@ -1,5 +1,6 @@
 package ru.projectx.datareference.config;
 
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -13,7 +14,8 @@ import org.springframework.validation.annotation.Validated;
 public record OneCContractProperties(
         @Nullable String rvlActivityId,
         @Nullable String rvlContractProperty,
-        @Nullable String dmsProductType,
+        @DefaultValue({"ЛичноеСтрахование", "Личное страхование"}) List<String> dmsProductType,
+        @DefaultValue("Страхователь") @NotBlank String insurerRole,
         @DefaultValue("Адрес") String addressRecordType,
         @DefaultValue({"Фактический адрес контрагента",
                        "Адрес местонахождения (регистрации) контрагента юр.лица"})
@@ -27,8 +29,8 @@ public record OneCContractProperties(
         return filled(rvlContractProperty);
     }
 
-    public Optional<String> dmsProduct() {
-        return filled(dmsProductType);
+    public List<String> dmsProducts() {
+        return dmsProductType.stream().flatMap(product -> filled(product).stream()).toList();
     }
 
     private static Optional<String> filled(@Nullable String setting) {

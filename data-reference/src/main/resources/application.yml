@@ -154,9 +154,6 @@ projectx:
       storage-check-interval: 10s
     contract:
       rvl-activity-id: f3876c53-c7d8-4620-b364-9538164ba5d4
-
-      dms-product-type: Личное страхование
-
     queues:
       policies: ${ONEC_QUEUE_POLICIES:1c-usk_to_rvl-online_policies}
       insurance-contracts: ${ONEC_QUEUE_INSURANCE_CONTRACTS:1c-usk_to_rvl-online_contracts-changes}
