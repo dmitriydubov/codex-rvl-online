@@ -2,7 +2,6 @@ package ru.projectx.contracts.service.status;
 
 import java.util.Optional;
 import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.message.KmContractState;
 
@@ -17,7 +16,6 @@ final class KmContractStates {
 
     static boolean anyUndrafted(IssuanceSnapshot snapshot) {
         return snapshot.composition().stream()
-                .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
                 .map(snapshot::statusOf)
                 .flatMap(Optional::stream)
                 .anyMatch(KmContractStates::undrafted);
