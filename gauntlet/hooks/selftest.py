@@ -186,6 +186,10 @@ def guard_tests(repo):
                  command=f"python3 -c \"print(open('{M}build/gauntlet/gauntletFast-hook.log').read())\"")
     expect_deny(repo, "rm $VAR with gauntlet assigned", "main", "Bash", command="D=gauntlet; rm -rf $D")
     expect_deny(repo, "rm $VAR next to gradlew gauntlet", "main", "Bash", command="./gradlew gauntlet; X=gauntlet/config; rm -rf $X")
+    expect_allow(repo, "python -c next to gradlew gauntlet", "main", "Bash",
+                 command="./gradlew gauntlet --continue > out.log 2>&1; python3 -c \"import time;time.sleep(1)\"")
+    expect_deny(repo, "python -c writing gauntlet next to gradlew gauntlet", "main", "Bash",
+                command="./gradlew gauntlet && python3 -c \"open('gauntlet/config/x','w').write('')\"")
     expect_deny(repo, "echo gauntlet | xargs rm next to gradlew gauntlet", "main", "Bash",
                 command="./gradlew gauntlet; echo gauntlet | xargs rm -rf")
     expect_deny(repo, "rm $VAR next to gradlew -p gauntlet", "main", "Bash", command="./gradlew -p gauntlet tasks; rm -rf $X")
