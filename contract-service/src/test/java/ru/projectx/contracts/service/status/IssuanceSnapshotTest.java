@@ -39,7 +39,7 @@ class IssuanceSnapshotTest {
         LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
 
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, SPOUSE_KM, CHILD_LM),
-                List.of(second, first), List.of(policy));
+                List.of(second, first), List.of(policy), List.of());
 
         assertThat(snapshot.contractOf(Tasks.SPOUSE)).isSameAs(second);
         assertThat(snapshot.policyOf(Tasks.CHILD)).isSameAs(policy);
@@ -61,7 +61,7 @@ class IssuanceSnapshotTest {
         RequestParticipant spouseLm = new RequestParticipant(Tasks.SPOUSE, DocumentKind.LM_POLICY);
 
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(spouseLm),
-                List.of(cancelled), List.of(policy));
+                List.of(cancelled), List.of(policy), List.of());
 
         assertThat(snapshot.statusOf(spouseLm)).contains(LmPolicyStatus.NEW);
         assertThat(snapshot.contractOf(Tasks.SPOUSE)).isSameAs(cancelled);
@@ -74,7 +74,7 @@ class IssuanceSnapshotTest {
         Contract failed = Issuances.contract(LATER, Tasks.SPOUSE, "DKM-2026-000002");
         failed.markError(RELATION_REQUIRED, NOW);
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM),
-                List.of(cancelled, failed), List.of());
+                List.of(cancelled, failed), List.of(), List.of());
         Contract failedAgain = Issuances.contract(LATEST, Tasks.SPOUSE, "DKM-2026-000003");
         failedAgain.markError(RELATION_REQUIRED, NOW);
         Contract failedOtherwise = Issuances.contract(LATEST, Tasks.SPOUSE, "DKM-2026-000003");
@@ -95,7 +95,7 @@ class IssuanceSnapshotTest {
     @Test
     void participantWithoutItsRecord_isAnIllegalState() {
         IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, CHILD_LM),
-                List.of(), List.of());
+                List.of(), List.of(), List.of());
 
         assertThatThrownBy(() -> snapshot.contractOf(Tasks.SPOUSE)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(Tasks.SPOUSE.toString());
@@ -110,19 +110,20 @@ class IssuanceSnapshotTest {
         failed.markError(new IssueError("UNKNOWN_GENDER", "недопустимое значение поля"), NOW);
         RequestParticipant insuredKm = new RequestParticipant(Tasks.INSURED, DocumentKind.KM_CONTRACT);
 
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, insuredKm), List.of(fresh, failed),
-                List.of()).hasUndraftedKmContract()).isTrue();
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(insuredKm), List.of(fresh, failed),
-                List.of()).hasUndraftedKmContract()).isFalse();
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED, CHILD_LM), List.of(fresh),
-                List.of(Issuances.policy(POLICY_ID, Tasks.CHILD))).hasUndraftedKmContract()).isFalse();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(SPOUSE_KM, insuredKm), List.of(fresh, failed), List.of(), List.of()))).isTrue();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(insuredKm), List.of(fresh, failed), List.of(), List.of()))).isFalse();
+        assertThat(KmContractStates.anyUndrafted(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(INSURED, CHILD_LM), List.of(fresh), List.of(Issuances.policy(POLICY_ID, Tasks.CHILD)),
+                List.of()))).isFalse();
     }
 
     @Test
     void requestStatus_isComputedByTheRules() {
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of()).requestStatus())
+        assertThat(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.CANCELLED);
-        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of()).requestStatus())
+        assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.COMPLETED);
     }
 }

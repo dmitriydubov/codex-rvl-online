@@ -11,21 +11,16 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
-import ru.projectx.contracts.entity.RequestReference;
-import ru.projectx.contracts.entity.TripPeriod;
+import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
 class RequestIssuanceTest {
 
     private static final Instant NOW = Instant.parse("2026-02-10T07:05:00Z");
-    private static final RequestReference REQUEST =
-            new RequestReference(Tasks.REQUEST, Tasks.INSURANCE_CONTRACT, Tasks.INSURER_POLICY);
-    private static final TripPeriod PERIOD = new TripPeriod(Tasks.FROM, Tasks.TO);
 
     private final Contract contract = Contract.open(
-            new ContractDraft("DKM-2026-000001", REQUEST, Tasks.SPOUSE, Tasks.INSURED, PERIOD, new BigDecimal("34000.00")),
-            NOW);
-    private final LmPolicy policy = LmPolicy.open(new LmPolicyDraft(REQUEST, Tasks.CHILD, Tasks.INSURED, PERIOD), NOW);
+            new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE, new BigDecimal("34000.00")), NOW);
+    private final LmPolicy policy = LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.CHILD), NOW);
     private final RequestIssuance issuance = new RequestIssuance(List.of(contract), List.of(policy));
 
     @Test

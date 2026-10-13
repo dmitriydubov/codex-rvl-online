@@ -26,6 +26,7 @@ import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import ru.projectx.contracts.config.BrokerConnectionProperties;
 import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.config.OneCBrokerProperties;
 import ru.projectx.contracts.config.OutboxProperties;
 import ru.projectx.contracts.service.outbox.OutboundMessage;
 import ru.projectx.contracts.service.outbox.PublishOutcome;
@@ -43,7 +44,12 @@ class BrokerPublisherTest {
             new OutboundRoutes(template, new InternalBrokerProperties(
                     new BrokerConnectionProperties("localhost", 5672, "/", "user", "secret", Duration.ofSeconds(10),
                             new BrokerConnectionProperties.Tls(false, true, true)),
-                    true, new InternalBrokerProperties.Queues("tasks", "status-changes"))),
+                    true, new InternalBrokerProperties.Queues("tasks", "status-changes")),
+                    mock(RabbitTemplate.class), new OneCBrokerProperties(
+                    new BrokerConnectionProperties("localhost", 5675, "/", "user", "secret", Duration.ofSeconds(10),
+                            new BrokerConnectionProperties.Tls(false, true, true)),
+                    true, new OneCBrokerProperties.Queues("km-submissions", "km-registrations", "lm-requests",
+                            "lm-issues"))),
             new OutboxProperties(new OutboxProperties.Publishing(Duration.ofSeconds(5), 100), CONFIRM_TIMEOUT,
                     new OutboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500)));

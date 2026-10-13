@@ -24,16 +24,20 @@ public class PartySnapshotStore {
     }
 
     public boolean replaceIfChanged(PersonOwner owner, List<Party> parties, Instant now) {
-        List<Party> stored = stored(owner).stream()
-                .map(person -> new Party(person.role(), person.person()))
-                .toList();
-        if (stored.equals(parties)) {
+        if (!differ(owner, parties)) {
             return false;
         }
         persons.deleteAll(stored(owner));
         persons.flush();
         store(owner, parties, now);
         return true;
+    }
+
+    public boolean differ(PersonOwner owner, List<Party> parties) {
+        List<Party> stored = stored(owner).stream()
+                .map(person -> new Party(person.role(), person.person()))
+                .toList();
+        return !stored.equals(parties);
     }
 
     private List<ContractPerson> stored(PersonOwner owner) {

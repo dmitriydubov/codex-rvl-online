@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
@@ -12,11 +13,18 @@ import ru.projectx.contracts.repository.LmPolicyRepository;
 @Component
 public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
 
+    static final String KIND = "полис ЛМ";
+
     private final LmPolicyRepository policies;
 
     public LmPolicyIssuance(LmPolicyRepository policies, PartySnapshotStore parties) {
         super(parties);
         this.policies = policies;
+    }
+
+    @Override
+    protected String kind() {
+        return KIND;
     }
 
     @Override
@@ -26,9 +34,7 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
 
     @Override
     protected LmPolicy open(Issue issue, Instant now) {
-        LmPolicyDraft draft = new LmPolicyDraft(issue.request(), issue.participant().id(),
-                issue.task().insured().id(), issue.period());
-        return policies.save(LmPolicy.open(draft, now));
+        return policies.save(LmPolicy.open(new LmPolicyDraft(issue.terms(), issue.participant().id()), now));
     }
 
     @Override
@@ -37,7 +43,14 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
     }
 
     @Override
-    protected boolean reviseTerms(LmPolicy policy, Issue issue) {
-        return policy.movePeriod(issue.period());
+    protected boolean submitted(LmPolicy policy) {
+        return policy.submitted();
+    }
+
+    @Override
+    protected boolean reviseTerms(LmPolicy policy, Issue issue, UUID program) {
+        boolean periodMoved = policy.movePeriod(issue.period());
+        boolean programMoved = policy.moveProgram(program);
+        return periodMoved || programMoved;
     }
 }

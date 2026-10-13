@@ -2,12 +2,14 @@ package ru.projectx.contracts.message;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public record TaskParticipant(
         int index,
         UUID id,
         boolean relative,
         BigDecimal amountDue,
+        @Nullable UUID programId,
         ParticipantPerson person) {
 
     public boolean pays() {

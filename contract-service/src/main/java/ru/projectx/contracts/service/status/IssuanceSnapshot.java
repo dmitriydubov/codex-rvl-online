@@ -10,10 +10,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.RequestStatus;
 
@@ -21,7 +21,6 @@ public final class IssuanceSnapshot {
 
     private static final String KM_CONTRACT = "договора КМ";
     private static final String LM_POLICY = "полиса ЛМ";
-    private static final String ANY_RECORD = "записи о выпуске";
 
     private final UUID individualRequestId;
     private final boolean cancelled;
@@ -31,9 +30,10 @@ public final class IssuanceSnapshot {
     private final Map<UUID, RecordOutcome> latestByParticipant;
     private final Map<UUID, Contract> latestContracts;
     private final Map<UUID, LmPolicy> latestPolicies;
+    private final Map<UUID, List<PrintedForm>> formsByPolicy;
 
     public IssuanceSnapshot(UUID individualRequestId, boolean cancelled, List<RequestParticipant> composition,
-            List<Contract> contracts, List<LmPolicy> policies) {
+            List<Contract> contracts, List<LmPolicy> policies, List<PrintedForm> forms) {
         this.individualRequestId = individualRequestId;
         this.cancelled = cancelled;
         this.composition = List.copyOf(composition);
@@ -43,6 +43,8 @@ public final class IssuanceSnapshot {
         this.latestByParticipant = latestBy(records, RecordOutcome::participantId, RecordOutcome::recordId);
         this.latestContracts = latestBy(contracts, IssuanceRecord::participantId, IssuanceRecord::id);
         this.latestPolicies = latestBy(policies, IssuanceRecord::participantId, IssuanceRecord::id);
+        this.formsByPolicy = forms.stream().filter(form -> form.lmPolicyId().isPresent())
+                .collect(Collectors.groupingBy(form -> form.lmPolicyId().get()));
     }
 
     private static <T> Map<UUID, T> latestBy(List<T> items, Function<T, UUID> participant, Function<T, UUID> order) {
@@ -79,6 +81,10 @@ public final class IssuanceSnapshot {
         return latest(latestPolicies, participantId, LM_POLICY);
     }
 
+    public List<PrintedForm> formsOf(LmPolicy policy) {
+        return formsByPolicy.getOrDefault(policy.id(), List.of());
+    }
+
     public Optional<IssuanceStatus> statusOf(RequestParticipant participant) {
         UUID participantId = participant.participantId();
         return switch (participant.kind()) {
@@ -95,12 +101,5 @@ public final class IssuanceSnapshot {
 
     public RequestStatus requestStatus() {
         return RequestStatusRules.of(this);
-    }
-
-    public boolean hasUndraftedKmContract() {
-        return composition.stream()
-                .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
-                .map(participant -> latest(latestByParticipant, participant.participantId(), ANY_RECORD).status())
-                .anyMatch(KmContractStates::undrafted);
     }
 }

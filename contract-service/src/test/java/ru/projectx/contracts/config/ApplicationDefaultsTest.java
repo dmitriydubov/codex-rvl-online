@@ -71,8 +71,16 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void lmPolicyRequestDefaults_prepareEveryTenSecondsInBatchesOfAHundred() {
+        assertThat(application.getProperty("projectx.lm-policy-requests.interval")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_INTERVAL:10s}");
+        assertThat(application.getProperty("projectx.lm-policy-requests.batch-size")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_BATCH_SIZE:100}");
+    }
+
+    @Test
     void schedulerPool_hasAThreadPerScheduledPass() {
-        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("4");
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("5");
     }
 
     @Test

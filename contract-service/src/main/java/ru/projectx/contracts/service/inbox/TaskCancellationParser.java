@@ -7,7 +7,7 @@ import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 
 @Component
-public class TaskCancellationParser {
+public class TaskCancellationParser implements PayloadParser<ContractTaskCancellation> {
 
     private static final String CANCELLED_AT = "cancelled_at";
 
@@ -17,6 +17,7 @@ public class TaskCancellationParser {
         this.bodies = bodies;
     }
 
+    @Override
     public ContractTaskCancellation parse(String payload) {
         JsonFields data = bodies.data(payload);
         try {

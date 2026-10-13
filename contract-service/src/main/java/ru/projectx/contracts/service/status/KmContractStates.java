@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.status;
 
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.message.KmContractState;
 
@@ -11,6 +12,13 @@ final class KmContractStates {
 
     static boolean undrafted(IssuanceStatus status) {
         return status == ContractStatus.NEW;
+    }
+
+    static boolean anyUndrafted(IssuanceSnapshot snapshot) {
+        return snapshot.composition().stream()
+                .filter(participant -> participant.kind() == DocumentKind.KM_CONTRACT)
+                .map(participant -> snapshot.statusOf(participant).orElseThrow())
+                .anyMatch(KmContractStates::undrafted);
     }
 
     static KmContractState of(ContractStatus status) {

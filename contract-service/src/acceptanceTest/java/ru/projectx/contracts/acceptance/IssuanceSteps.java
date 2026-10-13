@@ -19,8 +19,9 @@ import org.jspecify.annotations.Nullable;
 public class IssuanceSteps {
 
     private static final Set<String> KNOWN = Set.of("документ", "статус", "номер", "начало", "окончание", "премия",
-            "страхователь", "договор страхования", "полис страхователя", "версия", "причина прекращения", "комментарий",
-            "момент прекращения", "код ошибки", "текст ошибки");
+            "страхователь", "договор страхования", "полис страхователя", "программа", "версия", "причина прекращения",
+            "комментарий", "момент прекращения", "код ошибки", "текст ошибки", "идентификатор в 1С", "номер в 1С",
+            "номер полиса", "выпущенный полис");
 
     private final IssuanceRecords records;
 
@@ -108,15 +109,25 @@ public class IssuanceSteps {
         requisite(softly, expected, "страхователь", () -> text(record.policyholder()));
         requisite(softly, expected, "договор страхования", () -> text(record.insuranceContract()));
         requisite(softly, expected, "полис страхователя", () -> text(record.insurerPolicy()));
+        requisite(softly, expected, "программа", () -> text(record.program()));
         requisite(softly, expected, "версия", () -> Integer.toString(record.version()));
         requisite(softly, expected, "причина прекращения", record::cancelReason);
         requisite(softly, expected, "комментарий", record::cancelComment);
         requisite(softly, expected, "код ошибки", record::errorCode);
         requisite(softly, expected, "текст ошибки", record::errorMessage);
+        issuedRequisites(softly, expected, record);
         if (expected.containsKey("момент прекращения")) {
             softly.assertThat(record.cancelledAt()).as("момент прекращения")
                     .isEqualTo(moment(blankAsNull(expected.get("момент прекращения"))));
         }
+    }
+
+    private static void issuedRequisites(SoftAssertions softly, Map<String, String> expected,
+            IssuanceRecords.Record record) {
+        requisite(softly, expected, "идентификатор в 1С", () -> text(record.policyUskId()));
+        requisite(softly, expected, "номер в 1С", record::policyUskNumber);
+        requisite(softly, expected, "номер полиса", record::issuedPolicyNumber);
+        requisite(softly, expected, "выпущенный полис", () -> text(record.issuedPolicyId()));
     }
 
     private static void requisite(SoftAssertions softly, Map<String, String> expected, String key,

@@ -10,8 +10,10 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class MessageBodies {
 
+    static final String META = "meta";
+    static final String DATA = "data";
+
     private static final String ROOT = "";
-    private static final String DATA = "data";
 
     private final ObjectReader json;
 
@@ -20,8 +22,12 @@ public class MessageBodies {
     }
 
     JsonFields data(String payload) {
+        return body(payload).requiredObject(DATA);
+    }
+
+    JsonFields body(String payload) {
         try {
-            return new JsonFields(json.readTree(payload), ROOT).requiredObject(DATA);
+            return new JsonFields(json.readTree(payload), ROOT);
         }
         catch (JacksonException unreadable) {
             throw ContractViolationException.unreadableBody(unreadable);

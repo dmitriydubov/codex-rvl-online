@@ -2,6 +2,7 @@ package ru.projectx.contracts.acceptance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.cucumber.java.ParameterType;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
@@ -22,7 +23,7 @@ public class InboxSteps {
     private static final Set<String> PENDING = Set.of("ждёт разбора", "отложено до повтора");
 
     private final InboxJournal journal;
-    private final TaskQueue queue;
+    private final StandQueues queues;
     private final TaskMessages messages;
     private final PublishedMessages published;
     private final InboxProcessor processor;
@@ -31,11 +32,11 @@ public class InboxSteps {
     private final OutboxRecords outbox;
     private final ErasureStates statesBeforeErasure;
 
-    public InboxSteps(InboxJournal journal, TaskQueue queue, TaskMessages messages, PublishedMessages published,
+    public InboxSteps(InboxJournal journal, StandQueues queues, TaskMessages messages, PublishedMessages published,
             InboxProcessor processor, InboxPayloadRetention erasure, OutboxPayloadRetention outboxErasure,
             OutboxRecords outbox, ErasureStates statesBeforeErasure) {
         this.journal = journal;
-        this.queue = queue;
+        this.queues = queues;
         this.messages = messages;
         this.published = published;
         this.processor = processor;
@@ -45,9 +46,14 @@ public class InboxSteps {
         this.statesBeforeErasure = statesBeforeErasure;
     }
 
+    @ParameterType(MessageSender.PATTERN)
+    public MessageSender sender(String alias) {
+        return MessageSender.called(alias);
+    }
+
     @Тогда("очередь {string} пуста и у неё есть потребитель")
     public void queueEmptyWithConsumer(String queueName) {
-        TaskQueue target = queue.called(queueName);
+        StandQueue target = queues.called(queueName);
         Awaitility.await().atMost(PATIENCE).untilAsserted(() -> {
             var state = target.state();
             assertThat(state.getQueue()).isEqualTo(target.name());
@@ -56,36 +62,36 @@ public class InboxSteps {
         });
     }
 
-    @Тогда("сообщение сервиса Заявок {string} ждёт разбора")
-    public void awaitsProcessing(String messageId) {
+    @Тогда("сообщение {sender} {string} ждёт разбора")
+    public void awaitsProcessing(MessageSender sender, String messageId) {
         Awaitility.await().atMost(PATIENCE).untilAsserted(() -> assertThat(journal.find(messageId)).isPresent());
-        assertThat(entry(messageId).outcome()).isEqualTo("ждёт разбора");
+        assertThat(entry(sender, messageId).outcome()).isEqualTo("ждёт разбора");
     }
 
-    @Тогда("сообщение сервиса Заявок {string} обработано")
-    public void processed(String messageId) {
-        assertThat(entry(messageId).outcome()).isEqualTo("обработано");
+    @Тогда("сообщение {sender} {string} обработано")
+    public void processed(MessageSender sender, String messageId) {
+        assertThat(entry(sender, messageId).outcome()).isEqualTo("обработано");
     }
 
-    @Тогда("сообщение сервиса Заявок {string} пропущено с причиной {string}")
-    public void skipped(String messageId, String reason) {
-        InboxJournal.Entry entry = entry(messageId);
+    @Тогда("сообщение {sender} {string} пропущено с причиной {string}")
+    public void skipped(MessageSender sender, String messageId, String reason) {
+        InboxJournal.Entry entry = entry(sender, messageId);
         assertThat(entry.outcome()).isEqualTo("пропущено");
         assertThat(entry.errorMessage()).isEqualTo(reason);
     }
 
-    @Тогда("сообщение сервиса Заявок {string} отложено до повтора после попытки {int} с причиной {string}")
-    public void retrying(String messageId, int attempt, String reason) {
-        InboxJournal.Entry entry = entry(messageId);
+    @Тогда("сообщение {sender} {string} отложено до повтора после попытки {int} с причиной {string}")
+    public void retrying(MessageSender sender, String messageId, int attempt, String reason) {
+        InboxJournal.Entry entry = entry(sender, messageId);
         assertThat(entry.outcome()).isEqualTo("отложено до повтора");
         assertThat(entry.attempts()).isEqualTo(attempt);
         assertThat(entry.errorMessage()).isEqualTo(reason);
         assertThat(entry.nextAttemptAt()).isNotNull();
     }
 
-    @Тогда("сообщение сервиса Заявок {string} отклонено окончательно после попытки {int} с причиной {string}")
-    public void rejected(String messageId, int attempt, String reason) {
-        InboxJournal.Entry entry = entry(messageId);
+    @Тогда("сообщение {sender} {string} отклонено окончательно после попытки {int} с причиной {string}")
+    public void rejected(MessageSender sender, String messageId, int attempt, String reason) {
+        InboxJournal.Entry entry = entry(sender, messageId);
         assertThat(entry.outcome()).isEqualTo("отклонено окончательно");
         assertThat(entry.attempts()).isEqualTo(attempt);
         assertThat(entry.errorMessage()).isEqualTo(reason);
@@ -118,15 +124,17 @@ public class InboxSteps {
         assertThat(journal.find(messageId)).isEmpty();
     }
 
-    @Тогда("сообщения сервиса Заявок в журнале входящих в порядке приёма — {string}")
-    public void entriesInOrder(String messageIds) {
-        assertThat(journal.inOrderOfReceipt()).extracting(entry -> entry.messageId().toString())
+    @Тогда("сообщения {sender} в журнале входящих в порядке приёма — {string}")
+    public void entriesInOrder(MessageSender sender, String messageIds) {
+        assertThat(journal.inOrderOfReceipt()).filteredOn(entry -> sender.sends(entry.eventType()))
+                .extracting(entry -> entry.messageId().toString())
                 .containsExactlyElementsOf(list(messageIds));
     }
 
-    @Тогда("исходы сообщений сервиса Заявок в порядке приёма — {string}")
-    public void outcomesInOrder(String outcomes) {
-        assertThat(journal.inOrderOfReceipt()).extracting(InboxJournal.Entry::outcome)
+    @Тогда("исходы сообщений {sender} в порядке приёма — {string}")
+    public void outcomesInOrder(MessageSender sender, String outcomes) {
+        assertThat(journal.inOrderOfReceipt()).filteredOn(entry -> sender.sends(entry.eventType()))
+                .extracting(InboxJournal.Entry::outcome)
                 .containsExactlyElementsOf(list(outcomes));
     }
 
@@ -190,6 +198,14 @@ public class InboxSteps {
     private InboxJournal.Entry entry(String messageId) {
         return journal.find(messageId)
                 .orElseThrow(() -> new AssertionError("в журнале входящих нет записи о сообщении " + messageId));
+    }
+
+    private InboxJournal.Entry entry(MessageSender sender, String messageId) {
+        InboxJournal.Entry entry = entry(messageId);
+        assertThat(sender.sends(entry.eventType()))
+                .as("сообщение %s с типом события %s прислано %s", messageId, entry.eventType(), sender.alias())
+                .isTrue();
+        return entry;
     }
 
     private static List<String> list(String commaSeparated) {

@@ -13,3 +13,5 @@ databaseChangeLog:
       file: db/changelog/006-outbox-messages.yaml
   - include:
       file: db/changelog/007-issuance-requests.yaml
+  - include:
+      file: db/changelog/008-contract-documents.yaml

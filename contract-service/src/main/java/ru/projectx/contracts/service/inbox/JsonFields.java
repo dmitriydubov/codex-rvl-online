@@ -40,8 +40,38 @@ record JsonFields(JsonNode node, String path) {
         return child;
     }
 
+    boolean hasArray(String name) {
+        JsonNode value = node.path(name);
+        if (absent(value)) {
+            return false;
+        }
+        if (!value.isArray()) {
+            throw ContractViolationException.invalidValue(pathOf(name));
+        }
+        return true;
+    }
+
     int size() {
         return node.size();
+    }
+
+    @Nullable Long longOrNull(String name) {
+        JsonNode value = node.path(name);
+        if (absent(value)) {
+            return null;
+        }
+        if (notLong(value)) {
+            throw ContractViolationException.invalidValue(pathOf(name));
+        }
+        return value.longValue();
+    }
+
+    private static boolean absent(JsonNode value) {
+        return value.isMissingNode() || value.isNull();
+    }
+
+    private static boolean notLong(JsonNode value) {
+        return !value.isIntegralNumber() || !value.canConvertToLong();
     }
 
     String text(String name) {
@@ -50,7 +80,7 @@ record JsonFields(JsonNode node, String path) {
 
     private ContractViolationException absentOrInvalid(String name) {
         JsonNode value = node.path(name);
-        return value.isMissingNode() || value.isNull()
+        return absent(value)
                 ? ContractViolationException.missingField(pathOf(name))
                 : ContractViolationException.invalidValue(pathOf(name));
     }
@@ -66,6 +96,18 @@ record JsonFields(JsonNode node, String path) {
 
     UUID uuid(String name) {
         return Guids.canonical(text(name)).orElseThrow(() -> ContractViolationException.invalidValue(pathOf(name)));
+    }
+
+    @Nullable UUID uuidOrNull(String name) {
+        return optionalText(name).isPresent() ? uuid(name) : null;
+    }
+
+    int integer(String name) {
+        JsonNode value = node.path(name);
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            throw absentOrInvalid(name);
+        }
+        return value.intValue();
     }
 
     LocalDate date(String name) {

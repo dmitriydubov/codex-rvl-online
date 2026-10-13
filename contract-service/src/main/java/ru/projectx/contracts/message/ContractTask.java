@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record ContractTask(
+        int entityVersion,
         UUID individualRequestId,
         UUID insuranceContractId,
         UUID insurerPolicyId,

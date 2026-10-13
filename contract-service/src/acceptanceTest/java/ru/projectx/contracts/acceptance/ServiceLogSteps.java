@@ -24,15 +24,17 @@ public class ServiceLogSteps {
     private final TaskMessages messages;
     private final TaskQueue queue;
     private final OutboxRecords outbox;
+    private final IssuanceRecords records;
 
     public ServiceLogSteps(ServiceJournal journal, InboxJournal inbox, PublishedMessages published,
-            TaskMessages messages, TaskQueue queue, OutboxRecords outbox) {
+            TaskMessages messages, TaskQueue queue, OutboxRecords outbox, IssuanceRecords records) {
         this.journal = journal;
         this.inbox = inbox;
         this.published = published;
         this.messages = messages;
         this.queue = queue;
         this.outbox = outbox;
+        this.records = records;
     }
 
     @Before(order = 20)
@@ -89,6 +91,18 @@ public class ServiceLogSteps {
                 .isEqualTo("исходящее сообщение " + messageId + " отклонено окончательно: тип события " + eventType
                         + ", попытка " + attempt + ", причина: " + reason);
         assertThat(matching.get(0).getThrowableProxy()).as("приложенное исключение").isNull();
+    }
+
+    @Тогда("в журнале Договоров есть запись уровня WARN по полису ЛМ участника {string} заявки {string} с причиной {string}")
+    public void lmPolicyWarningLogged(String participantId, String requestId, String reason) {
+        String expected = "полис ЛМ " + records.latestLmPolicyId(participantId, requestId) + " участника " + participantId
+                + " заявки " + requestId + ": " + reason;
+        List<ILoggingEvent> matching = journal.events().stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .filter(event -> event.getFormattedMessage().equals(expected))
+                .toList();
+        assertThat(matching).as("записи WARN по полису ЛМ участника %s", participantId).isNotEmpty();
+        assertThat(matching).extracting(ILoggingEvent::getThrowableProxy).as("приложенное исключение").containsOnlyNulls();
     }
 
     @Тогда("значение поля {string} сообщения {string} есть в его теле, но не попало ни в причину исхода, ни в журнал Договоров")

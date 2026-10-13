@@ -13,19 +13,20 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.config.OneCBrokerProperties;
 import ru.projectx.contracts.service.integration.InternalBroker;
+import ru.projectx.contracts.service.integration.OneCBroker;
 
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "management.server.port=0",
-        "projectx.reference.url=http://reference.test:8080/internal/v1",
         "management.health.brokers.enabled=false",
         "projectx.scheduling.enabled=false",
         "projectx.inbox.requeue-delay=1s",
         "projectx.brokers.internal.connection.tls.enabled=false",
         "projectx.brokers.onec.connection.tls.enabled=false",
         "projectx.brokers.internal.listener-auto-startup=true",
-        "projectx.brokers.onec.listener-auto-startup=false"})
+        "projectx.brokers.onec.listener-auto-startup=true"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 
@@ -34,11 +35,23 @@ public class CucumberSpringConfiguration {
 
         private static final String POSTGRES_IMAGE = "postgres:16.10-alpine";
         private static final String RABBITMQ_IMAGE = "rabbitmq:4.1.2-alpine";
+        private static final String LM_POLICY_REQUESTS = "запросы на выпуск полисов ЛМ";
+        private static final String LM_POLICY_RESULTS = "результаты выпуска полисов ЛМ";
 
         @Bean
         @ServiceConnection
         PostgreSQLContainer postgresContainer() {
             return new PostgreSQLContainer(POSTGRES_IMAGE);
+        }
+
+        @Bean
+        ReferenceStub referenceStub() throws IOException {
+            return new ReferenceStub();
+        }
+
+        @Bean
+        DynamicPropertyRegistrar referenceUrl(ReferenceStub stub) {
+            return registry -> registry.add("projectx.reference.url", stub::url);
         }
 
         @Bean
@@ -77,6 +90,16 @@ public class CucumberSpringConfiguration {
         @Bean
         StatusQueue statusQueue(@InternalBroker ConnectionFactory connections, InternalBrokerProperties broker) {
             return new StatusQueue(connections, broker.queues().statusChanges());
+        }
+
+        @Bean
+        OneCQueue lmPolicyRequestQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
+            return new OneCQueue(connections, LM_POLICY_REQUESTS, broker.queues().lmPolicyRequests());
+        }
+
+        @Bean
+        OneCQueue lmPolicyResultQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
+            return new OneCQueue(connections, LM_POLICY_RESULTS, broker.queues().lmPolicyIssues());
         }
     }
 }

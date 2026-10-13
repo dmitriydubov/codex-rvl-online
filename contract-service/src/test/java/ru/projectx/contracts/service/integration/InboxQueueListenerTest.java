@@ -36,7 +36,7 @@ import ru.projectx.contracts.service.inbox.ReceiptOutcome;
 import ru.projectx.contracts.support.TaskBodies;
 import tools.jackson.databind.json.JsonMapper;
 
-class TaskQueueListenerTest {
+class InboxQueueListenerTest {
 
     private static final InboxReceipt RECEIPT = new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
             UUID.fromString(TaskBodies.REQUEST_ID), "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
@@ -47,14 +47,14 @@ class TaskQueueListenerTest {
     private final Channel channel = mock();
     private final Pauses pauses = mock();
     private final InboxMetrics metrics = mock();
-    private final TaskQueueListener listener = new TaskQueueListener(
+    private final InboxQueueListener listener = new InboxQueueListener(
             new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
             new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
                     new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
                     REQUEUE_DELAY), pauses, metrics);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
-    private final Logger log = (Logger) LoggerFactory.getLogger(TaskQueueListener.class);
+    private final Logger log = (Logger) LoggerFactory.getLogger(InboxQueueListener.class);
 
     @BeforeEach
     void collectJournal() {

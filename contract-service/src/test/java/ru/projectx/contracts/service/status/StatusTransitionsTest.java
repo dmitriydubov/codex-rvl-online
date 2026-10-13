@@ -28,7 +28,7 @@ class StatusTransitionsTest {
 
     @Test
     void firstTaskLeavingNothingToIssue_isPublishedAsCompleted() {
-        assertThat(StatusTransitions.publishAfterTask(NOTHING, snapshot(false, List.of(INSURED), List.of(), List.of())))
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, snapshot(false, List.of(INSURED), List.of(), List.of())))
                 .isTrue();
     }
 
@@ -36,7 +36,7 @@ class StatusTransitionsTest {
     void sameCompletedStateAgain_isNotPublished() {
         IssuanceSnapshot completed = snapshot(false, List.of(INSURED), List.of(), List.of());
 
-        assertThat(StatusTransitions.publishAfterTask(completed, completed)).isFalse();
+        assertThat(StatusTransitions.publishAfterChange(completed, completed)).isFalse();
     }
 
     @Test
@@ -44,7 +44,7 @@ class StatusTransitionsTest {
         IssuanceSnapshot completed = snapshot(false, List.of(INSURED), List.of(), List.of());
         RequestParticipant another = new RequestParticipant(Tasks.CHILD, DocumentKind.NONE);
 
-        assertThat(StatusTransitions.publishAfterTask(completed, snapshot(false, List.of(INSURED, another),
+        assertThat(StatusTransitions.publishAfterChange(completed, snapshot(false, List.of(INSURED, another),
                 List.of(), List.of()))).isTrue();
     }
 
@@ -52,7 +52,7 @@ class StatusTransitionsTest {
     void taskLeavingOnlyNewRecords_isNotPublished() {
         LmPolicy pending = Issuances.policy(POLICY_ID, Tasks.CHILD);
 
-        assertThat(StatusTransitions.publishAfterTask(NOTHING, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
                 List.of(pending)))).isFalse();
     }
 
@@ -62,8 +62,8 @@ class StatusTransitionsTest {
         failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
         IssuanceSnapshot after = snapshot(false, List.of(INSURED, CHILD_LM), List.of(), List.of(failed));
 
-        assertThat(StatusTransitions.publishAfterTask(NOTHING, after)).isTrue();
-        assertThat(StatusTransitions.publishAfterTask(after, after)).isFalse();
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, after)).isTrue();
+        assertThat(StatusTransitions.publishAfterChange(after, after)).isFalse();
     }
 
     @Test
@@ -73,7 +73,7 @@ class StatusTransitionsTest {
         LmPolicy cancelled = Issuances.policy(POLICY_ID, Tasks.CHILD);
         cancelled.cancel(new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW), NOW);
 
-        assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED), List.of(),
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED), List.of(),
                 List.of(cancelled)))).isTrue();
     }
 
@@ -86,7 +86,7 @@ class StatusTransitionsTest {
         LmPolicy failedAgain = Issuances.policy(LATER_POLICY_ID, Tasks.CHILD);
         failedAgain.markError(relationRequired, NOW);
 
-        assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
                 List.of(failed, failedAgain)))).isFalse();
     }
 
@@ -98,7 +98,7 @@ class StatusTransitionsTest {
         LmPolicy failedOtherwise = Issuances.policy(LATER_POLICY_ID, Tasks.CHILD);
         failedOtherwise.markError(new IssueError("UNKNOWN_GENDER", "недопустимое значение поля"), NOW);
 
-        assertThat(StatusTransitions.publishAfterTask(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
                 List.of(failed, failedOtherwise)))).isTrue();
     }
 
@@ -108,12 +108,12 @@ class StatusTransitionsTest {
         failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
         Contract fresh = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
 
-        assertThat(StatusTransitions.publishAfterTask(NOTHING, snapshot(false, List.of(INSURED, SPOUSE_KM, CHILD_LM),
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, snapshot(false, List.of(INSURED, SPOUSE_KM, CHILD_LM),
                 List.of(fresh), List.of(failed)))).isFalse();
     }
 
     private static IssuanceSnapshot snapshot(boolean cancelled, List<RequestParticipant> composition,
             List<Contract> contracts, List<LmPolicy> policies) {
-        return new IssuanceSnapshot(Tasks.REQUEST, cancelled, composition, contracts, policies);
+        return new IssuanceSnapshot(Tasks.REQUEST, cancelled, composition, contracts, policies, List.of());
     }
 }

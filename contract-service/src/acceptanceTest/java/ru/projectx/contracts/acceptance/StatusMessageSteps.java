@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.rabbitmq.client.GetResponse;
 import io.cucumber.java.ru.Тогда;
 import java.nio.charset.StandardCharsets;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,25 +16,27 @@ import tools.jackson.databind.JsonNode;
 
 public class StatusMessageSteps {
 
-    private static final Set<String> ENVELOPE = Set.of("topic", "event_type", "schema_version", "source",
-            "correlation_id", "entity_version", "created_at");
     private static final Set<String> PARTICIPANT = Set.of("участник", "document_kind", "km_contract_state",
-            "km_contract_id", "km_contract_number", "payment_status", "documents", "error_code", "error_message");
+            "km_contract_id", "km_contract_number", "policy_id", "policy_number", "payment_status", "documents",
+            "error_code", "error_message");
     private static final String KM_CONTRACT = "договор КМ";
+    private static final String NO_DOCUMENTS = "нет";
 
     private final ReceivedStatusMessages received;
     private final TaskMessages messages;
     private final PublishedMessages published;
     private final OutboxRecords journal;
     private final IssuanceRecords records;
+    private final PrintedFormRecords forms;
 
     public StatusMessageSteps(ReceivedStatusMessages received, TaskMessages messages, PublishedMessages published,
-            OutboxRecords journal, IssuanceRecords records) {
+            OutboxRecords journal, IssuanceRecords records, PrintedFormRecords forms) {
         this.received = received;
         this.messages = messages;
         this.published = published;
         this.journal = journal;
         this.records = records;
+        this.forms = forms;
     }
 
     @Тогда("тело сообщения о состоянии выпуска №{int} совпадает с телом исходящего сообщения №{int} по заявке {string} в журнале")
@@ -48,19 +49,7 @@ public class StatusMessageSteps {
 
     @Тогда("сообщение о состоянии выпуска №{int} получено с конвертом:")
     public void envelope(int ordinal, Map<String, String> expected) {
-        StepTables.onlyKnown(expected, ENVELOPE);
-        JsonNode meta = body(ordinal).path("meta");
-        SoftAssertions softly = new SoftAssertions();
-        for (Map.Entry<String, String> cell : expected.entrySet()) {
-            if ("created_at".equals(cell.getKey())) {
-                softly.assertThat(OffsetDateTime.parse(meta.path("created_at").stringValue()).toInstant())
-                        .as("created_at").isEqualTo(OffsetDateTime.parse(cell.getValue()).toInstant());
-            }
-            else {
-                softly.assertThat(meta.path(cell.getKey()).asString()).as(cell.getKey()).isEqualTo(cell.getValue());
-            }
-        }
-        softly.assertAll();
+        Envelopes.check(body(ordinal).path("meta"), expected);
     }
 
     @Тогда("сообщение о состоянии выпуска №{int}: заявка {string}, статус {string}, участники:")
@@ -110,8 +99,7 @@ public class StatusMessageSteps {
             softly.assertThat(actual.has(name)).as("поле %s отсутствует", name).isFalse();
         }
         else if ("documents".equals(name)) {
-            assertThat(expected).as("ожидание о documents").isEqualTo("нет");
-            softly.assertThat(actual.path(name).isArray() && actual.path(name).isEmpty()).as("documents пуст").isTrue();
+            documents(softly, expected, actual.path(name), participantId, requestId);
         }
         else if ("km_contract_id".equals(name)) {
             assertThat(expected).as("ожидание о km_contract_id").isEqualTo("есть");
@@ -121,6 +109,28 @@ public class StatusMessageSteps {
         else {
             softly.assertThat(actual.path(name).asString()).as(name).isEqualTo(expected);
         }
+    }
+
+    private void documents(SoftAssertions softly, String expected, JsonNode actual, String participantId,
+            String requestId) {
+        if (NO_DOCUMENTS.equals(expected)) {
+            softly.assertThat(actual.isArray() && actual.isEmpty()).as("documents пуст").isTrue();
+            return;
+        }
+        String[] form = expected.split(" ", 3);
+        assertThat(form).as("ожидание о documents: «doc_type kind url»").hasSize(3);
+        assertThat(actual.isArray()).as("documents — массив").isTrue();
+        softly.assertThat(actual).as("число документов").hasSize(1);
+        JsonNode document = actual.path(0);
+        softly.assertThat(document.path("doc_type").asString()).as("doc_type").isEqualTo(form[0]);
+        softly.assertThat(document.path("kind").asString()).as("kind").isEqualTo(form[1]);
+        softly.assertThat(document.path("url").asString()).as("url").isEqualTo(form[2]);
+        Optional<PrintedFormRecords.Form> record = forms.ofPolicy(records.latestLmPolicyId(participantId, requestId))
+                .stream().filter(candidate -> candidate.docType().equals(form[0]) && candidate.kind().equals(form[1]))
+                .findFirst();
+        assertThat(record).as("запись печатной формы %s %s", form[0], form[1]).isPresent();
+        softly.assertThat(document.path("document_id").asString()).as("document_id")
+                .isEqualTo(record.get().id().toString());
     }
 
     private UUID latestContractId(String participantId, String requestId) {
