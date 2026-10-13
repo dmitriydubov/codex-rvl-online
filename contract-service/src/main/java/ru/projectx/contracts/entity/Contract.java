@@ -53,6 +53,12 @@ public class Contract extends IssuanceRecord {
         return true;
     }
 
+    public void offerDraft() {
+        if (status == ContractStatus.NEW) {
+            this.status = ContractStatus.DRAFT_READY;
+        }
+    }
+
     @Override
     protected void enterError() {
         this.status = ContractStatus.ERROR;

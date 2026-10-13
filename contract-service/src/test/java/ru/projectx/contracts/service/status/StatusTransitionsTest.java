@@ -103,6 +103,38 @@ class StatusTransitionsTest {
     }
 
     @Test
+    void kmContractThatBecameReadyForAcceptance_isPublished() {
+        Contract drafted = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        drafted.offerDraft();
+        IssuanceSnapshot after = snapshot(false, List.of(INSURED, SPOUSE_KM), List.of(drafted), List.of());
+
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, after)).isTrue();
+        assertThat(StatusTransitions.publishAfterChange(after, after)).isFalse();
+    }
+
+    @Test
+    void kmContractReadyForAcceptanceNextToANewLmPolicy_isPublished() {
+        Contract drafted = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        drafted.offerDraft();
+        LmPolicy pending = Issuances.policy(POLICY_ID, Tasks.CHILD);
+
+        assertThat(StatusTransitions.publishAfterChange(NOTHING, snapshot(false, List.of(INSURED, SPOUSE_KM, CHILD_LM),
+                List.of(drafted), List.of(pending)))).isTrue();
+    }
+
+    @Test
+    void newKmContractReadyForAcceptanceAfterTheParticipantsErrorOne_isPublished() {
+        Contract failed = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, SPOUSE_KM), List.of(failed), List.of());
+        Contract corrected = Issuances.contract(LATER_POLICY_ID, Tasks.SPOUSE, "DKM-2026-000002");
+        corrected.offerDraft();
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED, SPOUSE_KM),
+                List.of(failed, corrected), List.of()))).isTrue();
+    }
+
+    @Test
     void anyUndraftedKmContract_defersThePublication() {
         LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
         failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);

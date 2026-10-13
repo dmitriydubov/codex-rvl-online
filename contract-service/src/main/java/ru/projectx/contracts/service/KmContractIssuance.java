@@ -40,7 +40,9 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     protected Contract open(Issue issue, Instant now) {
         ContractDraft draft = new ContractDraft(numbers.next(now), issue.terms(), issue.participant().id(),
                 issue.participant().amountDue());
-        return contracts.save(Contract.open(draft, now));
+        Contract contract = Contract.open(draft, now);
+        contract.offerDraft();
+        return contracts.save(contract);
     }
 
     @Override
@@ -57,6 +59,7 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     protected boolean reviseTerms(Contract contract, Issue issue, UUID program) {
         boolean termsRevised = contract.revise(new ContractTerms(issue.period(), issue.participant().amountDue()));
         boolean programMoved = contract.moveProgram(program);
+        contract.offerDraft();
         return termsRevised || programMoved;
     }
 }
