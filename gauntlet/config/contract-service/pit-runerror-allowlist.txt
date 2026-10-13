@@ -19,3 +19,11 @@ ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  Empt
 
 # PersonOwnerTest: contract_ownsPersonsThroughContractIdOnly (isEqualTo(new PersonOwner(ID, null)) fails on a null actual).
 ru.projectx.contracts.entity.PersonOwner#contract                            NullReturnValsMutator                # contract_owns...: isEqualTo(new PersonOwner(ID, null)) on null
+
+# StatusTransitionsTest / IssuanceSnapshotTest: outcome of a record in the issuance snapshot (record RecordOutcome).
+# stopped() is the filter of StatusTransitions.stoppedSince, looksLike() is the body of IssuanceSnapshot.knows.
+# Verified by the coordinator 2026-10-13 on main after the merge of the step that added the record
+# (RUN_ERROR appeared only in the final full run of the step; 246/246 killed in the run before).
+ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanTrueReturnValsMutator         # taskLeavingOnlyNewRecords_isNotPublished: a NEW record counts as stopped, the empty "before" does not know it -> isFalse() fails
+ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanFalseReturnValsMutator        # recordThatEnteredError_isPublished: nothing is stopped, request status ERROR is not COMPLETED -> isTrue() fails
+ru.projectx.contracts.service.status.RecordOutcome#looksLike                 BooleanTrueReturnValsMutator         # IssuanceSnapshotTest.knownOutcome_isTheRecordsOwnOrOtherwiseTheLatestOfItsParticipant: knows(failedOtherwise) isFalse() fails; StatusTransitionsTest.newRecordInAnotherError_isPublished isTrue() fails
