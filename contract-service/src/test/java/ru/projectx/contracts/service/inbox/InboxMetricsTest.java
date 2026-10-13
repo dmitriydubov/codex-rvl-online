@@ -23,4 +23,18 @@ class InboxMetricsTest {
         assertThat(registry.get("contracts.inbox.failed").counter().getId().getDescription())
                 .isEqualTo("входящие сообщения сервиса Заявок, отклонённые окончательно");
     }
+
+    @Test
+    void countLost_incrementsCounterTaggedWithReason() {
+        metrics.countLost("unusable_envelope");
+        metrics.countLost("unusable_envelope");
+        metrics.countLost("unstorable_text");
+
+        assertThat(registry.get("contracts.inbox.lost").tag("reason", "unusable_envelope").counter().count())
+                .isEqualTo(2);
+        assertThat(registry.get("contracts.inbox.lost").tag("reason", "unstorable_text").counter().count())
+                .isEqualTo(1);
+        assertThat(registry.get("contracts.inbox.lost").counter().getId().getDescription())
+                .isEqualTo("входящие сообщения сервиса Заявок, подтверждённые и потерянные без записи в журнал");
+    }
 }

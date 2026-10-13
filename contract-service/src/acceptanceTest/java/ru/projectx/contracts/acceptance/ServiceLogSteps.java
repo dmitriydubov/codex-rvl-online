@@ -23,14 +23,16 @@ public class ServiceLogSteps {
     private final PublishedMessages published;
     private final TaskMessages messages;
     private final TaskQueue queue;
+    private final OutboxRecords outbox;
 
     public ServiceLogSteps(ServiceJournal journal, InboxJournal inbox, PublishedMessages published,
-            TaskMessages messages, TaskQueue queue) {
+            TaskMessages messages, TaskQueue queue, OutboxRecords outbox) {
         this.journal = journal;
         this.inbox = inbox;
         this.published = published;
         this.messages = messages;
         this.queue = queue;
+        this.outbox = outbox;
     }
 
     @Before(order = 20)
@@ -74,6 +76,21 @@ public class ServiceLogSteps {
         assertThat(matching.get(0).getThrowableProxy()).isNull();
     }
 
+    @Тогда("в журнале Договоров есть запись уровня ERROR об окончательном отказе публикации исходящего сообщения №{int} по заявке {string}: тип события {string}, попытка {int}, причина {string}")
+    public void publicationRejectionLogged(int ordinal, String requestId, String eventType, int attempt, String reason) {
+        String messageId = outbox.number(ordinal, requestId).messageId().toString();
+        List<ILoggingEvent> matching = journal.events().stream()
+                .filter(event -> event.getLevel() == Level.ERROR)
+                .filter(event -> event.getFormattedMessage()
+                        .contains("исходящее сообщение " + messageId + " отклонено окончательно"))
+                .toList();
+        assertThat(matching).as("записи ERROR об окончательном отказе публикации %s", messageId).hasSize(1);
+        assertThat(matching.get(0).getFormattedMessage())
+                .isEqualTo("исходящее сообщение " + messageId + " отклонено окончательно: тип события " + eventType
+                        + ", попытка " + attempt + ", причина: " + reason);
+        assertThat(matching.get(0).getThrowableProxy()).as("приложенное исключение").isNull();
+    }
+
     @Тогда("значение поля {string} сообщения {string} есть в его теле, но не попало ни в причину исхода, ни в журнал Договоров")
     public void personalValueStaysInBody(String field, String messageId) {
         Optional<String> value = value(messages.read(published.of(messageId)), field);
@@ -104,7 +121,7 @@ public class ServiceLogSteps {
                 .as("записи журнала со значением поля %s", field).isEmpty();
     }
 
-    private static Optional<String> value(JsonNode body, String field) {
+    static Optional<String> value(JsonNode body, String field) {
         JsonNode node = body.path("data");
         Matcher segments = SEGMENT.matcher(field);
         while (segments.find()) {

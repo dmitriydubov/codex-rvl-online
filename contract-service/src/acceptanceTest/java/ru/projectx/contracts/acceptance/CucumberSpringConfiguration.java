@@ -73,5 +73,10 @@ public class CucumberSpringConfiguration {
         TaskQueue taskQueue(@InternalBroker ConnectionFactory connections, InternalBrokerProperties broker) {
             return new TaskQueue(connections, broker.queues().taskChanges());
         }
+
+        @Bean
+        StatusQueue statusQueue(@InternalBroker ConnectionFactory connections, InternalBrokerProperties broker) {
+            return new StatusQueue(connections, broker.queues().statusChanges());
+        }
     }
 }

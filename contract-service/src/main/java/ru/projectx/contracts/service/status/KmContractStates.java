@@ -1,0 +1,24 @@
+package ru.projectx.contracts.service.status;
+
+import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.IssuanceStatus;
+import ru.projectx.contracts.message.KmContractState;
+
+final class KmContractStates {
+
+    private KmContractStates() {
+    }
+
+    static boolean undrafted(IssuanceStatus status) {
+        return status == ContractStatus.NEW;
+    }
+
+    static KmContractState of(ContractStatus status) {
+        return switch (status) {
+            case NEW -> throw new IllegalStateException("договор КМ без проекта в ответ сервису Заявок не попадает");
+            case DRAFT_READY, ACCEPTED, INVOICE_ISSUED, PAID, SUBMITTED -> KmContractState.DRAFTED;
+            case ISSUED -> KmContractState.ISSUED;
+            case ERROR, CANCELLED -> KmContractState.CANCELLED;
+        };
+    }
+}

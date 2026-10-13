@@ -1,0 +1,71 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 006-outbox-messages
+      author: contract-service
+      comment: >
+        Журнал исходящих сообщений и вложения к ним. Запись делается в одной транзакции с
+        изменением данных, публикует её отдельный проход с подтверждением брокера; идентификатор
+        сообщения присваивается записи при создании и не меняется. Срок следующей попытки держит
+        лестницу повторов; тело стирается по сроку хранения, запись остаётся ради истории. Вложения
+        (печатные формы) хранятся отдельно от тела и наполняются шагом передачи договора в 1С:УСК;
+        внешний ключ на таблицу документов добавит шаг, который её заведёт.
+      changes:
+        - sql:
+            sql: CREATE TYPE outbox_status AS ENUM ('NEW', 'PUBLISHED', 'FAILED');
+        - createTable:
+            tableName: outbox_messages
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_outbox_messages, nullable: false } }
+              - column: { name: aggregate_type, type: varchar(50), constraints: { nullable: false } }
+              - column: { name: aggregate_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: message_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: correlation_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: topic, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: event_type, type: varchar(50), constraints: { nullable: false } }
+              - column: { name: entity_version, type: int, constraints: { nullable: false } }
+              - column: { name: payload, type: jsonb }
+              - column: { name: status, type: outbox_status, constraints: { nullable: false } }
+              - column: { name: attempts, type: int, constraints: { nullable: false } }
+              - column: { name: error_message, type: text }
+              - column: { name: next_attempt_at, type: timestamptz }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: published_at, type: timestamptz }
+        - addUniqueConstraint:
+            tableName: outbox_messages
+            columnNames: message_id
+            constraintName: uq_outbox_messages_message_id
+        - createIndex:
+            tableName: outbox_messages
+            indexName: ix_outbox_messages_correlation_id
+            columns:
+              - column: { name: correlation_id }
+        - sql:
+            sql: >
+              CREATE INDEX ix_outbox_messages_pending ON outbox_messages (created_at) WHERE status = 'NEW';
+              CREATE INDEX ix_outbox_messages_retention ON outbox_messages (created_at) WHERE payload IS NOT NULL;
+        - createTable:
+            tableName: message_attachments
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_message_attachments, nullable: false } }
+              - column: { name: outbox_message_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_message_attachments_outbox_message, references: outbox_messages(id) } }
+              - column: { name: document_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: file_key, type: text, constraints: { nullable: false } }
+              - column: { name: content_type, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: file_size, type: bigint, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - createIndex:
+            tableName: message_attachments
+            indexName: ix_message_attachments_outbox_message_id
+            columns:
+              - column: { name: outbox_message_id }
+        - createIndex:
+            tableName: message_attachments
+            indexName: ix_message_attachments_document_id
+            columns:
+              - column: { name: document_id }
+      rollback:
+        - dropTable: { tableName: message_attachments }
+        - dropTable: { tableName: outbox_messages }
+        - sql:
+            sql: DROP TYPE outbox_status;

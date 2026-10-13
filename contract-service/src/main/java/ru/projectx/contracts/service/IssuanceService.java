@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.message.ContractTask;
@@ -53,7 +54,7 @@ public class IssuanceService {
     }
 
     private void reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current, Instant now) {
-        IssuanceKind kind = IssuanceKind.of(participant);
+        DocumentKind kind = DocumentKinds.of(participant);
         current.of(participant.id())
                 .filter(active -> active.kind() != kind)
                 .ifPresent(active -> cancel(active.record(), KIND_CHANGED, now));

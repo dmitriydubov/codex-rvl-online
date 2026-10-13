@@ -1,0 +1,23 @@
+package ru.projectx.contracts.service.integration;
+
+import java.util.Map;
+import java.util.Optional;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.stereotype.Component;
+import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.message.StatusEvents;
+
+@Component
+public class OutboundRoutes {
+
+    private final Map<String, OutboundRoute> byEventType;
+
+    public OutboundRoutes(@InternalBroker RabbitTemplate internalTemplate, InternalBrokerProperties internal) {
+        this.byEventType = Map.of(StatusEvents.CONTRACT_STATUS_CHANGED,
+                new OutboundRoute(internalTemplate, internal.queues().statusChanges()));
+    }
+
+    Optional<OutboundRoute> of(String eventType) {
+        return Optional.ofNullable(byEventType.get(eventType));
+    }
+}

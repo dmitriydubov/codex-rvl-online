@@ -11,4 +11,6 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
 
     List<Contract> findByRequestIndividualRequestIdAndStatusNotIn(UUID individualRequestId,
             Collection<ContractStatus> statuses);
+
+    List<Contract> findByRequestIndividualRequestId(UUID individualRequestId);
 }

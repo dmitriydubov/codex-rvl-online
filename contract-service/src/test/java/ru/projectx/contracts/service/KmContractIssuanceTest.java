@@ -51,7 +51,7 @@ class KmContractIssuanceTest {
         Contract contract = savedContract();
         assertThat(contract.number()).isEqualTo("DKM-2026-000001");
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
-        assertThat(contract.insuredParticipantId()).isEqualTo(Tasks.SPOUSE);
+        assertThat(contract.participantId()).isEqualTo(Tasks.SPOUSE);
         assertThat(contract.state().policyholderParticipantId()).isEqualTo(Tasks.INSURED);
         assertThat(contract.state().period()).isEqualTo(new TripPeriod(Tasks.FROM, Tasks.TO));
         assertThat(contract.premiumAmount()).isEqualByComparingTo("34000.00");

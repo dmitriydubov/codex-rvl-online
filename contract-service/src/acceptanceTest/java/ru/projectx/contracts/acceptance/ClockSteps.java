@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.OutboxProperties;
 
 public class ClockSteps {
 
@@ -18,10 +19,12 @@ public class ClockSteps {
 
     private final StandClock clock;
     private final InboxProperties inbox;
+    private final OutboxProperties outbox;
 
-    public ClockSteps(StandClock clock, InboxProperties inbox) {
+    public ClockSteps(StandClock clock, InboxProperties inbox, OutboxProperties outbox) {
         this.clock = clock;
         this.inbox = inbox;
+        this.outbox = outbox;
     }
 
     @Before
@@ -57,5 +60,15 @@ public class ClockSteps {
     @Когда("на часах Договоров прошло на час меньше срока хранения тел входящих сообщений")
     public void retentionMinusHourPassed() {
         clock.advance(inbox.retention().payload().minus(ONE_HOUR));
+    }
+
+    @Когда("на часах Договоров прошло на час больше срока хранения тел исходящих сообщений")
+    public void outboxRetentionPlusHourPassed() {
+        clock.advance(outbox.retention().payload().plus(ONE_HOUR));
+    }
+
+    @Когда("на часах Договоров прошло на час меньше срока хранения тел исходящих сообщений")
+    public void outboxRetentionMinusHourPassed() {
+        clock.advance(outbox.retention().payload().minus(ONE_HOUR));
     }
 }
