@@ -80,6 +80,11 @@ public final class LmPolicyResultBodies {
         return this;
     }
 
+    public LmPolicyResultBodies withoutDocumentField(int index, String name) {
+        ((ObjectNode) data().get("documents").get(index)).remove(name);
+        return this;
+    }
+
     public LmPolicyResultBodies withEmptyDocuments() {
         data().putArray("documents");
         return this;

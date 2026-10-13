@@ -45,9 +45,10 @@ class LmPolicyIssuedParserTest {
     @Test
     void uskNumberAndFileSize_mayBeAbsent() {
         LmPolicyResult.Issued result = (LmPolicyResult.Issued) parser.parse(LmPolicyResultBodies.issued()
-                .withoutDataField("policy_usk_number").toJson());
+                .withoutDataField("policy_usk_number").withoutDocumentField(0, "file_size").toJson());
 
         assertThat(result.policyUskNumber()).isNull();
+        assertThat(result.documents()).containsExactly(new IssuedDocument("POLICY", LmPolicyResultBodies.FILE_URL, null));
     }
 
     @Test

@@ -89,6 +89,19 @@ class LmPolicyRequestRecordingTest {
     }
 
     @Test
+    void submit_sendsTheInsuredPartyEvenWhenAnotherRoleIsStoredBeforeIt() {
+        given(persons.findByLmPolicyIdOrderByRole(POLICY_ID)).willReturn(List.of(
+                ContractPerson.snapshot(PersonOwner.lmPolicy(POLICY_ID), PersonRole.POLICYHOLDER,
+                        PersonSnapshots.of(Tasks.insured("0.00")), NOW),
+                ContractPerson.snapshot(PersonOwner.lmPolicy(POLICY_ID), PersonRole.INSURED,
+                        PersonSnapshots.of(Tasks.child("0.00")), NOW)));
+
+        recording.submit(POLICY_ID, IDENTIFIERS);
+
+        verify(messages).write(eq(meta), same(policy), eq(PersonSnapshots.of(Tasks.child("0.00"))), eq(IDENTIFIERS));
+    }
+
+    @Test
     void submit_leavesAPolicyThatIsNoLongerNewAlone() {
         policy.submit(NOW);
 

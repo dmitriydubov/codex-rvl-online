@@ -47,6 +47,11 @@ class KmContractIssuanceTest {
     }
 
     @Test
+    void issuance_namesItsRecordAsAKmContract() {
+        assertThat(issuance.kind()).isEqualTo("договор КМ");
+    }
+
+    @Test
     void newContract_getsNumberTripDatesPremiumPolicyholderAndTwoParties() {
         issuance.reconcile(new Issue(task, Tasks.spouse("34000.00")), Optional.empty(), NOW);
 

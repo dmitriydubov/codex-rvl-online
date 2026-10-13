@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
@@ -14,7 +16,10 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.message.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -120,10 +125,37 @@ class IssuanceSnapshotTest {
     }
 
     @Test
+    void formsOfAPolicy_areItsOwnOnesOnly_formsOfContractsAndOtherPoliciesStayOut() {
+        Contract contract = Issuances.contract(EARLIER, Tasks.SPOUSE, "DKM-2026-000001");
+        LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        LmPolicy another = Issuances.policy(LATEST, Tasks.SPOUSE);
+        PrintedForm own = issuedForm(policy.id(), "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf");
+        PrintedForm foreign = issuedForm(another.id(), "https://s3.sogaz.ru/rvl/lm/2026/02/0555123457.pdf");
+        PrintedForm contractForm = formOfContract(contract.id(), "https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf");
+
+        IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM, CHILD_LM),
+                List.of(contract), List.of(policy, another), List.of(contractForm, foreign, own));
+
+        assertThat(snapshot.formsOf(policy)).containsExactly(own);
+        assertThat(snapshot.formsOf(another)).containsExactly(foreign);
+    }
+
+    @Test
     void requestStatus_isComputedByTheRules() {
         assertThat(new IssuanceSnapshot(Tasks.REQUEST, true, List.of(), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.CANCELLED);
         assertThat(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(), List.of(), List.of()).requestStatus())
                 .isEqualTo(RequestStatus.COMPLETED);
+    }
+
+    private static PrintedForm issuedForm(UUID policyId, String url) {
+        return PrintedForm.issuedForLmPolicy(policyId, new UskDocument(PrintedFormType.POLICY, url, 96256L), NOW);
+    }
+
+    private static PrintedForm formOfContract(UUID contractId, String url) {
+        PrintedForm form = issuedForm(contractId, url);
+        ReflectionTestUtils.setField(form, "lmPolicyId", null);
+        ReflectionTestUtils.setField(form, "contractId", contractId);
+        return form;
     }
 }
