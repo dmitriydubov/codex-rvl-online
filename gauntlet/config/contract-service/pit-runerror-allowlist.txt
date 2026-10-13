@@ -27,3 +27,9 @@ ru.projectx.contracts.entity.PersonOwner#contract                            Nul
 ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanTrueReturnValsMutator         # taskLeavingOnlyNewRecords_isNotPublished: a NEW record counts as stopped, the empty "before" does not know it -> isFalse() fails
 ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanFalseReturnValsMutator        # recordThatEnteredError_isPublished: nothing is stopped, request status ERROR is not COMPLETED -> isTrue() fails
 ru.projectx.contracts.service.status.RecordOutcome#looksLike                 BooleanTrueReturnValsMutator         # IssuanceSnapshotTest.knownOutcome_isTheRecordsOwnOrOtherwiseTheLatestOfItsParticipant: knows(failedOtherwise) isFalse() fails; StatusTransitionsTest.newRecordInAnotherError_isPublished isTrue() fails
+
+# ContractTaskParserTest / DocumentKindsTest / KmContractIssuanceTest / LmPolicyIssuanceTest / PersonSnapshotsTest: participant of a
+# task (record TaskParticipant). Verified by the coordinator 2026-10-13 on main after the merge of the LM policies step
+# (RUN_ERROR appeared in earlier runs of the step and was absent in the final one).
+ru.projectx.contracts.message.TaskParticipant#pays                           BooleanTrueReturnValsMutator         # ContractTaskParserTest.zeroAmountDue_isAccepted: pays() for 0.00 isFalse() fails; DocumentKindsTest.kind_followsRelativeFlagAndPositiveAmountDue: relative with 0.00 expects LM_POLICY, gets KM_CONTRACT
+ru.projectx.contracts.message.TaskParticipant#path                           EmptyObjectReturnValsMutator         # KmContractIssuanceTest / LmPolicyIssuanceTest: IssueError text "поле participants[1].program_id обязательно ..." becomes "поле .program_id ..."; PersonSnapshotsTest: hasMessage("поле participants[1].personal_data.relation_type ...") fails
