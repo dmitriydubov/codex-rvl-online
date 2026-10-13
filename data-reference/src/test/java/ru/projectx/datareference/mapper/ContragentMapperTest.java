@@ -230,7 +230,7 @@ class ContragentMapperTest {
     }
 
     private ContragentMapper mapper(String rvlActivity) {
-        var contract = new OneCContractProperties(rvlActivity, null, null, "Адрес", List.of());
+        var contract = new OneCContractProperties(rvlActivity, null, List.of(), "Страхователь", "Адрес", List.of());
         return new ContragentMapper(
                 lpuRepository, insurerRepository, new ForeignReferences(foreignRepository, clock), contract, clock);
     }

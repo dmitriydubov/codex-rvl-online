@@ -14,6 +14,10 @@ final class KmContractStates {
         return status == ContractStatus.NEW;
     }
 
+    static boolean reportedOnEntry(IssuanceStatus status) {
+        return status == ContractStatus.DRAFT_READY;
+    }
+
     static boolean anyUndrafted(IssuanceSnapshot snapshot) {
         return snapshot.composition().stream()
                 .map(snapshot::statusOf)

@@ -109,6 +109,44 @@ class ContractTest {
     }
 
     @Test
+    void offerDraft_makesNewContractReadyForAcceptanceWithoutNewVersion() {
+        contract.offerDraft();
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.DRAFT_READY);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+        assertThat(contract.finished()).isFalse();
+    }
+
+    @Test
+    void offerDraft_leavesContractInErrorAsItIs() {
+        contract.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), LATER);
+
+        contract.offerDraft();
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.ERROR);
+        assertThat(contract.state().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void offerDraft_leavesCancelledContractAsItIs() {
+        contract.cancel(new Cancellation(CancelReason.EXPIRED, null, LATER), LATER);
+
+        contract.offerDraft();
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+    }
+
+    @Test
+    void offerDraft_onContractReadyForAcceptance_keepsItReady() {
+        contract.offerDraft();
+
+        contract.offerDraft();
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.DRAFT_READY);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
     void moveProgram_changesOnlyAnotherProgram() {
         assertThat(contract.moveProgram(PROGRAM)).isFalse();
         assertThat(contract.moveProgram(OTHER_PROGRAM)).isTrue();

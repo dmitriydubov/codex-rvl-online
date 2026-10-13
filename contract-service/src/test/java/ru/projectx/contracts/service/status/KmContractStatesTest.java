@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.message.KmContractState;
 
 class KmContractStatesTest {
@@ -31,5 +32,17 @@ class KmContractStatesTest {
     void onlyNew_isUndrafted(ContractStatus status) {
         assertThat(KmContractStates.undrafted(status)).isFalse();
         assertThat(KmContractStates.undrafted(ContractStatus.NEW)).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = "DRAFT_READY", mode = EnumSource.Mode.EXCLUDE)
+    void onlyDraftReady_isReportedOnEntry(ContractStatus status) {
+        assertThat(KmContractStates.reportedOnEntry(status)).isFalse();
+        assertThat(KmContractStates.reportedOnEntry(ContractStatus.DRAFT_READY)).isTrue();
+    }
+
+    @Test
+    void lmPolicyStatus_isNeverReportedOnEntryAsAContractState() {
+        assertThat(KmContractStates.reportedOnEntry(LmPolicyStatus.NEW)).isFalse();
     }
 }

@@ -57,7 +57,8 @@ class KmContractIssuanceTest {
 
         Contract contract = savedContract();
         assertThat(contract.number()).isEqualTo("DKM-2026-000001");
-        assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
+        assertThat(contract.status()).isEqualTo(ContractStatus.DRAFT_READY);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
         assertThat(contract.participantId()).isEqualTo(Tasks.SPOUSE);
         assertThat(contract.state().policyholderParticipantId()).isEqualTo(Tasks.INSURED);
         assertThat(contract.state().programId()).contains(Tasks.PROGRAM);
@@ -94,6 +95,42 @@ class KmContractIssuanceTest {
         issuance.reconcile(new Issue(task, Tasks.spouse("34000.00")), Optional.of(existing), NOW);
 
         assertThat(existing.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void existingContractWithoutDraft_becomesReadyForAcceptanceOnRevision() {
+        Contract existing = existing("34000.00");
+        given(parties.replaceIfChanged(eq(PersonOwner.contract(existing.id())), anyList(), eq(NOW))).willReturn(false);
+
+        issuance.reconcile(new Issue(task, Tasks.spouse("34000.00")), Optional.of(existing), NOW);
+
+        assertThat(existing.status()).isEqualTo(ContractStatus.DRAFT_READY);
+    }
+
+    @Test
+    void contractReadyForAcceptance_withChangedPremium_staysReadyWithNextVersion() {
+        Contract existing = existing("34000.00");
+        existing.offerDraft();
+        given(parties.replaceIfChanged(eq(PersonOwner.contract(existing.id())), anyList(), eq(NOW))).willReturn(false);
+        ContractTask repriced = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("36000.00"));
+
+        issuance.reconcile(new Issue(repriced, Tasks.spouse("36000.00")), Optional.of(existing), NOW);
+
+        assertThat(existing.status()).isEqualTo(ContractStatus.DRAFT_READY);
+        assertThat(existing.premiumAmount()).isEqualByComparingTo("36000.00");
+        assertThat(existing.state().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void invalidParticipant_withContractReadyForAcceptance_marksItInError() {
+        Contract existing = existing("34000.00");
+        existing.offerDraft();
+        ContractTask invalid = Tasks.task(Tasks.insured("0.00"), Tasks.relative(1, Tasks.SPOUSE, "34000.00", null));
+
+        issuance.reconcile(new Issue(invalid, invalid.participants().get(1)), Optional.of(existing), NOW);
+
+        assertThat(existing.status()).isEqualTo(ContractStatus.ERROR);
+        assertThat(existing.state().error()).map(IssueError::code).contains("RELATION_TYPE_REQUIRED");
     }
 
     @Test
