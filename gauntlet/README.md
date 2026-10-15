@@ -48,7 +48,7 @@ gauntlet/
   archtest/               ArchUnit-тест, читающий config/architecture.properties
   hooks/                  guard.py (PreToolUse), stop_gate.py (Stop; SubagentStop hardener'а — matcher в
                           .claude/settings.json), session_start.sh (SessionStart),
-                          selftest.py (526 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
+                          selftest.py (714 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
   templates/              конфигурация Cucumber+Spring, пример фичи на русском
   claude/, ci/            только до установки: install.sh переносит их в .claude/ и .github/workflows/
 ```
@@ -131,9 +131,10 @@ found» — это ожидаемо), обычный `./gradlew build` кэш с
 
 **Сеть окружения.** Network access — Custom с галкой «Also include default list of common package managers»
 (Maven Central, портал плагинов Gradle, Docker Hub, GitHub) и доменами документации из раздела «Источники
-документации» `gauntlet/CLAUDE.md`. На 2026-09-30 из сессии закрыты docs.junit.org, site.mockito.org,
-rabbitmq.github.io, а www.rabbitmq.com отвечает 403 на страницы документации: для них в таблице указаны
-запасные пути (исходники документации по тегу, javadoc-jar). Корпоративный Nexus в список не вносится.
+документации» `gauntlet/CLAUDE.md`. По ревизии адресов 2026-10-05 в список окружения добавлены, среди прочих,
+docs.junit.org, site.mockito.org, rabbitmq.github.io и www.rabbitmq.com, закрытые на 2026-09-30; какие домены
+открыты сейчас и запасные пути для закрытых (исходники документации по тегу, javadoc-jar) — в той же таблице.
+Корпоративный Nexus в список не вносится.
 
 **Docker.** Приёмка и интеграционные тесты поднимают PostgreSQL и RabbitMQ через Testcontainers; без
 Docker они падают. Процессы в снимок окружения не попадают, поэтому демон поднимается в каждой сессии
@@ -142,8 +143,8 @@ Docker они падают. Процессы в снимок окружения 
 `nohup dockerd --host=unix:///var/run/docker.sock > /tmp/dockerd.log 2>&1 &` и ждать `docker info`.
 
 **Локальная сессия** (не облако): набор подключается к сборке только при публичных репозиториях, поэтому
-перед запуском Claude Code задайте `ORG_GRADLE_PROJECT_publicRepositories=true`; иначе сборка пойдёт в Nexus
-контура, а Stop-хук не найдёт задач набора.
+перед запуском Claude Code впишите `publicRepositories=true` в `~/.gradle/gradle.properties` (в облаке это делает
+SessionStart-хук); иначе сборка пойдёт в Nexus контура, а Stop-хук не найдёт задач набора.
 
 Переменные окружения cloud environment попадают в процессы сессии, хуки их читают при запуске.
 Обычные фичи делайте в охраняемом окружении — там, где переменная `GAUNTLET_GUARD` не задана. Проверка —

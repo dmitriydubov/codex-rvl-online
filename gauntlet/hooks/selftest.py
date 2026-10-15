@@ -9,6 +9,7 @@ Stop-gate logic is exercised without a JVM.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,7 @@ MODULES = []          # Gradle builds inside the repository: [] = one build at t
 M = ""                # prefix of the module the shared tests work in ("" or "core/")
 FEATURES = FEATURES_REL
 FAKE_GRADLEW = ("#!/bin/sh\ncode=$(cat build/gauntlet/fake-exit 2>/dev/null || echo 0)\n"
+                "sleep \"$(cat build/gauntlet/fake-sleep 2>/dev/null || echo 0)\"\n"
                 "echo \"fake gradle $*\"\n[ \"$code\" = 0 ] || echo 'CRAP FAIL com.example.X#y'\nexit $code\n")
 failures = []
 passed = 0
@@ -200,6 +202,44 @@ def guard_tests(repo):
     expect_deny(repo, "negated rm", "main", "Bash", command="! rm -f CLAUDE.md")
     expect_deny(repo, "do sed -i", "main", "Bash", command="while false; do sed -i 's/8/80/' gauntlet/config/gauntlet.properties; done")
     expect_deny(repo, "then git push --force", "main", "Bash", command="if true; then git push --force; fi")
+    # eval, function bodies, bash -c and wrapper options with values run the real command too
+    expect_deny(repo, "eval rm", "main", "Bash", command='eval "rm -rf gauntlet"')
+    expect_deny(repo, "eval unquoted rm", "main", "Bash", command="eval rm -rf .claude")
+    expect_deny(repo, "eval git push --force", "main", "Bash", command="eval 'git push --force'")
+    expect_deny(repo, "nested eval", "main", "Bash", command="eval \"eval 'rm -f CLAUDE.md'\"")
+    expect_deny(repo, "bash -c git push --force", "main", "Bash", command='bash -c "git push --force"')
+    expect_deny(repo, "function body rm", "main", "Bash", command="function f { rm -rf gauntlet; }; f")
+    expect_deny(repo, "function () body rm", "main", "Bash", command="function f() { rm -rf .claude; }; f")
+    expect_deny(repo, "env -i rm", "main", "Bash", command="env -i rm -rf gauntlet")
+    expect_deny(repo, "env -u VAR rm", "main", "Bash", command="env -u HOME rm -rf gauntlet")
+    expect_deny(repo, "env -S rm", "main", "Bash", command='env -S "rm -rf gauntlet"')
+    expect_deny(repo, "env -i git push --force", "main", "Bash", command="env -i git push --force")
+    expect_deny(repo, "nice -n rm", "main", "Bash", command="nice -n 5 rm -rf gauntlet")
+    expect_deny(repo, "nice -n git push --force", "main", "Bash", command="nice -n 1 git push --force")
+    expect_deny(repo, "timeout -s rm", "main", "Bash", command="timeout -s KILL 5 rm -rf gauntlet")
+    expect_deny(repo, "timeout -k rm", "main", "Bash", command="timeout -k 1 5 rm -rf .claude")
+    expect_deny(repo, "timeout -s git push --force", "main", "Bash", command="timeout -s 9 10 git push --force")
+    expect_deny(repo, "sudo -u rm", "main", "Bash", command="sudo -u root rm -rf gauntlet")
+    expect_allow(repo, "eval of a command substitution", "main", "Bash", command='eval "$(ssh-agent -s)"')
+    expect_allow(repo, "bash -c gradlew gauntletFast", "main", "Bash", command=f'bash -c "cd {M or "."} && ./gradlew gauntletFast"')
+    expect_allow(repo, "timeout gradlew gauntletFast", "main", "Bash", command="timeout 600 ./gradlew gauntletFast --continue")
+    expect_allow(repo, "nice -n gradlew gauntlet", "main", "Bash", command="nice -n 10 ./gradlew gauntlet")
+    expect_allow(repo, "env -i ls", "main", "Bash", command="env -i PATH=/usr/bin ls")
+    # the build-directory lock of gauntlet.gradle: removing it lets a second Gradle run into the same build/
+    expect_deny(repo, "rm the build lock", "main", "Bash", command=f"rm -f {M}.gradle/gauntlet-build.lock")
+    expect_deny(repo, "rm the build lock via $VAR", "main", "Bash", command="rm -f $D/.gradle/gauntlet-build.lock")
+    expect_deny(repo, "rm .gradle with the build lock", "main", "Bash", command=f"rm -rf {M}.gradle/")
+    expect_deny(repo, "hardener rm the build lock", "hardener", "Bash", command=f"rm -f {M}.gradle/gauntlet-build.lock")
+    expect_allow(repo, "rm .gradle caches", "main", "Bash", command=f"rm -rf {M}.gradle/caches")
+    expect_allow(repo, "read the build lock", "main", "Bash", command=f"cat {M}.gradle/gauntlet-build.lock")
+    # gh api: only merge endpoints and merge mutations are the human's, not any text with "merge" in it
+    expect_allow(repo, "gh api create PR with merge in body", "main", "Bash",
+                 command="gh api repos/o/r/pulls -f title=t -f head=b -f base=main -f body='no merge conflicts'")
+    expect_allow(repo, "gh api read mergeable state", "main", "Bash", command="gh api repos/o/r/pulls/12 --jq .mergeable")
+    expect_deny(repo, "gh api merges endpoint", "main", "Bash", command="gh api repos/o/r/merges -f base=main -f head=b")
+    expect_deny(repo, "gh api merge-upstream", "main", "Bash", command="gh api -X POST repos/o/r/merge-upstream -f branch=main")
+    expect_deny(repo, "gh api graphql mergePullRequest", "main", "Bash",
+                command="gh api graphql -f query='mutation { mergePullRequest(input: {pullRequestId: \"x\"}) { clientMutationId } }'")
     expect_deny(repo, "rm via $PWD", "main", "Bash", command="rm -rf $PWD/gauntlet")
     expect_deny(repo, "rm via $CLAUDE_PROJECT_DIR", "main", "Bash", command='rm -rf "$CLAUDE_PROJECT_DIR/.claude"')
     expect_deny(repo, "xargs rm", "main", "Bash", command="git ls-files gauntlet/config | xargs rm -f")
@@ -471,12 +511,41 @@ def stop_tests(repo):
     check("subagent attempt limit -> let go with warning", r.returncode == 0 and "still RED" in r.stdout,
           r.stdout + r.stderr)
     os.remove(os.path.join(repo, M + "build/gauntlet/fake-exit"))
+    if not MODULES:
+        subagent_window_tests(repo)
     # switched off by the human
     write(repo, M + "src/main/java/com/example/service/domain/Order.java", "package x; class Order { int d; }\n")
     write(repo, M + "build/gauntlet/fake-exit", "1")
     e = {"session_id": "s2", "cwd": repo, "hook_event_name": "Stop"}
     r = run_hook(repo, "stop_gate.py", e, env={"GAUNTLET_STOP_HOOK": "off"}, args=("--task", "gauntletFast"))
     check("GAUNTLET_STOP_HOOK=off", r.returncode == 0)
+
+
+def subagent_window_tests(repo):
+    """The SubagentStop retry window counts the time the agent worked since the last block, from the start of the
+    hook: a Gradle run of the hook itself (mutationGate) must not push a quick retry out of the window."""
+    state = os.path.join(repo, git(repo, "rev-parse", "--git-path", "gauntlet-hook"))
+    attempts = os.path.join(state, "s2-h2.attempts")
+    sub = {"session_id": "s2", "cwd": repo, "hook_event_name": "SubagentStop", "agent_type": "hardener",
+           "agent_id": "h2", "stop_hook_active": False}
+    sub_args = ("--task", "mutationGate", "--max-attempts", "2", "--timeout", "60")
+    window = 20 * 60
+    write(repo, M + "build/gauntlet/fake-exit", "1")
+    write(repo, M + "build/gauntlet/fake-sleep", "4")
+    write(repo, M + "src/main/java/com/example/service/domain/Order.java", "package x; class Order { int w; }\n")
+    with open(attempts, "w") as f:
+        f.write(f"1 {time.time() - window + 2}")
+    r = run_hook(repo, "stop_gate.py", sub, args=sub_args)
+    check("subagent window counts from the hook start, not after Gradle", r.returncode == 2 and "attempt 2/2" in r.stderr,
+          r.stderr)
+    os.remove(os.path.join(repo, M + "build/gauntlet/fake-sleep"))
+    write(repo, M + "src/main/java/com/example/service/domain/Order.java", "package x; class Order { int v; }\n")
+    with open(attempts, "w") as f:
+        f.write(f"1 {time.time() - window - 5}")
+    r = run_hook(repo, "stop_gate.py", sub, args=sub_args)
+    check("subagent retry after the window starts again at 1", r.returncode == 2 and "attempt 1/2" in r.stderr, r.stderr)
+    os.remove(attempts)
+    os.remove(os.path.join(repo, M + "build/gauntlet/fake-exit"))
 
 
 def multi_module_stop_tests(repo):
@@ -515,6 +584,23 @@ def multi_module_stop_tests(repo):
     r = stop()
     check("both changed -> gradle in both", r.returncode == 0 and "fake gradle" in log_of(core) and "fake gradle" in log_of(adapter),
           r.stderr)
+    check("lock wait fits the budget (half of --timeout 60)", re.search(r"-Pgauntlet\.lockWaitSeconds=(29|30)\b", log_of(core))
+          and "-Pgauntlet.lockWaitSeconds=" in log_of(adapter), log_of(core) + log_of(adapter))
+    # one budget for all modules: a slow first module leaves no time for the second, which is not started
+    clear_logs()
+    write(repo, core + "/build/gauntlet/fake-sleep", "3")
+    write(repo, core + "/src/main/java/com/example/service/domain/Order.java", "package x; class Order { int y; }\n")
+    write(repo, adapter + "/src/main/java/com/example/service/domain/Mapper.java", "package x; class Mapper { int y; }\n")
+    event = {"session_id": "s3", "cwd": repo, "hook_event_name": "Stop", "stop_hook_active": False}
+    r = run_hook(repo, "stop_gate.py", event, args=("--task", "gauntletFast", "--max-attempts", "3", "--timeout", "2"))
+    check("budget spent in the first module -> red, second module not run", r.returncode == 2
+          and "did not finish within" in log_of(core) and "no time left" in log_of(adapter)
+          and "fake gradle" not in log_of(adapter), r.stderr + log_of(core) + log_of(adapter))
+    clear_logs()
+    write(repo, core + "/src/main/java/com/example/service/domain/Order.java", "package x; class Order { int z; }\n")
+    write(repo, adapter + "/src/main/java/com/example/service/domain/Mapper.java", "package x; class Mapper {}\n")
+    r = stop(stop_hook_active=True)
+    check("budget test cleaned up -> green", r.returncode == 0, r.stderr)
     write(repo, adapter + "/build/gauntlet/fake-exit", "1")
     write(repo, adapter + "/src/main/java/com/example/service/domain/Mapper.java", "package x; class Mapper { int a; }\n")
     r = stop()
@@ -525,10 +611,79 @@ def multi_module_stop_tests(repo):
     check("fixed adapter -> green", r.returncode == 0, r.stderr)
 
 
+def run_session_start(repo, gradle_home, remote=True):
+    env = dict(os.environ, CLAUDE_PROJECT_DIR=repo, GRADLE_USER_HOME=gradle_home, GAUNTLET_DOCKER="off")
+    env.pop("CLAUDE_CODE_REMOTE", None)
+    if gradle_home is None:
+        env.pop("GRADLE_USER_HOME")
+        env.pop("HOME", None)
+    if remote:
+        env["CLAUDE_CODE_REMOTE"] = "true"
+    return subprocess.run(["bash", os.path.join(repo, "gauntlet/hooks/session_start.sh")], cwd=repo, input="{}",
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+
+
+def gradle_properties_tests(repo):
+    root = os.path.dirname(repo)
+    local_home = os.path.join(root, "gradle-local")
+    r = run_session_start(repo, local_home, remote=False)
+    check("session_start outside the cloud leaves the Gradle user home alone",
+          r.returncode == 0 and not os.path.exists(local_home), r.stdout + r.stderr)
+    home = os.path.join(root, "gradle-cloud")
+    props = os.path.join(home, "gradle.properties")
+    r = run_session_start(repo, home)
+    check("session_start creates gradle.properties with publicRepositories=true",
+          r.returncode == 0 and open(props).read() == "publicRepositories=true\n", r.stdout + r.stderr)
+    run_session_start(repo, home)
+    check("session_start does not duplicate publicRepositories", open(props).read() == "publicRepositories=true\n")
+    with open(props, "w") as f:
+        f.write("org.gradle.jvmargs=-Xmx2g")
+    run_session_start(repo, home)
+    check("session_start appends to an existing gradle.properties and keeps other lines",
+          open(props).read() == "org.gradle.jvmargs=-Xmx2g\npublicRepositories=true\n", open(props).read())
+    with open(props, "w") as f:
+        f.write("publicRepositories=false\n")
+    r = run_session_start(repo, home)
+    check("session_start keeps an explicit publicRepositories value and warns that it is not true",
+          open(props).read() == "publicRepositories=false\n" and "sets publicRepositories to a value other than true"
+          in r.stdout, r.stdout + r.stderr)
+    with open(props, "w") as f:
+        f.write("publicRepositories false\n")
+    r = run_session_start(repo, home)
+    check("session_start recognises a whitespace-separated publicRepositories key",
+          open(props).read() == "publicRepositories false\n" and "other than true" in r.stdout, r.stdout + r.stderr)
+    with open(props, "w") as f:
+        f.write("publicRepositories : true\n")
+    r = run_session_start(repo, home)
+    check("session_start accepts an explicit true without a warning",
+          open(props).read() == "publicRepositories : true\n" and "WARNING" not in r.stdout, r.stdout + r.stderr)
+    blocker = os.path.join(root, "not-a-directory")
+    with open(blocker, "w") as f:
+        f.write("")
+    r = run_session_start(repo, os.path.join(blocker, "gradle"))
+    check("session_start warns when the Gradle user home is not writable and still reports its status",
+          r.returncode == 0 and "could not write publicRepositories" in r.stdout and "[gauntlet] active" in r.stdout,
+          r.stdout + r.stderr)
+    with open(props, "w") as f:
+        f.write("publicRepositories=true\npublicRepositories=false\n")
+    r = run_session_start(repo, home)
+    check("session_start warns when the last publicRepositories value is not true",
+          "other than true" in r.stdout, r.stdout + r.stderr)
+    stray = "/.gradle"
+    stray_before = os.path.exists(stray)
+    r = run_session_start(repo, None)
+    stray_created = not stray_before and os.path.exists(stray)
+    if stray_created:
+        shutil.rmtree(stray, ignore_errors=True)
+    check("session_start warns when neither GRADLE_USER_HOME nor HOME is set",
+          r.returncode == 0 and "could not write publicRepositories" in r.stdout and not stray_created,
+          r.stdout + r.stderr)
+
+
 def session_start_tests(repo):
-    r = subprocess.run(["bash", os.path.join(repo, "gauntlet/hooks/session_start.sh")], cwd=repo, input="{}",
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
+    gradle_properties_tests(repo)
+    gradle_home = os.path.join(os.path.dirname(repo), "gradle-home")
+    r = run_session_start(repo, gradle_home)
     check("session_start reports active", r.returncode == 0 and "[gauntlet] active" in r.stdout, r.stdout + r.stderr)
     # base branch missing: simulate by pointing baseRef at a branch the remote does not have
     props = os.path.join(repo, "gauntlet/config/gauntlet.properties")
@@ -536,10 +691,9 @@ def session_start_tests(repo):
         original = f.read()
     with open(props, "w") as f:
         f.write(original.replace("baseRef=origin/main", "baseRef=origin/nowhere"))
-    r = subprocess.run(["bash", os.path.join(repo, "gauntlet/hooks/session_start.sh")], cwd=repo, input="{}",
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=repo, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
-    check("session_start warns about missing base", r.returncode == 0 and "WARNING" in r.stdout, r.stdout + r.stderr)
+    r = run_session_start(repo, gradle_home)
+    check("session_start warns about missing base", r.returncode == 0 and "cannot find the merge base" in r.stdout,
+          r.stdout + r.stderr)
     with open(props, "w") as f:
         f.write(original)
     # shallow clone of the bare origin: the hook must fetch enough history to find the merge base
@@ -549,9 +703,7 @@ def session_start_tests(repo):
                     "file://" + os.path.join(root, "origin.git"), shallow], check=True)
     check("clone is shallow and single-branch", git(shallow, "rev-parse", "--is-shallow-repository") == "true"
           and "origin/main" not in git(shallow, "branch", "-r"))
-    r = subprocess.run(["bash", os.path.join(shallow, "gauntlet/hooks/session_start.sh")], cwd=shallow, input="{}",
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                       env=dict(os.environ, CLAUDE_PROJECT_DIR=shallow, CLAUDE_CODE_REMOTE="true", GAUNTLET_DOCKER="off"))
+    r = run_session_start(shallow, gradle_home)
     check("session_start fetches the base in a shallow clone", "[gauntlet] active" in r.stdout, r.stdout + r.stderr)
 
 

@@ -3,8 +3,36 @@
 #  1. In a cloud session make sure the base branch is reachable: the scoped checks need the merge base,
 #     and a fresh clone may not have fetched it (or may be shallow).
 #  2. Record the working tree so the Stop gate knows what this session changed.
-#  3. Print a one-line status that lands in the agent's context.
+#  3. In a cloud session switch the Gradle builds to public repositories: the modules' settings.gradle read the
+#     neutral property publicRepositories, set here once in the Gradle user home before any Gradle command.
+#  4. In a cloud session start the Docker daemon for Testcontainers.
+#  5. Print a one-line status that lands in the agent's context.
 input=$(cat)
+
+# Appends publicRepositories=true to the user-level gradle.properties unless the key is already set there
+# (an explicit value is left as is, with a warning when the last one, which Gradle uses, is not true).
+# Other lines are kept.
+# A .properties key ends at '=', ':' or whitespace.
+public_key='^[[:space:]]*publicRepositories([[:space:]]*[=:]|[[:space:]]|$)'
+public_true='^[[:space:]]*publicRepositories([[:space:]]*[=:][[:space:]]*|[[:space:]]+)([Tt][Rr][Uu][Ee]|[Yy]|1)[[:space:]]*$'
+
+enable_public_repositories() {
+  [ -n "${GRADLE_USER_HOME:-$HOME}" ] || return 1
+  local dir="${GRADLE_USER_HOME:-$HOME/.gradle}"
+  local file="$dir/gradle.properties"
+  if grep -Eq "$public_key" "$file" 2>/dev/null; then
+    grep -E "$public_key" "$file" | tail -1 | grep -Eq "$public_true" || echo "[gauntlet] WARNING: $file sets publicRepositories to a value other than true; Gradle builds will use the corporate Nexus."
+    return 0
+  fi
+  mkdir -p "$dir" 2>/dev/null || return 1
+  if [ -s "$file" ] && [ -n "$(tail -c 1 "$file")" ]; then echo 2>/dev/null >> "$file" || return 1; fi
+  echo 'publicRepositories=true' 2>/dev/null >> "$file"
+}
+
+if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
+  enable_public_repositories || echo "[gauntlet] WARNING: could not write publicRepositories=true to the Gradle user home; builds will use the corporate Nexus."
+fi
+
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
 props=gauntlet/config/gauntlet.properties
 base=$(sed -n 's/^[[:space:]]*baseRef[[:space:]]*=[[:space:]]*//p' "$props" 2>/dev/null | tail -1)
@@ -26,12 +54,6 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ] && [ "$remote" != "$base" ] && ! reachable
 fi
 
 printf '%s' "$input" | python3 gauntlet/hooks/stop_gate.py --record-start
-
-# The build uses public repositories only when told to (settings.gradle of a module): a cloud session is outside
-# the corporate network, so expose the property to every later Bash command of the session.
-if [ "$CLAUDE_CODE_REMOTE" = "true" ] && [ -n "$CLAUDE_ENV_FILE" ]; then
-  echo 'export ORG_GRADLE_PROJECT_publicRepositories=true' >> "$CLAUDE_ENV_FILE"
-fi
 
 # Tests with a database or a broker run on Testcontainers and fail without Docker. In a cloud session the
 # daemon is not running after the container starts (processes are not part of the environment snapshot), and

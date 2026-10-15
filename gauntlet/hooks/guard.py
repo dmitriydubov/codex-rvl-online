@@ -54,12 +54,28 @@ GIT_READ_ONLY_FORMS = {"branch": ("--show-current", "--list", "-l", "-a", "-r", 
 HISTORY_REWRITING = {"rebase", "filter-branch", "filter-repo", "update-ref", "replace", "revert"}
 INTERPRETERS = {"python", "python3", "node", "ruby", "bash", "sh", "zsh"}   # with -c / -e inline code
 WRAPPERS = {"sudo", "command", "exec", "nohup", "time", "env", "timeout", "nice"}
+# options of a wrapper (and of xargs) that take the next word as their value: `nice -n 5 rm` runs rm, not 5
+WRAPPER_VALUE_OPTIONS = {
+    "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
+    "timeout": {"-s", "--signal", "-k", "--kill-after"},
+    "nice": {"-n", "--adjustment"},
+    "sudo": {"-u", "--user", "-g", "--group", "-C", "--close-from", "-D", "--chdir", "-p", "--prompt", "-r", "--role",
+             "-t", "--type", "-T", "--command-timeout", "-U", "--other-user", "-R", "--chroot"},
+    "exec": {"-a"},
+    "xargs": {"-I", "-n", "-P", "-L", "-d", "-E", "-s", "-a", "--arg-file", "--delimiter", "--max-args",
+              "--max-procs", "--max-lines", "--max-chars", "--eof"},
+}
+SHELLS = {"bash", "sh", "zsh"}
 SHELL_KEYWORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{"}   # `then rm x` runs rm
 GRADLE = {"gradlew", "gradle"}
 GRADLE_PATH_OPTIONS = {"-p", "--project-dir", "-g", "--gradle-user-home", "--project-cache-dir", "-b", "--build-file",
                        "-c", "--settings-file", "-I", "--init-script", "--include-build"}
 PERL_WRITES = re.compile(r"\b(open|unlink|rename|system|exec|qx|mkdir|rmdir|truncate|chmod|chown|symlink|link|"
                          r"utime|syswrite|sysopen)\b|`")
+# GitHub API calls that merge: REST merge endpoints and GraphQL merge mutations - not any text with "merge" in it
+MERGE_API = re.compile(r"/pulls/[^/\s]+/merge(?![\w-])|(^|/)repos/[^/\s]+/[^/\s]+/merges(?![\w-])|/merge-upstream(?![\w-])|"
+                       r"\b(mergePullRequest|enablePullRequestAutoMerge|enqueuePullRequest|mergeBranch)\b")
+BUILD_LOCK = ".gradle/gauntlet-build.lock"
 REDIRECT = re.compile(r"(?<!>)>>?\|?\s*([^\s;&|<>()]+)")
 GLOB_CHARS = re.compile(r"[*?\[]")
 
@@ -105,6 +121,7 @@ class Context:
         self.test_code = tuple(pfx + p for pfx in prefixes for p in TEST_CODE)
         self.src_main = [pfx + "src/main" for pfx in prefixes]
         self.build_dirs = tuple(pfx + d for pfx in prefixes for d in ("build/", ".gradle/")) + ("build/", ".gradle/")
+        self.build_locks = tuple(pfx + BUILD_LOCK for pfx in prefixes)
         self.base_ref = props.get("baseRef", DEFAULT_BASE)
         self.base_branch = self.base_ref.split("/", 1)[1] if "/" in self.base_ref else self.base_ref
         self.approval = props.get("spec.approval", "chat").lower()
@@ -207,6 +224,7 @@ def frozen_reason(rel):
 # ----------------------------------------------------------------------------- shell
 
 def command_violation(agent, command, ctx):
+    command = with_nested_commands(command)
     reason = human_only(command, ctx)
     if reason:
         return reason
@@ -240,7 +258,35 @@ def command_violation(agent, command, ctx):
             hit = next((p for p in protected if mentions(text, p)), None)
             if hit:
                 return protected_reason(agent, hit, ctx)
+            if os.path.basename(BUILD_LOCK) in text:
+                return lock_reason()
     return None
+
+
+def with_nested_commands(command, depth=3):
+    """`eval "rm -rf x"` and `bash -c "git push --force"` run their argument as a command: append it as a line of
+    its own, so every check below sees it like any other command (nested ones too, a few levels deep)."""
+    nested = []
+    for segment in segments(strip_heredocs(command)):
+        words = words_of(segment)
+        if not words:
+            continue
+        cmd = os.path.basename(words[0])
+        if cmd == "eval":
+            nested.append(" ".join(words[1:]))
+        elif cmd in SHELLS and "c" in short_flags(words[1:]):
+            code = next((w for w in words[1:] if not w.startswith("-")), "")
+            nested.append(code)
+    nested = [n for n in nested if n.strip()]
+    if not nested:
+        return command
+    inner = "\n".join(nested)
+    return command + "\n" + (with_nested_commands(inner, depth - 1) if depth > 1 else inner)
+
+
+def lock_reason():
+    return (f"{BUILD_LOCK} keeps two Gradle runs out of one build directory; removing it lets a second run overwrite "
+            f"the results the first one is judging. Wait for the other run to finish instead.")
 
 
 def strip_heredocs(command):
@@ -281,6 +327,8 @@ def write_violation(agent, target, cwd, ctx, protected, read_only, scope, what):
         return None
     if read_only:
         return f"The {agent} is read-only. Report findings instead of {what}."
+    if any(is_under(rel, (lock,)) or contains(rel, (lock,)) for lock in ctx.build_locks):
+        return lock_reason()
     if is_under(rel, ctx.build_dirs):
         return None                     # Gradle outputs: any role may clean or write them
     hit = next((p for p in protected if is_under(rel, (p,)) or contains(rel, (p,))), None)
@@ -325,7 +373,7 @@ def gh_human_only(args):
             rest.pop(0)
     if rest[:2] == ["pr", "merge"] or rest[:1] == ["merge"]:
         return "Merging the pull request is the human's decision. Push the branch, open the PR and report."
-    if rest[:1] == ["api"] and any("merge" in a.lower() for a in rest[1:]):
+    if rest[:1] == ["api"] and any(MERGE_API.search(a) for a in rest[1:]):
         return "Merging through the GitHub API is reserved for the human."
     if rest[:1] == ["repo"] and rest[1:2] and rest[1] in ("delete", "edit", "rename", "archive"):
         return "Changing the repository itself is reserved for the human."
@@ -392,19 +440,38 @@ def segments(command):
 
 
 def words_of(segment):
-    try:
-        words = shlex.split(segment, posix=True)
-    except ValueError:
-        words = segment.split()
+    words = split_words(segment)
     while words and (re.match(r"^\w+=", words[0]) or words[0] in WRAPPERS or words[0] in SHELL_KEYWORDS
-                     or words[0] == "xargs"):
+                     or words[0] in ("xargs", "function")):
         wrapper = words.pop(0)
-        if wrapper in ("xargs", "timeout", "nice"):
-            while words and words[0].startswith("-"):
-                words.pop(0)
-            if wrapper == "timeout" and words:
-                words.pop(0)   # the duration
+        if wrapper == "function" and words:
+            words.pop(0)       # `function name { rm x; }`: the body runs rm
+        if wrapper in WRAPPERS or wrapper == "xargs":
+            words = without_wrapper_options(wrapper, words)
     return words
+
+
+def without_wrapper_options(wrapper, words):
+    """Drop the options of a wrapper (and their values) and the duration of timeout; `env -S "rm x"` runs rm x."""
+    takes_value = WRAPPER_VALUE_OPTIONS.get(wrapper, set())
+    while words and words[0].startswith("-") and words[0] != "-":
+        option = words.pop(0)
+        if option == "--":
+            break
+        if option in takes_value and words:
+            value = words.pop(0)
+            if option in ("-S", "--split-string") and wrapper == "env":
+                words = split_words(value) + words
+    if wrapper == "timeout" and words:
+        words.pop(0)           # the duration
+    return words
+
+
+def split_words(text):
+    try:
+        return shlex.split(text, posix=True)
+    except ValueError:
+        return text.split()
 
 
 def follow_cd(words, cwd, project):

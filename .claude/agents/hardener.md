@@ -47,11 +47,12 @@ tests would notice if it were wrong. (Role adapted from Robert C. Martin's swarm
 - Tests that need PostgreSQL or RabbitMQ use the module's existing support (`@IntegrationTest`,
   `@AmqpIntegrationTest`); they fail without Docker - start `dockerd` as gauntlet/CLAUDE.md says rather
   than skipping anything. No `Thread.sleep`: wait with Awaitility and a timeout. Test data carries no real
-  personal data.
+  personal data. No comments and no Javadoc in the tests you write (gauntlet/CLAUDE.md, rule 15): a test name
+  reads as a statement about behaviour.
 - If you believe a mutant is equivalent (no test could ever detect it), explain why and leave it for the
   human, who may add an exclusion.
 
 ## Final message
 Mutation numbers before/after (killed / survived / no coverage / RUN_ERROR), tests added, survivors you
 could not kill and why, RUN_ERROR mutants with the allowlist line and the killing test for each,
-production-code changes you recommend.
+manual mutants you propose, production-code changes you recommend.

@@ -254,10 +254,10 @@ exit 0
   - Остаются `permissions.deny` (`gh pr merge`, `git rebase`, `filter-*`) и ограничение GitHub-прокси: push только в текущую
     ветку сессии.
   - `GAUNTLET_STOP_HOOK` не задан, поэтому Stop-хук работает. Но правки только в `gauntlet/` он не проверяет: список
-    затронутых модулей пуст (`stop_gate.py:102-104`).
+    затронутых модулей пуст (`stop_gate.py:110-112`).
 - **Порядок работы.**
   - Только правки набора (`gauntlet/`, `.claude/`, `CLAUDE.md`, workflow) и утверждённой спецификации, по решению владельца.
-  - После каждой правки вручную: `python3 gauntlet/hooks/selftest.py` (ожидается 517/0 или больше) и
+  - После каждой правки вручную: `python3 gauntlet/hooks/selftest.py` (ожидается 714/0 или больше) и
     `cd data-reference && ./gradlew gauntlet --continue`. Затем PR.
 - **Сеть, переменная зеркала и setup script** — те же, что в Default (раздел 1).
 - **Сессии задач.** Не открывать сессии задач в `gauntlet-admin`. Координатор создаёт их с явным ID окружения Default: сессия,
@@ -381,12 +381,12 @@ https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013P
 1. **Строка статуса.** Первым сообщением попросите: «процитируй строку статуса SessionStart и выполни
    `printenv GAUNTLET_GUARD`».
    - Ожидается `[gauntlet] active - scope: changed vs origin/main; guard: on; stop hook: on; docker: up` и пустой `printenv`.
-   - Если вместо этого WARNING о merge-base, строка выходит без полей guard, stop hook и docker (`session_start.sh:54-58`).
+   - Если вместо этого WARNING о merge-base, строка выходит без полей guard, stop hook и docker (`session_start.sh:82-86`).
      Это известный недочёт хука, а не выключенная защита: проверьте `printenv`.
    - В диалоге окружения Default не должно быть строк `GAUNTLET_*`: имя окружения ничего не гарантирует.
 2. **Guard.** Попросите дописать строку в `gauntlet/README.md`. Ожидается отказ
    «[gauntlet guard] … is part of the gauntlet and is human-owned».
-3. **Selftest.** `python3 gauntlet/hooks/selftest.py` → 517 passed, 0 failed.
+3. **Selftest.** `python3 gauntlet/hooks/selftest.py` → 714 passed, 0 failed (с 2026-10-15; при установке было 517).
 4. **Гейты.** В `data-reference`:
    - `./gradlew gauntletInfo`: `module : data-reference`, overlay `config/data-reference/gauntlet.properties`,
      `basePackage : ru.projectx.datareference`, glue `ru.projectx.datareference.acceptance`, cucumber 8.0.1;
