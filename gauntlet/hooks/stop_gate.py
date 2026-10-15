@@ -16,6 +16,11 @@ out of the run (the agent must be able to stop and ask), but every other check s
 exits 2 and feeds the failing lines back to the agent, which keeps working. After --max-attempts
 consecutive red stops it lets the agent stop and warns instead, so a session can never loop forever.
 
+--timeout is the budget of the whole hook, not of one Gradle run: the modules run one after another, each in
+the time the previous ones left, and each waits for another Gradle run's build-directory lock (gauntlet.gradle,
+"one run per build directory") at most half of what is left - so the hook itself always ends before Claude Code's
+own timeout of the hook (settings.json, a bit above --timeout) would kill it without a word.
+
 Humans can switch it off for a session:  GAUNTLET_STOP_HOOK=off (environment variable at start-up)
 Extra Gradle arguments (e.g. --offline):  GAUNTLET_GRADLE_ARGS="--offline"
 """
@@ -49,9 +54,11 @@ INTERESTING = re.compile(
 NOISE = re.compile(r"^(Picked up (JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS)|"
                    r"> Task .*(UP-TO-DATE|NO-SOURCE|SKIPPED)$|\s*$)")
 CONTINUATION_WINDOW_S = 20 * 60
+LOCK_WAIT_S = 1500          # gauntlet.lockWaitSeconds default in gauntlet.gradle: never wait longer than that
 
 
 def main():
+    started = time.time()
     ap = argparse.ArgumentParser()
     ap.add_argument("--record-start", action="store_true")
     ap.add_argument("--task", default="gauntletFast")
@@ -77,10 +84,10 @@ def main():
         return 0
     if os.environ.get("GAUNTLET_STOP_HOOK", "").lower() == "off":
         return 0
-    return gate(opts, event, state, session)
+    return gate(opts, event, state, session, started)
 
 
-def gate(opts, event, state, session):
+def gate(opts, event, state, session, started):
     start_file = os.path.join(state, session + ".start")
     try:
         start = json.loads(read(start_file))
@@ -139,7 +146,7 @@ def gate(opts, event, state, session):
     if cached:
         code, output = 1, "\n".join(read(l) for l in logs)   # nothing changed since the last red run: no re-run
     else:
-        code, output = run_all(affected, opts.task, excluded, opts.timeout)
+        code, output = run_all(affected, opts.task, excluded, started + opts.timeout)
     log_path = ", ".join(logs)
     note = (" Acceptance tests were left out: the changed feature files wait for the human's approval "
             "in the chat (commit them only after the human said yes).") if pending else ""
@@ -152,7 +159,7 @@ def gate(opts, event, state, session):
             print(json.dumps({"systemMessage": f"[gauntlet] {opts.task} is green.{note}"}))
         return 0
     write(red_file, fingerprint)
-    attempts = next_attempt(attempts_file, event)
+    attempts = next_attempt(attempts_file, event, started)
     if attempts > opts.max_attempts:
         remove(attempts_file)
         write(stop_mark, f"{code_tree}|{state_tag}|red")
@@ -199,7 +206,7 @@ def changed_paths(start_head):
     return {p for p in paths if p}
 
 
-def next_attempt(attempts_file, event):
+def next_attempt(attempts_file, event, started):
     previous, stamp = 0, 0.0
     raw = read(attempts_file)
     if raw:
@@ -208,12 +215,14 @@ def next_attempt(attempts_file, event):
         except (ValueError, IndexError):
             previous = 0
     # Stop: stop_hook_active is set by Claude Code after a blocked stop. SubagentStop: the same field only says
-    # whether the subagent has Stop hooks of its own (hooks docs), so its retries are told apart by time.
+    # whether the subagent has Stop hooks of its own (hooks docs), so its retries are told apart by time: the time
+    # the agent worked between the last block and this hook's start - not the Gradle run of this hook, which alone
+    # (mutationGate) can outlast the window.
     if event.get("hook_event_name") == "Stop" or ("stop_hook_active" in event
                                                   and event.get("hook_event_name") != "SubagentStop"):
         continuing = bool(event.get("stop_hook_active"))
     else:
-        continuing = time.time() - stamp < CONTINUATION_WINDOW_S
+        continuing = started - stamp < CONTINUATION_WINDOW_S
     attempts = previous + 1 if continuing else 1
     write(attempts_file, f"{attempts} {time.time()}")
     return attempts
@@ -223,11 +232,18 @@ def log_file(module, task):
     return os.path.join(module, "build", "gauntlet", f"{task}-hook.log")
 
 
-def run_all(modules, task, excluded, timeout):
-    """Runs the task in every affected module; red if any module is red."""
+def run_all(modules, task, excluded, deadline):
+    """Runs the task in every affected module, all within one deadline; red if any module is red."""
     worst, outputs = 0, []
     for module in modules:
-        code, _, output = run_gradle(task, excluded, timeout, module)
+        remaining = int(deadline - time.time())
+        if remaining < 1:
+            code, output = 124, (f"TIMEOUT: no time left in the hook's budget for ./gradlew {task} in {module} - "
+                                 f"run it there yourself")
+            os.makedirs(os.path.dirname(log_file(module, task)), exist_ok=True)
+            write(log_file(module, task), output)
+        else:
+            code, _, output = run_gradle(task, excluded, remaining, module)
         worst = max(worst, code)
         outputs.append((f"=== {module} ===\n" if module != "." else "") + output)
     return worst, "\n".join(outputs)
@@ -243,7 +259,8 @@ def gradle_env():
 
 def run_gradle(task, excluded, timeout, module="."):
     gradle = "./gradlew" if os.access(os.path.join(module, "gradlew"), os.X_OK) else "gradle"
-    cmd = [gradle, task, "--continue", "--console=plain"]
+    lock_wait = max(1, min(LOCK_WAIT_S, timeout // 2))
+    cmd = [gradle, task, "--continue", "--console=plain", f"-Pgauntlet.lockWaitSeconds={lock_wait}"]
     for name in excluded:
         cmd += ["-x", name]
     cmd += os.environ.get("GAUNTLET_GRADLE_ARGS", "").split()

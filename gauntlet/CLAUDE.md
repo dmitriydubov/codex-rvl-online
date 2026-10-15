@@ -52,13 +52,15 @@
 - Maven Central через прокси иногда отвечает 429 (Too Many Requests) на пачку новых артефактов: повтори
   через 20–60 секунд, к коду это отношения не имеет.
 - Набор подключается к сборке только при публичных репозиториях — свойство `publicRepositories`, по умолчанию
-  выключено (Nexus контура). В облаке его включает хук начала сессии (пишет
-  `ORG_GRADLE_PROJECT_publicRepositories=true` в `CLAUDE_ENV_FILE`), Stop-хук передаёт его Gradle сам, в GitHub
-  Actions — `env` задания в `gauntlet.yml`. В локальной сессии Claude Code задай
-  `ORG_GRADLE_PROJECT_publicRepositories=true` сам, иначе сборка пойдёт в Nexus контура, а Stop-хук не найдёт задач
-  набора. Сборка в фоне, запущенная до хука (старая сессия), свойства не видит — перезапусти сессию.
+  выключено (Nexus контура). В облаке SessionStart-хук пишет `publicRepositories=true` в
+  `~/.gradle/gradle.properties` (`$GRADLE_USER_HOME`; заданное там значение не трогает, а не `true` — предупреждает),
+  Stop-хук на всякий случай передаёт Gradle `ORG_GRADLE_PROJECT_publicRepositories=true` сам, в GitHub Actions —
+  `env` задания в `gauntlet.yml`. В локальной сессии Claude Code впиши `publicRepositories=true` в
+  `~/.gradle/gradle.properties` сам, иначе сборка пойдёт в Nexus контура, а Stop-хук не найдёт задач набора.
 - Не заканчивай ход, пока идёт фоновый прогон гейтов: Stop-хук запустит свой в тот же `build/` и будет ждать
-  его конца (блокировка `.gradle/gauntlet-build.lock`, до 1500 с), а при более долгом прогоне упадёт по таймауту.
+  его конца (блокировка `.gradle/gauntlet-build.lock`, не дольше половины оставшегося бюджета хука и не дольше
+  1500 с), а при более долгом прогоне упадёт по таймауту. У Stop-хука один бюджет `--timeout` на все модули:
+  модуль, на который времени не осталось, он не запускает и сообщает об этом — прогони его сам.
 
 ## Процесс для задачи, меняющей поведение сервиса
 
@@ -159,7 +161,30 @@
   облачные сессии Claude Code и GitHub — внешний контур. Зависимости и образы в контуре берутся только из
   корпоративного Nexus, с ним владелец работает сам, вручную; правки переносит тоже вручную, PR за PR
   в порядке мержа. Из сессии Nexus закрыт, и обращаться к нему не нужно: здесь — только публичные адреса
-  (Maven Central, портал плагинов Gradle, Docker Hub, официальная документация).
+  (Maven Central, портал плагинов Gradle, Docker Hub, официальная документация). *Внешний контур* — где владелец
+  пишет запросы Claude и работает с GitHub (облачные сессии Claude Code, GitHub Actions): зависимости публичные и
+  берутся напрямую, не через Nexus. Поток: PR в GitHub → merge владельцем → владелец вручную переносит файлы
+  сервиса в рабочий контур → прогон там.
+  - **Сборка в обоих режимах.** Модуль обязан собираться и работать и с Nexus, и с публичными репозиториями: в
+    сессии проверяется публичный режим, режим Nexus — у владельца при переносе. Поведение, которое проверяется
+    только во внешнем контуре (приёмка, гейты), не должно быть нужно для работы и сборки в рабочем. Никаких
+    обращений к GitHub и интернету в рантайме и в сборке по умолчанию. В переносимых файлах не упоминать Claude
+    и Anthropic: ни в именах, ни в переменных окружения, ни в комментариях.
+  - **Gradle Wrapper.** В рабочем контуре `./gradlew` запускается напрямую, а дистрибутив Gradle туда доставляется
+    вручную, поэтому версию Gradle Wrapper (`distributionUrl` в `<module>/gradle/wrapper/gradle-wrapper.properties`)
+    и сам wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/`) не менять без согласования с владельцем; нужна
+    смена — вопрос в «Нужно решение человека» («переслать координатору»).
+  - **Проверка следов разработки** (правило 15) — вывод обеих команд (содержимое и имена файлов) идёт в отчёт
+    «Перенос в контур»: `git grep -n -I -i -E 'claude|anthropic|github|pull request|\bPR ?#[0-9]+|решени[еяю] владельца|\bшаг[а-я]* [0-9]+[а-яa-z]?\b'
+    -- data-reference contract-service ':!*/CLAUDE.md' ':!*/src/acceptanceTest/*' ':!*/gradlew' ':!*/gradlew.bat'
+    ':!*/gradle/wrapper/*' | grep -v -i 'com\.github\.'` и `git ls-files -- data-reference contract-service
+    ':!*/CLAUDE.md' ':!*/src/acceptanceTest/*' | grep -i -E 'claude|anthropic'`. В контур переносятся каталоги
+    сервисов, поэтому команды смотрят только их. `-I` пропускает двоичные файлы; Gradle Wrapper исключён: его
+    генерирует Gradle и он не меняется (см. выше); пакеты `com.github.*` — координаты библиотек (Caffeine), а не
+    следы. Слово «gauntlet» команда не ищет — его содержит код подключения набора в `settings.gradle` и
+    `build.gradle`; комментарии о наборе ловит `reviewer`. Строки, которые уже есть в основной ветке, — долг, он
+    чистится отдельной задачей: сравни вывод с основной веткой, новых строк быть не должно (на 2026-10-15 вывод
+    обеих команд на основной ветке пуст).
   - Репозитории выбирает свойство `publicRepositories` (`settings.gradle` модуля): по умолчанию — Nexus контура,
     со свойством `true` — публичные; во внешнем контуре его выставляют хуки набора и `gauntlet.yml`, сам
     `settings.gradle` облако и GitHub не упоминает. Набор gauntlet подключается, только когда рядом лежит
@@ -228,13 +253,19 @@
     транзакций и таймаутов до того, как написать код; `hardener` — тестовые библиотеки; `reviewer` —
     что сверка была и источник подходит к версии. Версии — из BOM проекта (`./gradlew dependencies`),
     документация — той же версии, не «latest». Источники — только из раздела «Источники документации»
-    ниже. Никогда не выдумывай имя свойства, атрибут аннотации, метод или поведение: нет подтверждения
-    ни в одном источнике — не используй, остановись и опиши. Офлайн-источники, которые есть всегда:
-    имена, типы и значения по умолчанию свойств Spring Boot — `META-INF/spring-configuration-metadata.json`
-    внутри jar в кэше Gradle (`~/.gradle/caches/modules-2/files-2.1/`), сигнатуры и поведение —
-    `javap -p -c -cp <jar>`. Сайт недоступен — запасные пути раздела «Источники документации» по порядку:
-    javadoc-jar и sources-jar нужной версии, исходники документации по тегу, jar в кэше Gradle; каждый случай
-    — в отчёт.
+    ниже, строго в таком порядке:
+    (1) официальные сайты из столбца «Официальный источник» — строгий приоритет;
+    (2) только если нужный сайт недоступен или его домен закрыт — запасные пути из столбца «Если сайт
+    недоступен» по порядку: javadoc-jar и sources-jar нужной версии с repo.maven.apache.org (зеркало —
+    javadoc.io), исходники документации по тегу на raw.githubusercontent.com, затем jar в кэше Gradle и `javap`.
+    Офлайн-источники, которые есть всегда: имена, типы и значения по умолчанию свойств Spring Boot —
+    `META-INF/spring-configuration-metadata.json` внутри jar в кэше Gradle (`~/.gradle/caches/modules-2/files-2.1/`),
+    сигнатуры и поведение — `javap -p -c -cp <jar>`;
+    (3) только если недоступно и это — память модели, и лишь когда утверждение подтверждает тест в этом же
+    изменении (тест фиксирует поведение фреймворка или библиотеки и упал бы, будь память неверна).
+    Каждый случай (2) и (3) — в отчёт «Сверка по документации»; случай (3) — с пометкой «память + тест»
+    и именем теста. Никогда не выдумывай имя свойства, атрибут аннотации, метод или поведение: имя из памяти,
+    которого нет ни в одном источнике (1)–(2) и в jar, не используй; нет подтверждения — остановись и опиши.
 13. **Антипаттерны запрещены**, не только те, что ловит `pmdGate`: god class и класс-«сервис» со всем
     подряд, логика в листенере/контроллере/планировщике вместо домена, магические строки и числа,
     boolean-параметр-переключатель, `null` вместо `Optional` или пустой коллекции, проглоченное
@@ -304,16 +335,16 @@ PDF читаются инструментом Read (страницами). Фи�
 | Spring Framework 7.0.8 | docs.spring.io/spring-framework/reference/7.0/ (в т. ч. core/resilience.html — `@Retryable`, `RetryTemplate`, `@ConcurrencyLimit`, включаются `@EnableResilientMethods`; core/null-safety.html — JSpecify; integration/cache.html — `@Cacheable`/`@CacheEvict`, менеджеры кэша); **адрес с `7.0/` перенаправляет на страницу без версии** — это текущая ветка 7.0.x (метатег `version` показывал 7.0.9 при сборке на 7.0.8: патч-расхождение, сверять по метатегу); Javadoc: docs.spring.io/spring-framework/docs/7.0.x/javadoc-api/; изменения: raw.githubusercontent.com/wiki/spring-projects/spring-framework/Spring-Framework-7.0-Release-Notes.md | javadoc-jar и sources-jar, `javap` |
 | Spring AMQP 4.0.4 | docs.spring.io/spring-amqp/reference/4.0/; API: docs.spring.io/spring-amqp/docs/4.0.4/api/ | javadoc-jar, `javap` |
 | Spring Data JPA 4.0.6 | docs.spring.io/spring-data/jpa/reference/4.0/; API: docs.spring.io/spring-data/jpa/reference/4.0/api/java/ | javadoc-jar, `javap` |
-| Hibernate ORM 7.2.19 | docs.hibernate.org/orm/7.2/ (руководство: userguide/html_single/Hibernate_User_Guide.html) | javadoc-jar, `javap` |
+| Hibernate ORM 7.2.19 | docs.hibernate.org/orm/7.2/ (руководство: userguide/html_single/Hibernate_User_Guide.html); Javadoc: docs.jboss.org/hibernate/orm/7.2/javadocs/ | javadoc-jar, `javap` |
 | Hibernate Validator 9.0.1, Jakarta Validation 3.1 | docs.jboss.org/hibernate/validator/9.0/reference/en-US/html_single/; jakarta.ee/specifications/bean-validation/3.1/ | javadoc-jar |
 | Jakarta Persistence 3.2 | jakarta.ee/specifications/persistence/3.2/ | javadoc-jar |
 | Liquibase 5.0.3 | docs.liquibase.com — **открыт с 2026-10-05** (Network access); сайт без версии в пути, а репозиторий исходников его документации заархивирован в сентябре 2025 без веток под версии — расхождение со своей версией сверять по javadoc-jar | javadoc-jar: javadoc.io/doc/org.liquibase/liquibase-core/5.0.3; sources-jar `org.liquibase:liquibase-core`; исходники по тегу raw.githubusercontent.com/liquibase/liquibase/v5.0.3/ (README, `liquibase-standard/src/main/resources/` — схемы changelog); поведение проверять `./gradlew test` с Testcontainers |
-| PostgreSQL 16 (образ `postgres:16.10-alpine`), JDBC 42.7.11 | www.postgresql.org/docs/16/; jdbc.postgresql.org/documentation/ | исходник документации: raw.githubusercontent.com/postgres/postgres/REL_16_STABLE/doc/src/sgml/ |
+| PostgreSQL 16 (образ `postgres:16.10-alpine`), JDBC 42.7.11 | www.postgresql.org/docs/16/; jdbc.postgresql.org/documentation/ (API: jdbc.postgresql.org/documentation/publicapi/) | исходник документации: raw.githubusercontent.com/postgres/postgres/REL_16_STABLE/doc/src/sgml/; JDBC — javadoc-jar `org.postgresql:postgresql:42.7.11`, `javap` |
 | RabbitMQ 4.1 (образ `rabbitmq:4.1.2-alpine` — патч-версия брокера 1С контура, Р16): подтверждения, повторная доставка, DLX, аргументы очередей | www.rabbitmq.com/docs/4.1/<страница> (например, /docs/4.1/confirms) — **открыт с 2026-10-05**, брать адрес с версией: /docs/<страница> без версии показывает последнюю | исходники той же документации: raw.githubusercontent.com/rabbitmq/rabbitmq-website/main/versioned_docs/version-4.1/<страница>.md (например, confirms.md) |
 | RabbitMQ Java-клиент 5.27.1 | www.rabbitmq.com/client-libraries/java-api-guide; Javadoc rabbitmq.github.io/rabbitmq-java-client/api/current/ — **открыты с 2026-10-05** (Javadoc — последней версии клиента, сверять с 5.27.1 по javadoc-jar) | javadoc-jar `com.rabbitmq:amqp-client:5.27.1`; raw.githubusercontent.com/rabbitmq/rabbitmq-java-client/v5.27.1/ |
 | Jackson 3.1.4 (`tools.jackson`) | javadoc.io/doc/tools.jackson.core/jackson-databind/3.1.4; миграция: raw.githubusercontent.com/FasterXML/jackson/main/jackson3/MIGRATING_TO_JACKSON_3.md | javadoc-jar, `javap` |
-| JSpecify 1.0 | jspecify.dev/docs/user-guide/ | javadoc-jar |
-| Tomcat 11.0.22 (встроенный) | tomcat.apache.org/tomcat-11.0-doc/ | javadoc-jar |
+| JSpecify 1.0 | jspecify.dev/docs/user-guide/; API: jspecify.dev/docs/api/ | javadoc-jar `org.jspecify:jspecify:1.0.0`, `javap` |
+| Tomcat 11.0.22 (встроенный) | tomcat.apache.org/tomcat-11.0-doc/; API: tomcat.apache.org/tomcat-11.0-doc/api/ | sources-jar `org.apache.tomcat.embed:tomcat-embed-core:11.0.22` (javadoc-jar в Maven Central не публикуется), `javap` |
 | Kubernetes (пробы liveness/readiness, graceful shutdown — только при вопросах эксплуатации; манифестов в репозитории нет) | kubernetes.io/docs — **открыт с 2026-10-05** (Network access) | исходники документации: raw.githubusercontent.com/kubernetes/website/main/content/en/docs/<раздел>.md (например, concepts/workloads/pods/pod-lifecycle.md) |
 | HikariCP 7.0.2 (пул соединений, версия из BOM Boot 4.0.7) | README по тегу: raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-7.0.2/README.md (свойства пула, единицы и умолчания) | sources-jar и javadoc-jar `com.zaxxer:HikariCP:7.0.2` |
 | SLF4J 2.0, Logback 1.5 | www.slf4j.org/manual.html, www.slf4j.org/api/; logback.qos.ch/manual/ | `javap` |
@@ -326,10 +357,10 @@ PDF читаются инструментом Read (страницами). Фи�
 | Testcontainers 2.0.5 | java.testcontainers.org (модули: /modules/databases/postgres/, /modules/rabbitmq/) | raw.githubusercontent.com/testcontainers/testcontainers-java/2.0.5/docs/ |
 | Awaitility 4.3 | руководство — вики: raw.githubusercontent.com/wiki/awaitility/awaitility/Usage.md | javadoc-jar |
 | Cucumber-JVM 8.0.1 (приёмка); Cucumber Expressions 20.1.0; Gherkin 42.0.1 | cucumber.io/docs/ (Java: installation/java/; выражения шагов — docs/cucumber/cucumber-expressions/); Gherkin на русском — cucumber.io/docs/gherkin/languages/. Сайт без версии — сверять с исходниками по тегу | javadoc-jar, raw.githubusercontent.com/cucumber/cucumber-jvm/v8.0.1/; грамматика выражений шагов (альтернативы `a/b`, параметры) — raw.githubusercontent.com/cucumber/cucumber-expressions/v20.1.0/ARCHITECTURE.md (README тега документации не содержит); грамматика Gherkin — raw.githubusercontent.com/cucumber/gherkin/v42.0.1/gherkin.berp |
-| Gradle 8.14.3 | docs.gradle.org/8.14.3/userguide/; DSL: docs.gradle.org/8.14.3/dsl/ | нет |
+| Gradle 8.14.3 | docs.gradle.org/8.14.3/userguide/userguide.html (адрес без `userguide.html` отвечает 404); DSL: docs.gradle.org/8.14.3/dsl/ | нет |
 | Docker Compose v5.1.1 (CLI; в облачной VM версия меняется от сессии к сессии — встречалась и v5.3.1: сверять `docker compose version` и брать справку по своему тегу) и спецификация compose-файла (`docker-compose.yml`) | docs.docker.com — **открыт с 2026-10-05** (Network access; сайт без версии в пути — сверять с исходниками по тегу) | CLI — по тегу версии: raw.githubusercontent.com/docker/compose/v5.1.1/docs/reference/<команда>.md (compose.md, compose_up.md, compose_down.md …); файл — raw.githubusercontent.com/docker/docs/main/content/reference/compose-file/<раздел>.md (services.md, build.md, fragments.md) и raw.githubusercontent.com/compose-spec/compose-spec/main/<NN>-<раздел>.md; руководства — raw…/docker/docs/main/content/manuals/compose/…; у docker/docs и compose-spec тегов под версию нет — ветка main, поведение проверять `docker compose … config` |
 | Dockerfile и BuildKit (`Dockerfile` модуля: `RUN --mount`, `FROM ${ARG}`) | docs.docker.com — **открыт с 2026-10-05** (Network access; сайт без версии в пути — сверять с исходниками по тегу) | raw.githubusercontent.com/moby/buildkit/master/frontend/dockerfile/docs/reference.md; руководства — raw…/docker/docs/main/content/manuals/build/…; поведение проверять `docker build` локально |
-| Гейты: PIT 1.22.1, gradle-pitest-plugin 1.19.0, ArchUnit 1.5.1, Checkstyle 12.3.1, PMD 7.27.0, JaCoCo 0.8.15 | pitest.org; gradle-pitest-plugin.solidsoft.info; www.archunit.org/userguide/; checkstyle.org; docs.pmd-code.org/pmd-doc-7.27.0/; www.jacoco.org/jacoco/trunk/doc/ | по тегу версии на raw.githubusercontent.com: hcoles/pitest/1.22.1/README.md; szpak/gradle-pitest-plugin/release/1.19.0/README.md; TNG/ArchUnit/v1.5.1/docs/userguide/; checkstyle/checkstyle/checkstyle-12.3.1/src/site/xdoc/checks/; pmd/pmd/pmd_releases/7.27.0/pmd-java/src/main/resources/category/java/; jacoco/jacoco/v0.8.15/org.jacoco.doc/docroot/doc/ |
+| Гейты: PIT 1.22.1, gradle-pitest-plugin 1.19.0, ArchUnit 1.5.1, Checkstyle 12.3.1, PMD 7.27.0, JaCoCo 0.8.15 | pitest.org; gradle-pitest-plugin.solidsoft.info; www.archunit.org/userguide/html/000_Index.html (адрес `/userguide/` отвечает 404); checkstyle.org; docs.pmd-code.org/pmd-doc-7.27.0/; www.jacoco.org/jacoco/trunk/doc/ | по тегу версии на raw.githubusercontent.com: hcoles/pitest/1.22.1/README.md; szpak/gradle-pitest-plugin/release/1.19.0/README.md; TNG/ArchUnit/v1.5.1/docs/userguide/; checkstyle/checkstyle/checkstyle-12.3.1/src/site/xdoc/checks/; pmd/pmd/pmd_releases/7.27.0/pmd-java/src/main/resources/category/java/; jacoco/jacoco/v0.8.15/org.jacoco.doc/docroot/doc/ |
 | Git (`.gitattributes`, `.gitignore`; версия — `git --version` в сессии, сейчас 2.43.0) | git-scm.com/docs — **открыт с 2026-10-05** (Network access; страницы последней версии, без версии в пути) | по тегу версии: raw.githubusercontent.com/git/git/v<версия>/Documentation/<страница>.txt (например, gitattributes.txt); поведение проверять `git ls-files --eol`, `git check-attr` |
 | GitHub Actions (`.github/workflows/gauntlet.yml`: синтаксис workflow, `services`, кэш Gradle) | docs.github.com/en/actions — **открыт с 2026-10-05** (Network access) | исходники документации: raw.githubusercontent.com/github/docs/main/content/actions/reference/workflows-and-actions/workflow-syntax.md (оглавление — …/content/actions/index.md); поведение проверять прогоном CI на PR |
 | Образы контейнеров: `postgres:16.10-alpine`, `rabbitmq:4.1.2-alpine`, `eclipse-temurin:21.0.12.1_1-jdk/-jre` (Dockerfile), Testcontainers (`testcontainers/ryuk`) | теги и даты сборки — API Docker Hub: hub.docker.com/v2/repositories/library/<образ>/tags?name=<тег> (страницы hub.docker.com/_/<образ> тоже открыты); зеркало с манифестами: mirror.gcr.io/v2/library/<образ>/tags/list; Temurin: raw.githubusercontent.com/adoptium/containers/main/README.md | `docker manifest inspect`, `docker run … --version`; реестр registry-1.docker.io отвечает 401 без токена — нормально |

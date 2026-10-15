@@ -53,5 +53,7 @@ before any code is written; the coder must then make your scenarios pass without
 
 ## Final message
 1. Files created or changed.
-2. One line per scenario: what it pins down.
-3. Open questions and assumptions the human must confirm before approving.
+2. The full text of every new or changed scenario (the human reads it in the chat before approving).
+3. One line per scenario: what it pins down.
+4. Open questions and assumptions the human must confirm before approving, numbered, each marked
+   «ответьте здесь» or «переслать координатору» (gauntlet/CLAUDE.md, «Правила владельца»).

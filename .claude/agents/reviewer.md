@@ -16,15 +16,20 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
   merge base) plus the untracked files from `git ls-files --others --exclude-standard` - read those files
   directly. Base is given in your prompt; default `origin/main`.
 - The approved feature files touched by the change, and the module's architecture policy `gauntlet/config/<module>/architecture.properties` (fallback: the common
-  template `gauntlet/config/architecture.properties`; `./gradlew gauntletInfo` shows which applies).
+  template `gauntlet/config/architecture.properties`; `./gradlew gauntletInfo` shows which applies). Exceptions the
+  policy declares (temporary edges, lifted `forbidden`) are debt: new code that widens them is a finding.
 - When the change relies on framework behaviour, property names or an API contract: the official
   reference for the versions the build resolves (Spring Boot 4.0 / Framework 7.0 / Spring AMQP 4.0 /
   Hibernate 7.2 / Jackson 3 / Java 21 - docs.spring.io, docs.hibernate.org, docs.oracle.com, Javadoc), or offline `META-INF/spring-configuration-metadata.json` and `javap` on the
   jars in the Gradle cache. Do not review API use from memory. Allowed sources are listed in
   gauntlet/CLAUDE.md, section «Источники документации». A decision that depends on framework, library
-  or protocol behaviour without a cited official source of the resolved version (in the report's
-  «Сверка по документации» or in the code's Javadoc), or backed by a source outside that list, is a
-  **major** finding: name the decision and the source it needs.
+  or protocol behaviour without a cited official source of the resolved version in the report's
+  «Сверка по документации» (the code carries no comments or Javadoc, so a source cited only in the code
+  does not count and is itself a finding under item 10), or backed by a source outside that list, is a
+  **major** finding: name the decision and the source it needs. Rule 12 fixes the order: the official sites
+  first, then the fallback paths, and only then model memory, marked «память + тест» and backed by a test in
+  the same change that pins the behaviour. A «память + тест» entry without such a test, or used while a
+  source of steps (1)-(2) was reachable, is also **major**.
 - The module's own rules (for `data-reference` - `data-reference/CLAUDE.md`: packages, transactions,
   broker acknowledgements, personal data, tests) and the domain specifications in `project_files/`.
 - You may run `./gradlew gauntletFast --continue` from the module's directory to confirm the gates; you
@@ -55,25 +60,30 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 8. **The company contour** (see gauntlet/CLAUDE.md, «Рабочий контур»): a new dependency or plugin without
    coordinates in the report; production code or unit tests depending on `src/acceptanceTest` or `gauntlet/`;
    a hard-coded image registry or repository URL; a change to the repository switch in `settings.gradle`;
-   an artifact the company Nexus is known not to serve (`spring-boot-starter-webmvc*`); deleted or renamed
-   files missing from the report's transfer list.
+   an artifact the company Nexus is known not to serve (`spring-boot-starter-webmvc*`); a change to the Gradle
+   Wrapper (`distributionUrl`, `gradlew*`, `gradle/wrapper/`) without the owner's agreement; deleted or renamed
+   files missing from the report's transfer list; Claude, Anthropic or other traces of development outside the
+   contour (PR numbers, GitHub, branches, gauntlet and its gates, sessions and roles, «решение владельца», plan
+   step numbers) in transferred files - run the check commands of «Рабочий контур» and compare their output with
+   the base branch: any new line is a **major** finding.
 9. **Anti-patterns and readability the tools cannot measure**: boolean flag parameters, null instead
    of Optional or an empty collection, a catch-all outside a system boundary or without a decision
    (log + reject/requeue/retry/rethrow), swallowed failures, mutable shared state, names that do not
-   say what the thing is in the domain, mixed levels of abstraction in one method, comments that
-   explain bad code, a new integration path without idempotency, timeouts or limits, a cheaper or
-   safer design the author did not consider.
+   say what the thing is in the domain, mixed levels of abstraction in one method, a new integration path
+   without idempotency, timeouts or limits, a cheaper or safer design the author did not consider.
 10. **No comments and no Javadoc** (owner's rule of 2026-10-12; module `CLAUDE.md`, «Комментарии и Javadoc»): flag
    every comment or Javadoc in Java, `application.yml`, `#`-comments of Liquibase changeSets, `build.gradle`,
    `settings.gradle`, `Dockerfile`, `docker-compose.yml` and stand scripts, except the listed exceptions (feature
    headers, changeSet `comment:` fields, `#!` lines, `.env.example`, `.gitignore`, the header of the
    `publicRepositories` switch in `settings.gradle` and the commented-out «Nexus only» variant; the comments on
-   wiring the external quality gates in `settings.gradle` and `build.gradle` are not exceptions). A
-   non-obvious reason introduced by the change must be written to the module README, section «Почему так устроено»
-   (a reason needed only by acceptance tests - to `src/acceptanceTest/README.md`, which never reaches the contour),
-   in plain human language - flag a missing one. Flag plan or document codes and edit history in the README. A change
-   that only removes comments must prove that code and values did not change (identical bytecode, YAML tree,
-   `docker compose config`, Dockerfile lines without comments) - flag a missing proof.
+   wiring the external quality gates in `settings.gradle` and `build.gradle` are not exceptions). Comments
+   written before the rule are debt removed by separate tasks (the module `CLAUDE.md` says whether its cleanup
+   is done): flag only those the change adds or edits. A non-obvious reason introduced by the change must be
+   written to the module README, section «Почему так устроено» (a reason needed only by acceptance tests - to
+   `src/acceptanceTest/README.md`, which never reaches the contour), in plain human language - flag a missing one.
+   Flag plan or document codes and edit history in the README. A change that only removes comments must prove
+   that code and values did not change (identical bytecode, YAML tree, `docker compose config`, Dockerfile lines
+   without comments) - flag a missing proof.
 
 ## Output (exactly this shape)
 ```
