@@ -3,7 +3,7 @@
 ## Стек
 
 Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер 1С:УСК), Caffeine. Порт `8080` — REST и
-пробы `/livez`, `/readyz`; `8081` — `/actuator/health`, `/actuator/prometheus`. Версии — [CHANGELOG.md](CHANGELOG.md).
+пробы `/livez`, `/readyz`; `8081` — `/actuator/health`, `/actuator/prometheus`. История версий — [CHANGELOG.md](CHANGELOG.md).
 
 ## О сервисе
 
@@ -17,7 +17,7 @@ Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер
 | Запрос к базе при чтении по REST | 3 с | `API_READ_TIMEOUT_SECONDS` |
 | Ожидание соединения с базой | 2 с | `DB_REST_CONNECTION_TIMEOUT_MS`, `DB_CONNECTION_TIMEOUT_MS` |
 | Ответ зависшей базы: REST; приём и разбор | 5 с; 60 с | `DB_REST_SOCKET_TIMEOUT_SECONDS`; `DB_SOCKET_TIMEOUT_SECONDS` |
-| Оператор; блокировка | 30 с; 5 с | `DB_STATEMENT_TIMEOUT`; `DB_LOCK_TIMEOUT` |
+| Оператор; блокировка; простой транзакции | 30 с; 5 с; 1 мин | `DB_STATEMENT_TIMEOUT`; `DB_LOCK_TIMEOUT`; `DB_IDLE_IN_TRANSACTION_TIMEOUT` |
 | Соединение с брокером | 10 с | — |
 | Ожидание родителя сообщением | 24 ч | `ONEC_PARENT_WAIT_TIMEOUT` |
 | Повторы разбора при сбое | 30 с, 5 мин, 30 мин | — |
@@ -25,26 +25,25 @@ Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер
 
 ## Без базы и без брокера
 
-- База недоступна: REST отвечает 503 `SERVICE_UNAVAILABLE` примерно через 5 с; приём из 1С встаёт на паузу, сообщения ждут
-  в очередях, и приём сам возобновляется, когда база снова принимает записи. Без базы сервис не стартует: миграции идут
-  при запуске.
-- Брокер недоступен или слушатели выключены (`RABBITMQ_LISTENER_AUTO_STARTUP=false`): REST отдаёт то, что уже в базе.
-- Пробы `/livez`, `/readyz` от базы и брокера не зависят. Что лежит, видно в `/actuator/health`: `db` и `onecIngest`.
+- Нет базы: что есть в кэше, отдаётся; остальное и полисы — 503 через 2 с, у зависшей базы или занятого пула — до 5 с.
+  Приём из 1С на паузе, сообщения ждут в очередях; вернётся сам. Без базы сервис не стартует: миграции идут при запуске.
+- Нет брокера: сервис стартует, REST отвечает, приём ждёт брокера. Без очередей 1С — `RABBITMQ_LISTENER_AUTO_STARTUP=false`.
+- `/livez`, `/readyz` от базы и брокера не зависят. Что лежит, видно в `/actuator/health`: `db`, `rabbit`, `onecIngest`.
 
 ## Сообщения и REST
 
-Из 1С — 11 очередей (`ONEC_QUEUE_*`), у каждой один потребитель. Сообщение подтверждается после записи в базу,
-разбирается по времени приёма, действует последнее. Не наше получает `SKIPPED` с причиной: санаторий без вида
-деятельности РВЛ с его договорами, адресом, услугами и прайсами, договор страхования не ДМС, программа не РВЛ;
-страхователь сохраняется, но тоже `SKIPPED`. Ребёнок, пришедший раньше родителя, ждёт его до 24 ч.
-Сам сервис сообщений не отправляет. Наружу — только `GET /internal/v1/…`: ЛПУ, услуги и цены, МКБ-10, полисы, договоры
+Из 1С — 11 очередей (`ONEC_QUEUE_*`), у каждой один потребитель. Сообщение подтверждается после записи в базу; без
+пригодного `message-id` — подтверждается и теряется. Разбор — по времени приёма, действует последнее. Не наше получает
+`SKIPPED` с причиной: санаторий без вида деятельности РВЛ с его договорами, адресом, услугами и прайсами, договор
+страхования не ДМС, программа не РВЛ; страхователь сохраняется, но тоже `SKIPPED`. Ребёнок раньше родителя ждёт его
+до 24 ч. Сервис сообщений не отправляет. Наружу — `GET /internal/v1/…`: ЛПУ, услуги и цены, МКБ-10, полисы, договоры
 страхования, программы.
 
 ## Диагностика по базе
 
-Сырьё — `inbound_message`, тела, которые база не приняла, — `quarantine`. Статусы: `NEW` → `PROCESSED`; `SKIPPED` — не
-наше; `BUFFERED` — часть передачи прайса; `AWAITING_PARENT` — ждёт родителя; `RETRY` — временный сбой; `FAILED` — нужен
-человек, причина в `last_error`.
+Сырьё — `inbound_message`, тела, которые база не приняла, — `quarantine`. Статусы: `NEW` → `PROCESSED`; `SKIPPED` —
+пропущено с причиной; `BUFFERED` — часть передачи прайса; `AWAITING_PARENT` — ждёт родителя; `RETRY` — временный сбой;
+`FAILED` — нужен человек, причина в `last_error`.
 
 ```sql
 -- что не разобрано, по потокам
@@ -53,11 +52,11 @@ select stream, status, count(*), min(received_at)
  where status in ('NEW', 'RETRY', 'BUFFERED', 'AWAITING_PARENT', 'FAILED')
  group by stream, status order by stream, status;
 
--- причины отказов за сутки
-select stream, last_error, count(*)
+-- причины отказов
+select stream, last_error, count(*), max(received_at)
   from inbound_message
- where status = 'FAILED' and received_at > now() - interval '1 day'
- group by stream, last_error order by 3 desc;
+ where status = 'FAILED'
+ group by stream, last_error order by 3 desc limit 20;
 
 -- кого ждут сообщения
 select stream, awaited_parent_kind, awaited_parent_id, count(*), min(parent_wait_since)
@@ -68,6 +67,6 @@ select stream, awaited_parent_kind, awaited_parent_id, count(*), min(parent_wait
 
 ## Подробнее
 
-- [docs/operations.md](docs/operations.md) — переменные и настройки, метрики, сбои и ручные операции, ручки REST,
-  очереди, сборка и стенд.
+- [docs/operations.md](docs/operations.md) — переменные и настройки, выкатка, метрики, сбои и ручные операции, ручки
+  REST, очереди, сборка и стенд.
 - [docs/design.md](docs/design.md) — почему так устроено.
