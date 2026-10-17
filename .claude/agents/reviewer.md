@@ -79,9 +79,12 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    wiring the external quality gates in `settings.gradle` and `build.gradle` are not exceptions). Comments
    written before the rule are debt removed by separate tasks (the module `CLAUDE.md` says whether its cleanup
    is done): flag only those the change adds or edits. A non-obvious reason introduced by the change must be
-   written to the module README, section «Почему так устроено» (a reason needed only by acceptance tests - to
+   written to `<module>/docs/design.md` (a reason needed only by acceptance tests - to
    `src/acceptanceTest/README.md`, which never reaches the contour), in plain human language - flag a missing one.
-   Flag plan or document codes and edit history in the README. A change that only removes comments must prove
+   The module README is short and written only by the module coordinator (`gauntlet/CLAUDE.md`, «README модуля»):
+   flag a step change that edits `<module>/README.md`, and flag a README longer than 3500 characters (Unicode, LF,
+   code, tables and markup included) or with sections out of the prescribed order. Flag plan or document codes and
+   edit history in the README and in `<module>/docs/`. A change that only removes comments must prove
    that code and values did not change (identical bytecode, YAML tree, `docker compose config`, Dockerfile lines
    without comments) - flag a missing proof.
 
