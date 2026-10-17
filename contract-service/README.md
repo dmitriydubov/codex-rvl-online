@@ -3,7 +3,7 @@
 ## Стек
 
 Java 21, Spring Boot 4.0.7, Hibernate 7.2, Liquibase 5.0, PostgreSQL 16, RabbitMQ 4.1. Порты: `8080` — пробы
-`/livez`, `/readyz`; `8081` — актуатор (`health`, `info`, `prometheus`).
+`/livez`, `/readyz`; `8081` — актуатор.
 
 ## О сервисе
 
@@ -25,7 +25,8 @@ Java 21, Spring Boot 4.0.7, Hibernate 7.2, Liquibase 5.0, PostgreSQL 16, RabbitM
 
 - Справочный сервис: чтение повторяется (`REFERENCE_MAX_RETRIES`), растёт `contracts_reference_unavailable_total`.
   Запрос полиса ждёт следующего прохода, результат 1С:УСК — лестницы `INBOX_RETRY_BACKOFF` (1, 5, 15 мин), потом FAILED.
-- База: сообщение возвращается в очередь через `INBOX_REQUEUE_DELAY`, разбор — по той же лестнице, потом FAILED.
+- База: приём возвращает сообщение в очередь через `INBOX_REQUEUE_DELAY`, разбор ждёт; временный отказ при разборе —
+  по лестнице, потом FAILED.
 - Брокер: сервис стартует, в `/actuator/health` — DOWN у `internalBroker` или `onecBroker`, исходящие ждут в журнале.
 - 1С:УСК молчит: полис остаётся SUBMITTED без срока, его видно третьим запросом ниже.
 - Без очередей соседей: `RABBITMQ_INTERNAL_LISTENER_AUTO_STARTUP=false`, `RABBITMQ_ONEC_LISTENER_AUTO_STARTUP=false`.
@@ -39,12 +40,11 @@ Java 21, Spring Boot 4.0.7, Hibernate 7.2, Liquibase 5.0, PostgreSQL 16, RabbitM
 | `rvl_contracts_to_1c-usk_lm-policy-changes` | в 1С:УСК | `ONEC_QUEUE_LM_POLICY_REQUESTS` |
 | `1c-usk_to_rvl_contracts_lm-policy-changes` | из 1С:УСК | `ONEC_QUEUE_LM_POLICY_ISSUES` |
 
-Очереди договора КМ в 1С:УСК есть в настройках, обмена по ним пока нет. Справочники — REST GET на `REFERENCE_URL`.
-Своего REST API у сервиса пока нет.
+Очереди договора КМ в 1С:УСК есть в настройках, обмена по ним нет. Справочники — REST GET на `REFERENCE_URL`.
 
 ## Диагностика по базе
 
-Журналы `inbox_messages`, `outbox_messages`: NEW (`attempts` > 0 — ждёт повтора), PROCESSED, SKIPPED, PUBLISHED,
+`inbox_messages`: NEW (`attempts` > 0 — ждёт повтора), PROCESSED, SKIPPED, FAILED; `outbox_messages`: NEW, PUBLISHED,
 FAILED. `contracts`: NEW, DRAFT_READY … ISSUED, ERROR, CANCELLED; `lm_policies`: NEW, SUBMITTED, ISSUED, ERROR,
 CANCELLED. Запросы только читают, без персональных данных.
 
@@ -52,7 +52,7 @@ CANCELLED. Запросы только читают, без персональн
 select message_id, correlation_id, event_type, attempts, error_message, received_at from inbox_messages
  where status = 'FAILED' order by received_at desc limit 20;
 
-select message_id, event_type, attempts, error_message, next_attempt_at from outbox_messages
+select message_id, event_type, attempts, error_message, created_at from outbox_messages
  where status = 'NEW' order by created_at limit 20;
 
 select 'KM', insured_participant_id, number, status::text, error_code from contracts
