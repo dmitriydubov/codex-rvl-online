@@ -6,8 +6,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.ForeignReference;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.ForeignReference;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 
 @Repository
 public interface ForeignReferenceRepository

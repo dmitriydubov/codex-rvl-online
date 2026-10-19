@@ -14,12 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.InboundRetryProperties;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundOutcome;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundOutcome;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 

@@ -3,7 +3,7 @@ package ru.projectx.datareference.mapper;
 import java.time.Clock;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import tools.jackson.databind.JsonNode;

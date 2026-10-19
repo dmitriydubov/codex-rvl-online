@@ -24,7 +24,7 @@ import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.catalog.Insurer;
 import ru.projectx.datareference.entity.catalog.Lpu;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ForeignReferences;
 import ru.projectx.datareference.mapper.ImportResult;

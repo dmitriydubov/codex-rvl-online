@@ -2,7 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.ru.Дано;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 
 public class OneCFailureSteps {
 

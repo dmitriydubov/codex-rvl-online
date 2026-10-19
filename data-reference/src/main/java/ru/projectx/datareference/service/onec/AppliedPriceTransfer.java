@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.onec;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
 
 record AppliedPriceTransfer(UUID service, UUID cid, Instant finalReceivedAt) {
 

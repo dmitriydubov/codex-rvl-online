@@ -4,7 +4,7 @@ import java.time.Clock;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.InboxEntry;
+import ru.projectx.datareference.entity.inbound.InboxEntry;
 import ru.projectx.datareference.repository.InboxRepository;
 
 @Service

@@ -4,7 +4,7 @@ import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import tools.jackson.databind.node.ObjectNode;

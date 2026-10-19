@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;

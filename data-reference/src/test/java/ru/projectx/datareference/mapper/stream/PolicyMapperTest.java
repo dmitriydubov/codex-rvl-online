@@ -21,7 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.PolicyContractProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.entity.policy.PolicyProgram;
 import ru.projectx.datareference.entity.policy.PolicyServiceLine;

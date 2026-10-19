@@ -6,13 +6,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.ParentKind;
-import ru.projectx.datareference.entity.ParentWait;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.ParentKind;
+import ru.projectx.datareference.entity.inbound.ParentWait;
 import ru.projectx.datareference.mapper.ImportResult;
 
 class PriceListTransferStatusTest {

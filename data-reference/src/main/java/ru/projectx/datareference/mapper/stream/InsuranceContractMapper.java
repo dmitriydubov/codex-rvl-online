@@ -11,7 +11,7 @@ import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.mapper.CatalogStreamMapper;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.value.OneCValues;

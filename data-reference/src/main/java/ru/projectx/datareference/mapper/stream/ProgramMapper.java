@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.mapper.ImportResult;

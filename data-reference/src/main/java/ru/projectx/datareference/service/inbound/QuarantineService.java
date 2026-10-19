@@ -3,8 +3,8 @@ package ru.projectx.datareference.service.inbound;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.QuarantinedMessage;
-import ru.projectx.datareference.entity.RejectedMessage;
+import ru.projectx.datareference.entity.inbound.QuarantinedMessage;
+import ru.projectx.datareference.entity.inbound.RejectedMessage;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
 @Service

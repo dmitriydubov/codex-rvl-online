@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 public abstract class CatalogStreamMapper<E, S> implements StreamMapper {
 

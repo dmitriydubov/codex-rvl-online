@@ -34,7 +34,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.OneCJson;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.OneCLogContext;
 import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;

@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
 final class OneCProgramTermsMessages {

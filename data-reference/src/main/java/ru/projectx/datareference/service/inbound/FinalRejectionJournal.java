@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import ru.projectx.datareference.entity.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
 
 @Component
 public class FinalRejectionJournal {

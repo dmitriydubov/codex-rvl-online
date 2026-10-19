@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.LpuContract;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;

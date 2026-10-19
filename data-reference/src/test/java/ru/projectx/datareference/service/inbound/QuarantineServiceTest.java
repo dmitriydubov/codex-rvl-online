@@ -15,9 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.QuarantinedMessage;
-import ru.projectx.datareference.entity.RejectedMessage;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.QuarantinedMessage;
+import ru.projectx.datareference.entity.inbound.RejectedMessage;
 import ru.projectx.datareference.repository.QuarantineRepository;
 
 @ExtendWith(MockitoExtension.class)

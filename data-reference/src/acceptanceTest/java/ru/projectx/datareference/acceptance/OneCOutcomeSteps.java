@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 

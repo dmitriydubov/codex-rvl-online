@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.NestedExceptionUtils;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.database.SqlStates;

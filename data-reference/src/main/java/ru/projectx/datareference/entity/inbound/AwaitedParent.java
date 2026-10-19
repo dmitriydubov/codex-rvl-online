@@ -1,4 +1,4 @@
-package ru.projectx.datareference.entity;
+package ru.projectx.datareference.entity.inbound;
 
 import java.util.Objects;
 import java.util.UUID;

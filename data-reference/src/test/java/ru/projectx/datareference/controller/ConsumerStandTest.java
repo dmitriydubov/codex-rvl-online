@@ -22,7 +22,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 import ru.projectx.datareference.support.DatabaseCleaner;

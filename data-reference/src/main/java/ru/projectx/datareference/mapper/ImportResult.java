@@ -1,7 +1,7 @@
 package ru.projectx.datareference.mapper;
 
 import java.util.Objects;
-import ru.projectx.datareference.entity.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
 
 public sealed interface ImportResult {
 

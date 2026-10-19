@@ -6,7 +6,7 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistrar;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCQueueProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @Component
 public class OneCQueueEndpoints implements RabbitListenerConfigurer {

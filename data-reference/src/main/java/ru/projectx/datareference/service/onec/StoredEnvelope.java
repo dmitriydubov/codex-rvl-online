@@ -1,7 +1,7 @@
 package ru.projectx.datareference.service.onec;
 
 import java.util.Optional;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonParser;

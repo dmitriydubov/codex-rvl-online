@@ -4,8 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 
 public final class CatalogReference<R> {
 

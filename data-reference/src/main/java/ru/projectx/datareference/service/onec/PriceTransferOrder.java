@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;

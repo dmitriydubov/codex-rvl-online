@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCEnvelopeException;
 import ru.projectx.datareference.service.inbound.OneCLogContext;
 import ru.projectx.datareference.service.onec.OneCIngestService;

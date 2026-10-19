@@ -12,9 +12,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 
 @ExtendWith(MockitoExtension.class)

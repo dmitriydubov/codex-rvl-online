@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import ch.qos.logback.classic.Level;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Тогда;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import tools.jackson.databind.node.ObjectNode;
 
 public class OneCProgramTermsSteps {

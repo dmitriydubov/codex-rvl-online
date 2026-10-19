@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 

@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.PolicyContractProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.entity.policy.PolicyProgram;
 import ru.projectx.datareference.entity.policy.PolicyServiceLine;

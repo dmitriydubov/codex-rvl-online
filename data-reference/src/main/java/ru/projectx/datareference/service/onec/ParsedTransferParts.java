@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.onec;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
 import tools.jackson.databind.node.ObjectNode;
 
 record ParsedTransferParts(Map<UUID, ObjectNode> dataByMessage) {

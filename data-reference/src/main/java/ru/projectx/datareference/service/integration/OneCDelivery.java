@@ -6,8 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
 import org.springframework.amqp.core.Message;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.RejectedMessage;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.RejectedMessage;
 
 record OneCDelivery(OneCStream stream, Message message, Channel channel) {
 

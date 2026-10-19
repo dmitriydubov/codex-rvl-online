@@ -12,20 +12,20 @@ import static ru.projectx.datareference.config.ReferenceCaches.MKB10_CODES;
 import static ru.projectx.datareference.config.ReferenceCaches.MKB10_SEARCH;
 import static ru.projectx.datareference.config.ReferenceCaches.PROGRAMS;
 import static ru.projectx.datareference.config.ReferenceCaches.SERVICE_PRICES;
-import static ru.projectx.datareference.entity.OneCStream.APPEAL_TYPES;
-import static ru.projectx.datareference.entity.OneCStream.CONTRAGENTS;
-import static ru.projectx.datareference.entity.OneCStream.CONTRAGENT_SERVICES;
-import static ru.projectx.datareference.entity.OneCStream.INSURANCE_CONTRACTS;
-import static ru.projectx.datareference.entity.OneCStream.LPU_CONTACTS;
-import static ru.projectx.datareference.entity.OneCStream.LPU_CONTRACTS;
-import static ru.projectx.datareference.entity.OneCStream.MKB10;
-import static ru.projectx.datareference.entity.OneCStream.POLICIES;
-import static ru.projectx.datareference.entity.OneCStream.PRICE_LISTS;
+import static ru.projectx.datareference.entity.inbound.OneCStream.APPEAL_TYPES;
+import static ru.projectx.datareference.entity.inbound.OneCStream.CONTRAGENTS;
+import static ru.projectx.datareference.entity.inbound.OneCStream.CONTRAGENT_SERVICES;
+import static ru.projectx.datareference.entity.inbound.OneCStream.INSURANCE_CONTRACTS;
+import static ru.projectx.datareference.entity.inbound.OneCStream.LPU_CONTACTS;
+import static ru.projectx.datareference.entity.inbound.OneCStream.LPU_CONTRACTS;
+import static ru.projectx.datareference.entity.inbound.OneCStream.MKB10;
+import static ru.projectx.datareference.entity.inbound.OneCStream.POLICIES;
+import static ru.projectx.datareference.entity.inbound.OneCStream.PRICE_LISTS;
 
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 final class ReferenceCacheDependencies {
 

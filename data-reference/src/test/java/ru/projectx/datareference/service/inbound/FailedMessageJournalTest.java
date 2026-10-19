@@ -25,10 +25,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import ru.projectx.datareference.config.InboundRetryProperties;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundOutcome;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundOutcome;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 

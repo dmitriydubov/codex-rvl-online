@@ -7,8 +7,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @Repository
 public interface ParentWaitRepository extends org.springframework.data.repository.Repository<InboundMessage, UUID> {

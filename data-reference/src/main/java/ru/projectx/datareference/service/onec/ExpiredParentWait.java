@@ -2,9 +2,9 @@ package ru.projectx.datareference.service.onec;
 
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 public record ExpiredParentWait(OneCStream stream, AwaitedParent parent, @Nullable UUID transfer) {
 

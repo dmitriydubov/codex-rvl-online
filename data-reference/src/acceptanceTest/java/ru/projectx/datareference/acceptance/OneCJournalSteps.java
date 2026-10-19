@@ -11,7 +11,7 @@ import java.util.UUID;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import tools.jackson.databind.JsonNode;
 
 public class OneCJournalSteps {

@@ -7,7 +7,7 @@ import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;
 import java.time.Clock;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.catalog.AppealType;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.mapper.UnfilteredStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.AppealTypeRepository;

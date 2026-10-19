@@ -27,7 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import ru.projectx.datareference.entity.catalog.Lpu;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.exception.OneCFieldException;

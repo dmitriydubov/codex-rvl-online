@@ -11,9 +11,9 @@ import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @Component
 public class InboundTransitionMetrics {

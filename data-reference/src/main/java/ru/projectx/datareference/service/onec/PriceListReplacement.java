@@ -2,7 +2,7 @@ package ru.projectx.datareference.service.onec;
 
 import java.time.Instant;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
