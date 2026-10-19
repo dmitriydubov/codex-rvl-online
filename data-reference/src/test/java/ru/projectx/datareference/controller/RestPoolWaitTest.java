@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.datareference.config.RestReadDataSource;
+import ru.projectx.datareference.config.restread.RestReadDataSource;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;

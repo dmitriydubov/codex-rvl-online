@@ -16,7 +16,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
 import ru.projectx.datareference.config.ReferenceApiProperties;
-import ru.projectx.datareference.config.RestReadPoolProperties;
+import ru.projectx.datareference.config.restread.RestReadPoolProperties;
 import ru.projectx.datareference.repository.database.SessionSettingsRepository;
 
 @Component

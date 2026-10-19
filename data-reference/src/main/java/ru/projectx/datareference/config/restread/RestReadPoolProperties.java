@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.restread;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

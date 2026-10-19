@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.restread;
 
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;

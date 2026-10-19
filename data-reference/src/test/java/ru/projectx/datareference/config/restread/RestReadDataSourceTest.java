@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.restread;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;

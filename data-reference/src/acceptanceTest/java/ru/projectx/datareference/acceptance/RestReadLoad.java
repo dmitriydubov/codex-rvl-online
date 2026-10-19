@@ -28,7 +28,7 @@ import javax.sql.DataSource;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.config.RestReadDataSource;
+import ru.projectx.datareference.config.restread.RestReadDataSource;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component

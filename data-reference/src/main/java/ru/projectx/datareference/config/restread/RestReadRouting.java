@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.restread;
 
 import java.util.Map;
 import javax.sql.DataSource;
