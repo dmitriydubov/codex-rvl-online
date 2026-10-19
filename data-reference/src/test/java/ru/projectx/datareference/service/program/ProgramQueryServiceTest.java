@@ -23,8 +23,8 @@ import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.ProgramLpuRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramLpuRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.service.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)

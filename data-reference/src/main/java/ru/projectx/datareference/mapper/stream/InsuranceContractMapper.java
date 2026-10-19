@@ -15,7 +15,7 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.mapper.CatalogStreamMapper;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

@@ -14,7 +14,7 @@ import ru.projectx.datareference.entity.catalog.Mkb10;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.Mkb10Repository;
+import ru.projectx.datareference.repository.catalog.Mkb10Repository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;

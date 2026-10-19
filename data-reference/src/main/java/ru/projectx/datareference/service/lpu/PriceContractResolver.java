@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
-import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.catalog.LpuContractRepository;
 
 @Component
 public class PriceContractResolver {

@@ -17,7 +17,7 @@ import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.SnapshotUpsert;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component

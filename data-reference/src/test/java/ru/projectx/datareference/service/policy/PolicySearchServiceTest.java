@@ -31,7 +31,7 @@ import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
 import ru.projectx.datareference.service.ReadFixtures;

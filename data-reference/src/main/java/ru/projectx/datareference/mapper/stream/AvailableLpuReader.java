@@ -16,7 +16,7 @@ import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

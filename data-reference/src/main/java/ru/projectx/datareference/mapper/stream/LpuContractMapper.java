@@ -21,7 +21,7 @@ import ru.projectx.datareference.mapper.CatalogReferences;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.OwnedCatalogStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.catalog.LpuContractRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

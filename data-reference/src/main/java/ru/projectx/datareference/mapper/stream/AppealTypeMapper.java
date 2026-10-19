@@ -10,7 +10,7 @@ import ru.projectx.datareference.entity.catalog.AppealType;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.mapper.UnfilteredStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.AppealTypeRepository;
+import ru.projectx.datareference.repository.catalog.AppealTypeRepository;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component

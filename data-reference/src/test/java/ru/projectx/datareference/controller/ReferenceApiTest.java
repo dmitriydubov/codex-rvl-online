@@ -17,11 +17,11 @@ import ru.projectx.datareference.entity.catalog.Insurer;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.repository.InsurerRepository;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsurerRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

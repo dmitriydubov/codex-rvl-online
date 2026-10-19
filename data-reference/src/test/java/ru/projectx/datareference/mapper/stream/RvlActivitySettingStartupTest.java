@@ -15,8 +15,8 @@ import org.springframework.context.annotation.Import;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.mapper.ForeignReferences;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
-import ru.projectx.datareference.repository.InsurerRepository;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.InsurerRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 
 class RvlActivitySettingStartupTest {
 

@@ -6,8 +6,8 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
-import ru.projectx.datareference.repository.Mkb10Repository;
-import ru.projectx.datareference.repository.Mkb10Row;
+import ru.projectx.datareference.repository.catalog.Mkb10Repository;
+import ru.projectx.datareference.repository.catalog.Mkb10Row;
 import ru.projectx.datareference.service.rest.LikePatterns;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 

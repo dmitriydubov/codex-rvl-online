@@ -9,8 +9,8 @@ import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.catalog.Insurer;
 import ru.projectx.datareference.exception.MissingReference;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.repository.InsurerRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsurerRepository;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 

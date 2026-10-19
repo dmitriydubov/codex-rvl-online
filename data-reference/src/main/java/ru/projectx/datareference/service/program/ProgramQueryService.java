@@ -7,8 +7,8 @@ import org.springframework.transaction.annotation.Isolation;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.exception.MissingReference;
-import ru.projectx.datareference.repository.ProgramLpuRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramLpuRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service

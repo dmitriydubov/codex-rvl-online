@@ -32,8 +32,8 @@ import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

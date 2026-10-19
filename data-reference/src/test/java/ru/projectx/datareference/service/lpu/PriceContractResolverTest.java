@@ -19,7 +19,7 @@ import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
-import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.repository.catalog.LpuContractRepository;
 import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.service.lpu.PriceContractResolver.Resolution;
 

@@ -15,7 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import ru.projectx.datareference.repository.AppealTypeRepository;
+import ru.projectx.datareference.repository.catalog.AppealTypeRepository;
 import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.support.TestApiProperties;
 

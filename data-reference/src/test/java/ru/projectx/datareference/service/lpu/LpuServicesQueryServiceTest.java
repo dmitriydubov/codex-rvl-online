@@ -22,7 +22,7 @@ import ru.projectx.datareference.entity.catalog.AppealType;
 import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.LpuContract;
-import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.repository.catalog.PriceListItemRepository;
 import ru.projectx.datareference.service.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)

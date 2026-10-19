@@ -11,7 +11,7 @@ import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuServicesResponse;
 import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.entity.catalog.PriceListItem;
-import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.repository.catalog.PriceListItemRepository;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service

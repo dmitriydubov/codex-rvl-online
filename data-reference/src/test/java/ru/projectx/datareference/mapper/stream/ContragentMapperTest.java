@@ -29,8 +29,8 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ForeignReferences;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
-import ru.projectx.datareference.repository.InsurerRepository;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.InsurerRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

@@ -5,9 +5,9 @@ import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.entity.inbound.ParentKind;
-import ru.projectx.datareference.repository.ContragentServiceRepository;
-import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.ContragentServiceRepository;
+import ru.projectx.datareference.repository.catalog.LpuContractRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 import tools.jackson.databind.JsonNode;
 
 @Component

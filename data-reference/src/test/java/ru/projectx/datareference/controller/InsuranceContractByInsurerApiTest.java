@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.catalog.Insurer;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.repository.InsurerRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsurerRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

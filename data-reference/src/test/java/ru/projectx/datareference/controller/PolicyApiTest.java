@@ -18,9 +18,9 @@ import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.entity.policy.PolicyProgram;
 import ru.projectx.datareference.entity.policy.PolicyServiceLine;
 import ru.projectx.datareference.entity.catalog.Program;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

@@ -27,10 +27,10 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.CatalogReferences;
 import ru.projectx.datareference.mapper.ForeignReferences;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.catalog.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
-import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.repository.LpuRepository;
+import ru.projectx.datareference.repository.catalog.LpuContractRepository;
+import ru.projectx.datareference.repository.catalog.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

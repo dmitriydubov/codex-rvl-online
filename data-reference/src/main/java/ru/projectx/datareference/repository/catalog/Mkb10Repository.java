@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.catalog;
 
 import java.util.Collection;
 import java.util.List;
@@ -14,7 +14,7 @@ import ru.projectx.datareference.entity.catalog.Mkb10;
 public interface Mkb10Repository extends JpaRepository<Mkb10, UUID> {
 
     String ROWS = """
-            select new ru.projectx.datareference.repository.Mkb10Row(
+            select new ru.projectx.datareference.repository.catalog.Mkb10Row(
                        m.id, m.externalId, m.code, m.name, m.hierarchyLevel, parent.code, m.archive)
               from Mkb10 m
               left join Mkb10 parent on parent.externalId = m.externalParentId

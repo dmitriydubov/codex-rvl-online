@@ -17,9 +17,9 @@ import ru.projectx.datareference.entity.policy.PolicyServiceLine;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.MissingReference;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
-import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service

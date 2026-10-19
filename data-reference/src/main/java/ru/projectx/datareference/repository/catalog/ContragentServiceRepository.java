@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.catalog;
 
 import java.util.Collection;
 import java.util.List;

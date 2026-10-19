@@ -14,7 +14,7 @@ import ru.projectx.datareference.mapper.CatalogReferences;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.OwnedCatalogStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.ContragentServiceRepository;
+import ru.projectx.datareference.repository.catalog.ContragentServiceRepository;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component

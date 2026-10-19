@@ -14,7 +14,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.entity.catalog.AppealType;
-import ru.projectx.datareference.repository.AppealTypeRepository;
+import ru.projectx.datareference.repository.catalog.AppealTypeRepository;
 
 @Component
 public class RvlAppealTypes {

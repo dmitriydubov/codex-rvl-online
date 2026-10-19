@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.MissingReference;
-import ru.projectx.datareference.repository.InsuranceContractRepository;
+import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 
 @Component
 public class ActiveInsuranceContracts {
