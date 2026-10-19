@@ -35,8 +35,8 @@
 7. **Р53 (а)** X-Request-Id (Ш26) — рек.: принимать `[A-Za-z0-9._-]{1,64}`, иначе выдать новый UUID, не отклонять.
 8. **Р6** путь приёмки для 1С (Ш25a, Ш28) — рек.: сырьё в `inbound_message` и явный запуск разбора; брокер — только Ш30, Ш31.
 - **Д5:** аутентификации между сервисами нет; ручки с ПДн защищает только сетевая политика (О9, проверить на контуре).
-- **Следующая задача data-reference (приоритет, 2026-10-19):** Ш77 — договор страхования компании по GUID страхователя
-  в 1С (3.7, после Ш76); карточка утверждена, старт — по команде владельца.
+- **Очередь data-reference (2026-10-19):** Ш77 — договор страхования компании по GUID страхователя в 1С (3.7, после
+  Ш76), идёт с 16:55 UTC; затем Ш78 — пакет `service` по подпакетам, без изменения поведения, после мержа Ш77.
 
 ---
 
@@ -3318,6 +3318,36 @@ Dockerfile и gradle без комментариев. Модель — Opus 5.5.
   мержа (строка REST не меняется, если ручка входит в «договоры страхования»).
 - Ответ разработчице (путь, формат, 404 и 409) — после утверждения карточки; отправляет владелец.
 - Оценка: спецификация 1 ч, код и тесты 3,5 ч, закалка и ревью 2 ч, документы 1 ч.
+- **Сессия открыта 2026-10-19 16:55 UTC** (session_011HXMvm9cmavQYfAes27CpU, Opus 5.5, ветка
+  `claude/sh77-insurer-insurance-contract`; окружение шагов, guard включён — в окружении координатора guard выключен).
+  На остановке спецификации сессия задала 8 вопросов; 7 и 8 (правка `data-reference/CLAUDE.md` и README, контракт для
+  разработчицы Заявок) координатор ответил: делает координатор после мержа, текст для Заявок — координатор, отправляет
+  владелец; в описании PR — раздел «Контракт для сервиса Заявок». Рекомендации координатора по 1–6 переданы владельцу.
+
+**Ш78. Пакет `service` data-reference — по подпакетам по смыслу** — тип: без изменения поведения, 6–8 ч, один PR.
+**Порядок: после мержа Ш77** (ветки столкнулись бы на `InsuranceContract*`).
+- Основание: вопрос владельца 2026-10-19 — в корне `service` 54 класса, ручная правка ищет нужное среди всех. Карточка
+  утверждена «1) да», модель — Opus 5.5 xhigh («2) да»).
+- Раскладка (граф зависимостей проверен по `main` 13b1547; цикл «ЛПУ ↔ цена» снят переносом `PricedService` в `price`):
+  `service.lpu` — `ActiveLpus`, `LpuCardReads`, `LpuCardService`, `LpuCatalogReads`, `LpuCatalogService`, `LpuOffer`,
+  `LpuOffers`, `LpuServiceReads`, `LpuServicesQueryService`, `PriceContract`, `PriceContractResolver`, `RvlAppealTypes`;
+  `service.price` (к пяти классам пакета) — `PricedService`, `ServicePriceLookup`, `ServicePriceQueryService`,
+  `ServicePriceReads`, `ServicePriceResponses`; `service.policy` — `PolicyContractViewService`, `PolicyContractViews`,
+  `PolicyQueryService`, `PolicyReads`, `PolicySearchLookup`, `PolicySearchReads`, `PolicySearchService`;
+  `service.insurancecontract` — `ActiveInsuranceContracts`, `InsuranceContractQueryService`, `InsuranceContractReads` и
+  новые классы Ш77; `service.mkb10` — `Mkb10Lookup`, `Mkb10QueryService`, `Mkb10Reads`; `service.program` —
+  `ProgramQueryService`, `ProgramReads`; `service.rest` — `RestReadTransaction`, `ReferenceCalendar`,
+  `TodayKeyGenerator`, `LikePatterns`, `SearchInputLimits`, `ResultLimits`, `CanonicalGuids`; `service.cache` —
+  `ReferenceCacheDependencies`, `ReferenceCacheEviction`; `service.inbound` — `InboundMessageService`, `InboxService`,
+  `QuarantineService`, `FinalRejectionJournal`, `ParseFailure`, `ParseFailures`, `RejectionScope`,
+  `OneCMessageApplied`, `OneCLogContext`; `service.database` — `DatabaseOutages`, `DatabaseTimeoutsCheck`,
+  `PostgresDurations`, `SqlStates`. Направления: `lpu` → `insurancecontract`, `rest`; `price` → `lpu`, `rest`; `policy` →
+  `insurancecontract`, `rest`; `inbound` → `database`, `metrics`; `onec` → `inbound`.
+- Критерии: в корне `service` классов нет; тесты (40 файлов) переезжают со своими классами, импорты — ещё около 60
+  файлов; поведение не меняется — тесты и приёмка зелёные без правки проверок; архитектурная проверка без циклов;
+  `public` — только где класс без этого не виден из соседнего пакета; гейты зелёные (перенесённые файлы проходят их
+  целиком, с PIT); в отчёте — список старых путей для удаления при переносе в контур; «Структура пакетов» в
+  `data-reference/CLAUDE.md` — координатор после мержа.
 
 Решения владельца 2026-10-07 по ревью Grok AI (PR #133, `docs/grok-review-data-reference.md`): комментарий координатора в
 PR #133 — «не нужно»; номер строки контакта (`rowNumber`, только выбор адреса среди равных) остаётся нестрогим — «да,
@@ -4231,6 +4261,18 @@ REST.
   README придёт с переносом набора из medius (координатору medius сообщено); правка `data-reference/CLAUDE.md` —
   отдельным PR сессии-помощника; счётчик `attempt` при ручном возврате в `NEW` не сбрасывается; выпущенный раздел
   CHANGELOG не трогается. PR #179 смержен 09:58 UTC, PR #183 — 10:28 UTC.
+- 2026-10-19, **стенд rvl-test (k3s, s00-0000-rvl8): v2 из Dockerfile модуля, база dev перенесена** (PR #185, смержен
+  14:49 UTC). Сборка падала на Docker Hub: `deploy.sh` не передавал аргументы, Dockerfile брал образы по умолчанию; теперь
+  скрипт передаёт образы и Gradle из Nexus и собирает из корня модуля (решения владельца «1) б)», «1) да» — удалить
+  Dockerfile стенда). Вторая остановка — `No space left on device`: `/var` на стенде 4,9 ГБ; кэш BuildKit вынесен на
+  `/data` (`/etc/buildkit/buildkitd.toml`, `root = "/data/buildkit"`; запись в `docs/operations.md` — после Ш77). v2
+  выкачен. База dev (`docker-compose` на W00-0000-2075, PostgreSQL 16.10) перенесена в тестовую (PostgreSQL 17.11):
+  `pg_dump -Fc` в контейнере, `pg_restore --no-owner --no-acl --single-transaction` после удаления таблиц от имени
+  пользователя приложения (`DROP OWNED` не годится — отзывает права на базу). 172 договора ДМС, пропущенные старой
+  версией как «не ДМС: ЛичноеСтрахование», возвращены на разбор: 157 приняты, 15 — FAILED «нет обязательной даты в поле
+  dateBeginISO» (1С присылает `0001-01-01T00:00:00`; список передан владельцем в 1С). 37 полисов FAILED без `beginDate`
+  1С прислала заново — приняты. Сервис dev выключен: оба слушали одни очереди 1С; запускать dev — только с
+  `RABBITMQ_LISTENER_AUTO_STARTUP=false`. Образ v1 удалён, файлы дампа удалены.
 - 2026-10-15, **`owner_id` услуги в сообщении о групповой заявке Заявок → 1С** (письмо разработчика Заявок со схемой 1.2;
   ответы владельца «1) да 2) нет»). `owner_id` из «Услуг контрагентов» — GUID договора с ЛПУ; R-03 отдаёт его один раз на
   ответ (`price_contract.external_id`), поле у каждой услуги не добавляется. Рекомендация Заявкам — держать его в
