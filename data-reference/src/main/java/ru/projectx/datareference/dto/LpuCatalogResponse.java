@@ -3,7 +3,7 @@ package ru.projectx.datareference.dto;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
 
 public record LpuCatalogResponse(List<Item> items, List<Skipped> skipped) {
 

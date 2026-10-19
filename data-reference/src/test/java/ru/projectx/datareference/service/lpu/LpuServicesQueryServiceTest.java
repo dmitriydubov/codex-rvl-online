@@ -18,10 +18,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.LpuServicesResponse;
-import ru.projectx.datareference.entity.AppealType;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.AppealType;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.ReadFixtures;
 

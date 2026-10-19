@@ -1,7 +1,7 @@
 package ru.projectx.datareference.service.lpu;
 
 import ru.projectx.datareference.dto.PriceContractRef;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 
 public record PriceContract(LpuContract contract, PriceContractRef.Kind kind) {
 

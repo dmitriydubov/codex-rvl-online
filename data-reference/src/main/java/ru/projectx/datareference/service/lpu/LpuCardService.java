@@ -5,7 +5,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCardResponse;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 

@@ -9,7 +9,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.CatalogReference;

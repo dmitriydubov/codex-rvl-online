@@ -8,7 +8,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.Mkb10;
+import ru.projectx.datareference.entity.catalog.Mkb10;
 
 @Repository
 public interface Mkb10Repository extends JpaRepository<Mkb10, UUID> {

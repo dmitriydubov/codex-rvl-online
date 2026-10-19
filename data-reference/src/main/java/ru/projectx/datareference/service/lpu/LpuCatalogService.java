@@ -12,7 +12,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;

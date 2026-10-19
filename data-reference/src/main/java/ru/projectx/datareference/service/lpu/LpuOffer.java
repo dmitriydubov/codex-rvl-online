@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import ru.projectx.datareference.dto.LpuServicesResponse;
-import ru.projectx.datareference.entity.AppealType;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.AppealType;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
 
 public record LpuOffer(
         Lpu lpu,

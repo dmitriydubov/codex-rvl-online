@@ -27,7 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.dto.PolicySearchResponse;
-import ru.projectx.datareference.entity.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;

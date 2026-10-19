@@ -1,4 +1,4 @@
-package ru.projectx.datareference.entity;
+package ru.projectx.datareference.entity.catalog;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;

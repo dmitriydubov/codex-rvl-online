@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.AppealType;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.AppealType;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
 

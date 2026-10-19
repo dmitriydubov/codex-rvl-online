@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.Lpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InsurerRepository;

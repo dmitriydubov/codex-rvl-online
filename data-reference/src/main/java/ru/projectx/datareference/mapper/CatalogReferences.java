@@ -1,9 +1,9 @@
 package ru.projectx.datareference.mapper;
 
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;

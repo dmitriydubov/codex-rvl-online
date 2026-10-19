@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.datareference.entity.catalog.OneCEntity;
 
 @Entity
 @Table(name = "policies")

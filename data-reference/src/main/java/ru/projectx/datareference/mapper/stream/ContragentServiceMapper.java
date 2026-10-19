@@ -5,8 +5,8 @@ import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.mapper.CatalogReference;

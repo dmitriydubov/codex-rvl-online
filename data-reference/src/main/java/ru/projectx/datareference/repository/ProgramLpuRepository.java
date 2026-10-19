@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
-import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.entity.catalog.ProgramLpu;
 
 public interface ProgramLpuRepository extends Repository<ProgramLpu, UUID> {
 

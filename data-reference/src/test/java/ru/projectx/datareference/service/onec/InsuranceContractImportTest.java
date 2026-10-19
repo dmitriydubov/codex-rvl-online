@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.stream.InsuranceContractMapper;

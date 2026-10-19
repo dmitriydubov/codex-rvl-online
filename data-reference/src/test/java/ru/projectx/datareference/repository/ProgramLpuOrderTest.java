@@ -14,9 +14,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionOperations;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.Program;
-import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.Program;
+import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

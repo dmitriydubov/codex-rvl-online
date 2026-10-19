@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
 
 @Repository
 public interface InsuranceContractRepository extends JpaRepository<InsuranceContract, UUID> {

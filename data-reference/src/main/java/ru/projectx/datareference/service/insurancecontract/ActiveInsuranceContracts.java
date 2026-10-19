@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.InsuranceContractRepository;

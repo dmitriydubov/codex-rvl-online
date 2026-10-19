@@ -9,8 +9,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuServicesResponse;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.PriceListItem;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 

@@ -2,8 +2,8 @@ package ru.projectx.datareference.dto;
 
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 
 public record LpuCardResponse(
         UUID id,

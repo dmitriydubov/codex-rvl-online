@@ -6,17 +6,17 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.AppealType;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.InsuranceContract;
-import ru.projectx.datareference.entity.Insurer;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.AppealType;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.Insurer;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
-import ru.projectx.datareference.entity.PriceListItem;
-import ru.projectx.datareference.entity.Program;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
+import ru.projectx.datareference.entity.catalog.Program;
 
 public final class ReadFixtures {
 

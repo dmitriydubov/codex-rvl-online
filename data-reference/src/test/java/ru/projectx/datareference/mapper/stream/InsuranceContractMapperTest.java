@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.OneCContractProperties;
-import ru.projectx.datareference.entity.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;

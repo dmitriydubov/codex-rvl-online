@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.domain.Specification;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyServiceLine;
-import ru.projectx.datareference.entity.Program;
+import ru.projectx.datareference.entity.catalog.Program;
 
 public final class PolicySpecifications {
 

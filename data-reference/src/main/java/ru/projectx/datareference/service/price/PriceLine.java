@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.PriceListItem;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
 
 public record PriceLine(
         UUID id,

@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.PriceListItem;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;

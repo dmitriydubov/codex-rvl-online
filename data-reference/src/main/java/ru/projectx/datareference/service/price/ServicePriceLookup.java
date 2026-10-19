@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.dto.NamedRef;
-import ru.projectx.datareference.entity.ContragentService;
+import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.ContragentServiceRepository;

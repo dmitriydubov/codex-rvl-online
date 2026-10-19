@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyServiceLine;
-import ru.projectx.datareference.entity.Program;
+import ru.projectx.datareference.entity.catalog.Program;
 
 class ActivePolicyProgramsRepositoryImpl implements ActivePolicyProgramsRepository {
 

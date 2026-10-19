@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.AppealType;
+import ru.projectx.datareference.entity.catalog.AppealType;
 
 @Repository
 public interface AppealTypeRepository extends JpaRepository<AppealType, UUID> {

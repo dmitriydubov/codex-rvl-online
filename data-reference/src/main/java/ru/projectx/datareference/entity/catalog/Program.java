@@ -1,4 +1,4 @@
-package ru.projectx.datareference.entity;
+package ru.projectx.datareference.entity.catalog;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
