@@ -9,6 +9,7 @@ import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service
 @RestReadTransaction

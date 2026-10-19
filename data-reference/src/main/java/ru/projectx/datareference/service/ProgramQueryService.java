@@ -9,6 +9,7 @@ import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.ProgramLpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service
 public class ProgramQueryService implements ProgramReads {

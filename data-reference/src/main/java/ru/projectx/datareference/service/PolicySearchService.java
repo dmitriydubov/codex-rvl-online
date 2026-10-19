@@ -7,6 +7,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.dto.PolicySearchResponse;
+import ru.projectx.datareference.service.rest.ResultLimits;
+import ru.projectx.datareference.service.rest.SearchInputLimits;
 
 @Service
 public class PolicySearchService implements PolicySearchReads {

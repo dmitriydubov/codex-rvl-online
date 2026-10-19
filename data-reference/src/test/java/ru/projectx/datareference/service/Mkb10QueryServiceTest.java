@@ -23,6 +23,7 @@ import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.repository.Mkb10Repository;
 import ru.projectx.datareference.repository.Mkb10Row;
+import ru.projectx.datareference.service.rest.LikePatterns;
 import ru.projectx.datareference.support.TestApiProperties;
 
 @ExtendWith(MockitoExtension.class)

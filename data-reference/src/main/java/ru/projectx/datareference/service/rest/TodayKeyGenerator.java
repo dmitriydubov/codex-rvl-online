@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.rest;
 
 import java.lang.reflect.Method;
 import java.util.stream.Stream;

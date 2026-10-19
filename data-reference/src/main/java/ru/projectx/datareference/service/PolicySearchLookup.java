@@ -10,6 +10,9 @@ import ru.projectx.datareference.dto.PolicySearchResponse;
 import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.PolicyScope;
+import ru.projectx.datareference.service.rest.LikePatterns;
+import ru.projectx.datareference.service.rest.ReferenceCalendar;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service
 class PolicySearchLookup {

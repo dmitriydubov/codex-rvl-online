@@ -12,6 +12,8 @@ import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
+import ru.projectx.datareference.service.rest.ResultLimits;
+import ru.projectx.datareference.service.rest.SearchInputLimits;
 
 @Service
 public class Mkb10QueryService implements Mkb10Reads {

@@ -1,7 +1,7 @@
 package ru.projectx.datareference.controller;
 
 import java.beans.PropertyEditorSupport;
-import ru.projectx.datareference.service.CanonicalGuids;
+import ru.projectx.datareference.service.rest.CanonicalGuids;
 
 final class CanonicalUuidEditor extends PropertyEditorSupport {
 

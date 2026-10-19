@@ -11,6 +11,7 @@ import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Component
 public class ServicePriceLookup {

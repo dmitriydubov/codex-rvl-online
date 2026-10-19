@@ -30,6 +30,8 @@ import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
+import ru.projectx.datareference.service.rest.ReadFixtures;
+import ru.projectx.datareference.service.rest.ReferenceCalendar;
 import ru.projectx.datareference.support.TestApiProperties;
 
 @ExtendWith(MockitoExtension.class)

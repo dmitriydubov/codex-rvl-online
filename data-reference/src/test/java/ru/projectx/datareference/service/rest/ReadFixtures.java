@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.rest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,52 +18,52 @@ import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.entity.Program;
 
-final class ReadFixtures {
+public final class ReadFixtures {
 
-    static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
+    public static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
     static final LocalDate BEGIN = LocalDate.of(2026, 1, 1);
 
     private ReadFixtures() {
     }
 
-    static InsuranceContract contract(UUID externalId, @Nullable UUID externalInsurerId) {
+    public static InsuranceContract contract(UUID externalId, @Nullable UUID externalInsurerId) {
         return InsuranceContract.create(externalId,
                 new InsuranceContract.Details("ДМС-0001", BEGIN, null, externalInsurerId, false), NOW);
     }
 
-    static Insurer insurer(UUID externalId) {
+    public static Insurer insurer(UUID externalId) {
         return Insurer.create(externalId, new Insurer.Details("ООО «Страхователь»", null, null, null, false), NOW);
     }
 
-    static Program program(UUID externalId, boolean archived) {
+    public static Program program(UUID externalId, boolean archived) {
         return Program.create(externalId, new Program.Details(null, null, "Программа РВЛ", null, archived), NOW);
     }
 
-    static Lpu lpu(UUID externalId, boolean archived) {
+    public static Lpu lpu(UUID externalId, boolean archived) {
         return Lpu.create(externalId, new Lpu.Details("Санаторий", null, null, null, null, null, archived), NOW);
     }
 
-    static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId, boolean usePricesMainContract) {
+    public static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId, boolean usePricesMainContract) {
         return LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details("Д-1", null,
                 mainContractExternalId, usePricesMainContract, false, BEGIN, null, false), NOW);
     }
 
-    static AppealType appealType(UUID externalId, String name) {
+    public static AppealType appealType(UUID externalId, String name) {
         return AppealType.create(externalId,
                 new AppealType.Details(null, null, name, null, null, null, false, false, false), NOW);
     }
 
-    static ContragentService service(LpuContract contract, UUID externalAppealTypeId) {
+    public static ContragentService service(LpuContract contract, UUID externalAppealTypeId) {
         return ContragentService.create(UUID.randomUUID(), contract,
                 new ContragentService.Details(externalAppealTypeId, "У-1", "Размещение", false), NOW);
     }
 
-    static PriceListItem price(ContragentService service, String amount) {
+    public static PriceListItem price(ContragentService service, String amount) {
         return PriceListItem.of(service,
                 new PriceListItem.Row(null, null, null, new BigDecimal(amount), null, BEGIN, null), NOW);
     }
 
-    static Policy policy(UUID externalContractId, List<UUID> programIds, List<UUID> serviceLineProgramIds) {
+    public static Policy policy(UUID externalContractId, List<UUID> programIds, List<UUID> serviceLineProgramIds) {
         var details = new Policy.Details(externalContractId, "П-0001", "Петров", "Иван", null,
                 LocalDate.of(1984, 3, 11), null, null, BEGIN, null, true, false);
         List<PolicyProgram.Row> programs = programIds.stream()

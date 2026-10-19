@@ -1,6 +1,6 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.rest;
 
-final class LikePatterns {
+public final class LikePatterns {
 
     private static final String ESCAPE = "!";
     private static final String ANY = "%";
@@ -13,11 +13,11 @@ final class LikePatterns {
         return value.replace(ESCAPE, ESCAPE + ESCAPE).replace(ANY, ESCAPE + ANY).replace(ONE, ESCAPE + ONE);
     }
 
-    static String prefix(String value) {
+    public static String prefix(String value) {
         return escaped(value) + ANY;
     }
 
-    static String substring(String value) {
+    public static String substring(String value) {
         return ANY + escaped(value) + ANY;
     }
 }

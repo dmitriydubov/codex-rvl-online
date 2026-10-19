@@ -11,6 +11,8 @@ import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
+import ru.projectx.datareference.service.rest.ReferenceCalendar;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service
 public class InsuranceContractQueryService implements InsuranceContractReads {

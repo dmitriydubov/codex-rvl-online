@@ -17,6 +17,8 @@ import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.service.PriceContractResolver.Resolution;
+import ru.projectx.datareference.service.rest.ReferenceCalendar;
+import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service
 public class LpuCatalogService implements LpuCatalogReads {

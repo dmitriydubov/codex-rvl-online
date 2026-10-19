@@ -25,6 +25,7 @@ import ru.projectx.datareference.entity.ProgramLpu;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ProgramLpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
+import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)
 class ProgramQueryServiceTest {

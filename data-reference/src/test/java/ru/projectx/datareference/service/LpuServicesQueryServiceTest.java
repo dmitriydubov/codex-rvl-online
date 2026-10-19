@@ -23,6 +23,7 @@ import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)
 class LpuServicesQueryServiceTest {
