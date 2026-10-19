@@ -374,6 +374,30 @@ docker compose up --build stand-seed
   `docker pull mirror.gcr.io/library/postgres:16.10-alpine && docker tag mirror.gcr.io/library/postgres:16.10-alpine postgres:16.10-alpine`.
   В рабочем контуре все образы берутся из Nexus.
 
+### Тестовый стенд в k3s (`devops/test/`)
+
+Скрипт `devops/test/deploy.sh <тег>` собирает образ из `Dockerfile` модуля и выкатывает Helm-чарт `devops/test/helm` в
+namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` собирает образ прямо в containerd k3s, сокет и namespace
+заданы в `/etc/nerdctl/nerdctl.toml`.
+
+- На машину стенда копируется весь каталог модуля, а не только jar: jar собирается внутри образа (`JAR_SOURCE=build`).
+- В `certs/` кладётся сертификат корпоративного центра (`.crt`, `.cer` или `.pem`): без него Gradle внутри образа не
+  доверяет Nexus. Скрипт без сертификата не запускает сборку.
+- Базовые образы и дистрибутив Gradle берутся из Nexus, зависимости — тоже (`PUBLIC_REPOSITORIES=false`). Другие адреса
+  задаются переменными `JDK_IMAGE`, `JRE_IMAGE`, `GRADLE_DISTRIBUTION_URL`; `sudo` переменные окружения не передаёт,
+  поэтому они пишутся после него: `sudo JDK_IMAGE=… ./devops/test/deploy.sh v3`. Зеркало обязано отдать тот же
+  `gradle-8.14.3-bin.zip`: обёртка сверяет его контрольную сумму.
+- Пароли базы и брокера — в Secret `data-reference-secret`, его создают один раз вручную; без него скрипт подсказывает
+  команду и останавливается.
+- Тег каждый раз новый: с прежним тегом под не пересоздаётся, и скрипт откажется собирать.
+
+```shell
+sudo ./devops/test/deploy.sh v2
+```
+
+Настройки сервиса на стенде — ConfigMap чарта (`devops/test/helm/values.yaml`). Аргументы сборки образа в ConfigMap не
+задаются: под их не читает, сборка — тоже, их передаёт скрипт.
+
 ## Документация
 
 - [design.md](design.md) — почему так устроено: причины решений, которые не видны из кода.
