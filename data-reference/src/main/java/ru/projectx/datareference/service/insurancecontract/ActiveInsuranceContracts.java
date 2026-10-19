@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.insurancecontract;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -10,15 +10,15 @@ import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 
 @Component
-class ActiveInsuranceContracts {
+public class ActiveInsuranceContracts {
 
     private final InsuranceContractRepository insuranceContracts;
 
-    ActiveInsuranceContracts(InsuranceContractRepository insuranceContracts) {
+    public ActiveInsuranceContracts(InsuranceContractRepository insuranceContracts) {
         this.insuranceContracts = insuranceContracts;
     }
 
-    void requireActive(UUID contractExternalId, LocalDate today) {
+    public void requireActive(UUID contractExternalId, LocalDate today) {
         insuranceContracts.findByExternalId(contractExternalId)
                 .filter(contract -> contract.isActiveOn(today))
                 .orElseThrow(() -> MissingReference.INSURANCE_CONTRACT_BY_EXTERNAL_ID.notFound(contractExternalId));

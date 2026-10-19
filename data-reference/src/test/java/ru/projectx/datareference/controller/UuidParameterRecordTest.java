@@ -13,7 +13,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
-import ru.projectx.datareference.service.InsuranceContractReads;
+import ru.projectx.datareference.service.insurancecontract.InsuranceContractReads;
 import ru.projectx.datareference.service.LpuCardReads;
 import ru.projectx.datareference.service.LpuCatalogReads;
 import ru.projectx.datareference.service.LpuServiceReads;
