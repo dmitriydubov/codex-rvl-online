@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.database;
 
 import java.time.Duration;
 import java.util.List;

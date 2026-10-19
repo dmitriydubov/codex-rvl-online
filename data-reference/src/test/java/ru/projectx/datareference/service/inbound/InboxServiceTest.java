@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.inbound.InboxEntry;
-import ru.projectx.datareference.repository.InboxRepository;
+import ru.projectx.datareference.repository.inbound.InboxRepository;
 import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;

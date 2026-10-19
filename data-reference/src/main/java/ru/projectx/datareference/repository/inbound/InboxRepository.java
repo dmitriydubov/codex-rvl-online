@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.inbound;
 
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

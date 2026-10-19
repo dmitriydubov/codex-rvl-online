@@ -28,7 +28,7 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ForeignReferences;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.inbound.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.catalog.InsurerRepository;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
 import tools.jackson.databind.json.JsonMapper;

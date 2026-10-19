@@ -21,7 +21,7 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.catalog.ProgramLpu;
 import ru.projectx.datareference.mapper.stream.ProgramMapper;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
 import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;

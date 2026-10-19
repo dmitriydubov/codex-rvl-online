@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.InboxRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboxRepository;
 import ru.projectx.datareference.service.database.SqlStates;
 
 @Component

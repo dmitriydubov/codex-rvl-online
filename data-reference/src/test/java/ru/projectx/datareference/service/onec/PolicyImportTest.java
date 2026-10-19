@@ -16,7 +16,7 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.entity.policy.PolicyProgram;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.policy.PolicyRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;

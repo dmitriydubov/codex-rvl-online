@@ -11,7 +11,7 @@ import org.springframework.transaction.support.TransactionOperations;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;

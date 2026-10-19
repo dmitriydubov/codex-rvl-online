@@ -11,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.ParentWaitRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 @Component

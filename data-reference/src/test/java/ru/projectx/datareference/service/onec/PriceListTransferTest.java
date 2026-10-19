@@ -18,7 +18,7 @@ import ru.projectx.datareference.entity.catalog.PriceListItem;
 import ru.projectx.datareference.repository.catalog.ContragentServiceRepository;
 import ru.projectx.datareference.repository.catalog.LpuContractRepository;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.catalog.PriceListItemRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;

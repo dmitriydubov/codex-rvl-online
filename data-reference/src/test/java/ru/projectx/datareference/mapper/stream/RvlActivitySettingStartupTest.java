@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.mapper.ForeignReferences;
-import ru.projectx.datareference.repository.ForeignReferenceRepository;
+import ru.projectx.datareference.repository.inbound.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.catalog.InsurerRepository;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
 

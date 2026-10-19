@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.inbound.QuarantinedMessage;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
-import ru.projectx.datareference.repository.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 
 @Service
 public class QuarantineService {

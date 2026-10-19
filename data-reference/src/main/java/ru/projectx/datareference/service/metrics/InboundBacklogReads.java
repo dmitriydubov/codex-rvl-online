@@ -5,9 +5,9 @@ import java.time.Instant;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.QuarantineRepository;
-import ru.projectx.datareference.repository.StatusBacklog;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.StatusBacklog;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 
 @Component

@@ -9,7 +9,7 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.stream.PriceListMapper;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.inbound.RejectionScope;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;

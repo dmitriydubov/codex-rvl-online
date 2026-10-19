@@ -30,7 +30,7 @@ import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.entity.inbound.ParentWait;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 @ExtendWith(MockitoExtension.class)

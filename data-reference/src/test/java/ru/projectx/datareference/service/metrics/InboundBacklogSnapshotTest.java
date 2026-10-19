@@ -15,9 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.QuarantineRepository;
-import ru.projectx.datareference.repository.StatusBacklog;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.StatusBacklog;
 import ru.projectx.datareference.service.retention.ExpiredPolicyPersonalData;
 import ru.projectx.datareference.support.ImportSettings;
 

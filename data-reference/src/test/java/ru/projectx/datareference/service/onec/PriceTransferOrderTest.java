@@ -19,8 +19,8 @@ import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.PriceListFinalization;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.PriceListFinalizationRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.PriceListFinalizationRepository;
 
 class PriceTransferOrderTest {
 

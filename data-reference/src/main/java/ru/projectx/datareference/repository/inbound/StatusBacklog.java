@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.inbound;
 
 import java.time.Instant;
 import ru.projectx.datareference.entity.inbound.InboundStatus;

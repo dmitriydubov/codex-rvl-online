@@ -18,7 +18,7 @@ import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.ParentKind;
-import ru.projectx.datareference.repository.ParentWaitRepository;
+import ru.projectx.datareference.repository.inbound.ParentWaitRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 class SupersededParentWaitsTest {

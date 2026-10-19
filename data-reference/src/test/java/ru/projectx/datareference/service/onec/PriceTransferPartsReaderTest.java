@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 
 @ExtendWith(MockitoExtension.class)
 class PriceTransferPartsReaderTest {

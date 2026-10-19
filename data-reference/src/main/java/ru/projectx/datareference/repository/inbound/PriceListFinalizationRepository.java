@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.inbound;
 
 import jakarta.persistence.LockModeType;
 import java.util.Optional;

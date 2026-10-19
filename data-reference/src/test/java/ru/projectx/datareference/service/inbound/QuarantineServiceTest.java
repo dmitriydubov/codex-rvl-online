@@ -18,7 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.QuarantinedMessage;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
-import ru.projectx.datareference.repository.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 
 @ExtendWith(MockitoExtension.class)
 class QuarantineServiceTest {

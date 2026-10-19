@@ -33,7 +33,7 @@ import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.database.DatabaseOutages;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.ParseFailures;

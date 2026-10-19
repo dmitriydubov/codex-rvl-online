@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

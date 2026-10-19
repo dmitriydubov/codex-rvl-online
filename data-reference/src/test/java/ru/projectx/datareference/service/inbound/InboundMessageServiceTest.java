@@ -12,7 +12,7 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundOutcome;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import tools.jackson.databind.ObjectMapper;

@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.config.RestReadPoolProperties;
-import ru.projectx.datareference.repository.SessionSettingsRepository;
+import ru.projectx.datareference.repository.database.SessionSettingsRepository;
 
 @Component
 public class DatabaseTimeoutsCheck implements ApplicationRunner {

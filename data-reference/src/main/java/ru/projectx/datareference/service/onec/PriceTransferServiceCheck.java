@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import tools.jackson.databind.node.ObjectNode;
 
 final class PriceTransferServiceCheck {
