@@ -2,22 +2,31 @@
 
 set -e
 
-TAG=${1:?Specify a tag, for example: ./devops/test/deploy.sh v2}
+TAG=${1:?Specify a tag, for example: sudo ./devops/test/deploy.sh v2}
 NAMESPACE=rvl-test
 APP=data-reference
 SECRET=$APP-secret
 
-JDK_IMAGE=${JDK_IMAGE:-nexus.sogaz.ru/library/eclipse-temurin:21.0.12.1_1-jdk}
-JRE_IMAGE=${JRE_IMAGE:-nexus.sogaz.ru/library/eclipse-temurin:21.0.12.1_1-jre}
-GRADLE_DISTRIBUTION_URL=${GRADLE_DISTRIBUTION_URL:-https://nexus.sogaz.ru/repository/raw-proxy-services.gradle.com/gradle-8.14.3-bin.zip}
+IMAGE_REGISTRY=${IMAGE_REGISTRY:-nexus.sogaz.ru/library}
+GRADLE_MIRROR=${GRADLE_MIRROR:-https://nexus.sogaz.ru/repository/raw-proxy-services.gradle.com}
 
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 MODULE_DIR="$(readlink -f "$SCRIPT_DIR/../..")"
+WRAPPER_PROPERTIES=gradle/wrapper/gradle-wrapper.properties
 cd "$MODULE_DIR"
 
-if [ ! -f Dockerfile ] || [ ! -f gradlew ] || [ ! -d src ]; then
-    echo "No module sources in $MODULE_DIR: copy the whole data-reference module, this script lives in devops/test/."
+fail() {
+    echo "$1"
     exit 1
+}
+
+for required in Dockerfile gradlew "$WRAPPER_PROPERTIES" certs/import-ca.sh; do
+    [ -f "$required" ] || fail "No $required in $MODULE_DIR: copy the whole data-reference module, this script lives in devops/test/."
+done
+[ -d src ] || fail "No src/ in $MODULE_DIR: copy the whole data-reference module, this script lives in devops/test/."
+[ -x gradlew ] || fail "gradlew is not executable: run chmod +x $MODULE_DIR/gradlew."
+if grep -q $'\r' gradlew certs/import-ca.sh; then
+    fail "gradlew or certs/import-ca.sh has Windows line endings (CRLF): convert them to LF."
 fi
 
 shopt -s nullglob
@@ -28,6 +37,12 @@ if [ ${#CA_FILES[@]} -eq 0 ]; then
     echo "Gradle inside the image needs it to trust Nexus."
     exit 1
 fi
+
+JDK_IMAGE=${JDK_IMAGE:-$IMAGE_REGISTRY/$(sed -n 's/^ARG JDK_IMAGE=//p' Dockerfile)}
+JRE_IMAGE=${JRE_IMAGE:-$IMAGE_REGISTRY/$(sed -n 's/^ARG JRE_IMAGE=//p' Dockerfile)}
+GRADLE_DISTRIBUTION_URL=${GRADLE_DISTRIBUTION_URL:-$GRADLE_MIRROR/$(sed -n 's#^distributionUrl=.*/##p' "$WRAPPER_PROPERTIES")}
+
+helm -n "$NAMESPACE" list >/dev/null || fail "helm cannot reach the cluster: check the kubeconfig of the user running this script."
 
 if ! kubectl -n "$NAMESPACE" get secret "$SECRET" >/dev/null 2>&1; then
     echo "Secret $SECRET not found in namespace $NAMESPACE. Create it first:"
@@ -42,6 +57,7 @@ echo "Deployed now: $CURRENT"
 echo "Building:     $APP:$TAG"
 echo "JDK image:    $JDK_IMAGE"
 echo "JRE image:    $JRE_IMAGE"
+echo "Gradle:       $GRADLE_DISTRIBUTION_URL"
 echo
 
 if sudo nerdctl images | grep -q "^$APP  *$TAG "; then
