@@ -374,6 +374,40 @@ docker compose up --build stand-seed
   `docker pull mirror.gcr.io/library/postgres:16.10-alpine && docker tag mirror.gcr.io/library/postgres:16.10-alpine postgres:16.10-alpine`.
   В рабочем контуре все образы берутся из Nexus.
 
+### Тестовый стенд в k3s (`devops/test/`)
+
+Скрипт `devops/test/deploy.sh <тег>` собирает образ из `Dockerfile` модуля и выкатывает Helm-чарт `devops/test/helm` в
+namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` собирает образ прямо в containerd k3s, сокет и namespace
+заданы в `/etc/nerdctl/nerdctl.toml`.
+
+- На машину стенда копируется весь каталог модуля, а не только jar: jar собирается внутри образа (`JAR_SOURCE=build`).
+  Чарт `devops/test/helm` при этом заменяется версией из модуля: значения, нужные только стенду, сначала переносятся в
+  чарт модуля, иначе копия их затрёт.
+- В `certs/` кладётся сертификат корпоративного центра (`.crt`, `.cer` или `.pem`): без него Gradle внутри образа не
+  доверяет Nexus.
+- Базовые образы — те же, что в `Dockerfile`, из реестра `nexus.sogaz.ru/library`; дистрибутив Gradle — тот же, что в
+  `gradle/wrapper/gradle-wrapper.properties`, из зеркала Nexus; зависимости — из Nexus (`PUBLIC_REPOSITORIES=false`).
+  Реестр и зеркало меняются переменными `IMAGE_REGISTRY` и `GRADLE_MIRROR`, отдельный образ или архив — `JDK_IMAGE`,
+  `JRE_IMAGE`, `GRADLE_DISTRIBUTION_URL`. Через `sudo` переменная проходит только записью после него
+  (`sudo IMAGE_REGISTRY=… ./devops/test/deploy.sh v3`) и только если это разрешает sudoers. Зеркало обязано отдать тот
+  же архив Gradle: обёртка сверяет его контрольную сумму.
+- Пароли базы и брокера — в Secret `data-reference-secret`, его создают один раз вручную; без него скрипт подсказывает
+  команду и останавливается.
+- Тег каждый раз новый: с прежним тегом под не пересоздаётся, и скрипт откажется собирать.
+- До сборки скрипт проверяет то, что иначе уронило бы её через несколько минут: исходники модуля и
+  `certs/import-ca.sh`, сертификат в `certs/`, исполняемый `gradlew`, переводы строк LF в `gradlew` и `import-ca.sh`,
+  доступ `helm` к кластеру.
+- Образы старых тегов и кэш сборки сами не удаляются: место освобождают `sudo nerdctl rmi data-reference:<тег>` и
+  `sudo nerdctl builder prune` (спрашивает подтверждение и удаляет только висячий кэш; `--all` удаляет весь
+  неиспользуемый, вместе с кэшем зависимостей Gradle, и следующая сборка скачает их заново).
+
+```shell
+sudo ./devops/test/deploy.sh v2
+```
+
+Настройки сервиса на стенде — ConfigMap чарта (`devops/test/helm/values.yaml`). Аргументы сборки задаёт скрипт; в
+ConfigMap они не нужны: его читает только под.
+
 ## Документация
 
 - [design.md](design.md) — почему так устроено: причины решений, которые не видны из кода.
