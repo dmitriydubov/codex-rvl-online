@@ -14,7 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.LpuRepository;
-import ru.projectx.datareference.service.rest.ReadFixtures;
+import ru.projectx.datareference.service.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)
 class ActiveLpusTest {

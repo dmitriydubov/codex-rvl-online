@@ -26,10 +26,10 @@ import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.service.lpu.LpuOffer;
 import ru.projectx.datareference.service.lpu.LpuOffers;
 import ru.projectx.datareference.service.lpu.PriceContract;
-import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)
 class ServicePriceLookupTest {

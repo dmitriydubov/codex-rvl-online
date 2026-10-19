@@ -16,7 +16,7 @@ import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.dto.PriceContractRef;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
-import ru.projectx.datareference.service.rest.ReadFixtures;
+import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
 import ru.projectx.datareference.support.TestApiProperties;
 

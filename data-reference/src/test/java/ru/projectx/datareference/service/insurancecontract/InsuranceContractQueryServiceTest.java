@@ -20,7 +20,7 @@ import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
-import ru.projectx.datareference.service.rest.ReadFixtures;
+import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
 
 @ExtendWith(MockitoExtension.class)

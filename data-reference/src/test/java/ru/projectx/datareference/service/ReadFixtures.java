@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service.rest;
+package ru.projectx.datareference.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;

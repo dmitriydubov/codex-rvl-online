@@ -20,8 +20,8 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.repository.LpuContractRepository;
+import ru.projectx.datareference.service.ReadFixtures;
 import ru.projectx.datareference.service.lpu.PriceContractResolver.Resolution;
-import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)
 class PriceContractResolverTest {
