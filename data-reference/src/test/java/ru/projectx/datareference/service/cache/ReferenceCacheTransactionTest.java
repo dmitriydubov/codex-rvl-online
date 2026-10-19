@@ -14,7 +14,7 @@ import org.springframework.transaction.interceptor.BeanFactoryTransactionAttribu
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.OneCMessageApplied;
+import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

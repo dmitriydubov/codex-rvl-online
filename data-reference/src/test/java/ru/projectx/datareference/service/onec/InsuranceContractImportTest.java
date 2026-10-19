@@ -18,7 +18,7 @@ import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.InsuranceContractMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import tools.jackson.databind.ObjectMapper;

@@ -18,10 +18,10 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.OneCLogContext;
-import ru.projectx.datareference.service.ParseFailure;
-import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.OneCLogContext;
+import ru.projectx.datareference.service.inbound.ParseFailure;
+import ru.projectx.datareference.service.inbound.ParseFailures;
 import ru.projectx.datareference.service.onec.ImportOutcome;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 

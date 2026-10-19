@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.inbound;
 
 public sealed interface ParseFailure {
 

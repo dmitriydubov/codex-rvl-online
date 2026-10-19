@@ -23,8 +23,8 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.OneCMessageApplied;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

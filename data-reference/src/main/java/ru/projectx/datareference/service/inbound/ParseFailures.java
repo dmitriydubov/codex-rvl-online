@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.inbound;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;

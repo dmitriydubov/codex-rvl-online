@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.inbound;
 
 import java.time.Clock;
 import java.util.List;

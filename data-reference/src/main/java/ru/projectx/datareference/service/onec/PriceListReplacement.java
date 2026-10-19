@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.PriceListMapper;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 

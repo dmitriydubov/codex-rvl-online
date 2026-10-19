@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 
 @Component
 public class SupersededTransferClosure {

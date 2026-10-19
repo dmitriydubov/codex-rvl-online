@@ -27,8 +27,8 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
-import ru.projectx.datareference.service.FinalRejectionJournal;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.FinalRejectionJournal;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 class SupersededTransferClosureTest {

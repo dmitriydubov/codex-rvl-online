@@ -11,7 +11,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.OneCMessageApplied;
+import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 
 class ReferenceCacheEvictionTest {
 

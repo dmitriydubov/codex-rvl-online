@@ -14,8 +14,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.ParseFailure;
-import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.service.inbound.ParseFailure;
+import ru.projectx.datareference.service.inbound.ParseFailures;
 import ru.projectx.datareference.support.ExhaustedPool;
 import ru.projectx.datareference.support.IntegrationTest;
 

@@ -35,8 +35,8 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.database.DatabaseOutages;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.ParseFailures;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 

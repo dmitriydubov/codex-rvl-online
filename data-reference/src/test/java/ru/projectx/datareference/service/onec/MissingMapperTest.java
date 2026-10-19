@@ -13,7 +13,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 
 class MissingMapperTest {

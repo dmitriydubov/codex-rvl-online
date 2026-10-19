@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
-import ru.projectx.datareference.service.OneCMessageApplied;
+import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 
 @Component
 public class ReferenceCacheEviction {

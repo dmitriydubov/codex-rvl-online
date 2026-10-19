@@ -21,7 +21,7 @@ import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

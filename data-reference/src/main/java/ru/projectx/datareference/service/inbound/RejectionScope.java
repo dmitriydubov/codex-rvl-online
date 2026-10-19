@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.inbound;
 
 import java.util.List;
 import ru.projectx.datareference.entity.InboundMessage;

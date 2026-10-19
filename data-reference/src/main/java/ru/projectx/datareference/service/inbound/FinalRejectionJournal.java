@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.inbound;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
