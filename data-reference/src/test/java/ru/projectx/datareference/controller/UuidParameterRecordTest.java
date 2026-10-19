@@ -20,7 +20,7 @@ import ru.projectx.datareference.service.LpuServiceReads;
 import ru.projectx.datareference.service.PolicyContractViews;
 import ru.projectx.datareference.service.PolicyReads;
 import ru.projectx.datareference.service.PolicySearchReads;
-import ru.projectx.datareference.service.ProgramReads;
+import ru.projectx.datareference.service.program.ProgramReads;
 
 class UuidParameterRecordTest {
 

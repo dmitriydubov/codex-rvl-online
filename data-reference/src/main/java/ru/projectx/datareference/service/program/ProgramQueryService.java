@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.program;
 
 import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
