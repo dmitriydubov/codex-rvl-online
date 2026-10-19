@@ -9,6 +9,8 @@ import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
+import ru.projectx.datareference.service.lpu.LpuOffer;
+import ru.projectx.datareference.service.lpu.LpuOffers;
 import ru.projectx.datareference.service.price.PriceLine;
 import ru.projectx.datareference.service.price.StayPeriod;
 import ru.projectx.datareference.service.rest.RestReadTransaction;

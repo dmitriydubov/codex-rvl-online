@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.lpu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,7 +29,7 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
-import ru.projectx.datareference.service.PriceContractResolver.Resolution;
+import ru.projectx.datareference.service.lpu.PriceContractResolver.Resolution;
 import ru.projectx.datareference.service.insurancecontract.ActiveInsuranceContracts;
 import ru.projectx.datareference.service.rest.ReadFixtures;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;

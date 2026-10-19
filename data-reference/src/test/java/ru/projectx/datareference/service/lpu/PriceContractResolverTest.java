@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.lpu;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,7 +20,7 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.repository.LpuContractRepository;
-import ru.projectx.datareference.service.PriceContractResolver.Resolution;
+import ru.projectx.datareference.service.lpu.PriceContractResolver.Resolution;
 import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)

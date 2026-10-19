@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.lpu;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -34,7 +34,7 @@ public class LpuOffers {
         this.calendar = calendar;
     }
 
-    LpuOffer of(UUID lpuId) {
+    public LpuOffer of(UUID lpuId) {
         Lpu lpu = activeLpus.byId(lpuId);
         LocalDate today = calendar.today();
         PriceContract priceContract = priceContracts.resolve(lpuId, today);

@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.lpu;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -9,7 +9,7 @@ import ru.projectx.datareference.entity.AppealType;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.Lpu;
 
-record LpuOffer(
+public record LpuOffer(
         Lpu lpu,
         PriceContract priceContract,
         Map<UUID, AppealType> appealTypes,
