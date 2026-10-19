@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -10,10 +10,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
-import ru.projectx.datareference.service.price.PriceBreakdown;
-import ru.projectx.datareference.service.price.PriceLine;
-import ru.projectx.datareference.service.price.PriceSegment;
-import ru.projectx.datareference.service.price.StayPeriod;
 
 class ServicePriceResponsesTest {
 

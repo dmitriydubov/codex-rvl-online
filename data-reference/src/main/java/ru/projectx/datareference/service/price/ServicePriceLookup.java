@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import java.util.List;
 import java.util.UUID;
@@ -11,8 +11,6 @@ import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.lpu.LpuOffer;
 import ru.projectx.datareference.service.lpu.LpuOffers;
-import ru.projectx.datareference.service.price.PriceLine;
-import ru.projectx.datareference.service.price.StayPeriod;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Component

@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
-import ru.projectx.datareference.service.ServicePriceReads;
+import ru.projectx.datareference.service.price.ServicePriceReads;
 
 @ExtendWith(MockitoExtension.class)
 class ServicePriceControllerTest {

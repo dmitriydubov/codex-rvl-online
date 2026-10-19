@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -8,8 +8,6 @@ import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.ServicePriceResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.service.price.ServicePriceCalculator;
-import ru.projectx.datareference.service.price.StayPeriod;
 
 @Service
 public class ServicePriceQueryService implements ServicePriceReads {

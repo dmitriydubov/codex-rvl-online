@@ -1,10 +1,7 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.dto.ServicePriceResponse;
-import ru.projectx.datareference.service.price.PriceBreakdown;
-import ru.projectx.datareference.service.price.PriceSegment;
-import ru.projectx.datareference.service.price.StayPeriod;
 
 final class ServicePriceResponses {
 

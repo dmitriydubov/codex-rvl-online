@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,8 +29,6 @@ import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.lpu.LpuOffer;
 import ru.projectx.datareference.service.lpu.LpuOffers;
 import ru.projectx.datareference.service.lpu.PriceContract;
-import ru.projectx.datareference.service.price.PriceLine;
-import ru.projectx.datareference.service.price.StayPeriod;
 import ru.projectx.datareference.service.rest.ReadFixtures;
 
 @ExtendWith(MockitoExtension.class)

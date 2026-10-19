@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.price;
 
 import java.time.LocalDate;
 import java.util.UUID;
