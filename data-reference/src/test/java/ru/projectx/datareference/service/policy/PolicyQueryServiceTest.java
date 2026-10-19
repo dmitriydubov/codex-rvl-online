@@ -18,7 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.PolicyResponse;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.InsuranceContractRepository;

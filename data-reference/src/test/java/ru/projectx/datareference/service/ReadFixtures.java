@@ -12,9 +12,9 @@ import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.catalog.Insurer;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.entity.catalog.LpuContract;
-import ru.projectx.datareference.entity.Policy;
-import ru.projectx.datareference.entity.PolicyProgram;
-import ru.projectx.datareference.entity.PolicyServiceLine;
+import ru.projectx.datareference.entity.policy.Policy;
+import ru.projectx.datareference.entity.policy.PolicyProgram;
+import ru.projectx.datareference.entity.policy.PolicyServiceLine;
 import ru.projectx.datareference.entity.catalog.PriceListItem;
 import ru.projectx.datareference.entity.catalog.Program;
 

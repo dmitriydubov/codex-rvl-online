@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 
 @Repository
 public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySearchRepository, ActivePolicyProgramsRepository {

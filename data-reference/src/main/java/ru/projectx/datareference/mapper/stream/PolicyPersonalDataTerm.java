@@ -4,7 +4,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.config.ReferenceApiProperties;
-import ru.projectx.datareference.entity.PersonalDataCutoff;
+import ru.projectx.datareference.entity.policy.PersonalDataCutoff;
 
 @Component
 public class PolicyPersonalDataTerm {

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionOperations;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 

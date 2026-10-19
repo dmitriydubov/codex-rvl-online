@@ -3,7 +3,7 @@ package ru.projectx.datareference.dto;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 
 public record PolicySearchResponse(List<Item> items) {
 

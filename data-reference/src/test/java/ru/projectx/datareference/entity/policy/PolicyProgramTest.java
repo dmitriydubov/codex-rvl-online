@@ -1,4 +1,4 @@
-package ru.projectx.datareference.entity;
+package ru.projectx.datareference.entity.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

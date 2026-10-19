@@ -1,7 +1,7 @@
 package ru.projectx.datareference.repository;
 
 import java.util.List;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 
 public interface PolicySearchRepository {
 

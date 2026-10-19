@@ -8,7 +8,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 
 class PolicySearchRepositoryImpl implements PolicySearchRepository {
 

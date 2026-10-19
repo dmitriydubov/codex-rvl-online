@@ -15,7 +15,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.datareference.config.PolicyContractProperties;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.TestApiProperties;

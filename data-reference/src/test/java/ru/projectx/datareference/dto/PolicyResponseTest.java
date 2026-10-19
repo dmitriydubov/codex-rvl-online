@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.entity.PersonalDataCutoff;
-import ru.projectx.datareference.entity.Policy;
+import ru.projectx.datareference.entity.policy.PersonalDataCutoff;
+import ru.projectx.datareference.entity.policy.Policy;
 
 class PolicyResponseTest {
 
