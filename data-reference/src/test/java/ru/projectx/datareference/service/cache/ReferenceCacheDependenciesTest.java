@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static ru.projectx.datareference.config.ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER;

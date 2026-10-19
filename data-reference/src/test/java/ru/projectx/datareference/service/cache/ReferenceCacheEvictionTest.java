@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.cache;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,6 +11,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.service.OneCMessageApplied;
 
 class ReferenceCacheEvictionTest {
 

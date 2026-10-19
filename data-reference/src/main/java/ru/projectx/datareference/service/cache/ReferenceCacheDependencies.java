@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.cache;
 
 import static java.util.Map.entry;
 import static ru.projectx.datareference.config.ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER;
