@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import java.time.Instant;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,6 +26,7 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.TestApiProperties;

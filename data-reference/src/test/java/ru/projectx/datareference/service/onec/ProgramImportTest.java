@@ -20,7 +20,7 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.entity.ProgramLpu;
-import ru.projectx.datareference.mapper.ProgramMapper;
+import ru.projectx.datareference.mapper.stream.ProgramMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;

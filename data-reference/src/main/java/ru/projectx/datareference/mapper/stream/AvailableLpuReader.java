@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;

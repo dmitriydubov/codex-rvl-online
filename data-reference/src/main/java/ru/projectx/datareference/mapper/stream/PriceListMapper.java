@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.amountOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
@@ -16,6 +16,9 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.CatalogReference;
+import ru.projectx.datareference.mapper.CatalogReferences;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.JsonNode;

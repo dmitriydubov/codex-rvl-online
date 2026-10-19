@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +27,9 @@ import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.CatalogReferences;
+import ru.projectx.datareference.mapper.ForeignReferences;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.LpuContractRepository;

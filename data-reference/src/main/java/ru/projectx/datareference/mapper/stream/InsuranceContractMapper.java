@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.OneCContractProperties;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.mapper.CatalogStreamMapper;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import tools.jackson.databind.JsonNode;

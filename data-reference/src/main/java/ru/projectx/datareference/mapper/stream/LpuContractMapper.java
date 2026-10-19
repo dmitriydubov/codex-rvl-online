@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
@@ -16,6 +16,10 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.CatalogReference;
+import ru.projectx.datareference.mapper.CatalogReferences;
+import ru.projectx.datareference.mapper.ImportResult;
+import ru.projectx.datareference.mapper.OwnedCatalogStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import tools.jackson.databind.JsonNode;

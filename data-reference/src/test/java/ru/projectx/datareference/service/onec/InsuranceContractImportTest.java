@@ -15,7 +15,7 @@ import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InsuranceContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.mapper.InsuranceContractMapper;
+import ru.projectx.datareference.mapper.stream.InsuranceContractMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;

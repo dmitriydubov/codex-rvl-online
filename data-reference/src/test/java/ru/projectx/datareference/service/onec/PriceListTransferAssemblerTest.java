@@ -34,7 +34,7 @@ import ru.projectx.datareference.entity.ParentWait;
 import ru.projectx.datareference.entity.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
-import ru.projectx.datareference.mapper.PriceListMapper;
+import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.repository.PriceListFinalizationRepository;
 import ru.projectx.datareference.service.inbound.FinalRejectionJournal;

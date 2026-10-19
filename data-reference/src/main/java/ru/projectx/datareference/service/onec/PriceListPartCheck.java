@@ -6,7 +6,7 @@ import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.PriceListMapper;
+import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

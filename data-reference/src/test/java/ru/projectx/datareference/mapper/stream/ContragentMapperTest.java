@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
@@ -26,6 +26,8 @@ import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.ForeignReferences;
+import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;

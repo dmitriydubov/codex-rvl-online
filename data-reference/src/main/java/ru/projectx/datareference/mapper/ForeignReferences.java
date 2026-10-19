@@ -9,14 +9,14 @@ import ru.projectx.datareference.repository.ForeignReferenceRepository;
 import tools.jackson.databind.JsonNode;
 
 @Component
-class ForeignReferences {
+public class ForeignReferences {
 
     private static final String RECORD_ID = "id";
 
     private final ForeignReferenceRepository repository;
     private final Clock clock;
 
-    ForeignReferences(ForeignReferenceRepository repository, Clock clock) {
+    public ForeignReferences(ForeignReferenceRepository repository, Clock clock) {
         this.repository = repository;
         this.clock = clock;
     }
@@ -25,7 +25,7 @@ class ForeignReferences {
         return repository.existsByExternalIdAndKind(externalId, kind);
     }
 
-    ImportResult skipAsForeign(ParentKind kind, UUID externalId, String reason) {
+    public ImportResult skipAsForeign(ParentKind kind, UUID externalId, String reason) {
         remember(kind, externalId);
         return ImportResult.skipped(reason);
     }

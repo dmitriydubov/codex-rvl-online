@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.amountOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
@@ -19,6 +19,7 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.UnfilteredStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.PolicyRepository;

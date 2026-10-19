@@ -4,7 +4,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.PriceListMapper;
+import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import tools.jackson.databind.node.ObjectNode;
 

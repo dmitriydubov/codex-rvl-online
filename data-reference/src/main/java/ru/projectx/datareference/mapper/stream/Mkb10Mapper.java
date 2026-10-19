@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.stream;
 
 import static ru.projectx.datareference.mapper.value.OptionalFields.integerOrNull;
 import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
@@ -8,6 +8,7 @@ import java.time.Clock;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.Mkb10;
 import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.mapper.UnfilteredStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.Mkb10Repository;
 import tools.jackson.databind.node.ObjectNode;
