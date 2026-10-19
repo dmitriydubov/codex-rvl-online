@@ -1,8 +1,8 @@
 package ru.projectx.datareference.mapper;
 
-import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -16,6 +16,7 @@ import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.LpuContractRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;

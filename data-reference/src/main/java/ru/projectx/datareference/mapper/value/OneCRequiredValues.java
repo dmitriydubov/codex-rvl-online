@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.value;
 
 import java.math.BigDecimal;
 import ru.projectx.datareference.exception.OneCFieldException;

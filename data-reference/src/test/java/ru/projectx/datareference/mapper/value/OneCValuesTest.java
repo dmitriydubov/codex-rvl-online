@@ -1,4 +1,4 @@
-package ru.projectx.datareference.mapper;
+package ru.projectx.datareference.mapper.value;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -1,7 +1,7 @@
 package ru.projectx.datareference.mapper;
 
-import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +14,8 @@ import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.mapper.value.OneCRequiredValues;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;

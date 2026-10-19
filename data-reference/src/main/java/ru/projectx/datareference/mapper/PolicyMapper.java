@@ -1,9 +1,9 @@
 package ru.projectx.datareference.mapper;
 
-import static ru.projectx.datareference.mapper.OptionalFields.amountOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.uuidOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.amountOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.uuidOrNull;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -19,6 +19,8 @@ import ru.projectx.datareference.entity.Policy;
 import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.value.OneCRequiredValues;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.PolicyRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;

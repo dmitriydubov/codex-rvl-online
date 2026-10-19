@@ -12,6 +12,8 @@ import ru.projectx.datareference.entity.Insurer;
 import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.mapper.value.OneCGuid;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.InsurerRepository;
 import ru.projectx.datareference.repository.LpuRepository;
 import tools.jackson.databind.JsonNode;

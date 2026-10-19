@@ -1,8 +1,8 @@
 package ru.projectx.datareference.mapper;
 
-import static ru.projectx.datareference.mapper.OptionalFields.amountOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.dateOrNull;
-import static ru.projectx.datareference.mapper.OptionalFields.textOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.amountOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.dateOrNull;
+import static ru.projectx.datareference.mapper.value.OptionalFields.textOrNull;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;

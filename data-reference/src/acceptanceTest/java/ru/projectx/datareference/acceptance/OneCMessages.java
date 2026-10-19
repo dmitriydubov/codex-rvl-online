@@ -14,7 +14,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.mapper.OneCGuid;
+import ru.projectx.datareference.mapper.value.OneCGuid;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 

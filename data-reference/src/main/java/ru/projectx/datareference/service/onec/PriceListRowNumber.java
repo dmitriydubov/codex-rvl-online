@@ -1,6 +1,6 @@
 package ru.projectx.datareference.service.onec;
 
-import ru.projectx.datareference.mapper.OneCRequiredValues;
+import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import tools.jackson.databind.JsonNode;
 
 final class PriceListRowNumber {

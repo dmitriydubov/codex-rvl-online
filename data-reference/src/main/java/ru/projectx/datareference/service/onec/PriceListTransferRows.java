@@ -6,7 +6,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.InboundMessage;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.OneCValues;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
