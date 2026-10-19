@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +28,8 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
+import ru.projectx.datareference.controller.FailingController;
+import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
 
 @ExtendWith(OutputCaptureExtension.class)

@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.error;
 
 import java.time.LocalDate;
 import java.util.LinkedHashSet;
@@ -36,7 +36,7 @@ public class RequestErrorAdvice {
 
     private static final Map<Class<?>, String> EXPECTED_VALUES = Map.of(LocalDate.class, "дата yyyy-mm-dd");
 
-    static final String REQUIRED_PARAMETER = "обязательный параметр";
+    public static final String REQUIRED_PARAMETER = "обязательный параметр";
 
     @ExceptionHandler(InvalidRequestException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

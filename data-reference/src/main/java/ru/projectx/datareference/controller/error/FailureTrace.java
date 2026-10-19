@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.error;
 
 import java.util.Objects;
 import java.util.stream.Collectors;

@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.error;
 
 import org.springframework.core.Ordered;
 

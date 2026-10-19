@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
+import ru.projectx.datareference.controller.FailingController;
+import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
