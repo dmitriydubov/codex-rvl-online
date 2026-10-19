@@ -15,6 +15,12 @@
 
 ### Добавлено
 
+- Действующий договор страхования по GUID страхователя в 1С:УСК: `GET /internal/v1/insurance-contracts?insurer_external_id=`.
+  Отдаёт единственный договор, действующий сегодня по московскому календарю, в том же виде, что договор по `id`. Нет
+  действующего — 404 `INSURANCE_CONTRACT_NOT_FOUND`, несколько — 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id`
+  кандидатов в `details`. Ответ кэшируется до сообщения 1С:УСК о договорах страхования или контрагентах и до конца
+  московских суток. `external_id` вместе с `insurer_external_id` — 400 по полю `external_id`; запрос без ключа — по-прежнему
+  400, причина теперь «нужен external_id либо insurer_external_id».
 - Роль страхователя в договоре страхования — настройка `projectx.onec.contract.insurer-role` (переменная
   `PROJECTX_ONEC_CONTRACT_INSURERROLE`), по умолчанию `Страхователь`. Пустое значение останавливает старт сервиса.
 

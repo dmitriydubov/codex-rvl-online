@@ -8,4 +8,6 @@ public interface InsuranceContractReads {
     InsuranceContractResponse byId(UUID id);
 
     InsuranceContractResponse byExternalId(UUID externalId);
+
+    InsuranceContractResponse activeByInsurer(UUID insurerExternalId);
 }

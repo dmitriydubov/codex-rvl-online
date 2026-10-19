@@ -9,7 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.exception.MissingReference;
 
 class ErrorAdviceOrderTest {
 
@@ -24,7 +24,7 @@ class ErrorAdviceOrderTest {
 
     @Test
     void referenceNotFound_reachesReferenceAdvice_notServerFailure() {
-        controller.failWith(ReferenceNotFoundException.lpu(UUID.fromString("0a9e0000-0000-4000-8000-000000000005")));
+        controller.failWith(MissingReference.LPU.notFound(UUID.fromString("0a9e0000-0000-4000-8000-000000000005")));
 
         MvcTestResult result = mvc.get().uri(FailingController.FAILING).exchange();
 

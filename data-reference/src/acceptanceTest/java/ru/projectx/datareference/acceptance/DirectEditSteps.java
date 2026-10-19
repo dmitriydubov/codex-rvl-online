@@ -17,6 +17,10 @@ public class DirectEditSteps {
                     """,
             "наименование кода МКБ-10", "update mkb10 set name = :value where external_id = :externalId",
             "номер договора страхования", "update insurance_contracts set number = :value where external_id = :externalId",
+            "страхователь договора страхования", """
+                    update insurance_contracts set external_insurer_id = cast(:value as uuid)
+                     where external_id = :externalId
+                    """,
             "наименование программы", "update programs set name = :value where external_id = :externalId",
             "номер полиса", "update policies set number = :value where external_id = :externalId");
 

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import ru.projectx.datareference.config.ReferenceCaches;
 import ru.projectx.datareference.dto.ProgramResponse;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.ProgramLpuRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
 
@@ -27,6 +27,6 @@ public class ProgramQueryService implements ProgramReads {
     public ProgramResponse byId(UUID id) {
         return programs.findById(id)
                 .map(program -> ProgramResponse.of(program, programRows.findOrderedByProgramId(id)))
-                .orElseThrow(() -> ReferenceNotFoundException.program(id));
+                .orElseThrow(() -> MissingReference.PROGRAM.notFound(id));
     }
 }

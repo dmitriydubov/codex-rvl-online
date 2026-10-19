@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static ru.projectx.datareference.config.ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER;
 import static ru.projectx.datareference.config.ReferenceCaches.INSURANCE_CONTRACTS_BY_EXTERNAL_ID;
 import static ru.projectx.datareference.config.ReferenceCaches.INSURANCE_CONTRACTS_BY_ID;
 import static ru.projectx.datareference.config.ReferenceCaches.LPU_CARD;
@@ -29,10 +30,11 @@ class ReferenceCacheDependenciesTest {
         return Stream.of(
                 Arguments.of(OneCStream.POLICIES, Set.of(LPU_CATALOG)),
                 Arguments.of(OneCStream.INSURANCE_CONTRACTS,
-                        Set.of(LPU_CATALOG, INSURANCE_CONTRACTS_BY_ID, INSURANCE_CONTRACTS_BY_EXTERNAL_ID)),
+                        Set.of(LPU_CATALOG, INSURANCE_CONTRACTS_BY_ID, INSURANCE_CONTRACTS_BY_EXTERNAL_ID,
+                                ACTIVE_INSURANCE_CONTRACTS_BY_INSURER)),
                 Arguments.of(OneCStream.CONTRAGENTS, Set.of(LPU_CATALOG, LPU_CARD, LPU_SERVICES,
                         LPU_SERVICES_WITH_PRICES, SERVICE_PRICES, INSURANCE_CONTRACTS_BY_ID,
-                        INSURANCE_CONTRACTS_BY_EXTERNAL_ID, PROGRAMS)),
+                        INSURANCE_CONTRACTS_BY_EXTERNAL_ID, ACTIVE_INSURANCE_CONTRACTS_BY_INSURER, PROGRAMS)),
                 Arguments.of(OneCStream.MKB10, Set.of(MKB10_SEARCH, MKB10_CODES)),
                 Arguments.of(OneCStream.LPU_CONTRACTS,
                         Set.of(LPU_CATALOG, LPU_CARD, LPU_SERVICES, LPU_SERVICES_WITH_PRICES, SERVICE_PRICES)),

@@ -1,5 +1,5 @@
 {
-  "description": "400 на запрос без ключа: договор ищется по id в пути либо по external_id параметром.",
+  "description": "400 на запрос без ключа: договор ищется по id в пути, по external_id или по insurer_external_id параметром.",
   "placeholders": {},
   "request": {
     "method": "GET",
@@ -13,7 +13,7 @@
       "error": {
         "code": "VALIDATION_ERROR",
         "message": "нарушен формат запроса",
-        "details": [ { "field": "external_id", "reason": "нужен external_id" } ],
+        "details": [ { "field": "external_id", "reason": "нужен external_id либо insurer_external_id" } ],
         "request_id": "stand-08"
       }
     }

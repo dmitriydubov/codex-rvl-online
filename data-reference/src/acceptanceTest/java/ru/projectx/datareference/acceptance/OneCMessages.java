@@ -33,6 +33,7 @@ final class OneCMessages {
     private static final String PLACEHOLDER_FIRST_NAME = "Шаг";
     private static final String PLACEHOLDER_DATE_OF_BIRTH = "1985-06-15";
     private static final String DELETE_MARK = "пометка удаления";
+    private static final String ARCHIVED = "в архиве";
     private static final String BEGIN = "начало";
     private static final String AVAILABILITY = "availability";
     private static final String LINE_PROGRAM = "условие обслуживания: программа";
@@ -89,14 +90,14 @@ final class OneCMessages {
 
     private static OneCMessage insuranceContract(String productType, InboundStatus expected, Map<String, String> table) {
         onlyKnown(table, "external_id", "номер", "страхователь", PARTY, PARTY_ROLE, "начало", "окончание",
-                MESSAGE_ID, BEFORE_ENVELOPE);
+                ARCHIVED, MESSAGE_ID, BEFORE_ENVELOPE);
         ObjectNode data = JSON.createObjectNode()
                 .put("contractId", required(table, "external_id"))
                 .put("number", required(table, "номер"))
                 .put("productType", productType)
                 .put("dateBeginISO", required(table, "начало"))
                 .put("dateEndISO", required(table, "окончание"))
-                .put("notActive", false);
+                .put("notActive", flagOr(table, ARCHIVED, false));
         Optional.ofNullable(table.get("страхователь")).ifPresent(insurer -> addParty(data, insurer, INSURER_ROLE));
         Optional.ofNullable(table.get(PARTY))
                 .ifPresent(party -> addParty(data, party, oneOf(table, PARTY_ROLE, PARTY_ROLES)));

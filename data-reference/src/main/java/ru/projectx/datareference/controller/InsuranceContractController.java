@@ -11,6 +11,9 @@ import ru.projectx.datareference.service.InsuranceContractReads;
 @InternalApi
 public class InsuranceContractController {
 
+    private static final String EXTERNAL_ID = "external_id";
+    private static final String INSURER_EXTERNAL_ID = "insurer_external_id";
+
     private final InsuranceContractReads insuranceContracts;
 
     public InsuranceContractController(InsuranceContractReads insuranceContracts) {
@@ -22,13 +25,25 @@ public class InsuranceContractController {
         return insuranceContracts.byId(id);
     }
 
-    @GetMapping(path = "/insurance-contracts", params = "external_id")
-    public InsuranceContractResponse insuranceContractByExternalId(@RequestParam("external_id") UUID externalId) {
+    @GetMapping(path = "/insurance-contracts", params = {EXTERNAL_ID, "!" + INSURER_EXTERNAL_ID})
+    public InsuranceContractResponse insuranceContractByExternalId(@RequestParam(EXTERNAL_ID) UUID externalId) {
         return insuranceContracts.byExternalId(externalId);
+    }
+
+    @GetMapping(path = "/insurance-contracts", params = {INSURER_EXTERNAL_ID, "!" + EXTERNAL_ID})
+    public InsuranceContractResponse activeInsuranceContractOfInsurer(
+            @RequestParam(INSURER_EXTERNAL_ID) UUID insurerExternalId) {
+
+        return insuranceContracts.activeByInsurer(insurerExternalId);
+    }
+
+    @GetMapping(path = "/insurance-contracts", params = {EXTERNAL_ID, INSURER_EXTERNAL_ID})
+    public InsuranceContractResponse insuranceContractByConflictingKeys() {
+        throw new InvalidRequestException(EXTERNAL_ID, "external_id не передаётся вместе с insurer_external_id");
     }
 
     @GetMapping("/insurance-contracts")
     public InsuranceContractResponse insuranceContractWithoutKey() {
-        throw new InvalidRequestException("external_id", "нужен external_id");
+        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id либо insurer_external_id");
     }
 }
