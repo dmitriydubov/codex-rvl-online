@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.mkb10;
 
 import java.util.List;
 import java.util.Locale;
