@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.request;
 
 import java.time.LocalDate;
 import org.springframework.web.bind.WebDataBinder;

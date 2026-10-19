@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

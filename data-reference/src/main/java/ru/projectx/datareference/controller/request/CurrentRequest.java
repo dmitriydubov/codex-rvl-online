@@ -1,14 +1,14 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.request;
 
 import org.jspecify.annotations.Nullable;
 import org.slf4j.MDC;
 
-final class CurrentRequest {
+public final class CurrentRequest {
 
     private CurrentRequest() {
     }
 
-    static @Nullable String id() {
+    public static @Nullable String id() {
         return MDC.get(RequestIdFilter.MDC_KEY);
     }
 }

@@ -1,4 +1,4 @@
-package ru.projectx.datareference.controller;
+package ru.projectx.datareference.controller.request;
 
 import java.beans.PropertyEditorSupport;
 import java.time.LocalDate;

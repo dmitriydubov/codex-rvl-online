@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
+import ru.projectx.datareference.controller.request.RequestIdFilter;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ServerFailureAdviceTest {

@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
+import ru.projectx.datareference.controller.request.RequestIdFilter;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
 @ExtendWith(OutputCaptureExtension.class)
