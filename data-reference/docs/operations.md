@@ -398,7 +398,8 @@ namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` с
   `certs/import-ca.sh`, сертификат в `certs/`, исполняемый `gradlew`, переводы строк LF в `gradlew` и `import-ca.sh`,
   доступ `helm` к кластеру.
 - Образы старых тегов и кэш сборки сами не удаляются: место освобождают `sudo nerdctl rmi data-reference:<тег>` и
-  `sudo nerdctl builder prune`.
+  `sudo nerdctl builder prune` (спрашивает подтверждение и удаляет только висячий кэш; `--all` удаляет весь
+  неиспользуемый, вместе с кэшем зависимостей Gradle, и следующая сборка скачает их заново).
 
 ```shell
 sudo ./devops/test/deploy.sh v2
