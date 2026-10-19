@@ -401,6 +401,11 @@ namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` с
 - Образы старых тегов и кэш сборки сами не удаляются: место освобождают `sudo nerdctl rmi data-reference:<тег>` и
   `sudo nerdctl builder prune` (спрашивает подтверждение и удаляет только висячий кэш; `--all` удаляет весь
   неиспользуемый, вместе с кэшем зависимостей Gradle, и следующая сборка скачает их заново).
+- Каталог BuildKit на стенде перенесён на `/data`: строка `root = "/data/buildkit"` в `/etc/buildkit/buildkitd.toml`
+  (по умолчанию `/var/lib/buildkit`). Раздел `/var` там около 5 ГБ, а одной сборке нужно 1–1,5 ГБ под дистрибутив
+  Gradle, зависимости и слои. Строка `root` стоит в начале файла, до первой секции `[…]`: в TOML ключ после заголовка
+  секции относится к этой секции. После правки — `sudo systemctl restart buildkit`. Готовые образы по-прежнему хранит
+  containerd k3s на `/var` (`/var/lib/rancher/k3s/agent/containerd`), поэтому образы старых тегов всё равно удаляются.
 
 ```shell
 sudo ./devops/test/deploy.sh v2
