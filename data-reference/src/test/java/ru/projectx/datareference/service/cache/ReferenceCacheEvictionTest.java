@@ -9,7 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 

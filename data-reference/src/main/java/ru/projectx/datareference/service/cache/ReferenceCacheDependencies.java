@@ -1,17 +1,17 @@
 package ru.projectx.datareference.service.cache;
 
 import static java.util.Map.entry;
-import static ru.projectx.datareference.config.ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER;
-import static ru.projectx.datareference.config.ReferenceCaches.INSURANCE_CONTRACTS_BY_EXTERNAL_ID;
-import static ru.projectx.datareference.config.ReferenceCaches.INSURANCE_CONTRACTS_BY_ID;
-import static ru.projectx.datareference.config.ReferenceCaches.LPU_CARD;
-import static ru.projectx.datareference.config.ReferenceCaches.LPU_CATALOG;
-import static ru.projectx.datareference.config.ReferenceCaches.LPU_SERVICES;
-import static ru.projectx.datareference.config.ReferenceCaches.LPU_SERVICES_WITH_PRICES;
-import static ru.projectx.datareference.config.ReferenceCaches.MKB10_CODES;
-import static ru.projectx.datareference.config.ReferenceCaches.MKB10_SEARCH;
-import static ru.projectx.datareference.config.ReferenceCaches.PROGRAMS;
-import static ru.projectx.datareference.config.ReferenceCaches.SERVICE_PRICES;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.INSURANCE_CONTRACTS_BY_EXTERNAL_ID;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.INSURANCE_CONTRACTS_BY_ID;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.LPU_CARD;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.LPU_CATALOG;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.LPU_SERVICES;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.LPU_SERVICES_WITH_PRICES;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.MKB10_CODES;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.MKB10_SEARCH;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.PROGRAMS;
+import static ru.projectx.datareference.config.cache.ReferenceCaches.SERVICE_PRICES;
 import static ru.projectx.datareference.entity.inbound.OneCStream.APPEAL_TYPES;
 import static ru.projectx.datareference.entity.inbound.OneCStream.CONTRAGENTS;
 import static ru.projectx.datareference.entity.inbound.OneCStream.CONTRAGENT_SERVICES;

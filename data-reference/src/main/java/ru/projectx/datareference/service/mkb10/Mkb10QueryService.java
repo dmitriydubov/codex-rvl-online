@@ -9,7 +9,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.config.ReferenceApiProperties;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.service.rest.ResultLimits;

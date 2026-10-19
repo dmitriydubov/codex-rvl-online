@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.cache;
 
 import com.github.benmanes.caffeine.cache.Ticker;
 import java.time.Clock;

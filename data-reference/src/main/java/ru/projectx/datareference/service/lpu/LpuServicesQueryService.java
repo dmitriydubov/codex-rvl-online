@@ -7,7 +7,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuServicesResponse;
 import ru.projectx.datareference.entity.catalog.ContragentService;
 import ru.projectx.datareference.entity.catalog.PriceListItem;

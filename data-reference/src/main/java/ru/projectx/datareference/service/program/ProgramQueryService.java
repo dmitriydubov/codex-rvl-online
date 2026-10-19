@@ -4,7 +4,7 @@ import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.ProgramResponse;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.catalog.ProgramLpuRepository;

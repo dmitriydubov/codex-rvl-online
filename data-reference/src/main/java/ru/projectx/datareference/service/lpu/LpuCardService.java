@@ -3,7 +3,7 @@ package ru.projectx.datareference.service.lpu;
 import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;

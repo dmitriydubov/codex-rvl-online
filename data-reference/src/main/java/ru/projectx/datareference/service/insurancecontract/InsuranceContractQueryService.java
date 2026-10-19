@@ -4,7 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.catalog.Insurer;

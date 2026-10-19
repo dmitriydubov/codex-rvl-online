@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;

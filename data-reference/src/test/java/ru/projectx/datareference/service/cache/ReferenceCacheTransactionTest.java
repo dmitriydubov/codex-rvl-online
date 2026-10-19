@@ -12,7 +12,7 @@ import org.springframework.cache.interceptor.BeanFactoryCacheOperationSourceAdvi
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.datareference.config.ReferenceCaches;
+import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 import ru.projectx.datareference.support.DatabaseCleaner;

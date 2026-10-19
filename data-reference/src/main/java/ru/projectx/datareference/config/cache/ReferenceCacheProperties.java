@@ -1,4 +1,4 @@
-package ru.projectx.datareference.config;
+package ru.projectx.datareference.config.cache;
 
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
