@@ -43,7 +43,8 @@ public final class ReadFixtures {
         return Lpu.create(externalId, new Lpu.Details("Санаторий", null, null, null, null, null, archived), NOW);
     }
 
-    public static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId, boolean usePricesMainContract) {
+    public static LpuContract lpuContract(Lpu lpu, @Nullable UUID mainContractExternalId,
+                                          boolean usePricesMainContract) {
         return LpuContract.create(UUID.randomUUID(), lpu, new LpuContract.Details("Д-1", null,
                 mainContractExternalId, usePricesMainContract, false, BEGIN, null, false), NOW);
     }
