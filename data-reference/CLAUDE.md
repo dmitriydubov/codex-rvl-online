@@ -525,9 +525,9 @@ GUID вида деятельности «РВЛ» — `f3876c53-c7d8-4620-b364-9
 **Ответы справочника кэшируются (Ш43, PR #90; устарелость принята владельцем 2026-10-06).** Каталог, карточка и услуги
 ЛПУ (R-01…R-03), стоимость (R-06), МКБ-10 (R-07), договор страхования (R-08: по `id`, по GUID и действующий по GUID
 страхователя) и программа (R-09)
-отдаются из кэша в памяти (Spring Cache + Caffeine, `config.CacheConfig`). Применённое или пропущенное сообщение 1С
-сбрасывает кэши своего потока сразу после фиксации разбора (`service.ReferenceCacheEviction`, таблица
-`service.ReferenceCacheDependencies`), поэтому данные из 1С видны сразу. Срок жизни записи — страховка от правки базы
+отдаются из кэша в памяти (Spring Cache + Caffeine, `config.cache.CacheConfig`). Применённое или пропущенное сообщение 1С
+сбрасывает кэши своего потока сразу после фиксации разбора (`service.cache.ReferenceCacheEviction`, таблица
+`service.cache.ReferenceCacheDependencies`), поэтому данные из 1С видны сразу. Срок жизни записи — страховка от правки базы
 мимо 1С: `projectx.cache.ttl` (`REFERENCE_CACHE_TTL`, 10 мин), предел `projectx.cache.maximum-size`
 (`REFERENCE_CACHE_MAXIMUM_SIZE`, 1000 записей на кэш). Ответы «на сегодня» ключуются московским днём. Отказы (404, 409,
 422, 503) не кэшируются; при недоступной базе ответ из кэша отдаётся. **Не кэшируются** поиск полисов (R-04), полис
@@ -694,26 +694,57 @@ Central через прокси иногда отвечает 429 на пачк�
 
 ## Структура пакетов
 
-Архитектура **слоистая**, база — `ru.projectx.datareference`. Слои появляются
-по мере фаз; целевой вид:
+Архитектура **слоистая**, база — `ru.projectx.datareference`. Слои — пакеты верхнего уровня, внутри
+крупных пакетов — подпакеты по ресурсу или обязанности:
 
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/          — @Configuration и @ConfigurationProperties
-├── entity/          — JPA-сущности
-├── exception/       — исключения домена
-├── mapper/          — разбор потоков 1С, по одному на ТЗ, и правила значений 1С (`StreamMapper`, `ImportResult`, `OneCValues`, `OneCGuid`, `OneCMoneyScale`, `OneCRawParser`, `OneCRequiredValues`)
-├── repository/      — Spring Data JPA
-├── dto/             — тела ответов REST и единый формат ошибки; собираются из сущностей
-├── service/         — бизнес-логика
-│   ├── integration/ — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
-│   ├── onec/        — разбор сырья: диспетчер потоков, сохранённый конверт (`StoredEnvelope`), сборка передач прайса
-│   └── schedulers/  — задачи по расписанию
-└── controller/      — REST-чтение справочников: контроллеры по ресурсам (ЛПУ, полисы, договоры
-                        страхования, МКБ-10, программы) под общей аннотацией `@InternalApi`
-                        (путь `/internal/v1`, JSON), фильтр X-Request-Id, обработчик ошибок
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С (`*Properties`) — в корне
+│   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел
+│   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него
+├── entity/            — JPA-сущности
+│   ├── catalog/       — справочники 1С и общая основа `OneCEntity`
+│   ├── policy/        — полис с программами и строками условий
+│   └── inbound/       — приём из 1С: `inbox`, сырьё `inbound_message`, ожидание родителя, карантин, «не наши»,
+│                        сборка передач прайса
+├── exception/         — исключения домена
+├── mapper/            — разбор потоков 1С; в корне — контракт (`StreamMapper`, `ImportResult`) и основа мапперов
+│   ├── stream/        — по мапперу на поток ТЗ-1 … ТЗ-10, с помощниками
+│   └── value/         — правила значений 1С (`OneCValues`, `OneCGuid`, `OneCMoneyScale`, `OneCRawParser`, `OneCRequiredValues`)
+├── repository/        — Spring Data JPA
+│   ├── catalog/       — справочники
+│   ├── policy/        — полисы, их поиск и проекция для Договоров
+│   ├── inbound/       — приём и разбор сообщений 1С
+│   └── database/      — настройки сеанса базы (`SessionSettingsRepository`)
+├── dto/               — тела ответов REST и единый формат ошибки; собираются из сущностей
+├── service/           — бизнес-логика; в корне классов нет
+│   ├── lpu/ price/ policy/ insurancecontract/ mkb10/ program/
+│   │                  — REST-чтение по ресурсам: сервисы за интерфейсами `*Reads` и их правила
+│   ├── rest/          — общее для REST-чтений: `@RestReadTransaction`, московский день (`ReferenceCalendar`), ключ
+│   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`
+│   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`)
+│   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
+│   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
+│   ├── onec/          — разбор сырья: диспетчер потоков, сохранённый конверт (`StoredEnvelope`), сборка передач прайса
+│   ├── database/      — классы отказов и таймауты базы (`DatabaseOutages`, `SqlStates`, `DatabaseTimeoutsCheck`)
+│   ├── metrics/       — метрики приёма и разбора
+│   ├── retention/     — стирание персональных данных по сроку
+│   └── schedulers/    — задачи по расписанию
+└── controller/        — REST-чтение справочников: контроллеры по ресурсам (ЛПУ, полисы, договоры
+    │                     страхования, МКБ-10, программы) под общей аннотацией `@InternalApi`
+    │                     (путь `/internal/v1`, JSON)
+    ├── error/         — советники ошибок и их порядок (`ErrorAdviceOrder`)
+    └── request/       — разбор UUID и дат в параметрах, фильтр и значение `X-Request-Id`
 ```
+
+Подпакеты введены 2026-10-19 (Ш78, PR #190), поведение не менялось. Зависимости между ними идут в одну сторону, циклы
+запрещает архитектурный тест (`fail.on.cycles=true`): `service.lpu` → `insurancecontract`, `rest`; `price` → `lpu`,
+`rest`; `policy` → `insurancecontract`, `rest`; `mkb10`, `program`, `insurancecontract` → `rest`; `inbound` → `database`,
+`metrics`; `cache` и `onec` → `inbound`; `mapper.stream` → корень `mapper` и `value`, корень `mapper` → `value`;
+`entity.policy` → `entity.catalog`; корень `controller` → `error` → `request`. Новый класс кладётся в подпакет своего
+ресурса или обязанности; общий для нескольких — в `service.rest` (REST-чтение) или в корень своего пакета (основа
+мапперов, свойства). Тесты лежат в том же подпакете, что их класс; тесты API целиком — в корне `controller`.
 
 **REST — три правила.** Контроллер только вызывает сервис чтения своего ресурса (через
 узкий интерфейс `*Reads`) и отдаёт ответ: транзакция и сборка DTO — в сервисе, потому что
@@ -747,7 +778,7 @@ ru.projectx.datareference
 зависимости идут сверху вниз и не разворачиваются. `service` вызывает `mapper`, обратно — никогда:
 маппер не видит `service` (с Ш20, PR #88, цикл `mapper ↔ service` разорван, политика архитектуры
 запрещает циклы); общее правило, нужное и мапперу, и сервису, живёт в `mapper`, а нужное сервису и
-контроллеру — в `service` (`service.CanonicalGuids`). **Про AMQP знает только
+контроллеру — в `service` (`service.rest.CanonicalGuids`). **Про AMQP знает только
 `service/integration`** — ни маппер, ни прикладной сервис, ни сущность конверта не видят:
 дальше границы идут `message-id` и тело как строка.
 
@@ -783,7 +814,7 @@ PR #23). Исходов ровно четыре (Ш30 и Ш31, PR #42):
    а сохранить под придуманным идентификатором — нарушить смысл ключа.
 
 Класс отказа решает SQLSTATE самого глубокого исключения JDBC в цепочке причин, у которого код есть
-(`service.SqlStates`; тем же правилом пользуется `DatabaseOutages`), а не тип исключения Spring. Сбой самого
+(`service.database.SqlStates`; тем же правилом пользуется `DatabaseOutages`), а не тип исключения Spring. Сбой самого
 подтверждения (`IOException`, `IllegalStateException` «Channel closed; cannot ack/nack») отказом записи не
 считается: запись уже зафиксирована, исключение уходит контейнеру, брокер пришлёт сообщение снова как
 дубль. Ведущий UTF-8 BOM снимается до разбора конверта и записи сырья (`OneCDelivery.body()`); в карантин
@@ -953,7 +984,7 @@ upsert по `external_id`, а отказ, пришедший после фикс
 - Никаких `e.printStackTrace()` и пустых `catch {}`.
 - Исключение несёт контекст: `messageId`, поток, очередь. Без них разбор в проде
   превращается в грепанье по логам. В приёме из 1С этот контекст на время обработки лежит и
-  в MDC (имена ключей — константы `service.OneCLogContext`): слушатель кладёт `stream` и `queue`
+  в MDC (имена ключей — константы `service.inbound.OneCLogContext`): слушатель кладёт `stream` и `queue`
   на входе в `receive`, `messageId` — когда прочитан из конверта (у нечитаемого конверта его нет);
   разбор по расписанию (`ReferenceImportScheduler`) на время разбора одного сообщения кладёт
   `messageId` и `stream` и пишет в журнал исход разбора; в `finally` снимаются только свои ключи. Карантин и
