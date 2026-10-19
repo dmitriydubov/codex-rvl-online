@@ -8,9 +8,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.Program;
-import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.Program;
+import ru.projectx.datareference.entity.catalog.ProgramLpu;
 
 class ProgramResponseTest {
 

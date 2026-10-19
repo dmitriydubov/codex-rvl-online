@@ -3,9 +3,9 @@ package ru.projectx.datareference.service.retention;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.PersonalDataCutoff;
-import ru.projectx.datareference.mapper.PolicyPersonalDataTerm;
-import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.entity.policy.PersonalDataCutoff;
+import ru.projectx.datareference.mapper.stream.PolicyPersonalDataTerm;
+import ru.projectx.datareference.repository.policy.PolicyRepository;
 
 @Component
 public class ExpiredPolicyPersonalData {

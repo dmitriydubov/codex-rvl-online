@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import tools.jackson.databind.json.JsonMapper;
 
 class MissingMapperTest {

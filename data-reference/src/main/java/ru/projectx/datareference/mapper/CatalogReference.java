@@ -4,10 +4,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 
-final class CatalogReference<R> {
+public final class CatalogReference<R> {
 
     private final Function<UUID, Optional<R>> finder;
     private final ParentKind kind;
@@ -22,11 +22,12 @@ final class CatalogReference<R> {
         this.outsideCatalog = outsideCatalog;
     }
 
-    ImportResult applyIfKnown(UUID referenceId, Function<R, ImportResult> step) {
+    public ImportResult applyIfKnown(UUID referenceId, Function<R, ImportResult> step) {
         return applyIfKnown(referenceId, step, () -> ImportResult.skipped(outsideCatalog + referenceId));
     }
 
-    ImportResult applyIfKnown(UUID referenceId, Function<R, ImportResult> step, Supplier<ImportResult> whenForeign) {
+    public ImportResult applyIfKnown(UUID referenceId, Function<R, ImportResult> step,
+                                     Supplier<ImportResult> whenForeign) {
         return finder.apply(referenceId)
                 .map(step)
                 .orElseGet(() -> withoutRecord(referenceId, whenForeign));

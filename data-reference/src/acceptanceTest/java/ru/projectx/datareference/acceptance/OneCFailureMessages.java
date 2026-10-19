@@ -1,7 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import tools.jackson.core.StreamReadConstraints;
 import tools.jackson.core.json.JsonFactory;
 import tools.jackson.databind.DeserializationFeature;

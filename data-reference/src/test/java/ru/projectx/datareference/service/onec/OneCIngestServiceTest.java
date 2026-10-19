@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.InboxService;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.InboxService;
 
 @ExtendWith(MockitoExtension.class)
 class OneCIngestServiceTest {

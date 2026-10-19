@@ -2,8 +2,8 @@ package ru.projectx.datareference.service.onec;
 
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.mapper.OneCValues;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.mapper.value.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
 record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCount) {

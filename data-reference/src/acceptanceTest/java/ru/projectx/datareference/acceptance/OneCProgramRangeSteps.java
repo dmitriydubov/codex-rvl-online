@@ -1,7 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import io.cucumber.java.ru.Дано;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 public class OneCProgramRangeSteps {
 

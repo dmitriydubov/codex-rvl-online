@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
-import ru.projectx.datareference.service.QuarantineService;
+import ru.projectx.datareference.service.inbound.QuarantineService;
 
 @Component
 class OneCStorageFailures {

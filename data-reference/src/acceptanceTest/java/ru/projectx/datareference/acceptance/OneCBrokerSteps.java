@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.amqp.core.QueueInformation;
-import ru.projectx.datareference.mapper.OneCGuid;
+import ru.projectx.datareference.mapper.value.OneCGuid;
 
 public class OneCBrokerSteps {
 

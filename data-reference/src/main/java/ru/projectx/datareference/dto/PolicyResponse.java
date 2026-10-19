@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.InsuranceContract;
-import ru.projectx.datareference.entity.Policy;
-import ru.projectx.datareference.entity.PolicyProgram;
-import ru.projectx.datareference.entity.PolicyServiceLine;
-import ru.projectx.datareference.entity.Program;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
+import ru.projectx.datareference.entity.policy.Policy;
+import ru.projectx.datareference.entity.policy.PolicyProgram;
+import ru.projectx.datareference.entity.policy.PolicyServiceLine;
+import ru.projectx.datareference.entity.catalog.Program;
 
 public record PolicyResponse(
         UUID id,

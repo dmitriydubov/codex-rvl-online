@@ -42,9 +42,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionSystemException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.OneCJson;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.RejectedMessage;
-import ru.projectx.datareference.service.QuarantineService;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.RejectedMessage;
+import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 @ExtendWith(MockitoExtension.class)

@@ -2,7 +2,7 @@ package ru.projectx.datareference.service.integration;
 
 import java.util.function.Function;
 import ru.projectx.datareference.config.OneCQueueProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 enum OneCQueue {
 

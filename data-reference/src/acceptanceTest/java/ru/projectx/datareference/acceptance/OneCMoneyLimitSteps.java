@@ -3,7 +3,7 @@ package ru.projectx.datareference.acceptance;
 import io.cucumber.java.ru.Дано;
 import java.math.BigDecimal;
 import java.util.UUID;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 public class OneCMoneyLimitSteps {
 

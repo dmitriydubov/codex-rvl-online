@@ -5,8 +5,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.Program;
-import ru.projectx.datareference.entity.ProgramLpu;
+import ru.projectx.datareference.entity.catalog.Program;
+import ru.projectx.datareference.entity.catalog.ProgramLpu;
 
 public record ProgramResponse(
         UUID id,

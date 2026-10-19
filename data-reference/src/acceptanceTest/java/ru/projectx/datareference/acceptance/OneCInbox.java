@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)

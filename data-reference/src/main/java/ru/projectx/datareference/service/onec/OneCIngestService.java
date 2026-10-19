@@ -3,9 +3,9 @@ package ru.projectx.datareference.service.onec;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.InboxService;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.service.inbound.InboxService;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 
 @Service
 public class OneCIngestService {

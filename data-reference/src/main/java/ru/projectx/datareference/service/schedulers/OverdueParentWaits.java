@@ -10,7 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.metrics.ParentWaitMetrics;
 import ru.projectx.datareference.service.onec.ExpiredParentWait;
 import ru.projectx.datareference.service.onec.ParentWaitExpiry;

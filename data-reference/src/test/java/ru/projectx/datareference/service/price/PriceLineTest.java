@@ -7,10 +7,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
-import ru.projectx.datareference.entity.PriceListItem;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
 
 class PriceLineTest {
 

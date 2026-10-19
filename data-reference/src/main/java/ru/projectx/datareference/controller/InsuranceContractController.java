@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import ru.projectx.datareference.dto.InsuranceContractResponse;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.service.InsuranceContractReads;
+import ru.projectx.datareference.service.insurancecontract.InsuranceContractReads;
 
 @InternalApi
 public class InsuranceContractController {

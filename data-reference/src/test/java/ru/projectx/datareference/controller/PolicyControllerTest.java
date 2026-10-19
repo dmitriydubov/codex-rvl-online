@@ -21,9 +21,9 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.PolicySearchResponse;
-import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicySearchReads;
-import ru.projectx.datareference.service.PolicyReads;
+import ru.projectx.datareference.service.policy.PolicyContractViews;
+import ru.projectx.datareference.service.policy.PolicySearchReads;
+import ru.projectx.datareference.service.policy.PolicyReads;
 
 @ExtendWith(MockitoExtension.class)
 class PolicyControllerTest {

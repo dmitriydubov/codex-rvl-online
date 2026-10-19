@@ -6,14 +6,14 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-final class SnapshotUpsert<E, S> {
+public final class SnapshotUpsert<E, S> {
 
     private final Function<UUID, Optional<E>> finder;
     private final Creation<E, S> creation;
     private final Refresh<E, S> refresh;
     private final Consumer<E> store;
 
-    SnapshotUpsert(Function<UUID, Optional<E>> finder, Creation<E, S> creation, Refresh<E, S> refresh,
+    public SnapshotUpsert(Function<UUID, Optional<E>> finder, Creation<E, S> creation, Refresh<E, S> refresh,
                    Consumer<E> store) {
         this.finder = finder;
         this.creation = creation;
@@ -21,7 +21,7 @@ final class SnapshotUpsert<E, S> {
         this.store = store;
     }
 
-    ImportResult apply(UUID externalId, S snapshot, Instant now) {
+    public ImportResult apply(UUID externalId, S snapshot, Instant now) {
         E entry = finder.apply(externalId)
                 .map(known -> refreshed(known, snapshot, now))
                 .orElseGet(() -> creation.create(externalId, snapshot, now));
@@ -35,13 +35,13 @@ final class SnapshotUpsert<E, S> {
     }
 
     @FunctionalInterface
-    interface Creation<E, S> {
+    public interface Creation<E, S> {
 
         E create(UUID externalId, S snapshot, Instant now);
     }
 
     @FunctionalInterface
-    interface Refresh<E, S> {
+    public interface Refresh<E, S> {
 
         void apply(E entry, S snapshot, Instant now);
     }

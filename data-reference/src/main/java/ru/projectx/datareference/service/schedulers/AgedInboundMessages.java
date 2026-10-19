@@ -6,9 +6,9 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.repository.BufferedTransfer;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.BufferedTransfer;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 
 @Component
 public class AgedInboundMessages {

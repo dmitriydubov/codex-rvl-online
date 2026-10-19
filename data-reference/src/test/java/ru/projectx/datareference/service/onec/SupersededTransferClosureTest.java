@@ -20,15 +20,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import ru.projectx.datareference.config.InboundRetryProperties;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.PriceListFinalization;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.PriceListFinalizationRepository;
-import ru.projectx.datareference.service.FinalRejectionJournal;
-import ru.projectx.datareference.service.InboundMessageService;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.PriceListFinalization;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.PriceListFinalizationRepository;
+import ru.projectx.datareference.service.inbound.FinalRejectionJournal;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
 class SupersededTransferClosureTest {

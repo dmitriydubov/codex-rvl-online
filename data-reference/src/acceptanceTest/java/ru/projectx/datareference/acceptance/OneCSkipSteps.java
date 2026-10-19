@@ -6,7 +6,7 @@ import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Тогда;
 import java.util.Map;
 import java.util.UUID;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 
 public class OneCSkipSteps {
 

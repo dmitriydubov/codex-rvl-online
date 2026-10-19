@@ -14,9 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Limit;
-import ru.projectx.datareference.repository.BufferedTransfer;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.QuarantineRepository;
+import ru.projectx.datareference.repository.inbound.BufferedTransfer;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AgedInboundMessagesTest {
