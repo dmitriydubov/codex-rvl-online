@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.database;
 
 import java.time.Duration;
 import java.util.List;

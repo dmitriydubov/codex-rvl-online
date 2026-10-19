@@ -2,6 +2,8 @@ package ru.projectx.datareference.service;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.service.database.DatabaseOutages;
+import ru.projectx.datareference.service.database.SqlStates;
 
 @Component
 public class ParseFailures {

@@ -22,7 +22,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.datareference.entity.PriceListFinalization;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.service.database.SqlStates;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.MigrationSql;

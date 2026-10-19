@@ -12,7 +12,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.repository.BufferedTransfer;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.service.database.SqlStates;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 
 @Component

@@ -16,7 +16,7 @@ import org.springframework.core.NestedExceptionUtils;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
 import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.service.database.SqlStates;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;

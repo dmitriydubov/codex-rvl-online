@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.projectx.datareference.dto.ErrorResponse;
-import ru.projectx.datareference.service.DatabaseOutages;
+import ru.projectx.datareference.service.database.DatabaseOutages;
 
 @RestControllerAdvice
 @Order(ErrorAdviceOrder.SERVER_FAILURE)

@@ -1,7 +1,7 @@
 package ru.projectx.datareference.service.integration;
 
 import java.util.Optional;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.service.database.SqlStates;
 
 sealed interface OneCStorageFailure {
 

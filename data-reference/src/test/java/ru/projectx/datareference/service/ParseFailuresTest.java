@@ -9,6 +9,7 @@ import org.hibernate.exception.LockAcquisitionException;
 import org.junit.jupiter.api.Test;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.service.database.DatabaseOutages;
 import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.node.MissingNode;
 

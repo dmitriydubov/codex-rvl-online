@@ -25,7 +25,7 @@ import ru.projectx.datareference.entity.InboundReceipt;
 import ru.projectx.datareference.entity.InboundStatus;
 import ru.projectx.datareference.entity.OneCStream;
 import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.DatabaseOutages;
+import ru.projectx.datareference.service.database.DatabaseOutages;
 import ru.projectx.datareference.service.InboundMessageService;
 import ru.projectx.datareference.service.OneCLogContext;
 import ru.projectx.datareference.service.ParseFailures;

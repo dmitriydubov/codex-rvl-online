@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.database;
 
 import jakarta.persistence.PersistenceException;
 import java.util.List;

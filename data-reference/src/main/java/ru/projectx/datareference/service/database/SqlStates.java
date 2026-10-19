@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.database;
 
 import java.sql.SQLException;
 import java.util.Optional;

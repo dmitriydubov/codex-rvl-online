@@ -3,7 +3,7 @@ package ru.projectx.datareference.controller;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import ru.projectx.datareference.service.DatabaseOutages;
+import ru.projectx.datareference.service.database.DatabaseOutages;
 
 final class StandaloneMvc {
 
