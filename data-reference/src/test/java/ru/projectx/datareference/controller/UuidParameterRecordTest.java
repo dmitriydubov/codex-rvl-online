@@ -17,9 +17,9 @@ import ru.projectx.datareference.service.insurancecontract.InsuranceContractRead
 import ru.projectx.datareference.service.LpuCardReads;
 import ru.projectx.datareference.service.LpuCatalogReads;
 import ru.projectx.datareference.service.LpuServiceReads;
-import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicyReads;
-import ru.projectx.datareference.service.PolicySearchReads;
+import ru.projectx.datareference.service.policy.PolicyContractViews;
+import ru.projectx.datareference.service.policy.PolicyReads;
+import ru.projectx.datareference.service.policy.PolicySearchReads;
 import ru.projectx.datareference.service.program.ProgramReads;
 
 class UuidParameterRecordTest {

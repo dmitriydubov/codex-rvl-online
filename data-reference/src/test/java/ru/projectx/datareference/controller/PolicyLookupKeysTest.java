@@ -17,9 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.PolicyResponse;
-import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicyReads;
-import ru.projectx.datareference.service.PolicySearchReads;
+import ru.projectx.datareference.service.policy.PolicyContractViews;
+import ru.projectx.datareference.service.policy.PolicyReads;
+import ru.projectx.datareference.service.policy.PolicySearchReads;
 
 @ExtendWith(MockitoExtension.class)
 class PolicyLookupKeysTest {

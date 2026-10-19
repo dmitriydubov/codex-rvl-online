@@ -1,4 +1,4 @@
-package ru.projectx.datareference.service;
+package ru.projectx.datareference.service.policy;
 
 import java.util.List;
 import java.util.Map;
