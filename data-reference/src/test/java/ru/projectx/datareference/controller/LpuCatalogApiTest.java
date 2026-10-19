@@ -29,7 +29,7 @@ import ru.projectx.datareference.repository.catalog.ContragentServiceRepository;
 import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.catalog.LpuContractRepository;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
-import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.repository.policy.PolicyRepository;
 import ru.projectx.datareference.repository.catalog.PriceListItemRepository;
 import ru.projectx.datareference.repository.catalog.ProgramRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;

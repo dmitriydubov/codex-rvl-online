@@ -14,8 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.PolicyContractRow;
-import ru.projectx.datareference.repository.PolicyContractViewRepository;
+import ru.projectx.datareference.repository.policy.PolicyContractRow;
+import ru.projectx.datareference.repository.policy.PolicyContractViewRepository;
 
 @ExtendWith(MockitoExtension.class)
 class PolicyContractViewServiceTest {

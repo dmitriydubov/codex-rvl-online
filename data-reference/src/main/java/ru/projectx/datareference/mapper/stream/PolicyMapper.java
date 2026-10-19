@@ -22,7 +22,7 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.UnfilteredStreamMapper;
 import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import ru.projectx.datareference.mapper.value.OneCValues;
-import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.repository.policy.PolicyRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

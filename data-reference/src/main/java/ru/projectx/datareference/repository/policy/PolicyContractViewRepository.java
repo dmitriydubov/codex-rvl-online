@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.policy;
 
 import java.util.Optional;
 import java.util.UUID;

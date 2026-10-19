@@ -1,4 +1,4 @@
-package ru.projectx.datareference.repository;
+package ru.projectx.datareference.repository.policy;
 
 import java.time.Instant;
 import java.time.LocalDate;

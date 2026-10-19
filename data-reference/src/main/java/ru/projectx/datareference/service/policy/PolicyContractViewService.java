@@ -7,8 +7,8 @@ import org.springframework.stereotype.Service;
 import ru.projectx.datareference.dto.PolicyContractView;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
-import ru.projectx.datareference.repository.PolicyContractRow;
-import ru.projectx.datareference.repository.PolicyContractViewRepository;
+import ru.projectx.datareference.repository.policy.PolicyContractRow;
+import ru.projectx.datareference.repository.policy.PolicyContractViewRepository;
 import ru.projectx.datareference.service.rest.RestReadTransaction;
 
 @Service

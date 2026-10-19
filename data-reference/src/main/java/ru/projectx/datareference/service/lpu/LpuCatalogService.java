@@ -15,7 +15,7 @@ import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.entity.catalog.Lpu;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.repository.catalog.LpuRepository;
-import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.repository.policy.PolicyRepository;
 import ru.projectx.datareference.service.lpu.PriceContractResolver.Resolution;
 import ru.projectx.datareference.service.insurancecontract.ActiveInsuranceContracts;
 import ru.projectx.datareference.service.rest.ReferenceCalendar;
