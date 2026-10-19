@@ -282,7 +282,9 @@
       | /internal/v1/insurance-contracts    | 400    | VALIDATION_ERROR | external_id | ожидается UUID |
       | /internal/v1/policies/contract-view | 400    | VALIDATION_ERROR | external_id | ожидается UUID |
 
-  # [ТЗ-Д] «Коды ответов»: 400 — отсутствует обязательное поле; [API] «Коды ошибок»: неполные параметры.
+  # [ТЗ-Д] «Коды ответов»: 400 — отсутствует обязательное поле; [API] «Коды ошибок»: неполные параметры. [Ш77]: у договора
+  # страхования два ключа — свой GUID и GUID страхователя (insurance_contract_by_insurer.feature), и причина отказа без
+  # ключа называет оба.
   Структура сценария: Запрос без ключа при недоступной базе — сервису Договоров 400 с нарушением по полю external_id
     Когда сервис Договоров запрашивает "<ресурс>"
     Тогда Дата-референс отвечает <статус>
@@ -293,9 +295,39 @@
     И в журнале Дата-референса нет записей уровня ERROR
 
     Примеры:
-      | ресурс                              | статус | код              | поле        | причина           |
-      | /internal/v1/insurance-contracts    | 400    | VALIDATION_ERROR | external_id | нужен external_id |
-      | /internal/v1/policies/contract-view | 400    | VALIDATION_ERROR | external_id | нужен external_id |
+      | ресурс                              | статус | код              | поле        | причина                                    |
+      | /internal/v1/insurance-contracts    | 400    | VALIDATION_ERROR | external_id | нужен external_id либо insurer_external_id |
+      | /internal/v1/policies/contract-view | 400    | VALIDATION_ERROR | external_id | нужен external_id                          |
+
+  # [Ш77]: договор страхования по GUID страхователя — ручка сервиса Заявок; GUID не в канонической записи и пустой параметр
+  # — 400 по полю insurer_external_id, оба ключа сразу — 400 по полю external_id (insurance_contract_by_insurer.feature).
+  # [Ш27a]: всё это находится по набору и разбору параметров, до базы. Верный запрос доходит до базы — 503 ([ТЗ-Д], [Р24]).
+  Структура сценария: Ошибки ключа страхователя у договора страхования при недоступной базе — сервису Заявок 400 с полем и причиной, верный запрос — 503
+    Когда сервис Заявок запрашивает "/internal/v1/insurance-contracts?insurer_external_id=not-a-uuid"
+    Тогда Дата-референс отвечает <статус>
+    И поле "error.code" ответа равно "<код>"
+    И поле "error.details[0].field" ответа равно "<поле страхователя>"
+    И поле "error.details[0].reason" ответа равно "<причина нечитаемого страхователя>"
+    И поля "error.details[1]" в ответе нет
+    Когда сервис Заявок запрашивает "/internal/v1/insurance-contracts?insurer_external_id="
+    Тогда Дата-референс отвечает <статус>
+    И поле "error.code" ответа равно "<код>"
+    И поле "error.details[0].field" ответа равно "<поле страхователя>"
+    И поля "error.details[1]" в ответе нет
+    Когда сервис Заявок запрашивает "/internal/v1/insurance-contracts?external_id=77ff17b5-e659-4720-b57f-e8a19c00fcea&insurer_external_id=f662d1c4-5b26-4248-8ba1-47954abd301a"
+    Тогда Дата-референс отвечает <статус>
+    И поле "error.code" ответа равно "<код>"
+    И поле "error.details[0].field" ответа равно "<поле при двух ключах>"
+    И поле "error.details[0].reason" ответа равно "<причина при двух ключах>"
+    И поля "error.details[1]" в ответе нет
+    И в журнале Дата-референса нет записей уровня ERROR
+    Когда сервис Заявок запрашивает "/internal/v1/insurance-contracts?insurer_external_id=f662d1c4-5b26-4248-8ba1-47954abd301a"
+    Тогда Дата-референс отвечает <статус недоступности>
+    И поле "error.code" ответа равно "<код недоступности>"
+
+    Примеры:
+      | статус | код              | поле страхователя   | причина нечитаемого страхователя | поле при двух ключах | причина при двух ключах                                | статус недоступности | код недоступности   |
+      | 400    | VALIDATION_ERROR | insurer_external_id | ожидается UUID                   | external_id          | external_id не передаётся вместе с insurer_external_id | 503                  | SERVICE_UNAVAILABLE |
 
   # [ТЗ-Д] «Коды ответов»: 400 — неверный тип; [Р20]: полис и ЛПУ — ручки сервиса Заявок.
   Структура сценария: Нечитаемый UUID в пути при недоступной базе — сервису Заявок 400 с нарушением по полю id

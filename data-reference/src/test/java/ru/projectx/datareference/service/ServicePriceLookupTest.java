@@ -22,6 +22,7 @@ import ru.projectx.datareference.entity.Lpu;
 import ru.projectx.datareference.entity.LpuContract;
 import ru.projectx.datareference.entity.PriceListItem;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
+import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
@@ -98,7 +99,7 @@ class ServicePriceLookupTest {
     @Test
     void lpuRefusal_comesBeforeServiceChecks() {
         when(contragentServices.findById(service.id())).thenReturn(Optional.of(service));
-        when(offers.of(lpu.id())).thenThrow(ReferenceNotFoundException.lpu(lpu.id()));
+        when(offers.of(lpu.id())).thenThrow(MissingReference.LPU.notFound(lpu.id()));
 
         assertThatThrownBy(() -> lookup.source(service.id(), PERIOD))
                 .isInstanceOfSatisfying(ReferenceNotFoundException.class,

@@ -1,79 +1,23 @@
 package ru.projectx.datareference.exception;
 
 import java.io.Serial;
-import java.util.UUID;
 
 public final class ReferenceNotFoundException extends RuntimeException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private static final String PROGRAM_NOT_FOUND = "PROGRAM_NOT_FOUND";
-    private static final String POLICY_NOT_FOUND = "POLICY_NOT_FOUND";
-    private static final String INSURANCE_CONTRACT_NOT_FOUND = "INSURANCE_CONTRACT_NOT_FOUND";
-    private static final String LPU_NOT_FOUND = "LPU_NOT_FOUND";
-    private static final String SERVICE_NOT_FOUND = "SERVICE_NOT_FOUND";
-
-    private enum Missing {
-        PROGRAM(PROGRAM_NOT_FOUND, "программа страхования %s не найдена"),
-        POLICY(POLICY_NOT_FOUND, "полис %s не найден"),
-        POLICY_BY_EXTERNAL_ID(POLICY_NOT_FOUND, "полис с external_id %s не найден"),
-        POLICY_BY_NUMBER(POLICY_NOT_FOUND, "в договоре страхования с external_id %s нет полиса с таким номером"),
-        INSURANCE_CONTRACT(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования %s не найден"),
-        INSURANCE_CONTRACT_BY_EXTERNAL_ID(INSURANCE_CONTRACT_NOT_FOUND, "договор страхования с external_id %s не найден"),
-        LPU(LPU_NOT_FOUND, "ЛПУ %s не найдено"),
-        SERVICE(SERVICE_NOT_FOUND, "услуга %s не найдена");
-
-        private final String code;
-        private final String messageTemplate;
-
-        Missing(String code, String messageTemplate) {
-            this.code = code;
-            this.messageTemplate = messageTemplate;
-        }
-
-        ReferenceNotFoundException notFound(UUID id) {
-            return new ReferenceNotFoundException(code, messageTemplate.formatted(id));
-        }
-    }
+    static final String PROGRAM_NOT_FOUND = "PROGRAM_NOT_FOUND";
+    static final String POLICY_NOT_FOUND = "POLICY_NOT_FOUND";
+    static final String INSURANCE_CONTRACT_NOT_FOUND = "INSURANCE_CONTRACT_NOT_FOUND";
+    static final String LPU_NOT_FOUND = "LPU_NOT_FOUND";
+    static final String SERVICE_NOT_FOUND = "SERVICE_NOT_FOUND";
 
     private final String code;
 
-    private ReferenceNotFoundException(String code, String message) {
+    ReferenceNotFoundException(String code, String message) {
         super(message);
         this.code = code;
-    }
-
-    public static ReferenceNotFoundException program(UUID id) {
-        return Missing.PROGRAM.notFound(id);
-    }
-
-    public static ReferenceNotFoundException policy(UUID id) {
-        return Missing.POLICY.notFound(id);
-    }
-
-    public static ReferenceNotFoundException policyByExternalId(UUID externalId) {
-        return Missing.POLICY_BY_EXTERNAL_ID.notFound(externalId);
-    }
-
-    public static ReferenceNotFoundException policyByNumber(UUID contractExternalId) {
-        return Missing.POLICY_BY_NUMBER.notFound(contractExternalId);
-    }
-
-    public static ReferenceNotFoundException insuranceContract(UUID id) {
-        return Missing.INSURANCE_CONTRACT.notFound(id);
-    }
-
-    public static ReferenceNotFoundException insuranceContractByExternalId(UUID externalId) {
-        return Missing.INSURANCE_CONTRACT_BY_EXTERNAL_ID.notFound(externalId);
-    }
-
-    public static ReferenceNotFoundException lpu(UUID id) {
-        return Missing.LPU.notFound(id);
-    }
-
-    public static ReferenceNotFoundException service(UUID id) {
-        return Missing.SERVICE.notFound(id);
     }
 
     public String code() {

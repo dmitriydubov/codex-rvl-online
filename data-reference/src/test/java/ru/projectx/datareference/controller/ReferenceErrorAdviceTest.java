@@ -18,7 +18,7 @@ import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.exception.MissingReference;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ReferenceErrorAdviceTest {
@@ -37,7 +37,7 @@ class ReferenceErrorAdviceTest {
 
     @Test
     void referenceNotFound_isNotFound_withSameBodyAsBefore() throws UnsupportedEncodingException {
-        controller.failWith(ReferenceNotFoundException.program(FIRST));
+        controller.failWith(MissingReference.PROGRAM.notFound(FIRST));
 
         MvcTestResult result = request();
 
@@ -70,6 +70,20 @@ class ReferenceErrorAdviceTest {
         assertThat(body(result)).isEqualTo("{\"error\":{\"code\":\"AMBIGUOUS_PRICE_CONTRACT\","
                 + "\"message\":\"у ЛПУ " + FIRST + " больше одного действующего кандидата на прайсовый договор\","
                 + "\"details\":[{\"lpuContractId\":\"" + SECOND + "\"}],"
+                + "\"requestId\":\"" + REQUEST_ID + "\"}}");
+    }
+
+    @Test
+    void ambiguousInsuranceContract_isConflict_listingContractCandidates() throws UnsupportedEncodingException {
+        controller.failWith(AmbiguousReferenceException.insuranceContract(FIRST, List.of(SECOND, FIRST)));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(409);
+        assertThat(body(result)).isEqualTo("{\"error\":{\"code\":\"AMBIGUOUS_INSURANCE_CONTRACT\","
+                + "\"message\":\"у страхователя " + FIRST + " больше одного действующего договора страхования\","
+                + "\"details\":[{\"insuranceContractId\":\"" + SECOND + "\"},"
+                + "{\"insuranceContractId\":\"" + FIRST + "\"}],"
                 + "\"requestId\":\"" + REQUEST_ID + "\"}}");
     }
 
@@ -107,7 +121,7 @@ class ReferenceErrorAdviceTest {
 
     @Test
     void serviceNotFound_isNotFound_namingServiceReference() {
-        controller.failWith(ReferenceNotFoundException.service(FIRST));
+        controller.failWith(MissingReference.SERVICE.notFound(FIRST));
 
         MvcTestResult result = request();
 

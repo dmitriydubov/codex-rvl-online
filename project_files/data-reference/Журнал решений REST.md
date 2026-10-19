@@ -167,6 +167,38 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 - **Решение владельца 2026-10-07** на остановке спецификации Ш66 (вариант А; ответы через координатора). Закреплено
   `program_services_order.feature`. Соседям отдельно не сообщается: порядок только добавляет гарантию.
 
+### В-13. Действующий договор страхования по GUID страхователя (Ш77, 2026-10-19)
+
+- **Правило.** `GET /internal/v1/insurance-contracts?insurer_external_id={GUID страхователя в 1С}` отдаёт один договор
+  страхования, действующий сегодня по В-4 (не в архиве, `begin_date <= сегодня`, `end_date` пуста или `>= сегодня`,
+  день — московский), в том же виде, что `GET /insurance-contracts/{id}`. Страхователя может не быть в справочнике
+  `insurers` — тогда `insurer: null`, договор отдаётся. Действующего нет (страхователь неизвестен, без договоров, все
+  недействующие) — 404 `INSURANCE_CONTRACT_NOT_FOUND` с пустыми `details`. Действующих два и больше — 409
+  `AMBIGUOUS_INSURANCE_CONTRACT`, в `details` по объекту `{"insurance_contract_id": <наш id>}` на кандидата, порядок не
+  задан; отказ пишется в журнал WARN, как остальные 409. Недействующие договоры в кандидаты не входят. Нечитаемый GUID
+  или пустой параметр — 400 `VALIDATION_ERROR` по полю `insurer_external_id`; `external_id` вместе с
+  `insurer_external_id` (в том числе пустой) — 400 по полю `external_id` с причиной «external_id не передаётся вместе с
+  insurer_external_id»; без ключа — 400 по `external_id` с причиной «нужен external_id либо insurer_external_id».
+  Ответ кэшируется (В-10): ключ — московский день и GUID страхователя, сброс — потоками договоров страхования и
+  контрагентов; 404 и 409 не кэшируются.
+- **Потребитель.** Сервис Заявок: кадровик входит через B2B-портал, `companyId` из токена — GUID страхователя в 1С:УСК;
+  `id` ответа Заявки хранят как `insurance_contract_id`, `external_id` передают в R-01 и R-04.
+- **Где в коде.** `controller/InsuranceContractController`, `service/InsuranceContractQueryService.activeByInsurer`,
+  `service/ActiveInsuranceContracts.soleActiveOf` (отбор правилом `entity/InsuranceContract.isActiveOn`),
+  `repository/InsuranceContractRepository.findAllByExternalInsurerId`, `exception/AmbiguousReferenceException.insuranceContract`,
+  `dto/ErrorResponse.InsuranceContractCandidate`, `config/ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER`,
+  `service/ReferenceCacheDependencies`. Спецификация: `insurance_contract_by_insurer.feature`,
+  `rest_input_validation_without_database.feature`.
+- **ТЗ API.** Ручки нет: «Допущения» ТЗ API считают, что вызывающий уже знает `external_id` договора. Правку копии ТЗ
+  в `edit/` делает координатор.
+- **Почему так.** Договор не угадывается: два одновременно действующих договора одного страхователя — ошибка данных
+  1С:УСК (как неоднозначный прайсовый договор, В-6б), а «самый новый» молча привязал бы заявки к не тому договору.
+  Правило «действующего» не дублируется в SQL: договоры страхователя читаются все (их единицы) и отбираются тем же
+  правилом сущности, что у R-01 и R-04.
+- **Решение владельца 2026-10-19:** критерии приёмки — карточка Jira («1) да 2) да»); спецификация утверждена на
+  остановке Ш77 вместе с пунктами 1–6 (код 409, поле кандидата, тексты 400, `insurer: null`, новые шаги, без отдельных
+  сценариев кэша при отказе базы). Контракт сообщает разработчице Заявок владелец до мержа.
+
 ### Решение от 23.09. `details` в ошибке — всегда массив объектов
 
 - **Правило.** Тело ошибки: `{"error": {"code", "message", "details": [...], "request_id"}}`. `details` — всегда массив
@@ -205,6 +237,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 | R-05 по номеру | `?number=&contract_external_id=` | так же с 2026-10-05 (Ш38, PR #55); прежний `contract_id` — 400 с полем `contract_id`, половина ключа или пустой номер — 400 по недостающей части; неизвестный договор — 404 `POLICY_NOT_FOUND` | Р19 п. 2; решения владельца на остановке Ш38 (вариант «а») и по отчёту PR #55 (п. 1) |
 | R-05 для Договоров | один ответ с ПДн | проекция без ПДн `…/policies/{id}/contract-view`, `…/policies/contract-view?external_id=` | Р20 (а), Ш39 |
 | R-05 обезличенный полис | ПДн обязательны | 200, ПДн `null`, поле `personal_data_erased` (В-11) | Р59, Ш62; согласовано с Заявками |
+| Договор страхования по страхователю | нет ручки (вызывающий знает `external_id` договора) | `GET /insurance-contracts?insurer_external_id=`: один действующий договор (В-4); 404 `INSURANCE_CONTRACT_NOT_FOUND`, 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов (В-13) | Ш77; запрос сервиса Заявок |
 | Программа | нет ручки | `GET /programs/{id}`; перечень `services` — в устойчивом порядке (В-12) | ТЗ сервиса Договоров; Ш66 |
 | `is_archive` в ответе | только условие отбора | поле каждого ответа | договор по программе с `deleteMark` иначе незаметен |
 | Взаимоисключающие ключи | не описано | 400 `VALIDATION_ERROR` с именем поля | Ш27 (Р53 (б)) |

@@ -16,7 +16,7 @@ import ru.projectx.datareference.entity.PolicyProgram;
 import ru.projectx.datareference.entity.PolicyServiceLine;
 import ru.projectx.datareference.entity.Program;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.InsuranceContractRepository;
 import ru.projectx.datareference.repository.PolicyRepository;
 import ru.projectx.datareference.repository.ProgramRepository;
@@ -41,7 +41,7 @@ public class PolicyQueryService implements PolicyReads {
     public PolicyResponse byId(UUID id) {
         return policies.findById(id)
                 .map(this::assemble)
-                .orElseThrow(() -> ReferenceNotFoundException.policy(id));
+                .orElseThrow(() -> MissingReference.POLICY.notFound(id));
     }
 
     @Override
@@ -49,7 +49,7 @@ public class PolicyQueryService implements PolicyReads {
     public PolicyResponse byExternalId(UUID externalId) {
         return policies.findByExternalId(externalId)
                 .map(this::assemble)
-                .orElseThrow(() -> ReferenceNotFoundException.policyByExternalId(externalId));
+                .orElseThrow(() -> MissingReference.POLICY_BY_EXTERNAL_ID.notFound(externalId));
     }
 
     @Override
@@ -61,7 +61,7 @@ public class PolicyQueryService implements PolicyReads {
         }
         return found.stream().findFirst()
                 .map(this::assemble)
-                .orElseThrow(() -> ReferenceNotFoundException.policyByNumber(contractExternalId));
+                .orElseThrow(() -> MissingReference.POLICY_BY_NUMBER.notFound(contractExternalId));
     }
 
     private PolicyResponse assemble(Policy policy) {

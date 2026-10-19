@@ -5,6 +5,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import ru.projectx.datareference.dto.PolicyContractView;
+import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.PolicyContractRow;
 import ru.projectx.datareference.repository.PolicyContractViewRepository;
@@ -21,12 +22,12 @@ public class PolicyContractViewService implements PolicyContractViews {
 
     @Override
     public PolicyContractView byId(UUID id) {
-        return view(id, policies::findContractViewById, ReferenceNotFoundException::policy);
+        return view(id, policies::findContractViewById, MissingReference.POLICY::notFound);
     }
 
     @Override
     public PolicyContractView byExternalId(UUID externalId) {
-        return view(externalId, policies::findContractViewByExternalId, ReferenceNotFoundException::policyByExternalId);
+        return view(externalId, policies::findContractViewByExternalId, MissingReference.POLICY_BY_EXTERNAL_ID::notFound);
     }
 
     private static PolicyContractView view(

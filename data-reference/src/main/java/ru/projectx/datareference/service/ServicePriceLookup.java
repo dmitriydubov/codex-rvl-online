@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.dto.NamedRef;
 import ru.projectx.datareference.entity.ContragentService;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
-import ru.projectx.datareference.exception.ReferenceNotFoundException;
+import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.repository.ContragentServiceRepository;
 import ru.projectx.datareference.repository.PriceListItemRepository;
 import ru.projectx.datareference.service.price.PriceLine;
@@ -30,7 +30,7 @@ public class ServicePriceLookup {
     @RestReadTransaction
     public PricedService source(UUID serviceId, StayPeriod period) {
         ContragentService service = contragentServices.findById(serviceId)
-                .orElseThrow(() -> ReferenceNotFoundException.service(serviceId));
+                .orElseThrow(() -> MissingReference.SERVICE.notFound(serviceId));
         requireOffered(service, offers.of(service.contract().lpu().id()));
         List<PriceLine> lines = priceListItems
                 .findWithinPeriodByServiceId(serviceId, period.checkIn(), period.checkOut()).stream()
@@ -45,13 +45,13 @@ public class ServicePriceLookup {
             throw IncompleteReferenceException.serviceOutsidePriceContract(offer.lpu().id());
         }
         if (offer.services().stream().noneMatch(offered -> offered.id().equals(service.id()))) {
-            throw ReferenceNotFoundException.service(service.id());
+            throw MissingReference.SERVICE.notFound(service.id());
         }
     }
 
     private static void requireNotArchived(ContragentService service) {
         if (service.isArchive()) {
-            throw ReferenceNotFoundException.service(service.id());
+            throw MissingReference.SERVICE.notFound(service.id());
         }
     }
 }

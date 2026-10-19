@@ -15,6 +15,7 @@ final class AmbiguityDetails {
         Function<UUID, ErrorResponse.Detail> detail = switch (ambiguous.candidateKind()) {
             case POLICY -> ErrorResponse.PolicyCandidate::new;
             case LPU_CONTRACT -> ErrorResponse.LpuContractCandidate::new;
+            case INSURANCE_CONTRACT -> ErrorResponse.InsuranceContractCandidate::new;
         };
         return ambiguous.candidateIds().stream().map(detail).toList();
     }
