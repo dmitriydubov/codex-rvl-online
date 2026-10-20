@@ -52,6 +52,12 @@ public class ServiceLog {
         entryMentioning(level, code);
     }
 
+    @Тогда("в журнале Дата-референса есть запись уровня {уровень} с X-Request-Id ответа")
+    public void entryWithResponseRequestId(Level level) {
+        assertThat(contracts.lastResponse().requestIds()).as("заголовок X-Request-Id ответа").hasSize(1);
+        entryMentioning(level, contracts.lastResponse().requestIds().getFirst());
+    }
+
     @Тогда("строка query из запроса не попала ни в ответ, ни в журнал Дата-референса")
     public void searchStringNotRepeated() {
         assertThat(contracts.lastResponse().body().toString())

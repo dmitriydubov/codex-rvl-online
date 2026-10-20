@@ -4,6 +4,7 @@ import jakarta.persistence.PersistenceException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import org.springframework.core.NestedRuntimeException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.RecoverableDataAccessException;
@@ -19,13 +20,13 @@ public class DatabaseOutages {
 
     private static final List<Class<? extends RuntimeException>> TEMPORARY = List.of(
             CannotCreateTransactionException.class,
-            TransactionTimedOutException.class,
             DataAccessResourceFailureException.class,
             RecoverableDataAccessException.class,
             TransientDataAccessException.class);
 
     private static final List<Predicate<Throwable>> TEMPORARY_RULES = List.of(
             DatabaseOutages::isTemporaryType,
+            DatabaseOutages::hasExpiredDeadline,
             DatabaseOutages::isExpiredHibernateTransaction,
             DatabaseOutages::isSessionClosedForIdleTransaction);
 
@@ -66,6 +67,9 @@ public class DatabaseOutages {
         if (isExpiredHibernateTransaction(classified)) {
             return type + "/" + classified.getCause().getClass().getSimpleName();
         }
+        if (hidesExpiredDeadline(classified)) {
+            return type + "/" + TransactionTimedOutException.class.getSimpleName();
+        }
         return type;
     }
 
@@ -80,6 +84,14 @@ public class DatabaseOutages {
 
     private static boolean isTemporaryType(Throwable failure) {
         return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure));
+    }
+
+    private static boolean hasExpiredDeadline(Throwable failure) {
+        return failure instanceof NestedRuntimeException nested && nested.contains(TransactionTimedOutException.class);
+    }
+
+    private static boolean hidesExpiredDeadline(Throwable failure) {
+        return hasExpiredDeadline(failure) && !(failure instanceof TransactionTimedOutException);
     }
 
     private static boolean isSessionClosedForIdleTransaction(Throwable failure) {
