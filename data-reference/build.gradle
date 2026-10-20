@@ -75,7 +75,7 @@ dependencies {
     implementation 'org.springframework.integration:spring-integration-jdbc'
     implementation 'org.jspecify:jspecify'
     implementation 'tools.jackson.core:jackson-databind'
-    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.postgresql:postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'

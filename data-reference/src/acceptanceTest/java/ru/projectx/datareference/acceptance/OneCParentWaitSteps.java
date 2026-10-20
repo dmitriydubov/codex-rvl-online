@@ -23,11 +23,15 @@ public class OneCParentWaitSteps {
     private final OneCInbox inbox;
     private final ReferenceImportScheduler scheduler;
     private final ImportProperties properties;
+    private final CacheNotificationsDelivered notifications;
 
-    public OneCParentWaitSteps(OneCInbox inbox, ReferenceImportScheduler scheduler, ImportProperties properties) {
+    public OneCParentWaitSteps(OneCInbox inbox, ReferenceImportScheduler scheduler, ImportProperties properties,
+            CacheNotificationsDelivered notifications) {
+
         this.inbox = inbox;
         this.scheduler = scheduler;
         this.properties = properties;
+        this.notifications = notifications;
     }
 
     @Дано("1С:УСК прислала контрагента ЛПУ без вида деятельности РВЛ:")
@@ -52,6 +56,7 @@ public class OneCParentWaitSteps {
         for (int pass = 0; pass < passes; pass++) {
             scheduler.importPendingMessages();
         }
+        notifications.awaitDelivered();
     }
 
     @Дано("с начала ожидания родителя прошло на час {word} срока ожидания родителя")

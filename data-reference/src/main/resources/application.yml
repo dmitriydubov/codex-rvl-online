@@ -138,6 +138,9 @@ projectx:
   cache:
     ttl: ${REFERENCE_CACHE_TTL:10m}
     maximum-size: ${REFERENCE_CACHE_MAXIMUM_SIZE:1000}
+    notifications:
+      reconnect-delay: ${REFERENCE_CACHE_RECONNECT_DELAY:1s}
+      reconnect-max-delay: ${REFERENCE_CACHE_RECONNECT_MAX_DELAY:10s}
 
   api:
     zone: Europe/Moscow
