@@ -3,7 +3,6 @@ package ru.projectx.datareference.service.warmup;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -25,7 +24,7 @@ public class StartupWarmup implements ApplicationRunner {
     }
 
     @Override
-    public void run(@Nullable ApplicationArguments arguments) {
+    public void run(ApplicationArguments arguments) {
         Instant started = clock.instant();
         WarmupOutcome outcome = warmup.warm(started.plus(properties.timeout()));
         journal.record(outcome, Duration.between(started, clock.instant()));

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.DefaultApplicationArguments;
 import ru.projectx.datareference.config.WarmupProperties;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,7 +31,8 @@ class StartupWarmupTest {
         WarmupOutcome outcome = WarmupOutcome.completed(9);
         when(warmup.warm(STARTED.plusSeconds(20))).thenReturn(outcome);
 
-        new StartupWarmup(warmup, journal, new WarmupProperties(Duration.ofSeconds(20), 100), clock).run(null);
+        new StartupWarmup(warmup, journal, new WarmupProperties(Duration.ofSeconds(20), 100), clock)
+                .run(new DefaultApplicationArguments());
 
         verify(journal).record(outcome, Duration.ofMillis(1500));
     }

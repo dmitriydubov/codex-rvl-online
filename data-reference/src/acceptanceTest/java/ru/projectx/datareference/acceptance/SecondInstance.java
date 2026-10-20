@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -32,6 +34,8 @@ public class SecondInstance {
     private static final String PASSWORD = "second-instance";
     private static final Duration DISCONNECT_TIMEOUT = Duration.ofSeconds(30);
     private static final String WITHOUT_ACCEPTANCE_STAND = "withoutAcceptanceStand";
+    private static final Duration START_TIMEOUT = Duration.ofMinutes(3);
+    private static final Executor STARTER = command -> Thread.ofPlatform().name("second-instance-start").start(command);
 
     private static final String CREATE_ROLE = """
             do $$
@@ -79,7 +83,8 @@ public class SecondInstance {
         application.setListeners(application.getListeners().stream()
                 .filter(listener -> !(listener instanceof LoggingApplicationListener))
                 .toList());
-        starting = CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)));
+        starting = CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER)
+                .orTimeout(START_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
     }
 
     public int port() {
