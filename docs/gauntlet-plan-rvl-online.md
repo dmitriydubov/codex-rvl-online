@@ -4531,6 +4531,13 @@ REST.
     менял `gauntlet/`, `.claude/`, `.github/` и `CLAUDE.md`, фичи менялись только коммитами `spec:` (вторую правку фичи
     Ш81 утвердил владелец). Дальше сессии шагов data-reference — только в `default`; сессия проверяет `guard: on` в строке
     статуса при старте, иначе остановка.
+  - **Ответы владельца 2026-10-20 «1) а 2) да 3) заархивировал лишнюю среду, проверь»:** (1) запуск без очереди принят
+    как есть, документы уже под код (PR #200), отдельной задачи нет; (2) Ш83 открыт 10:44 UTC в `default`
+    (session_01VphwzMsWLAZnCSQrYvgmDk, Opus 5.5, ветка `claude/sh83-receipt-db-time`); (3) проверка координатора:
+    заархивировано `env_013PC74pJafEbrLaF8A6CVYY` («gauntlet-admin», 2026-09-25) — в нём сессии координаторов
+    data-reference (эта) и contract-service; активными остались `default` и `env_011KhGJ5hPyZ2jaWNeQYEh4A`
+    («gauntlet-admin», 2026-08-14) — в нём координатор medius. Вопрос владельцу: вернуть `env_013PC…` из архива или
+    оставить одно окружение без guard (`env_011KhG…`) для всех координаторов.
 - 2026-10-20, **Ш79 закрыт: PR #195 смержен (`d39523c`) после PR #194; сессия заархивирована.** Проверка после мержа:
   14 файлов (+549/−58); новый `service.database.TemporaryFailure` (правила временных отказов, перечисление), тест
   `ExpiredReadDeadlineTest`; в `src/acceptanceTest` — `LateFirstReadDataSource`, `ReadDeadline`, `ReadDeadlineSteps`;
