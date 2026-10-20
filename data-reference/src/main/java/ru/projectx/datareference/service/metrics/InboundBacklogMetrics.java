@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.ToDoubleFunction;
 import org.jspecify.annotations.Nullable;
@@ -62,12 +63,8 @@ public class InboundBacklogMetrics implements MeterBinder {
 
     public void withdraw() {
         synchronized (publication) {
-            MeterRegistry target = registry;
-            if (target == null) {
-                return;
-            }
             for (Meter meter : published) {
-                target.remove(meter);
+                Objects.requireNonNull(registry).remove(meter);
             }
             published.clear();
         }
