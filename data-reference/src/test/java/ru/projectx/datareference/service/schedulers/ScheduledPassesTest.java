@@ -14,6 +14,7 @@ import org.springframework.scheduling.config.IntervalTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.support.ImportSettings;
+import ru.projectx.datareference.support.TestLeadership;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduledPassesTest {
@@ -66,6 +67,18 @@ class ScheduledPassesTest {
     }
 
     @Test
+    void standby_runsNoneOfThePasses() {
+        ScheduledPasses passes = new ScheduledPasses(importScheduler, retention, stuckTransferAlert,
+                ImportSettings.defaults().build(), TestLeadership.standby());
+
+        passes.importOnSchedule();
+        passes.retentionOnSchedule();
+        passes.stuckTransferCheckOnSchedule();
+
+        verifyNoInteractions(importScheduler, retention, stuckTransferAlert);
+    }
+
+    @Test
     void allThreePasses_areFixedDelayTasksOnly() {
         ScheduledTaskRegistrar registrar = configured();
 
@@ -89,7 +102,7 @@ class ScheduledPassesTest {
                 .stuckTransferPollInterval(STUCK_TRANSFER_PAUSE)
                 .build();
         ScheduledTaskRegistrar registrar = new ScheduledTaskRegistrar();
-        new ScheduledPasses(importScheduler, retention, stuckTransferAlert, properties).configureTasks(registrar);
+        new ScheduledPasses(importScheduler, retention, stuckTransferAlert, properties, TestLeadership.leader()).configureTasks(registrar);
         return registrar;
     }
 }

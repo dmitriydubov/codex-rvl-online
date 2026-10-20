@@ -1,10 +1,13 @@
 package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -24,6 +27,8 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.ParentWaitRepository;
+import ru.projectx.datareference.service.leadership.LeadershipFence;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 import ru.projectx.datareference.support.ImportSettings;
 
@@ -38,12 +43,22 @@ class ParentWaitExpiryTest {
     private static final AwaitedParent SERVICE =
             new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, UUID.fromString("4b7d1f9a-3c6e-4d28-9a05-b8e2c1f7d346"));
 
+    private final LeadershipFence fence = mock(LeadershipFence.class);
     private final ParentWaitRepository waits = mock(ParentWaitRepository.class);
     private final InboundMessageRepository inbound = mock(InboundMessageRepository.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final ParentWaitExpiry expiry = new ParentWaitExpiry(waits, inbound, new InboundTransitionMetrics(registry),
             ImportSettings.defaults().batchSize(BATCH_SIZE).parentWaitTimeout(TIMEOUT).build(),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC), fence);
+
+    @Test
+    void instanceThatLostTheLeaderLock_expiresNothing() {
+        doThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c")).when(fence).holdUntilCommit();
+
+        assertThatThrownBy(expiry::expireOverdue).isInstanceOf(LeadershipLostException.class);
+
+        verifyNoInteractions(waits, inbound);
+    }
 
     @Test
     void overdueMessage_isRejectedNamingItsParent_andReturnedForTheJournal() {

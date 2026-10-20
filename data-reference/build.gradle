@@ -72,6 +72,7 @@ dependencies {
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'com.github.ben-manes.caffeine:caffeine'
+    implementation 'org.springframework.integration:spring-integration-jdbc'
     implementation 'org.jspecify:jspecify'
     implementation 'tools.jackson.core:jackson-databind'
     runtimeOnly 'org.postgresql:postgresql'

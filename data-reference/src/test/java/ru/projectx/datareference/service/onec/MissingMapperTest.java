@@ -14,6 +14,7 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.leadership.LeadershipFence;
 import tools.jackson.databind.json.JsonMapper;
 
 class MissingMapperTest {
@@ -24,7 +25,7 @@ class MissingMapperTest {
         ReferenceImportService importService = new ReferenceImportService(
                 List.of(), List.of(), inboundMessageService, mock(SupersededParentWaits.class),
                 JsonMapper.builder().build(),
-                mock(ApplicationEventPublisher.class));
+                mock(ApplicationEventPublisher.class), mock(LeadershipFence.class));
 
         UUID messageId = UUID.randomUUID();
         InboundMessage message = InboundMessage.receive(

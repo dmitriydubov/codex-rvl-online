@@ -112,6 +112,11 @@ projectx:
   scheduling:
     enabled: true
 
+  leadership:
+    group: data-reference
+    lock-ttl: ${LEADER_LOCK_TTL:30s}
+    heartbeat: 1s
+
   metrics:
     backlog-refresh-interval: 30s
 
@@ -152,6 +157,7 @@ projectx:
     ingest:
       duplicate-delivery-backoff: 5s
       storage-check-interval: 10s
+      consumer-stop-timeout: 30s
     contract:
       rvl-activity-id: f3876c53-c7d8-4620-b364-9538164ba5d4
     queues:

@@ -1,0 +1,27 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 020-leader-lock
+      author: rvl-online
+      comment: >
+        Блокировка ведущего экземпляра. Приём из 1С:УСК, разбор сырья и задачи по расписанию идут только на том
+        экземпляре, который держит строку этой таблицы; остальные экземпляры отвечают на REST. Строку ведут
+        DefaultLockRepository и JdbcLockRegistry Spring Integration 7.0: ключ блокировки, группа экземпляров (region),
+        идентификатор держащего экземпляра и срок, после которого её может забрать другой. Состав колонок и ключ — как
+        в schema-postgresql.sql из spring-integration-jdbc 7.0.5; имя таблицы задаёт префикс репозитория блокировок.
+      changes:
+        - createTable:
+            tableName: leader_lock
+            columns:
+              - column: { name: lock_key, type: char(36), constraints: { nullable: false } }
+              - column: { name: region, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: client_id, type: char(36) }
+              - column: { name: created_date, type: timestamp, constraints: { nullable: false } }
+              - column: { name: expired_after, type: timestamp, constraints: { nullable: false } }
+        - addPrimaryKey:
+            tableName: leader_lock
+            columnNames: lock_key, region
+            constraintName: leader_lock_pk
+      rollback:
+        - dropTable:
+            tableName: leader_lock

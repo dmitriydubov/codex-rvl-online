@@ -3,6 +3,8 @@ package ru.projectx.datareference.service.onec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,6 +27,8 @@ import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
+import ru.projectx.datareference.service.leadership.LeadershipFence;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -50,6 +54,21 @@ class ReferenceImportDispatchTest {
 
     @Mock
     private SupersededParentWaits supersededWaits;
+
+    private final LeadershipFence fence = mock(LeadershipFence.class);
+
+    @Test
+    void instanceThatLostTheLeaderLock_importsNothing() {
+        doThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c")).when(fence).holdUntilCommit();
+
+        ReferenceImportService service = new ReferenceImportService(
+                List.of(), List.of(), inboundMessageService, supersededWaits, json, events, fence);
+
+        assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, "{\"data\":" + MKB10_DATA + "}")))
+                .isInstanceOf(LeadershipLostException.class);
+
+        verifyNoInteractions(inboundMessageService, events, supersededWaits);
+    }
 
     @Test
     void messageOfMappedStream_goesToItsMapper_withDataOfEnvelope() {
@@ -143,7 +162,7 @@ class ReferenceImportDispatchTest {
 
     @Test
     void bodyThatIsNotJson_isContractViolation_withoutQuotingTheBody() {
-        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events);
+        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events, fence);
 
         assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, "{не json")))
                 .isInstanceOf(OneCFieldException.class)
@@ -154,7 +173,7 @@ class ReferenceImportDispatchTest {
     }
 
     private void assertEnvelopeRejected(String payload, String reason) {
-        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events);
+        ReferenceImportService service = new ReferenceImportService(List.of(), List.of(), inboundMessageService, supersededWaits, json, events, fence);
 
         assertThatThrownBy(() -> service.importMessage(message(OneCStream.MKB10, payload)))
                 .isInstanceOf(OneCFieldException.class)
@@ -162,7 +181,7 @@ class ReferenceImportDispatchTest {
     }
 
     private ReferenceImportService service() {
-        return new ReferenceImportService(List.of(mkb10Mapper), List.of(priceListHandler), inboundMessageService, supersededWaits, json, events);
+        return new ReferenceImportService(List.of(mkb10Mapper), List.of(priceListHandler), inboundMessageService, supersededWaits, json, events, fence);
     }
 
     private static InboundMessage message(OneCStream stream, String payload) {

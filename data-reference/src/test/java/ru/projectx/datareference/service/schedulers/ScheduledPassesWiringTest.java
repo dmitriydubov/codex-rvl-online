@@ -18,6 +18,7 @@ import org.springframework.scheduling.config.ScheduledTaskHolder;
 import ru.projectx.datareference.config.ImportProperties;
 import ru.projectx.datareference.config.SchedulingConfig;
 import ru.projectx.datareference.support.ImportSettings;
+import ru.projectx.datareference.support.TestLeadership;
 
 class ScheduledPassesWiringTest {
 
@@ -58,6 +59,6 @@ class ScheduledPassesWiringTest {
                 .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
                 .withUserConfiguration(SchedulingConfig.class)
                 .withBean(ScheduledPasses.class, () -> new ScheduledPasses(
-                        importScheduler, retention, stuckTransferAlert, properties));
+                        importScheduler, retention, stuckTransferAlert, properties, TestLeadership.leader()));
     }
 }

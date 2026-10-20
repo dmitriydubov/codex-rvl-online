@@ -30,6 +30,7 @@ public class OneCQueueEndpoints implements RabbitListenerConfigurer {
         SimpleRabbitListenerEndpoint endpoint = new SimpleRabbitListenerEndpoint();
         endpoint.setId(queueName);
         endpoint.setQueueNames(queueName);
+        endpoint.setAutoStartup(false);
         endpoint.setMessageListener((ChannelAwareMessageListener) (message, channel) ->
                 listener.receive(stream, message, channel));
         return endpoint;

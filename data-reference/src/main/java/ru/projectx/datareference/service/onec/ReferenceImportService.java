@@ -16,6 +16,7 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.StreamMapper;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
+import ru.projectx.datareference.service.leadership.LeadershipFence;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -26,6 +27,7 @@ public class ReferenceImportService {
     private final InboundMessageService inboundMessageService;
     private final StoredEnvelope envelope;
     private final ApplicationEventPublisher events;
+    private final LeadershipFence leadership;
 
     public ReferenceImportService(
             List<StreamMapper> mappers,
@@ -33,7 +35,8 @@ public class ReferenceImportService {
             InboundMessageService inboundMessageService,
             SupersededParentWaits supersededWaits,
             ObjectMapper json,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            LeadershipFence leadership) {
 
         this.handlers = Stream.concat(
                         mappers.stream().map(mapper ->
@@ -43,10 +46,12 @@ public class ReferenceImportService {
         this.inboundMessageService = inboundMessageService;
         this.envelope = new StoredEnvelope(json);
         this.events = events;
+        this.leadership = leadership;
     }
 
     @Transactional
     public ImportOutcome importMessage(InboundMessage message) {
+        leadership.holdUntilCommit();
         ObjectNode data = dataOf(message);
         OneCStream stream = message.receipt().stream();
         ImportOutcome result = handlerFor(stream)

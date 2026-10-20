@@ -34,6 +34,7 @@ import ru.projectx.datareference.service.inbound.OneCLogContext;
 import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 import ru.projectx.datareference.support.StructuredJournal;
+import ru.projectx.datareference.support.TestLeadership;
 import tools.jackson.databind.JsonNode;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
@@ -121,12 +122,13 @@ class OneCQueueListenerStructuredJournalTest {
     private final OneCIngestMetrics metrics = IngestTestMetrics.discarded();
 
     private OneCQueueListener listener() {
-        OneCConsumerPause pause = new OneCConsumerPause(containers, probe, Clock.fixed(NOW, ZoneOffset.UTC), metrics);
+        OneCConsumerPause pause = new OneCConsumerPause(QueueContainersFixture.containers(containers, TestLeadership.leader()), probe, Clock.fixed(NOW, ZoneOffset.UTC), metrics);
         return new OneCQueueListener(
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, pause,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10)), metrics),
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10), Duration.ofSeconds(30)), metrics,
+                        TestLeadership.leader()),
                 metrics);
     }
 

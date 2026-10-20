@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.service.inbound.QuarantineService;
+import ru.projectx.datareference.service.leadership.BackgroundLeadership;
 
 @Component
 class OneCStorageFailures {
@@ -17,14 +18,16 @@ class OneCStorageFailures {
     private final OneCConsumerPause consumers;
     private final IngestProperties properties;
     private final OneCIngestMetrics metrics;
+    private final BackgroundLeadership leadership;
 
     OneCStorageFailures(QuarantineService quarantine, OneCConsumerPause consumers, IngestProperties properties,
-            OneCIngestMetrics metrics) {
+            OneCIngestMetrics metrics, BackgroundLeadership leadership) {
 
         this.quarantine = quarantine;
         this.consumers = consumers;
         this.properties = properties;
         this.metrics = metrics;
+        this.leadership = leadership;
     }
 
     void handle(OneCDelivery delivery, UUID messageId, RuntimeException failure) throws IOException {
@@ -32,6 +35,7 @@ class OneCStorageFailures {
             case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
             case OneCStorageFailure.DuplicateRace ignored -> returnAfterPause(delivery, messageId, failure);
             case OneCStorageFailure.Outage outage -> pauseConsumers(delivery, messageId, outage.outage());
+            case OneCStorageFailure.LeadershipLost ignored -> standDown(delivery, messageId);
         }
     }
 
@@ -76,6 +80,15 @@ class OneCStorageFailures {
         pauseBeforeRedelivery();
         metrics.record(delivery, IngestOutcome.RETURNED);
         delivery.returnToQueue();
+    }
+
+    private void standDown(OneCDelivery delivery, UUID messageId) throws IOException {
+        log.info("сообщение {} возвращено в очередь {}: экземпляр больше не ведущий, потребители останавливаются",
+                messageId, delivery.queue());
+        metrics.record(delivery, IngestOutcome.RETURNED);
+        delivery.returnToQueue();
+        consumers.stopConsumersWithoutProbe();
+        leadership.stepDown();
     }
 
     private void pauseConsumers(OneCDelivery delivery, UUID messageId, StorageOutage outage) {

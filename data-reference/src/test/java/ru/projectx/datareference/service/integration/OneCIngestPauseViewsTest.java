@@ -18,6 +18,7 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import ru.projectx.datareference.support.TestLeadership;
 
 @ExtendWith(MockitoExtension.class)
 class OneCIngestPauseViewsTest {
@@ -40,9 +41,9 @@ class OneCIngestPauseViewsTest {
 
     @BeforeEach
     void healthAndGaugeOverOnePause() {
-        pause = new OneCConsumerPause(registryProvider, probe,
+        pause = new OneCConsumerPause(QueueContainersFixture.containers(registryProvider, TestLeadership.leader()), probe,
                 Clock.fixed(Instant.parse("2026-10-05T12:00:00Z"), ZoneOffset.UTC), IngestTestMetrics.on(meters));
-        health = new OneCIngestHealthIndicator(pause, consumers);
+        health = new OneCIngestHealthIndicator(pause, consumers, TestLeadership.leader());
         new OneCIngestPauseGauge(pause).bindTo(meters);
         paused = meters.get(OneCIngestPauseGauge.PAUSED).gauge();
         when(consumers.queuesWithoutConsumer()).thenReturn(List.of());
