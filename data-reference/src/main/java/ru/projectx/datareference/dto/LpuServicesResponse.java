@@ -6,11 +6,11 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.AppealType;
-import ru.projectx.datareference.entity.ContragentService;
-import ru.projectx.datareference.entity.Lpu;
-import ru.projectx.datareference.entity.LpuContract;
-import ru.projectx.datareference.entity.PriceListItem;
+import ru.projectx.datareference.entity.catalog.AppealType;
+import ru.projectx.datareference.entity.catalog.ContragentService;
+import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.entity.catalog.LpuContract;
+import ru.projectx.datareference.entity.catalog.PriceListItem;
 
 public record LpuServicesResponse(NamedRef lpu, PriceContractRef priceContract, List<Service> services) {
 

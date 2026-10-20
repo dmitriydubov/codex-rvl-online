@@ -1,7 +1,8 @@
 package ru.projectx.datareference.service.integration;
 
 import java.util.Optional;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.service.database.SqlStates;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 
 sealed interface OneCStorageFailure {
 
@@ -9,6 +10,13 @@ sealed interface OneCStorageFailure {
     String UNIQUE_VIOLATION = "23505";
 
     static OneCStorageFailure of(RuntimeException failure) {
+        if (failure instanceof LeadershipLostException) {
+            return new LeadershipLost();
+        }
+        return ofDatabase(failure);
+    }
+
+    private static OneCStorageFailure ofDatabase(RuntimeException failure) {
         Optional<String> sqlState = SqlStates.deepest(failure);
         if (sqlState.filter(code -> code.startsWith(DATA_EXCEPTION_CLASS)).isPresent()) {
             return new Poison(sqlState.get());
@@ -23,6 +31,9 @@ sealed interface OneCStorageFailure {
     }
 
     record DuplicateRace() implements OneCStorageFailure {
+    }
+
+    record LeadershipLost() implements OneCStorageFailure {
     }
 
     record Outage(StorageOutage outage) implements OneCStorageFailure {

@@ -8,16 +8,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestController
-class FailingController {
+public class FailingController {
 
-    static final String FAILING = "/failing";
-    static final String NO_RESOURCE = "/no-resource";
-    static final String WITH_PARAMETER = "/with-parameter";
-    static final String READ_ONLY = "/read-only";
+    public static final String FAILING = "/failing";
+    public static final String NO_RESOURCE = "/no-resource";
+    public static final String WITH_PARAMETER = "/with-parameter";
+    public static final String READ_ONLY = "/read-only";
 
     private Exception failure = new IllegalStateException("отказ не задан");
 
-    void failWith(Exception next) {
+    public void failWith(Exception next) {
         this.failure = next;
     }
 

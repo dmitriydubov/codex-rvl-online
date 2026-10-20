@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import tools.jackson.databind.node.ObjectNode;
 
 final class OneCProgramRangeMessages {

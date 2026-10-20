@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.mapper.ImportResult;
 
 class ImportOutcomeTest {

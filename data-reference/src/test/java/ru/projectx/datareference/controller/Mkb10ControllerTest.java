@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import ru.projectx.datareference.dto.Mkb10Code;
 import ru.projectx.datareference.dto.Mkb10Response;
-import ru.projectx.datareference.service.Mkb10Reads;
+import ru.projectx.datareference.service.mkb10.Mkb10Reads;
 
 @ExtendWith(MockitoExtension.class)
 class Mkb10ControllerTest {

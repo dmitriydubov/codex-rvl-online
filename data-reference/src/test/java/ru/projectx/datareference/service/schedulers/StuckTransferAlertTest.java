@@ -23,7 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
-import ru.projectx.datareference.repository.BufferedTransfer;
+import ru.projectx.datareference.repository.inbound.BufferedTransfer;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 import ru.projectx.datareference.support.ImportSettings;
 

@@ -9,8 +9,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
-import ru.projectx.datareference.mapper.PolicyPersonalDataTerm;
-import ru.projectx.datareference.repository.PolicyRepository;
+import ru.projectx.datareference.mapper.stream.PolicyPersonalDataTerm;
+import ru.projectx.datareference.repository.policy.PolicyRepository;
 import ru.projectx.datareference.support.ImportSettings;
 import ru.projectx.datareference.support.TestApiProperties;
 

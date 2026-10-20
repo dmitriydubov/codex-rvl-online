@@ -16,8 +16,8 @@ import liquibase.integration.spring.SpringLiquibase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.NestedExceptionUtils;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.SessionSettingsRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.database.SessionSettingsRepository;
 import ru.projectx.datareference.support.IntegrationTest;
 
 @IntegrationTest

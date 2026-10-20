@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import ru.projectx.datareference.dto.Mkb10Response;
 import ru.projectx.datareference.exception.InvalidRequestException;
-import ru.projectx.datareference.service.Mkb10Reads;
+import ru.projectx.datareference.service.mkb10.Mkb10Reads;
 
 @InternalApi
 public class Mkb10Controller {

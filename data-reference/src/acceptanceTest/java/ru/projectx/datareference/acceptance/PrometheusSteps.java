@@ -10,6 +10,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 
@@ -19,6 +21,7 @@ public class PrometheusSteps {
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final URI scrape;
+    private final List<String> scenarioScrapes = new ArrayList<>();
     private String beforeScenario = "";
 
     public PrometheusSteps(@LocalManagementPort int managementPort) {
@@ -39,10 +42,51 @@ public class PrometheusSteps {
                 .isEqualTo(growth);
     }
 
+    @Тогда("показатель Prometheus {string} равен {int}")
+    public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
+        assertThat(seriesValues(scrape(), Pattern.quote(name) + " "))
+                .as("ряд %s без меток", name)
+                .containsExactly((double) expected);
+    }
+
+    @Тогда("показатель Prometheus {string} с метками stream {string} и status {string} равен {int}")
+    public void gaugeWithStreamAndStatusEquals(String name, String stream, String status, int expected)
+            throws IOException, InterruptedException {
+
+        assertThat(seriesValues(scrape(), Pattern.quote(name) + "\\{(?=[^}]*stream=\"" + Pattern.quote(stream)
+                + "\")(?=[^}]*status=\"" + Pattern.quote(status) + "\")[^}]*} "))
+                .as("ряд %s{stream=\"%s\",status=\"%s\"}", name, stream, status)
+                .containsExactly((double) expected);
+    }
+
+    @Тогда("ряда Prometheus {string} нет")
+    public void noSeries(String name) throws IOException, InterruptedException {
+        boolean shownEarlier = scenarioScrapes.stream().anyMatch(exposition -> hasSeries(exposition, name));
+        String now = scrape();
+
+        assertThat(shownEarlier)
+                .as("ряды %s в ответах /actuator/prometheus раньше в сценарии", name)
+                .isTrue();
+        assertThat(hasSeries(now, name))
+                .as("ряды %s в ответе /actuator/prometheus", name)
+                .isFalse();
+    }
+
+    private static boolean hasSeries(String exposition, String name) {
+        return Pattern.compile("^" + Pattern.quote(name) + "[{ ]", Pattern.MULTILINE).matcher(exposition).find();
+    }
+
+    private static List<Double> seriesValues(String exposition, String series) {
+        return Pattern.compile("^" + series + "(\\S+)$", Pattern.MULTILINE).matcher(exposition).results()
+                .map(match -> Double.parseDouble(match.group(1)))
+                .toList();
+    }
+
     private String scrape() throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(scrape).timeout(TIMEOUT).GET().build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).as("ответ /actuator/prometheus").isEqualTo(200);
+        scenarioScrapes.add(response.body());
         return response.body();
     }
 

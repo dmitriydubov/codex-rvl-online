@@ -4,12 +4,16 @@ import io.cucumber.spring.ScenarioScope;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @Component
 @ScenarioScope(proxyMode = ScopedProxyMode.NO)
@@ -190,7 +194,16 @@ public class OneCInbox {
     }
 
     public List<String> expectedStatuses() {
-        return List.copyOf(expectedStatuses);
+        List<OneCMessage> firstReceipts = received.stream()
+                .collect(Collectors.toMap(OneCMessage::messageId, message -> message, (first, repeated) -> first,
+                        LinkedHashMap::new))
+                .values().stream()
+                .toList();
+        return IntStream.range(0, expectedStatuses.size())
+                .mapToObj(index -> OneCPriceTransferMessages.batchWithoutItsFinal(firstReceipts.get(index), received)
+                        ? InboundStatus.BUFFERED.name()
+                        : expectedStatuses.get(index))
+                .toList();
     }
 
     public List<String> transferStatuses(UUID cid) {

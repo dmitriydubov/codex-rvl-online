@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
+import ru.projectx.datareference.support.TestLeadership;
 
 @ExtendWith(MockitoExtension.class)
 class OneCIngestHealthIndicatorTest {
@@ -27,14 +29,25 @@ class OneCIngestHealthIndicatorTest {
     private OneCQueueConsumers consumers;
 
     @Test
-    void everyQueueHasConsumer_isUpWithoutDetails() {
+    void everyQueueHasConsumer_isUpNamingTheLeaderRole() {
         when(pause.paused()).thenReturn(Optional.empty());
         when(consumers.queuesWithoutConsumer()).thenReturn(List.of());
 
-        Health health = new OneCIngestHealthIndicator(pause, consumers).health();
+        Health health = new OneCIngestHealthIndicator(pause, consumers, TestLeadership.leader()).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.UP);
-        assertThat(health.getDetails()).isEmpty();
+        assertThat(health.getDetails()).containsOnly(entry("role", "leader"));
+    }
+
+    @Test
+    void standbyExpectsNoConsumers_isUpNamingTheStandbyRole() {
+        when(pause.paused()).thenReturn(Optional.empty());
+        when(consumers.queuesWithoutConsumer()).thenReturn(List.of());
+
+        Health health = new OneCIngestHealthIndicator(pause, consumers, TestLeadership.standby()).health();
+
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(health.getDetails()).containsOnly(entry("role", "standby"));
     }
 
     @Test
@@ -42,11 +55,12 @@ class OneCIngestHealthIndicatorTest {
         when(pause.paused()).thenReturn(Optional.empty());
         when(consumers.queuesWithoutConsumer()).thenReturn(List.of("q-mkb10", "q-policies"));
 
-        Health health = new OneCIngestHealthIndicator(pause, consumers).health();
+        Health health = new OneCIngestHealthIndicator(pause, consumers, TestLeadership.leader()).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         assertThat(health.getDetails())
-                .containsOnlyKeys("queuesWithoutConsumer")
+                .containsOnlyKeys("queuesWithoutConsumer", "role")
+                .containsEntry("role", "leader")
                 .containsEntry("queuesWithoutConsumer", List.of("q-mkb10", "q-policies"));
     }
 
@@ -57,11 +71,12 @@ class OneCIngestHealthIndicatorTest {
 
         lenient().when(consumers.queuesWithoutConsumer()).thenReturn(List.of("q-policies"));
 
-        Health health = new OneCIngestHealthIndicator(pause, consumers).health();
+        Health health = new OneCIngestHealthIndicator(pause, consumers, TestLeadership.leader()).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         assertThat(health.getDetails())
                 .doesNotContainKey("queuesWithoutConsumer")
+                .containsEntry("role", "leader")
                 .containsEntry("sqlstate", "08001")
                 .containsEntry("failure", "CannotCreateTransactionException")
                 .containsEntry("since", "2026-10-04T12:00:00Z")

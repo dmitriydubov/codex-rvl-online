@@ -2,7 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import java.util.Map;
 import java.util.Optional;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 
 final class OneCRequisiteMessages {
 

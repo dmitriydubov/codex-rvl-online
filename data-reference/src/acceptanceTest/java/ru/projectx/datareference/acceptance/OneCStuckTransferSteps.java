@@ -46,8 +46,12 @@ public class OneCStuckTransferSteps {
 
     @Когда("Дата-референс проверяет зависшие передачи прайсов")
     public void checkStuckTransfers() {
+        journalCheck(alert::reportStuckTransfers);
+    }
+
+    void journalCheck(Runnable check) {
         eventsBeforeCheck = journal.events().size();
-        alert.reportStuckTransfers();
+        check.run();
         eventsAfterCheck = journal.events().size();
     }
 

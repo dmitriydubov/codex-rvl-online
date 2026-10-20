@@ -11,10 +11,12 @@ public final class AmbiguousReferenceException extends RuntimeException {
 
     private static final String AMBIGUOUS_POLICY = "AMBIGUOUS_POLICY";
     public static final String AMBIGUOUS_PRICE_CONTRACT = "AMBIGUOUS_PRICE_CONTRACT";
+    private static final String AMBIGUOUS_INSURANCE_CONTRACT = "AMBIGUOUS_INSURANCE_CONTRACT";
 
     public enum CandidateKind {
         POLICY,
-        LPU_CONTRACT
+        LPU_CONTRACT,
+        INSURANCE_CONTRACT
     }
 
     private final String code;
@@ -37,6 +39,12 @@ public final class AmbiguousReferenceException extends RuntimeException {
         return new AmbiguousReferenceException(AMBIGUOUS_PRICE_CONTRACT,
                 "у ЛПУ " + lpuId + " больше одного действующего кандидата на прайсовый договор",
                 CandidateKind.LPU_CONTRACT, lpuContractIds);
+    }
+
+    public static AmbiguousReferenceException insuranceContract(UUID insurerExternalId, List<UUID> contractIds) {
+        return new AmbiguousReferenceException(AMBIGUOUS_INSURANCE_CONTRACT,
+                "у страхователя " + insurerExternalId + " больше одного действующего договора страхования",
+                CandidateKind.INSURANCE_CONTRACT, contractIds);
     }
 
     public String code() {

@@ -6,7 +6,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
-import ru.projectx.datareference.config.RestReadDataSource;
+import ru.projectx.datareference.config.restread.RestReadDataSource;
 
 public final class ExhaustedPool implements AutoCloseable {
 

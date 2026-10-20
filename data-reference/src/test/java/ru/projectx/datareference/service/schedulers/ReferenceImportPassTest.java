@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.schedulers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -41,20 +42,21 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
-import ru.projectx.datareference.entity.AwaitedParent;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundOutcome;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.ParentKind;
+import ru.projectx.datareference.entity.inbound.AwaitedParent;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundOutcome;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.DatabaseOutages;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.OneCLogContext;
-import ru.projectx.datareference.service.ParseFailure;
-import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.service.database.DatabaseOutages;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.OneCLogContext;
+import ru.projectx.datareference.service.inbound.ParseFailure;
+import ru.projectx.datareference.service.inbound.ParseFailures;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.ImportSettings;
 
@@ -314,6 +316,21 @@ class ReferenceImportPassTest {
         InOrder order = inOrder(importService, overdueParentWaits);
         order.verify(importService).importMessage(message);
         order.verify(overdueParentWaits).rejectAndReport();
+    }
+
+    @Test
+    void lostLeadership_endsThePassWithoutRecordingAFailureOrExpiringWaits() {
+        InboundMessage first = received();
+        InboundMessage second = received();
+        when(repository.findDueForImport(NOW, Limit.of(BATCH_SIZE))).thenReturn(List.of(first, second));
+        when(importService.importMessage(first))
+                .thenThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c"));
+
+        assertThatThrownBy(() -> scheduler().importPendingMessages()).isInstanceOf(LeadershipLostException.class);
+
+        verify(importService, never()).importMessage(second);
+        verifyNoInteractions(inboundMessageService, overdueParentWaits);
+        assertThat(MDC.get(OneCLogContext.MESSAGE_ID)).isNull();
     }
 
     @Test

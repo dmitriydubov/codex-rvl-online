@@ -20,7 +20,7 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpoint;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistrar;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import ru.projectx.datareference.config.OneCQueueProperties;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 
 @ExtendWith(MockitoExtension.class)
 class OneCQueueEndpointsTest {
@@ -88,8 +88,13 @@ class OneCQueueEndpointsTest {
         assertThat(registeredEndpoints()).allSatisfy(endpoint -> {
             assertThat(endpoint.getAckMode()).isNull();
             assertThat(endpoint.getConcurrency()).isNull();
-            assertThat(endpoint.getAutoStartup()).isNull();
         });
+    }
+
+    @Test
+    void endpoints_doNotStartWithTheContext_theLeaderRoleStartsThem() {
+        assertThat(registeredEndpoints())
+                .allSatisfy(endpoint -> assertThat(endpoint.getAutoStartup()).isFalse());
     }
 
     private List<SimpleRabbitListenerEndpoint> registeredEndpoints() {

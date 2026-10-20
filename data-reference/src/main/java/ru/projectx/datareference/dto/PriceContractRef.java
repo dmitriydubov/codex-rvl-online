@@ -3,7 +3,7 @@ package ru.projectx.datareference.dto;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.LpuContract;
+import ru.projectx.datareference.entity.catalog.LpuContract;
 
 public record PriceContractRef(
         UUID id,

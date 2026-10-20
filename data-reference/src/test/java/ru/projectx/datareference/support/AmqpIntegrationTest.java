@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.scheduling.enabled=false",
+        "projectx.leadership.group=${random.uuid}",
         "spring.rabbitmq.ssl.enabled=false",
         "spring.rabbitmq.listener.simple.auto-startup=true"})
 @Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})

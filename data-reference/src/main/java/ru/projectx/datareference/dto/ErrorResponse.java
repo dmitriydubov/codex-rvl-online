@@ -20,7 +20,8 @@ public record ErrorResponse(Body error) {
     public record Body(String code, String message, List<? extends Detail> details, @Nullable String requestId) {
     }
 
-    public sealed interface Detail permits Violation, PolicyCandidate, LpuContractCandidate, PriceRowCandidate, UncoveredInterval {
+    public sealed interface Detail permits Violation, PolicyCandidate, LpuContractCandidate, InsuranceContractCandidate,
+            PriceRowCandidate, UncoveredInterval {
     }
 
     public record Violation(String field, String reason) implements Detail {
@@ -30,6 +31,9 @@ public record ErrorResponse(Body error) {
     }
 
     public record LpuContractCandidate(UUID lpuContractId) implements Detail {
+    }
+
+    public record InsuranceContractCandidate(UUID insuranceContractId) implements Detail {
     }
 
     public record PriceRowCandidate(LocalDate validFrom, @Nullable LocalDate validTo) implements Detail {

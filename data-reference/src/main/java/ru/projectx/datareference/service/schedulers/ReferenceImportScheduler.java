@@ -12,16 +12,17 @@ import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundOutcome;
-import ru.projectx.datareference.entity.InboundReceipt;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.service.InboundMessageService;
-import ru.projectx.datareference.service.OneCLogContext;
-import ru.projectx.datareference.service.ParseFailure;
-import ru.projectx.datareference.service.ParseFailures;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundOutcome;
+import ru.projectx.datareference.entity.inbound.InboundReceipt;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.service.inbound.InboundMessageService;
+import ru.projectx.datareference.service.inbound.OneCLogContext;
+import ru.projectx.datareference.service.inbound.ParseFailure;
+import ru.projectx.datareference.service.inbound.ParseFailures;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import ru.projectx.datareference.service.onec.ImportOutcome;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 
@@ -101,8 +102,15 @@ public class ReferenceImportScheduler {
             return Optional.empty();
         }
         catch (RuntimeException failure) {
-            return Optional.of(recordFailure(receipt, beforeAttempt, failures.classify(failure)));
+            return Optional.of(recordFailure(receipt, beforeAttempt, classifyUnlessLeadershipLost(failure)));
         }
+    }
+
+    private ParseFailure classifyUnlessLeadershipLost(RuntimeException failure) {
+        if (failure instanceof LeadershipLostException lost) {
+            throw lost;
+        }
+        return failures.classify(failure);
     }
 
     private InboundStatus recordFailure(InboundReceipt receipt, InboundOutcome beforeAttempt, ParseFailure failure) {

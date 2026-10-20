@@ -23,8 +23,8 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.InboxRepository;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboxRepository;
 
 @ExtendWith(MockitoExtension.class)
 class IngestStorageProbeTest {
@@ -116,6 +116,23 @@ class IngestStorageProbeTest {
                 .thenThrow(new CannotAcquireLockException("lock", new SQLException("lock", "55P03")));
 
         assertThat(probe().storageAvailable()).isFalse();
+    }
+
+    @Test
+    void lockedTable_isAnOutageNamingItsCodeAndType() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(inbox.existsById(NEVER_STORED))
+                .thenThrow(new CannotAcquireLockException("lock", new SQLException("lock", "55P03")));
+
+        assertThat(probe().outage())
+                .hasValue(new StorageOutage("55P03", CannotAcquireLockException.class.getName()));
+    }
+
+    @Test
+    void readableTables_areNoOutage() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+
+        assertThat(probe().outage()).isEmpty();
     }
 
     @Test

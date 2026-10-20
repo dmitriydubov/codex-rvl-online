@@ -1,7 +1,7 @@
 package ru.projectx.datareference.dto;
 
 import java.util.UUID;
-import ru.projectx.datareference.entity.OneCEntity;
+import ru.projectx.datareference.entity.catalog.OneCEntity;
 
 public record NamedRef(UUID id, UUID externalId, String name) {
 

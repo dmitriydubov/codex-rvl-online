@@ -37,6 +37,19 @@ class AmbiguousReferenceExceptionTest {
     }
 
     @Test
+    void insuranceContract_listsInsuranceContractCandidates_andNamesInsurer() {
+        AmbiguousReferenceException ambiguous =
+                AmbiguousReferenceException.insuranceContract(LPU, List.of(FIRST, SECOND));
+
+        assertThat(ambiguous.code()).isEqualTo("AMBIGUOUS_INSURANCE_CONTRACT");
+        assertThat(ambiguous)
+                .hasMessage("у страхователя " + LPU + " больше одного действующего договора страхования");
+        assertThat(ambiguous.candidateKind())
+                .isEqualTo(AmbiguousReferenceException.CandidateKind.INSURANCE_CONTRACT);
+        assertThat(ambiguous.candidateIds()).containsExactly(FIRST, SECOND);
+    }
+
+    @Test
     void candidates_doNotFollowLaterChangesOfCallersList() {
         List<UUID> found = new ArrayList<>(List.of(FIRST));
         AmbiguousReferenceException ambiguous = AmbiguousReferenceException.policy(found);

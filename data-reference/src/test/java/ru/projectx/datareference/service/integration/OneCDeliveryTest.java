@@ -11,8 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.entity.RejectedMessage;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.entity.inbound.RejectedMessage;
 
 @ExtendWith(MockitoExtension.class)
 class OneCDeliveryTest {

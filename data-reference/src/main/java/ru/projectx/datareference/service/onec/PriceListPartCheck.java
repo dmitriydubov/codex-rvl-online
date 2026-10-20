@@ -3,10 +3,10 @@ package ru.projectx.datareference.service.onec;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
-import ru.projectx.datareference.entity.InboundMessage;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundMessage;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.PriceListMapper;
+import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 

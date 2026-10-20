@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service.integration;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,9 +8,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.datareference.repository.InboundMessageRepository;
-import ru.projectx.datareference.repository.InboxRepository;
-import ru.projectx.datareference.service.SqlStates;
+import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
+import ru.projectx.datareference.repository.inbound.InboxRepository;
+import ru.projectx.datareference.service.database.SqlStates;
 
 @Component
 public class IngestStorageProbe {
@@ -33,14 +34,18 @@ public class IngestStorageProbe {
     }
 
     public boolean storageAvailable() {
+        return outage().isEmpty();
+    }
+
+    public Optional<StorageOutage> outage() {
         try {
             readOnly.executeWithoutResult(status -> touchIngestTables());
-            return true;
+            return Optional.empty();
         }
         catch (RuntimeException unavailable) {
             log.info("таблицы приёма из 1С:УСК недоступны: {} SQLSTATE {}",
                     unavailable.getClass().getName(), SqlStates.deepestOrNone(unavailable));
-            return false;
+            return Optional.of(new StorageOutage(SqlStates.deepestOrNone(unavailable), unavailable.getClass().getName()));
         }
     }
 

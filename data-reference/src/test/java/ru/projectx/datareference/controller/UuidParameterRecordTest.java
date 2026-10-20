@@ -13,14 +13,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
-import ru.projectx.datareference.service.InsuranceContractReads;
-import ru.projectx.datareference.service.LpuCardReads;
-import ru.projectx.datareference.service.LpuCatalogReads;
-import ru.projectx.datareference.service.LpuServiceReads;
-import ru.projectx.datareference.service.PolicyContractViews;
-import ru.projectx.datareference.service.PolicyReads;
-import ru.projectx.datareference.service.PolicySearchReads;
-import ru.projectx.datareference.service.ProgramReads;
+import ru.projectx.datareference.service.insurancecontract.InsuranceContractReads;
+import ru.projectx.datareference.service.lpu.LpuCardReads;
+import ru.projectx.datareference.service.lpu.LpuCatalogReads;
+import ru.projectx.datareference.service.lpu.LpuServiceReads;
+import ru.projectx.datareference.service.policy.PolicyContractViews;
+import ru.projectx.datareference.service.policy.PolicyReads;
+import ru.projectx.datareference.service.policy.PolicySearchReads;
+import ru.projectx.datareference.service.program.ProgramReads;
 
 class UuidParameterRecordTest {
 

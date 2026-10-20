@@ -7,9 +7,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import ru.projectx.datareference.dto.LpuCardResponse;
 import ru.projectx.datareference.dto.LpuCatalogResponse;
 import ru.projectx.datareference.dto.LpuServicesResponse;
-import ru.projectx.datareference.service.LpuCardReads;
-import ru.projectx.datareference.service.LpuCatalogReads;
-import ru.projectx.datareference.service.LpuServiceReads;
+import ru.projectx.datareference.service.lpu.LpuCardReads;
+import ru.projectx.datareference.service.lpu.LpuCatalogReads;
+import ru.projectx.datareference.service.lpu.LpuServiceReads;
 
 @InternalApi
 public class LpuController {

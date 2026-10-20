@@ -3,8 +3,8 @@ package ru.projectx.datareference.dto;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.datareference.entity.InsuranceContract;
-import ru.projectx.datareference.entity.Insurer;
+import ru.projectx.datareference.entity.catalog.InsuranceContract;
+import ru.projectx.datareference.entity.catalog.Insurer;
 
 public record InsuranceContractResponse(
         UUID id,

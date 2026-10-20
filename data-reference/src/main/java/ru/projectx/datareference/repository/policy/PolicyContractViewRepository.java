@@ -1,0 +1,13 @@
+package ru.projectx.datareference.repository.policy;
+
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.repository.Repository;
+import ru.projectx.datareference.entity.policy.Policy;
+
+public interface PolicyContractViewRepository extends Repository<Policy, UUID> {
+
+    Optional<PolicyContractRow> findContractViewById(UUID id);
+
+    Optional<PolicyContractRow> findContractViewByExternalId(UUID externalId);
+}

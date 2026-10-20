@@ -15,19 +15,21 @@ class ReferenceNotFoundExceptionTest {
 
     static Stream<Arguments> factories() {
         return Stream.of(
-                missing(ReferenceNotFoundException::program,
+                missing(MissingReference.PROGRAM::notFound,
                         "PROGRAM_NOT_FOUND", "программа страхования " + ID + " не найдена"),
-                missing(ReferenceNotFoundException::policy,
+                missing(MissingReference.POLICY::notFound,
                         "POLICY_NOT_FOUND", "полис " + ID + " не найден"),
-                missing(ReferenceNotFoundException::policyByExternalId,
+                missing(MissingReference.POLICY_BY_EXTERNAL_ID::notFound,
                         "POLICY_NOT_FOUND", "полис с external_id " + ID + " не найден"),
-                missing(ReferenceNotFoundException::policyByNumber,
+                missing(MissingReference.POLICY_BY_NUMBER::notFound,
                         "POLICY_NOT_FOUND", "в договоре страхования с external_id " + ID + " нет полиса с таким номером"),
-                missing(ReferenceNotFoundException::insuranceContract,
+                missing(MissingReference.INSURANCE_CONTRACT::notFound,
                         "INSURANCE_CONTRACT_NOT_FOUND", "договор страхования " + ID + " не найден"),
-                missing(ReferenceNotFoundException::insuranceContractByExternalId,
+                missing(MissingReference.INSURANCE_CONTRACT_BY_EXTERNAL_ID::notFound,
                         "INSURANCE_CONTRACT_NOT_FOUND", "договор страхования с external_id " + ID + " не найден"),
-                missing(ReferenceNotFoundException::lpu,
+                missing(MissingReference.ACTIVE_INSURANCE_CONTRACT_OF_INSURER::notFound,
+                        "INSURANCE_CONTRACT_NOT_FOUND", "у страхователя " + ID + " нет действующего договора страхования"),
+                missing(MissingReference.LPU::notFound,
                         "LPU_NOT_FOUND", "ЛПУ " + ID + " не найдено"));
     }
 

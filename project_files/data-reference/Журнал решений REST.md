@@ -18,8 +18,8 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   Действует запись, у которой `is_archive = false`, `begin_date <= today` и (`end_date IS NULL` или `end_date >= today`).
   Ещё не начавшийся полис или договор ЛПУ действующим не считается. Будущие периоды прайсов в R-03 отдаются (вызывающему
   бывает нужен заезд следующего сезона), прошедшие — нет.
-- **Где в коде.** `repository/LpuContractRepository.findActiveByLpuIdIn`, `repository/PolicyRepository.findRvlProgramExternalIdsOfActivePolicies`,
-  `repository/PolicySpecifications.activeRvlPoliciesOf`, `repository/PriceListItemRepository`, миграция `010-insurance-contracts.yaml`
+- **Где в коде.** `repository/catalog/LpuContractRepository.findActiveByLpuIdIn`, `repository/policy/PolicyRepository.findRvlProgramExternalIdsOfActivePolicies`,
+  `repository/policy/PolicySpecifications.activeRvlPoliciesOf`, `repository/catalog/PriceListItemRepository`, миграция `010-insurance-contracts.yaml`
   (3000-01-01 → NULL). Закреплено тестом `PolicyApiTest` (будущий полис в поиск не попадает).
 - **ТЗ API.** «Общие соглашения» задают «единое правило»: только `is_archive = false` и `end_date IS NULL OR end_date >= today`;
   открытый вопрос 5: «участвуют ли в отборе begin_date договоров ЛПУ — не участвуют». Расходится по `begin_date`.
@@ -36,8 +36,8 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
     договора по id или `external_id` (сервис Договоров) срок не проверяет — как и раньше.
   - Строка условий полиса (`policy_services`) действует, если она доступна и день попадает в её срок; пустая дата начала
     или окончания срок с этой стороны не ограничивает. Раньше дата начала строки не проверялась.
-  - Где в коде: `entity/InsuranceContract.isActiveOn`, `service/ActiveInsuranceContracts`, `service/LpuCatalogService`,
-    `service/PolicySearchLookup`, `repository/PolicySpecifications`, `repository/ActivePolicyProgramsRepositoryImpl`.
+  - Где в коде: `entity/catalog/InsuranceContract.isActiveOn`, `service/insurancecontract/ActiveInsuranceContracts`, `service/lpu/LpuCatalogService`,
+    `service/policy/PolicySearchLookup`, `repository/policy/PolicySpecifications`, `repository/policy/ActivePolicyProgramsRepositoryImpl`.
     Спецификация: `insurance_contract_validity.feature`, `active_policies.feature`. Решение владельца 2026-10-06 («3) по
     твоей рекомендации» — прав журнал, а не прежний код).
 
@@ -47,7 +47,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   Правило «не более одного активного договора ЛПУ» из первой версии не применяется. Прайсовый договор выбирается
   по базовой логике B ТЗ API: допсоглашение со своими ценами (`main_contract_external_id` заполнен и
   `use_prices_main_contract = false`), иначе главный договор; два и более кандидата — 409, ни одного — 422.
-- **Где в коде.** `service/PriceContractResolver`.
+- **Где в коде.** `service/lpu/PriceContractResolver`.
 - **ТЗ API.** Базовая логика B описана так же; расхождения нет, запись нужна как источник для Javadoc.
 
 ### В-6. Три правила каталога и цен
@@ -58,7 +58,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 - **Правило.** В каталог ЛПУ попадают учреждения из перечней действующих программ РВЛ, у которых строка перечня
   (`program_lpu`) идёт по виду обращения РВЛ («РВЛ и СКЛ», «РВЛ в России»). Сроки строки перечня в отбор не входят
   (ТЗ API, вопрос 5). Услуги R-03 отбираются по тем же видам обращения.
-- **Где в коде.** `repository/LpuRepository`, `service/LpuCatalogService`, `service/RvlAppealTypes`, `service/LpuOffers`.
+- **Где в коде.** `repository/catalog/LpuRepository`, `service/lpu/LpuCatalogService`, `service/lpu/RvlAppealTypes`, `service/lpu/LpuOffers`.
 - **ТЗ API.** R-01: «вид обращения в этой ручке пока не фильтруется»; открытый вопрос 1 — «фильтровать ли». Расходится.
 - **Почему так.** Без фильтра в каталог РВЛ попали бы учреждения, где по той же программе есть только амбулаторная
   помощь или стационар, а санаторного лечения нет. Разработчик сервиса Заявок 2026-09-30 подтвердил, что R-01 в
@@ -72,7 +72,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   пользователей договора, но и молчать о ней нельзя — по таким записям собирается очередь на исправление в 1С.
   В R-02, R-03 и R-06 ответ по одному ЛПУ, подменить его нечем — 409 `AMBIGUOUS_PRICE_CONTRACT` или
   422 `NO_ACTIVE_PRICE_CONTRACT`.
-- **Где в коде.** `service/LpuCatalogService.skip`, `dto/LpuCatalogResponse`, `service/PriceContractResolver.resolve`.
+- **Где в коде.** `service/lpu/LpuCatalogService.skip`, `dto/LpuCatalogResponse`, `service/lpu/PriceContractResolver.resolve`.
 - **ТЗ API.** Описано так же, с пометкой «решение требует подтверждения» (открытый вопрос 4). Подтверждено.
 
 **В-6в. Основная цена выбирается в расчёте стоимости (R-06), а не в R-03.**
@@ -93,7 +93,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   `{valid_from, valid_to}`, важнее 422. `uploaded_to_sob` для расчёта не требуется (вопрос 3 ТЗ API закрыт). Услуга
   считается, только если учреждение отдаёт её в перечне R-03: иначе 404 `SERVICE_NOT_FOUND`; учреждение в архиве — 404
   `LPU_NOT_FOUND` раньше услуги. Закреплено `service_price_period.feature`. Где в коде: `controller/ServicePriceController`,
-  `service/ServicePriceLookup`, `service/price/ServicePriceCalculator`, `dto/ServicePriceResponse`.
+  `service/price/ServicePriceLookup`, `service/price/ServicePriceCalculator`, `dto/ServicePriceResponse`.
 
 ### В-8. Поле без источника в 1С в контракт не попадает
 
@@ -112,7 +112,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   «РВЛ в России»); сравнение без учёта регистра и краевых пробелов; на старте сервис пишет WARN, если хотя бы одно
   наименование в `appeal_types` не нашлось. Кэша нет: справочник маленький, запрос дешёвый. Когда 1С назовёт GUID
   этих видов (OQ-48, вопрос к 1С в плане, раздел 7), сравнение переводится на GUID тем же свойством.
-- **Где в коде.** `service/RvlAppealTypes`, `application.yml` (`projectx.api.rvl-appeal-types`), тест `RvlAppealTypesTest`.
+- **Где в коде.** `service/lpu/RvlAppealTypes`, `application.yml` (`projectx.api.rvl-appeal-types`), тест `RvlAppealTypesTest`.
 - **ТЗ API.** R-03 и открытый вопрос 8 описывают ровно это. Расхождения нет; вопрос 8 закрыт.
 
 ### В-10. Кэш ответов справочника (Ш43, PR #90, 2026-10-06)
@@ -124,8 +124,9 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   кэшируются; при недоступной базе отдаётся ответ из кэша. Допустимая устарелость для соседей — до 10 минут (правка базы
   мимо 1С; гонка чтения с фиксацией); владелец принял 2026-10-06 («подходит»), гонка — остаточный риск (координатор).
   Кэш у каждой реплики свой — сервис рассчитан на одну реплику.
-- **Где в коде.** `config/CacheConfig`, `ReferenceCaches`, `ReferenceCacheProperties`, `ClockTicker`;
-  `service/ReferenceCacheEviction`, `ReferenceCacheDependencies`, `TodayKeyGenerator`, `OneCMessageApplied`.
+- **Где в коде.** `config/cache/CacheConfig`, `ReferenceCaches`, `ReferenceCacheProperties`, `ClockTicker`;
+  `service/cache/ReferenceCacheEviction`, `ReferenceCacheDependencies`; `service/rest/TodayKeyGenerator`;
+  `service/inbound/OneCMessageApplied`.
 - **ТЗ API.** Кэширование не описано. Расхождения в контракте нет; устарелость — сведение для соседей
   (`data-reference/CLAUDE.md`, «Соседи по контуру»).
 
@@ -139,7 +140,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
   действия или перевода в архив (`projectx.import.policy-personal-data-grace`, `POLICY_PERSONAL_DATA_GRACE`, 30 суток,
   минимум сутки; решение владельца по Р59).
 - **Уведомление.** Разработчик сервиса Заявок предупреждён владельцем до мержа и согласен (2026-10-06).
-- **Где в коде.** `dto/PolicyResponse`, `entity/Policy` (`erasePersonalDataBeyond`), `mapper/PolicyPersonalDataTerm`,
+- **Где в коде.** `dto/PolicyResponse`, `entity/policy/Policy` (`erasePersonalDataBeyond`), `mapper/stream/PolicyPersonalDataTerm`,
   `service/retention/ExpiredPolicyPersonalData`, миграция 019.
 - **ТЗ API.** Не описано; ТЗ-01 объявляет ФИО и дату рождения обязательными — это требование к сообщению 1С, не к
   хранению после срока (толкование Ш62).
@@ -156,7 +157,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 - **Сравнение наименований — общее правило для перечней учреждений:** наименования сравнивает база (`order by` в запросе),
   так же, как в каталоге R-01 (`order by lpu.name`). Регистр, «ё» и знаки препинания упорядочиваются одинаково в обоих
   ответах.
-- **Где в коде.** `repository/ProgramLpuRepository.findOrderedByProgramId`, `service/ProgramQueryService`,
+- **Где в коде.** `repository/catalog/ProgramLpuRepository.findOrderedByProgramId`, `service/program/ProgramQueryService`,
   `dto/ProgramResponse`.
 - **ТЗ API.** Ручки программы нет; ТЗ сервиса Договоров («перечень услуг») порядка не задаёт. Прецедент — R-01 «отсортированный
   по name», R-03 `ORDER BY cs.name`.
@@ -167,12 +168,46 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 - **Решение владельца 2026-10-07** на остановке спецификации Ш66 (вариант А; ответы через координатора). Закреплено
   `program_services_order.feature`. Соседям отдельно не сообщается: порядок только добавляет гарантию.
 
+### В-13. Действующий договор страхования по GUID страхователя (Ш77, 2026-10-19)
+
+- **Правило.** `GET /internal/v1/insurance-contracts?insurer_external_id={GUID страхователя в 1С}` отдаёт один договор
+  страхования, действующий сегодня по В-4 (не в архиве, `begin_date <= сегодня`, `end_date` пуста или `>= сегодня`,
+  день — московский), в том же виде, что `GET /insurance-contracts/{id}`. Страхователя может не быть в справочнике
+  `insurers` — тогда `insurer: null`, договор отдаётся. Действующего нет (страхователь неизвестен, без договоров, все
+  недействующие) — 404 `INSURANCE_CONTRACT_NOT_FOUND` с пустыми `details`. Действующих два и больше — 409
+  `AMBIGUOUS_INSURANCE_CONTRACT`, в `details` по объекту `{"insurance_contract_id": <наш id>}` на кандидата, порядок не
+  задан; отказ пишется в журнал WARN, как остальные 409. Недействующие договоры в кандидаты не входят. Нечитаемый GUID
+  или пустой параметр — 400 `VALIDATION_ERROR` по полю `insurer_external_id`; `external_id` вместе с
+  `insurer_external_id` (в том числе пустой) — 400 по полю `external_id` с причиной «external_id не передаётся вместе с
+  insurer_external_id»; без ключа — 400 по `external_id` с причиной «нужен external_id либо insurer_external_id».
+  Ответ кэшируется (В-10): ключ — московский день и GUID страхователя, сброс — потоками договоров страхования и
+  контрагентов; 404 и 409 не кэшируются.
+- **Потребитель.** Сервис Заявок: кадровик входит через B2B-портал, `companyId` из токена — GUID страхователя в 1С:УСК;
+  `id` ответа Заявки хранят как `insurance_contract_id`, `external_id` передают в R-01 и R-04.
+- **Где в коде.** `controller/InsuranceContractController`, `service/insurancecontract/InsuranceContractQueryService.activeByInsurer`,
+  `service/insurancecontract/ActiveInsuranceContracts.soleActiveOf` (отбор правилом `entity/catalog/InsuranceContract.isActiveOn`),
+  `repository/catalog/InsuranceContractRepository.findAllByExternalInsurerId`, `exception/AmbiguousReferenceException.insuranceContract`,
+  `dto/ErrorResponse.InsuranceContractCandidate`, `config/cache/ReferenceCaches.ACTIVE_INSURANCE_CONTRACTS_BY_INSURER`,
+  `service/cache/ReferenceCacheDependencies`. Спецификация: `insurance_contract_by_insurer.feature`,
+  `rest_input_validation_without_database.feature`.
+- **ТЗ API.** Ручки нет: «Допущения» ТЗ API считают, что вызывающий уже знает `external_id` договора. Правки — в копии
+  `edit/` (обновлена 2026-10-19): допущение и число ручек на стр. 1, коды ошибок и `details`, R-08 на стр. 8.
+- **Почему так.** Договор не угадывается: два одновременно действующих договора одного страхователя — ошибка данных
+  1С:УСК (как неоднозначный прайсовый договор, В-6б), а «самый новый» молча привязал бы заявки к не тому договору.
+  Правило «действующего» не дублируется в SQL: договоры страхователя читаются все (их единицы) и отбираются тем же
+  правилом сущности, что у R-01 и R-04.
+- **Решение владельца 2026-10-19:** критерии приёмки — карточка Jira («1) да 2) да»); спецификация утверждена на
+  остановке Ш77 вместе с пунктами 1–6 (код 409, поле кандидата, тексты 400, `insurer: null`, новые шаги, без отдельных
+  сценариев кэша при отказе базы). Контракт сообщает разработчице Заявок владелец до мержа; текст сообщения утверждён
+  владельцем 2026-10-19 («1) да»: путь, 200, 404, 409 с незаданным порядком кандидатов, новый текст 400 «без ключа», 503,
+  кэш до 10 минут). PR #187 смержен 2026-10-19.
+
 ### Решение от 23.09. `details` в ошибке — всегда массив объектов
 
 - **Правило.** Тело ошибки: `{"error": {"code", "message", "details": [...], "request_id"}}`. `details` — всегда массив
   объектов, состав элемента зависит от кода: нарушение по полю запроса (`field`, `reason`), кандидат-полис (`policy_id`),
   кандидат-договор ЛПУ (`lpu_contract_id`). Поле с плавающим типом ломает генерацию клиентов.
-- **Где в коде.** `dto/ErrorResponse`, советники `controller/RequestErrorAdvice`, `ReferenceErrorAdvice`, `ServerFailureAdvice`.
+- **Где в коде.** `dto/ErrorResponse`, советники `controller/error/RequestErrorAdvice`, `ReferenceErrorAdvice`, `ServerFailureAdvice`.
 - **ТЗ API.** «Коды ошибок»: тело `{code, message, details: {...}}` — объект без обёртки `error`, `details` — объект.
   Расходится. Формат с обёрткой `error` и `request_id` взят из ТЗ сервиса Договоров («Сервис договоров_синхронные
   эндпоинты»), чтобы у контура был один формат (Р19 п. 1, 2026-09-30).
@@ -205,6 +240,7 @@ PDF в `project_files/data-reference/edit/` (там же — пояснения 
 | R-05 по номеру | `?number=&contract_external_id=` | так же с 2026-10-05 (Ш38, PR #55); прежний `contract_id` — 400 с полем `contract_id`, половина ключа или пустой номер — 400 по недостающей части; неизвестный договор — 404 `POLICY_NOT_FOUND` | Р19 п. 2; решения владельца на остановке Ш38 (вариант «а») и по отчёту PR #55 (п. 1) |
 | R-05 для Договоров | один ответ с ПДн | проекция без ПДн `…/policies/{id}/contract-view`, `…/policies/contract-view?external_id=` | Р20 (а), Ш39 |
 | R-05 обезличенный полис | ПДн обязательны | 200, ПДн `null`, поле `personal_data_erased` (В-11) | Р59, Ш62; согласовано с Заявками |
+| Договор страхования по страхователю | нет ручки (вызывающий знает `external_id` договора) | `GET /insurance-contracts?insurer_external_id=`: один действующий договор (В-4); 404 `INSURANCE_CONTRACT_NOT_FOUND`, 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов (В-13) | Ш77; запрос сервиса Заявок |
 | Программа | нет ручки | `GET /programs/{id}`; перечень `services` — в устойчивом порядке (В-12) | ТЗ сервиса Договоров; Ш66 |
 | `is_archive` в ответе | только условие отбора | поле каждого ответа | договор по программе с `deleteMark` иначе незаметен |
 | Взаимоисключающие ключи | не описано | 400 `VALIDATION_ERROR` с именем поля | Ш27 (Р53 (б)) |

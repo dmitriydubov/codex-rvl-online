@@ -7,8 +7,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
-import ru.projectx.datareference.entity.InboundStatus;
-import ru.projectx.datareference.entity.OneCStream;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -73,6 +73,16 @@ final class OneCPriceTransferMessages {
         ArrayNode recordSet = JSON.createArrayNode();
         rows.forEach(row -> recordSet.add(numberedRow(row)));
         return batchMessage(messageId, JSON.createObjectNode().put(KEY_VALUE, service), recordSet, InboundStatus.FAILED);
+    }
+
+    static boolean batchWithoutItsFinal(OneCMessage message, List<OneCMessage> received) {
+        return BATCH_QUEUE.equals(message.queue())
+                && message.expected() == InboundStatus.PROCESSED
+                && received.stream().noneMatch(other -> FINAL_QUEUE.equals(other.queue()) && sameTransfer(other, message));
+    }
+
+    private static boolean sameTransfer(OneCMessage first, OneCMessage second) {
+        return first.data().path(CID).asString().equals(second.data().path(CID).asString());
     }
 
     private static ObjectNode transferData(UUID cid, String service) {

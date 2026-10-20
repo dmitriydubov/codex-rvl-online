@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 import ru.projectx.datareference.config.ImportProperties;
-import ru.projectx.datareference.entity.InboundStatus;
+import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.service.schedulers.ReferenceImportScheduler;
 
 public class OneCParentWaitSteps {

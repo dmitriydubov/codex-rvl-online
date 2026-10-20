@@ -34,10 +34,11 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.config.OneCJson;
-import ru.projectx.datareference.entity.OneCStream;
-import ru.projectx.datareference.service.OneCLogContext;
-import ru.projectx.datareference.service.QuarantineService;
+import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.service.inbound.OneCLogContext;
+import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.service.onec.OneCIngestService;
+import ru.projectx.datareference.support.TestLeadership;
 
 @ExtendWith(MockitoExtension.class)
 class OneCQueueListenerJournalTest {
@@ -287,7 +288,8 @@ class OneCQueueListenerJournalTest {
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10)), metrics),
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10), Duration.ofSeconds(30)), metrics,
+                        TestLeadership.leader()),
                 metrics);
     }
 
