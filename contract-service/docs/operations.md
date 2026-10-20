@@ -119,7 +119,8 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 
 Концы строк в git задаёт `.gitattributes` модуля: LF у текстовых файлов, CRLF у `*.bat`. Без него git на Windows с
 `core.autocrlf=true` кладёт в рабочую копию CRLF, и `gradlew` и `certs/import-ca.sh` падают в Linux-контейнере на «\r».
-Кодировку, концы строк и отступы для редактора задаёт `.editorconfig` модуля, правила кода — [code-style.md](code-style.md).
+Кодировку, концы строк и отступы для редактора задаёт `.editorconfig` модуля, правила кода —
+[code-style.md](code-style.md).
 
 Локально база и оба брокера поднимаются из `docker-compose.yml`, пароли — локального контура:
 
