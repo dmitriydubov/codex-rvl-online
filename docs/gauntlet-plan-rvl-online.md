@@ -4536,8 +4536,17 @@ REST.
     (session_01VphwzMsWLAZnCSQrYvgmDk, Opus 5.5, ветка `claude/sh83-receipt-db-time`); (3) проверка координатора:
     заархивировано `env_013PC74pJafEbrLaF8A6CVYY` («gauntlet-admin», 2026-09-25) — в нём сессии координаторов
     data-reference (эта) и contract-service; активными остались `default` и `env_011KhGJ5hPyZ2jaWNeQYEh4A`
-    («gauntlet-admin», 2026-08-14) — в нём координатор medius. Вопрос владельцу: вернуть `env_013PC…` из архива или
-    оставить одно окружение без guard (`env_011KhG…`) для всех координаторов.
+    («gauntlet-admin», 2026-08-14) — в нём координатор medius. Ответ владельца: «env_011KhG… — полностью идентична
+    архивированной» — `env_013PC…` не возвращается; окружение без guard для всех координаторов — `env_011KhG…`, для
+    сессий шагов — `default`.
+  - **Передача координатора data-reference** (если эта сессия, session_01NGcFQBukkn1fjszvj8xCbd, не поднимется после
+    простоя: её окружение в архиве). Новый координатор открывается в `env_011KhG…`, ветка `claude/hopeful-brown-c5i29y`
+    (подтянуть `main` слиянием), состояние — «Коротко» и последние записи раздела 9. На 2026-10-20 ~10:50 UTC:
+    - Ш83 идёт — session_01VphwzMsWLAZnCSQrYvgmDk (`default`), ждём остановки на спецификации;
+    - дальше Ш82 → Ш80, Ш84 — при подготовке к проду (задачи для Jira утверждены, тексты — в истории чата координатора и
+      в карточках);
+    - ручная проверка смены ведущего на стенде — после копирования обновлённого модуля на сервер;
+    - после мержа Ш83 и Ш82 — README (строка о репликах) и `data-reference/CLAUDE.md`.
 - 2026-10-20, **Ш79 закрыт: PR #195 смержен (`d39523c`) после PR #194; сессия заархивирована.** Проверка после мержа:
   14 файлов (+549/−58); новый `service.database.TemporaryFailure` (правила временных отказов, перечисление), тест
   `ExpiredReadDeadlineTest`; в `src/acceptanceTest` — `LateFirstReadDataSource`, `ReadDeadline`, `ReadDeadlineSteps`;
