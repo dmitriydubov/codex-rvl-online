@@ -5199,7 +5199,11 @@ REST.
     отдельной задачей координатора, с прогоном CI на её PR.
   - Метка `ubuntu-latest` переходит на Ubuntu 26 с 2026-10-19 (уведомление GitHub в аннотации проверки на PR #177): к
     первому прогону после обновления лимита образ раннера сменится — сверить Docker, Java и `setup-gradle` на новом образе
-    и решить, закреплять ли `ubuntu-24.04` до сверки.
+    и решить, закреплять ли `ubuntu-24.04` до сверки. **Закреплено** (владелец «2) да», 2026-10-20): `runs-on: ubuntu-24.04`
+    в `gauntlet.yml`, метка есть в docs.github.com, «GitHub-hosted runners» (строка Linux x64: `ubuntu-latest`,
+    `ubuntu-24.04`, `ubuntu-22.04`, `ubuntu-26.04`). Переход на Ubuntu 26 — отдельной задачей, с прогоном CI. Лимит Actions
+    («recent account payments have failed or your spending limit needs to be increased», PR #194) — «1) пока
+    игнорируем»: CI на PR не стартует, проверка — локальный `gauntletFast` сессий.
 - **О4. Облачные окружения** (Инструкция, разделы 1, 4, 5).
   - **Часть 1 — до Ш2a** (первый шаг этапа 1).
     - `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` в Default и gauntlet-admin (Р38).
