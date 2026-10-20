@@ -19,9 +19,11 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
+import org.springframework.data.jpa.repository.query.BadJpqlGrammarException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.TransactionTimedOutException;
 
 class DatabaseOutagesTest {
@@ -29,6 +31,7 @@ class DatabaseOutagesTest {
     private static final String TEXT = "canceling statement due to user request";
     private static final String QUERY_CANCELED = "57014";
     private static final String CONNECTION_FAILURE = "08006";
+    private static final String JPQL = "select p from Policy p where p.externalId = ?1";
 
     private final DatabaseOutages outages = new DatabaseOutages(new HibernateExceptionTranslator());
 
@@ -66,6 +69,32 @@ class DatabaseOutagesTest {
         assertThat(outage).hasValue(new DatabaseOutages.Outage("DataAccessResourceFailureException", CONNECTION_FAILURE));
     }
 
+    @Test
+    void deadlineExpiredUnderDerivedQueryWrapper_isTemporary_namedByWrapperAndExpiredDeadline() {
+        var hidden = new BadJpqlGrammarException(TEXT, JPQL, new TransactionTimedOutException(TEXT));
+
+        Optional<DatabaseOutages.Outage> outage = outages.recognize(hidden);
+
+        assertThat(outage).hasValue(new DatabaseOutages.Outage("BadJpqlGrammarException/TransactionTimedOutException", "нет"));
+    }
+
+    @Test
+    void deadlineExpiredDeepInCauseChain_isTemporary_namedByWrapperAndExpiredDeadline_notByDirectCause() {
+        var hidden = new BadJpqlGrammarException(TEXT, JPQL,
+                new IllegalStateException(TEXT, new TransactionTimedOutException(TEXT)));
+
+        assertThat(outages.recognize(hidden))
+                .hasValue(new DatabaseOutages.Outage("BadJpqlGrammarException/TransactionTimedOutException", "нет"));
+    }
+
+    @Test
+    void deadlineExpiredUnderWrapperOutsideSpring_isTemporary_namedByWrapperAndExpiredDeadline() {
+        var hidden = new UnsupportedOperationException(TEXT, new TransactionTimedOutException(TEXT));
+
+        assertThat(outages.recognize(hidden))
+                .hasValue(new DatabaseOutages.Outage("UnsupportedOperationException/TransactionTimedOutException", "нет"));
+    }
+
     static Stream<RuntimeException> springOutages() {
         return Stream.of(
                 new CannotCreateTransactionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE)),
@@ -89,7 +118,11 @@ class DatabaseOutagesTest {
                 new LazyInitializationException("no session"),
                 new DataIntegrityViolationException(TEXT),
                 new JpaSystemException(new IllegalStateException(TEXT)),
+                new BadJpqlGrammarException(TEXT, JPQL, new IllegalArgumentException(TEXT)),
+                new BadJpqlGrammarException(TEXT, JPQL, new DataAccessResourceFailureException(TEXT)),
+                new BadJpqlGrammarException(TEXT, JPQL, new IllegalTransactionStateException(TEXT)),
                 new IllegalStateException(TEXT),
+                new NullPointerException(TEXT),
                 new Exception(TEXT));
     }
 
