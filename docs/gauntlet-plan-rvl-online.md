@@ -4505,6 +4505,18 @@ REST.
   `v1.0.0-rc.2` — у владельца в контуре. Ш79 (PR #195) сообщено: слить `main`, строку «Исправлено» — в новый
   «Не выпущено»; ответ владельца по п. 3 PR #195 — «1) да» (коммит слияния со стандартным сообщением Git приемлем,
   дальше слияния — с `-m` и строкой роли).
+- 2026-10-20, **стиль кода для рабочего контура** (вопрос владельца «нужен ли отдельный файл в гите с код-стайлом?»,
+  ответы «1) да 2) да 3) да»). В контур не уходят ни `data-reference/CLAUDE.md` («Как пишем код»), ни Checkstyle/PMD
+  набора, ни корневой `.gitattributes`. PR координатора: (1) `data-reference/.editorconfig` — UTF-8, LF, 4 пробела
+  (YAML, JSON, фичи, Markdown, `gradlew` — 2), перевод строки в конце, без хвостовых пробелов, CRLF у `*.bat`; значения
+  сняты с файлов модуля (табов и CRLF нет, кроме `gradlew.bat`, хвостовых пробелов нет), длина строки не задаётся (193
+  строки длиннее 120); сверено по спецификации EditorConfig 0.17.2 (raw.githubusercontent.com/editorconfig/specification/
+  v0.17.2/index.rst; editorconfig.org из сессии закрыт, в таблице «Источники документации» строки нет); (2)
+  `data-reference/docs/code-style.md` — выжимка правил кода без следов разработки, лимиты — те, что держит код
+  (Checkstyle и PMD набора), ссылки из README, `operations.md` и `CLAUDE.md` модуля («меняя правило здесь, меняйте и
+  там»); (3) `data-reference/.gitattributes` — копия правил корневого (LF, CRLF у `*.bat`, двоичные), причина — в
+  `operations.md`; приоритет ближнего файла сверен по git 2.43.0 (`Documentation/gitattributes.txt`), `git check-attr`
+  на ветке — `gradlew` lf, `gradlew.bat` crlf, jar без текста. README — 3495 символов.
 - 2026-10-20, **Ш81 закрыт: PR #199 смержен 10:19 UTC (`5437fd8`) после PR #198 (allowlist); сессия заархивирована.**
   Проверка после мержа: 79 файлов (+3114/−185); новый пакет `service.leadership` (`BackgroundLeadership`, `LeaderLock`,
   `LeadershipFence`, `LeaderRoleGauge`, `LeadershipConfiguration`, `LeadershipLostException`), в `service.integration` —
