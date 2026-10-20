@@ -206,7 +206,7 @@ BOM Spring Boot.
 | `onec_inbound_backlog_staleness_seconds` | давность снимка, по которому считаются `onec_inbound_messages` и возраст ожидания | намного больше 30 с: снимок не обновляется, значения выше устарели |
 | `onec_retention_overdue_payloads`, `onec_retention_overdue_quarantine_bodies` | тела с персональными данными и тела карантина старше срока хранения, ещё не стёртые | больше 0 дольше двух проходов стирания (2 ч при `retention-poll-interval` 1 ч) |
 | `policies_retention_overdue_personal_data` | полисы, чьи ФИО, дата рождения и почта должны быть стёрты, но ещё нет | больше 0 дольше двух проходов стирания (2 ч) |
-| `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор) и `rest-read` (REST-чтения) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0` |
+| `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор) и `rest-read` (REST-чтения) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`; `hikaricp_connections_pending{pool="rest-read"} > 0` дольше минуты — REST-чтений больше, чем успевает пул: следующий шаг нагрузки даёт 503 ([load-testing.md](load-testing.md)) |
 | `http_server_requests_seconds_count{status,uri}` | запросы REST по статусу и шаблону пути | доля `status="503"` среди `uri=~"/internal/v1/.*"` выше 5 % за 10 минут |
 | `cache_gets_total`, `cache_puts_total`, `cache_evictions_total`, `cache_size` с меткой `cache` | кэш ответов | — |
 
@@ -395,6 +395,10 @@ namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` с
 - Пароли базы и брокера — в Secret `data-reference-secret`, его создают один раз вручную; без него скрипт подсказывает
   команду и останавливается.
 - Тег каждый раз новый: с прежним тегом под не пересоздаётся, и скрипт откажется собирать.
+- Куча JVM на стенде — 60 % лимита памяти пода: `jvm.options` чарта (`-XX:MaxRAMPercentage=60.0
+  -XX:+ExitOnOutOfMemoryError`) уходит в под переменной `JDK_JAVA_OPTIONS` через ConfigMap и перекрывает умолчание
+  образа (75 %). При 75 % и лимите 1 ГБ перегрузка REST доводила память до лимита, и ядро убивало процесс; при 60 % сервис
+  отвечал 503 и сразу восстанавливался ([load-testing.md](load-testing.md)).
 - До сборки скрипт проверяет то, что иначе уронило бы её через несколько минут: исходники модуля и
   `certs/import-ca.sh`, сертификат в `certs/`, исполняемый `gradlew`, переводы строк LF в `gradlew` и `import-ca.sh`,
   доступ `helm` к кластеру.
