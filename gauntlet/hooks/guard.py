@@ -132,18 +132,32 @@ class Context:
         """True once the branch holds a commit that touches the feature files and they differ from the
         base branch: the human approved the specification in the chat and the agent committed it. From
         then on only the human changes it. Once the base branch has the same feature files (the PR was
-        merged) the branch is free again. Fails open (not frozen) when the base branch cannot be found."""
+        merged) the branch is free again. Fails open (not frozen) when the base branch cannot be found.
+        A stale remote-tracking base (the branch was cut from a newer base than the local ref) makes the base's
+        own spec commits look like the branch's, so before answering "frozen" the base is fetched once and
+        checked again; when the fetch fails the answer stays "frozen"."""
         if self._frozen is None:
             if self.approval == "pr":
                 self._frozen = False    # spec.approval=pr: the human reads the spec in the PR, no freeze
             elif git_code(self.project, "symbolic-ref", "-q", "HEAD") != 0:
                 self._frozen = True     # detached HEAD: not the task's branch, nothing may be specified here
             else:
-                specs = [d.rstrip("/") for d in self.features_dirs]   # one task per branch: any module's spec freezes all
-                count = git(self.project, "rev-list", "--count", f"{self.base_ref}..HEAD", "--", *specs)
-                differs = git_code(self.project, "diff", "--quiet", self.base_ref, "HEAD", "--", *specs) == 1
-                self._frozen = count.isdigit() and int(count) > 0 and differs
+                self._frozen = self._spec_committed() and (not self._refresh_base() or self._spec_committed())
         return self._frozen
+
+    def _spec_committed(self):
+        specs = [d.rstrip("/") for d in self.features_dirs]   # one task per branch: any module's spec freezes all
+        count = git(self.project, "rev-list", "--count", f"{self.base_ref}..HEAD", "--", *specs)
+        differs = git_code(self.project, "diff", "--quiet", self.base_ref, "HEAD", "--", *specs) == 1
+        return count.isdigit() and int(count) > 0 and differs
+
+    def _refresh_base(self):
+        """Fetches the base branch into its remote-tracking ref; False when there is no remote or the fetch failed."""
+        if "/" not in self.base_ref:
+            return False
+        remote = self.base_ref.split("/", 1)[0]
+        refspec = f"+refs/heads/{self.base_branch}:refs/remotes/{remote}/{self.base_branch}"
+        return git_code(self.project, "fetch", "--quiet", remote, refspec) == 0
 
     def role_scope(self, agent):
         return {"specifier": self.features_dirs, "hardener": self.test_code, "reviewer": ()}.get(agent)

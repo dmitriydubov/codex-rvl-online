@@ -680,6 +680,34 @@ def gradle_properties_tests(repo):
           r.stdout + r.stderr)
 
 
+def stale_base_tests():
+    """The branch was cut from a base newer than the local remote-tracking ref: the base's own spec commit must not
+    freeze the branch - the guard fetches the base before answering "frozen"; without the remote it stays frozen."""
+    repo = make_repo()
+    try:
+        feature = FEATURES + "/order.feature"
+        stale = git(repo, "rev-parse", "origin/main")
+        git(repo, "checkout", "-q", "main")
+        write(repo, FEATURES + "/merged.feature", "# language: ru\nФункция: Уже в основной ветке\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "spec: merged earlier")
+        git(repo, "push", "-q", "origin", "main")
+        git(repo, "checkout", "-q", "-B", "claude/feature-y", "main")
+        git(repo, "update-ref", "refs/remotes/origin/main", stale)
+        check("stale base: base's spec commit looks like the branch's",
+              git(repo, "rev-list", "--count", "origin/main..HEAD", "--", FEATURES) == "1")
+        expect_allow(repo, "stale base: specifier writes a draft after the guard fetches the base", "specifier", "Write",
+                     file_path=feature, content="# language: ru\n")
+        check("stale base: the guard moved origin/main to the remote's main",
+              git(repo, "rev-parse", "origin/main") == git(repo, "rev-parse", "main"))
+        git(repo, "update-ref", "refs/remotes/origin/main", stale)
+        git(repo, "remote", "set-url", "origin", os.path.join(os.path.dirname(repo), "missing.git"))
+        r = guard(repo, "specifier", "Write", file_path=feature, content="# language: ru\n")
+        check("stale base, fetch fails: stays frozen", r is not None and "frozen" in r, repr(r))
+    finally:
+        shutil.rmtree(os.path.dirname(repo), ignore_errors=True)
+
+
 def session_start_tests(repo):
     gradle_properties_tests(repo)
     gradle_home = os.path.join(os.path.dirname(repo), "gradle-home")
@@ -723,6 +751,7 @@ def main():
                 multi_module_stop_tests(repo)
         finally:
             shutil.rmtree(os.path.dirname(repo), ignore_errors=True)
+        stale_base_tests()
     for f in failures:
         print("FAIL", f)
     print(f"{passed} passed, {len(failures)} failed")
