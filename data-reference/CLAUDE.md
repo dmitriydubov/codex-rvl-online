@@ -559,6 +559,28 @@ GUID вида деятельности «РВЛ» — `f3876c53-c7d8-4620-b364-9
   переполнение очереди оповещений 8 ГБ тестом не покрыто (контроль — `pg_notification_queue_usage()` в
   `docs/operations.md`); при плавной остановке экземпляр до 30 с отвечает на начатые запросы без оповещений.
 
+**Прогрев после старта (Ш80, PR #208).** Пробы Kubernetes — `/livez` и `/readyz` на порту API
+(`management.endpoint.health.probes.add-additional-paths`), от базы и брокера они не зависят. `/livez` отвечает 200 сразу,
+`/readyz` — только после прогрева. Прогрев — `ApplicationRunner` (`service.warmup.StartupWarmup`): Spring Boot выставляет
+`ReadinessState.ACCEPTING_TRAFFIC` только после runner'ов, а веб-сервер к этому моменту уже слушает. Прогрев читает
+ключи — первые по `id` неархивные записи договоров страхования, ЛПУ, программ и полисов, по
+`projectx.warmup.records-per-reference` (`WARMUP_RECORDS_PER_REFERENCE`, 100) каждого (`WarmupKeysReader`, транзакция
+REST-чтения). Затем по очереди идут HTTP-запросы JDK `HttpClient` к своему порту на localhost (`LocalApi`,
+`LocalApiClient`, `X-Request-Id: startup-warmup`) по путям `WarmupKeys`: договор страхования по `id`, по GUID и по GUID
+страхователя, каталог по договору, карточка и услуги ЛПУ с ценами и без, программа, `contract-view` полиса. Так
+прогреваются те же контроллеры, сервисы и кэши, что у соседей, а `contract-view` — только код: его ответ не кэшируется.
+Прогрев только читает: не пишет, не оповещает другие экземпляры, к соседям не обращается, в свою запись журнала не
+пишет ни ключей, ни ПДн. Подписчик Ш82 сбрасывает весь кэш при подключении раньше runner'ов (`start()` ждёт этого сброса), поэтому
+прогретое не стирается. Предел — `projectx.warmup.timeout` (`WARMUP_TIMEOUT`, 30 с, не меньше 1 с), отсчёт от начала
+прогрева, каждый запрос ограничен остатком предела (`WarmupRun`). Итог — одна запись `WarmupJournal`: INFO «прогрев
+закончен» или «пропущен» (порт API не запущен), WARN «прогрев прерван: <причина>» — отказ базы при чтении ключей, ответ
+5xx, отказ запроса, предел времени, остановка. Число чтений и длительность в записи есть. Прерванный прогрев готовности
+не мешает: экземпляр всё равно становится готовым, ведь недоступную базу перезапуск пода не починит. Запросы прогрева
+видны в метрике `http.server.requests`, а записи журнала во время них несут `requestId` `startup-warmup`. Пробы стенда
+(чарт `data-reference/devops/test/helm`): readiness —
+`initialDelaySeconds` 60, `periodSeconds` 10, `failureThreshold` 6; liveness — 120, 30, 3. Время старта с прогревом на
+поде 1 CPU / 1 ГБ не замерено — остаточный риск, принятый владельцем («3) да» в PR #208).
+
 ### Сервис Заявок (он же сервис HR)
 
 Заявки массовые и индивидуальные, согласования ЦКЗ и ответственного от страхователя,
@@ -721,7 +743,7 @@ Central через прокси иногда отвечает 429 на пачк�
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С (`*Properties`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
 │   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел; соединение слушателя оповещений о сбросе вне пулов (`ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`, `ListenerConnectionSettings`) и его настройки (`ReferenceCacheNotificationProperties`)
 │   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него
 ├── entity/            — JPA-сущности
@@ -733,8 +755,8 @@ ru.projectx.datareference
 ├── mapper/            — разбор потоков 1С; в корне — контракт (`StreamMapper`, `ImportResult`) и основа мапперов
 │   ├── stream/        — по мапперу на поток ТЗ-1 … ТЗ-10, с помощниками
 │   └── value/         — правила значений 1С (`OneCValues`, `OneCGuid`, `OneCMoneyScale`, `OneCRawParser`, `OneCRequiredValues`)
-├── repository/        — Spring Data JPA
-│   ├── catalog/       — справочники
+├── repository/        — Spring Data JPA; в корне — общая проекция ключа справочника (`ReferenceId`)
+│   ├── catalog/       — справочники; проекция ключей договора страхования для прогрева (`InsuranceContractKey`)
 │   ├── policy/        — полисы, их поиск и проекция для Договоров
 │   ├── inbound/       — приём и разбор сообщений 1С
 │   └── database/      — настройки сеанса базы (`SessionSettingsRepository`), строка блокировки ведущего (`LeaderLockRepository`), часы базы для момента приёма (`DatabaseClockRepository`), оповещение о сбросе кэша (`CacheNotificationRepository`)
@@ -752,6 +774,7 @@ ru.projectx.datareference
 │   ├── database/      — классы отказов и таймауты базы (`DatabaseOutages`, `SqlStates`, `DatabaseTimeoutsCheck`)
 │   ├── metrics/       — метрики приёма и разбора
 │   ├── retention/     — стирание персональных данных по сроку
+│   ├── warmup/        — прогрев после старта до готовности: runner (`StartupWarmup`), ключи (`WarmupKeysReader`, `WarmupKeys`), чтения своего API (`LocalApi`, `LocalApiClient`, `WarmupRun`), итог и журнал (`WarmupOutcome`, `WarmupResult`, `WarmupJournal`)
 │   └── schedulers/    — задачи по расписанию
 └── controller/        — REST-чтение справочников: контроллеры по ресурсам (ЛПУ, полисы, договоры
     │                     страхования, МКБ-10, программы) под общей аннотацией `@InternalApi`
