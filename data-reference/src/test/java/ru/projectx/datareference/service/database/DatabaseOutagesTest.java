@@ -23,6 +23,7 @@ import org.springframework.data.jpa.repository.query.BadJpqlGrammarException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.TransactionTimedOutException;
 
 class DatabaseOutagesTest {
@@ -78,11 +79,12 @@ class DatabaseOutagesTest {
     }
 
     @Test
-    void deadlineExpiredDeepInCauseChain_isTemporary() {
+    void deadlineExpiredDeepInCauseChain_isTemporary_namedByWrapperAndExpiredDeadline_notByDirectCause() {
         var hidden = new BadJpqlGrammarException(TEXT, JPQL,
                 new IllegalStateException(TEXT, new TransactionTimedOutException(TEXT)));
 
-        assertThat(outages.recognize(hidden)).isPresent();
+        assertThat(outages.recognize(hidden))
+                .hasValue(new DatabaseOutages.Outage("BadJpqlGrammarException/TransactionTimedOutException", "нет"));
     }
 
     static Stream<RuntimeException> springOutages() {
@@ -110,7 +112,9 @@ class DatabaseOutagesTest {
                 new JpaSystemException(new IllegalStateException(TEXT)),
                 new BadJpqlGrammarException(TEXT, JPQL, new IllegalArgumentException(TEXT)),
                 new BadJpqlGrammarException(TEXT, JPQL, new DataAccessResourceFailureException(TEXT)),
+                new BadJpqlGrammarException(TEXT, JPQL, new IllegalTransactionStateException(TEXT)),
                 new IllegalStateException(TEXT),
+                new NullPointerException(TEXT),
                 new Exception(TEXT));
     }
 
