@@ -4,10 +4,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import ru.projectx.datareference.entity.catalog.Lpu;
+import ru.projectx.datareference.repository.ReferenceId;
 
 @Repository
 public interface LpuRepository extends JpaRepository<Lpu, UUID> {
@@ -27,4 +29,6 @@ public interface LpuRepository extends JpaRepository<Lpu, UUID> {
              order by lpu.name
             """)
     List<Lpu> findRvlCatalog(Collection<UUID> programExternalIds, Collection<UUID> appealTypeExternalIds);
+
+    List<ReferenceId> findByArchiveFalseOrderByIdAsc(Limit limit);
 }

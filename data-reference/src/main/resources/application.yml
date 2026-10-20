@@ -120,6 +120,10 @@ projectx:
   metrics:
     backlog-refresh-interval: 30s
 
+  warmup:
+    timeout: ${WARMUP_TIMEOUT:30s}
+    records-per-reference: ${WARMUP_RECORDS_PER_REFERENCE:100}
+
   import:
     initial-delay: 30s
     poll-interval: 10s
