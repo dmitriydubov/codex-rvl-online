@@ -26,3 +26,5 @@ data:
   {{- end }}
 
   LOGGING_LEVEL_ROOT: "{{ .Values.logging.root }}"
+
+  JDK_JAVA_OPTIONS: "{{ .Values.jvm.options }}"
