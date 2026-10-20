@@ -231,6 +231,18 @@ class OneCConsumerPauseTest {
     }
 
     @Test
+    void lockLostWhileStoring_stopsConsumersWithoutTouchingTheDatabase() {
+        OneCConsumerPause pause = pause();
+
+        pause.stopConsumersWithoutProbe();
+
+        verify(policies).stop(any(Runnable.class));
+        verify(mkb10).stop(any(Runnable.class));
+        verifyNoInteractions(probe);
+        assertThat(pause.paused()).isEmpty();
+    }
+
+    @Test
     void roleLostWithStorageDown_pausesTheIngestWithItsCode() {
         when(probe.outage()).thenReturn(Optional.of(CONNECTION_LOST));
         OneCConsumerPause pause = pause();

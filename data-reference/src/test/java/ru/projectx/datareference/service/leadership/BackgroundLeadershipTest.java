@@ -3,7 +3,10 @@ package ru.projectx.datareference.service.leadership;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -125,7 +128,7 @@ class BackgroundLeadershipTest {
 
     @Test
     void lockLostInTheMiddleOfThePass_givesTheRoleBackToTheElection() {
-        Context election = mock(Context.class);
+        Context election = leadingElection();
         leadership.onGranted(election);
 
         leadership.runAsLeader(() -> {
@@ -137,12 +140,35 @@ class BackgroundLeadershipTest {
 
     @Test
     void stepDown_yieldsTheElectionThatGrantedTheRole() {
-        Context election = mock(Context.class);
+        Context election = leadingElection();
         leadership.onGranted(election);
 
         leadership.stepDown();
 
         verify(election).yield();
+    }
+
+    @Test
+    void repeatedStepDown_yieldsOncePerGrant() {
+        Context election = leadingElection();
+        leadership.onGranted(election);
+
+        leadership.stepDown();
+        leadership.stepDown();
+        leadership.onGranted(election);
+        leadership.stepDown();
+
+        verify(election, times(2)).yield();
+    }
+
+    @Test
+    void stepDownOfAnElectionNoLongerLeading_yieldsNothing() {
+        Context election = mock(Context.class);
+        leadership.onGranted(election);
+
+        leadership.stepDown();
+
+        verify(election, never()).yield();
     }
 
     @Test
@@ -159,6 +185,12 @@ class BackgroundLeadershipTest {
         assertThatIllegalStateException().isThrownBy(() -> leadership.runAsLeader(() -> {
             throw new IllegalStateException("сбой прохода");
         }));
+    }
+
+    private static Context leadingElection() {
+        Context election = mock(Context.class);
+        when(election.isLeader()).thenReturn(true);
+        return election;
     }
 
     private static Logger leadershipLog() {

@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.leadership;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,7 @@ public class BackgroundLeadership implements Candidate {
     private final LeaderLock lock;
     private volatile boolean leader;
     private volatile @Nullable Context election;
+    private final AtomicBoolean steppingDown = new AtomicBoolean();
 
     public BackgroundLeadership(LeaderLock lock) {
         this.lock = lock;
@@ -32,6 +34,7 @@ public class BackgroundLeadership implements Candidate {
     @Override
     public void onGranted(Context context) {
         election = context;
+        steppingDown.set(false);
         leader = true;
         log.info("экземпляр {} стал ведущим: приём из 1С:УСК и задачи по расписанию идут на нём", lock.instanceId());
     }
@@ -66,6 +69,14 @@ public class BackgroundLeadership implements Candidate {
     }
 
     public void stepDown() {
-        Optional.ofNullable(election).ifPresent(Context::yield);
+        Optional.ofNullable(election)
+                .filter(Context::isLeader)
+                .ifPresent(this::yieldOnce);
+    }
+
+    private void yieldOnce(Context leading) {
+        if (steppingDown.compareAndSet(false, true)) {
+            leading.yield();
+        }
     }
 }

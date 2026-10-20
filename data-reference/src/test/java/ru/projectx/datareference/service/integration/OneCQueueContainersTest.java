@@ -1,8 +1,8 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -14,6 +14,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -152,7 +153,7 @@ class OneCQueueContainersTest {
     }
 
     @Test
-    void startRightAfterStop_waitsUntilTheContainerHasStopped() {
+    void awaitStops_waitsUntilTheStoppingContainerHasStopped() {
         AtomicReference<Runnable> stopFinishes = new AtomicReference<>();
         doAnswer(invocation -> {
             stopFinishes.set(invocation.getArgument(0, Runnable.class));
@@ -161,12 +162,19 @@ class OneCQueueContainersTest {
         OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader());
         containers.stopRunning();
 
-        CompletableFuture<Void> start = CompletableFuture.runAsync(containers::startExpected);
+        CompletableFuture<Void> waiting = CompletableFuture.runAsync(containers::awaitStops);
 
-        verify(policies, after(QUIET_MILLIS).never()).start();
+        await().during(Duration.ofMillis(QUIET_MILLIS)).atMost(Duration.ofSeconds(5)).until(() -> !waiting.isDone());
         stopFinishes.get().run();
-        start.join();
-        verify(policies).start();
+        waiting.join();
+        assertThat(logged.list).noneMatch(event -> event.getLevel() == Level.WARN);
+    }
+
+    @Test
+    void awaitStopsWithNothingStopping_returnsAtOnceWithoutWarning() {
+        QueueContainersFixture.containers(registryProvider, TestLeadership.leader()).awaitStops();
+
+        assertThat(logged.list).isEmpty();
     }
 
     @Test

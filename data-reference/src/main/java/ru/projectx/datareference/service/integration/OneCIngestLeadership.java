@@ -1,7 +1,9 @@
 package ru.projectx.datareference.service.integration;
 
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.task.ThreadPoolTaskExecutorBuilder;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.integration.leader.event.AbstractLeaderEvent;
@@ -18,20 +20,21 @@ class OneCIngestLeadership implements AutoCloseable {
 
     private static final String THREAD_PREFIX = "onec-role-";
     private static final int ONE_THREAD = 1;
-    private static final int FINISH_ROLE_CHANGE_SECONDS = 30;
+    private static final Duration FINISH_ROLE_CHANGE = Duration.ofSeconds(30);
 
     private final OneCConsumerPause consumers;
     private final LeaderLock lock;
-    private final ThreadPoolTaskExecutor roleChanges = new ThreadPoolTaskExecutor();
+    private final ThreadPoolTaskExecutor roleChanges = new ThreadPoolTaskExecutorBuilder()
+            .corePoolSize(ONE_THREAD)
+            .maxPoolSize(ONE_THREAD)
+            .threadNamePrefix(THREAD_PREFIX)
+            .awaitTermination(true)
+            .awaitTerminationPeriod(FINISH_ROLE_CHANGE)
+            .build();
 
     OneCIngestLeadership(OneCConsumerPause consumers, LeaderLock lock) {
         this.consumers = consumers;
         this.lock = lock;
-        roleChanges.setCorePoolSize(ONE_THREAD);
-        roleChanges.setMaxPoolSize(ONE_THREAD);
-        roleChanges.setThreadNamePrefix(THREAD_PREFIX);
-        roleChanges.setWaitForTasksToCompleteOnShutdown(true);
-        roleChanges.setAwaitTerminationSeconds(FINISH_ROLE_CHANGE_SECONDS);
         roleChanges.initialize();
     }
 

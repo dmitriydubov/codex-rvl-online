@@ -71,6 +71,7 @@ public class OneCConsumerPause {
     }
 
     void startUnlessPaused() {
+        containers.awaitStops();
         synchronized (lifecycle) {
             if (state == null) {
                 containers.startExpected();
@@ -82,6 +83,12 @@ public class OneCConsumerPause {
         Optional<StorageOutage> outage = probe.outage();
         synchronized (lifecycle) {
             outage.ifPresentOrElse(this::pause, containers::stopRunning);
+        }
+    }
+
+    void stopConsumersWithoutProbe() {
+        synchronized (lifecycle) {
+            containers.stopRunning();
         }
     }
 

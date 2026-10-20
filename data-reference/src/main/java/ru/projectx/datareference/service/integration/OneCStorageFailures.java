@@ -87,7 +87,7 @@ class OneCStorageFailures {
                 messageId, delivery.queue());
         metrics.record(delivery, IngestOutcome.RETURNED);
         delivery.returnToQueue();
-        consumers.stopConsumers();
+        consumers.stopConsumersWithoutProbe();
         leadership.stepDown();
     }
 

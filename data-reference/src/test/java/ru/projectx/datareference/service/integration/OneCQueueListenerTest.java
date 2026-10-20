@@ -255,7 +255,7 @@ class OneCQueueListenerTest {
 
         InOrder returnedThenStopped = inOrder(channel, consumers, leadership);
         returnedThenStopped.verify(channel).basicNack(DELIVERY_TAG, false, true);
-        returnedThenStopped.verify(consumers).stopConsumers();
+        returnedThenStopped.verify(consumers).stopConsumersWithoutProbe();
         returnedThenStopped.verify(leadership).stepDown();
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
         verify(consumers, never()).pause(any());
