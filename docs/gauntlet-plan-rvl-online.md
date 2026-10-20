@@ -4505,6 +4505,32 @@ REST.
   `v1.0.0-rc.2` — у владельца в контуре. Ш79 (PR #195) сообщено: слить `main`, строку «Исправлено» — в новый
   «Не выпущено»; ответ владельца по п. 3 PR #195 — «1) да» (коммит слияния со стандартным сообщением Git приемлем,
   дальше слияния — с `-m` и строкой роли).
+- 2026-10-20, **Ш81 закрыт: PR #199 смержен 10:19 UTC (`5437fd8`) после PR #198 (allowlist); сессия заархивирована.**
+  Проверка после мержа: 79 файлов (+3114/−185); новый пакет `service.leadership` (`BackgroundLeadership`, `LeaderLock`,
+  `LeadershipFence`, `LeaderRoleGauge`, `LeadershipConfiguration`, `LeadershipLostException`), в `service.integration` —
+  `OneCIngestLeadership`, `OneCQueueContainers`, `repository.database.LeaderLockRepository`, `config.LeadershipProperties`,
+  миграция `020-leader-lock`; удалённых и переименованных файлов нет; новые зависимости
+  `org.springframework.integration:spring-integration-jdbc:7.0.5` и `spring-integration-core:7.0.5` (в Nexus есть); новая
+  переменная `LEADER_LOCK_TTL` (30s), настройки `projectx.leadership.*`, `projectx.onec.ingest.consumer-stop-timeout`;
+  следов разработки в файлах контура нет (обе команды пусты на `5437fd8`); ревьюер — два раунда с исправлениями; Grok не
+  комментировал; CI не получил раннер (лимит Actions). Контрольный `gauntletFast` на `main` `5437fd8` зелёный: 1907
+  тестов, 674 сценария, 7 архитектурных, 0 skipped (15 мин 38 с). Итоги в документах — PR координатора: README
+  (до трёх реплик, ведущий, `LEADER_LOCK_TTL`, `role`, `onec_leader`; 3491 символ), `data-reference/CLAUDE.md` (кэш,
+  RETRY, onecIngest, структура пакетов, запуск потребителей по роли), анализ многорепличности («Ход работ»).
+  - **Находка координатора — запуск без очереди.** Точки приёма теперь без автостарта, потребителей запускает роль
+    ведущего после старта приложения, и `OneCQueueContainers.start` ловит отказ запуска контейнера и пишет ERROR. Очередь,
+    которой нет на брокере, больше не роняет запуск сервиса (раньше — роняла, `missing-queues-fatal`): видно ERROR
+    «потребитель очереди … не запущен» и `queuesWithoutConsumer`. Установлено по коду, прогоном не проверялось.
+    `docs/operations.md` («Очередь без потребителя», «Сервис не стартует»), `docs/design.md` («Имена очередей только из
+    конфигурации») и `data-reference/CLAUDE.md` («Контракт 1С:УСК») говорили обратное — поправлены под код в том же PR
+    координатора. Принять или вернуть отказ старта — вопрос владельцу.
+  - **Окружение сессий шагов (п. 3 PR #199, владелец «2) да» — переслано координатору).** Ш77, Ш78, Ш79 и Ш81 работали в
+    `env_011KhGJ5hPyZ2jaWNeQYEh4A`, оно называется «gauntlet-admin», и guard там выключен (`guard: off` в строке статуса
+    Ш81): хук заморозки не помешал правке закоммиченной фичи. Сессии medius с 2026-10-19 работают в новом
+    `env_01YVg9QhVoXA1mAduxrH5NH4` («default»). Проверка координатора по `main`: ни один из PR #187, #190, #195, #199 не
+    менял `gauntlet/`, `.claude/`, `.github/` и `CLAUDE.md`, фичи менялись только коммитами `spec:` (вторую правку фичи
+    Ш81 утвердил владелец). Дальше сессии шагов data-reference — только в `default`; сессия проверяет `guard: on` в строке
+    статуса при старте, иначе остановка.
 - 2026-10-20, **Ш79 закрыт: PR #195 смержен (`d39523c`) после PR #194; сессия заархивирована.** Проверка после мержа:
   14 файлов (+549/−58); новый `service.database.TemporaryFailure` (правила временных отказов, перечисление), тест
   `ExpiredReadDeadlineTest`; в `src/acceptanceTest` — `LateFirstReadDataSource`, `ReadDeadline`, `ReadDeadlineSteps`;
