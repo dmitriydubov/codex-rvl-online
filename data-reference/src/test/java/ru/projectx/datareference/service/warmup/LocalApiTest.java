@@ -87,6 +87,16 @@ class LocalApiTest {
         }
     }
 
+    @Test
+    void closedClient_acceptsNoMoreReads() {
+        LocalApiClient api = connect();
+        api.close();
+
+        assertThatExceptionOfType(IOException.class)
+                .isThrownBy(() -> api.read("/internal/v1/programs/1", READ_TIMEOUT));
+        assertThat(received.get("uri")).isNull();
+    }
+
     private LocalApiClient connect() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("local.server.port", String.valueOf(server.getAddress().getPort()));
