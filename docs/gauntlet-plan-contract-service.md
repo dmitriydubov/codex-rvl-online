@@ -546,6 +546,22 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   задача 8.К6d утверждена, модель К6d — Fable 5.1 xhigh; Д-10 меняется для К6d: незнакомый код причины прекращения —
   прекращение с причиной OTHER, код в комментарии, WARN и счётчик (журнал решений Договоров, Д-10); **новые сессии
   (К6c, К6d и дальше) не открываются до команды владельца.**
+- 2026-10-20, **стиль кода для рабочего контура** (просьба координатора data-reference по решению владельца «2) да»:
+  сделать для `contract-service` то же, что его PR #201). Это PR координатора, не новая сессия шага: запрет владельца
+  от 2026-10-17 на новые задачи его не касается. Состав: (1) `contract-service/.editorconfig` — UTF-8, LF, 4 пробела
+  (YAML, JSON, фичи, Markdown, `gradlew` — 2), перевод строки в конце, без хвостовых пробелов, CRLF у `*.bat`; значения
+  сняты с файлов модуля (табов и хвостовых пробелов нет, CRLF только у `gradlew.bat`), длина строки не задаётся (1371
+  строка длиннее 120); файл совпал с data-reference; (2) `contract-service/.gitattributes` — копия правил корневого
+  (LF, CRLF у `*.bat`, двоичные jar, png, pdf), без комментариев; причина — в `docs/operations.md`, «Сборка»; `git
+  check-attr`: `gradlew` lf, `gradlew.bat` crlf, jar без текста; (3) `contract-service/docs/code-style.md` — выжимка
+  «Как пишем код», «Структура пакетов» и правил клиента справочников из `contract-service/CLAUDE.md` без следов
+  разработки, лимиты — те, что держат Checkstyle и PMD набора; ссылки из README (3499 символов), `operations.md`,
+  CHANGELOG и `contract-service/CLAUDE.md` («меняя правило здесь, меняйте и в `docs/code-style.md`»). Сверено:
+  спецификация EditorConfig 0.17.2 (raw.githubusercontent.com/editorconfig/specification/v0.17.2/index.rst), git 2.43.0
+  `Documentation/gitattributes.txt` (ближний `.gitattributes` приоритетнее). Строка EditorConfig в «Источниках
+  документации» `gauntlet/CLAUDE.md` — в PR #201 data-reference. Окружения с 2026-10-20: координаторы —
+  `env_011KhGJ5hPyZ2jaWNeQYEh4A` без guard (прежнее gauntlet-admin владелец заархивировал), сессии шагов — `default`
+  `env_01YVg9QhVoXA1mAduxrH5NH4`.
 - 2026-10-13, **хвост К5 (координатор):** контрольный `gauntletFast -Pgauntlet.scope=all` на `main` `8c3c387` в отдельном
   worktree — **зелёный**: 639 unit-тестов, archTest 7/7, приёмка 128/128 без пропусков, integrity, Checkstyle, PMD, CRAP,
   CPD 0; 4 мин 56 с (первый запуск упал без Docker после перезапуска контейнера — Docker поднят, прогон повторён).

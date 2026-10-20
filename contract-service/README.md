@@ -65,5 +65,5 @@ select 'LM', participant_id, issued_policy_number, status::text, error_code from
 ## Документация
 
 - [docs/operations.md](docs/operations.md) — сборка, запуск, настройки, метрики, оповещения.
-- [docs/design.md](docs/design.md) — почему так устроено.
+- [docs/design.md](docs/design.md) — почему так устроено; [docs/code-style.md](docs/code-style.md) — как пишем код.
 - [CHANGELOG.md](CHANGELOG.md) — версии.
