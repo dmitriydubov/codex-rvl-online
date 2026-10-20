@@ -101,12 +101,38 @@ class InboundBacklogMetricsTest {
     }
 
     @Test
+    void refreshWhileSeriesArePublished_registersNoSeriesAgain() {
+        when(reads.read()).thenReturn(InboundBacklog.empty(REFRESHED));
+        registry.clear();
+
+        metrics.refresh();
+
+        assertThat(registry.getMeters()).isEmpty();
+    }
+
+    @Test
     void withdrawBeforeBinding_changesNothing() {
         InboundBacklogMetrics unbound = new InboundBacklogMetrics(reads, clock);
 
         unbound.withdraw();
 
         assertThat(registry.find(InboundBacklogMetrics.STALENESS).timeGauges()).hasSize(1);
+    }
+
+    @Test
+    void refreshBeforeBinding_keepsTheSnapshotForTheRegistryBoundLater() {
+        InboundBacklogMetrics unbound = new InboundBacklogMetrics(reads, clock);
+        SimpleMeterRegistry later = new SimpleMeterRegistry();
+        when(reads.read()).thenReturn(new InboundBacklog(List.of(
+                new InboundBacklog.StatusCount(OneCStream.POLICIES, InboundStatus.FAILED, 7, STARTED)),
+                0, new InboundBacklog.Overdue(0, 0, 0), REFRESHED));
+
+        unbound.refresh();
+        unbound.bindTo(later);
+
+        assertThat(later.get(InboundBacklogMetrics.MESSAGES).tag("stream", "POLICIES").tag("status", "FAILED")
+                .gauge().value()).isEqualTo(7.0);
+        assertThat(logged.list).isEmpty();
     }
 
     @Test

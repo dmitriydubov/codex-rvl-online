@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
@@ -21,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OneCIngestLeadershipTest {
 
     private static final long WAIT_MILLIS = 5_000;
+    private static final long QUIET_MILLIS = 500;
 
     @Mock
     private OneCConsumerPause consumers;
@@ -87,7 +89,9 @@ class OneCIngestLeadershipTest {
         leadership.close();
 
         leadership.revoked();
+        leadership.granted();
 
-        verify(consumers, never()).stopConsumers();
+        verify(consumers, after(QUIET_MILLIS).never()).stopConsumers();
+        verify(consumers, never()).startUnlessPaused();
     }
 }
