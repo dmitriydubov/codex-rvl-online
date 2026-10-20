@@ -1,6 +1,5 @@
 package ru.projectx.datareference.service.schedulers;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -11,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.ImportProperties;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.BufferedTransfer;
 import ru.projectx.datareference.service.database.SqlStates;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
@@ -23,15 +23,15 @@ public class StuckTransferAlert {
     private final AgedInboundMessages agedMessages;
     private final SupersededTransferClosure closure;
     private final ImportProperties properties;
-    private final Clock clock;
+    private final DatabaseClockRepository databaseClock;
 
     public StuckTransferAlert(AgedInboundMessages agedMessages, SupersededTransferClosure closure,
-            ImportProperties properties, Clock clock) {
+            ImportProperties properties, DatabaseClockRepository databaseClock) {
 
         this.agedMessages = agedMessages;
         this.closure = closure;
         this.properties = properties;
-        this.clock = clock;
+        this.databaseClock = databaseClock;
     }
 
     public void reportStuckTransfers() {
@@ -57,7 +57,7 @@ public class StuckTransferAlert {
         if (stuck.isEmpty()) {
             return;
         }
-        Instant now = clock.instant();
+        Instant now = databaseClock.currentMoment();
         String transfers = stuck.stream()
                 .map(transfer -> describe(transfer, now))
                 .collect(Collectors.joining(", "));

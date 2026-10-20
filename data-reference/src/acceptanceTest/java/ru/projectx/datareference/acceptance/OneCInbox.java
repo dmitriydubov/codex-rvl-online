@@ -22,8 +22,7 @@ public class OneCInbox {
     private static final String RECEIVE = """
             insert into inbound_message (message_id, stream, source_queue, payload, status, attempt, received_at)
             values (:messageId, :stream, :queue, cast(:payload as jsonb), 'NEW', 0,
-                    greatest(cast(:now as timestamptz) + make_interval(secs => :order),
-                             (select max(received_at) + interval '1 second' from inbound_message)))
+                    greatest(clock_timestamp(), (select max(received_at) + interval '1 millisecond' from inbound_message)))
             """;
     private static final String STATUSES = "select status from inbound_message order by received_at";
     private static final String TRANSFER_STATUSES = """
@@ -47,7 +46,7 @@ public class OneCInbox {
             where correlation_id = :cid
             """;
     private static final String AGE = """
-            update inbound_message set received_at = cast(:now as timestamptz) - cast(:age as interval)
+            update inbound_message set received_at = clock_timestamp() - cast(:age as interval)
             where message_id = :messageId
             """;
 
@@ -81,8 +80,6 @@ public class OneCInbox {
                 .param("stream", message.stream().name())
                 .param("queue", message.queue())
                 .param("payload", message.envelope())
-                .param("now", clock.moment())
-                .param("order", expectedStatuses.size())
                 .update();
     }
 
@@ -162,7 +159,6 @@ public class OneCInbox {
 
     public void ageLast(Duration age) {
         int aged = jdbc.sql(AGE)
-                .param("now", clock.moment())
                 .param("age", age.toSeconds() + " seconds")
                 .param("messageId", received.getLast().messageId())
                 .update();

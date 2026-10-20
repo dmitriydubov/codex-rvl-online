@@ -30,6 +30,7 @@ import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.entity.inbound.ParentWait;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -41,6 +42,7 @@ class InboundOutcomeRecordingTest {
     private static final String PAYLOAD = "{\"data\":{}}";
     private static final Instant RECEIVED_AT = Instant.parse("2026-03-14T09:00:00Z");
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
+    private static final Instant DATABASE_MOMENT = Instant.parse("2026-10-20T08:30:00.123456Z");
     private static final List<Duration> BACKOFF = List.of(Duration.ofSeconds(30), Duration.ofMinutes(5));
     private static final ParseFailure.Temporary LOCK_TIMEOUT = new ParseFailure.Temporary(
             "временный отказ базы данных: CannotAcquireLockException, SQLSTATE 55P03",
@@ -52,15 +54,19 @@ class InboundOutcomeRecordingTest {
     @Mock
     private InboundMessageRepository repository;
 
+    @Mock
+    private DatabaseClockRepository databaseClock;
+
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     @Test
-    void store_savesTheMessageAsNewWithTheMomentOfReceipt() {
+    void store_savesTheMessageAsNewWithTheMomentOfReceiptByDatabaseClock() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(databaseClock.currentMoment()).thenReturn(DATABASE_MOMENT);
 
         InboundMessage stored = service().store(MESSAGE_ID, OneCStream.MKB10, QUEUE, PAYLOAD);
 
-        assertThat(stored.receipt()).isEqualTo(new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, NOW));
+        assertThat(stored.receipt()).isEqualTo(new InboundReceipt(MESSAGE_ID, OneCStream.MKB10, QUEUE, DATABASE_MOMENT));
         assertThat(stored.payload()).isEqualTo(PAYLOAD);
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
         assertThat(transitions()).isEmpty();
@@ -288,7 +294,7 @@ class InboundOutcomeRecordingTest {
 
     private InboundMessageService service(RejectionScope... scopes) {
         return new InboundMessageService(
-                repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC),
+                repository, new InboundRetryProperties(BACKOFF), Clock.fixed(NOW, ZoneOffset.UTC), databaseClock,
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of(scopes));
     }
 }

@@ -1,11 +1,11 @@
 package ru.projectx.datareference.service.schedulers;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.BufferedTransfer;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.QuarantineRepository;
@@ -15,12 +15,13 @@ public class AgedInboundMessages {
 
     private final InboundMessageRepository repository;
     private final QuarantineRepository quarantine;
-    private final Clock clock;
+    private final DatabaseClockRepository databaseClock;
 
-    public AgedInboundMessages(InboundMessageRepository repository, QuarantineRepository quarantine, Clock clock) {
+    public AgedInboundMessages(InboundMessageRepository repository, QuarantineRepository quarantine,
+            DatabaseClockRepository databaseClock) {
         this.repository = repository;
         this.quarantine = quarantine;
-        this.clock = clock;
+        this.databaseClock = databaseClock;
     }
 
     public int forgetPayloads(Duration age, int limit) {
@@ -40,6 +41,6 @@ public class AgedInboundMessages {
     }
 
     private Instant receivedBefore(Duration age) {
-        return clock.instant().minus(age);
+        return databaseClock.currentMoment().minus(age);
     }
 }

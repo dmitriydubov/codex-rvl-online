@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.schedulers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -9,10 +10,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.BufferedTransfer;
 import ru.projectx.datareference.service.onec.SupersededTransferClosure;
 import ru.projectx.datareference.support.ImportSettings;
@@ -30,7 +30,7 @@ import ru.projectx.datareference.support.ImportSettings;
 @ExtendWith(MockitoExtension.class)
 class StuckTransferAlertTest {
 
-    private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
+    private static final Instant DATABASE_NOW = Instant.parse("2026-10-20T08:30:00.123456Z");
     private static final Duration THRESHOLD = Duration.ofMinutes(90);
     private static final int REPORT_LIMIT = 3;
     private static final UUID FIRST_TRANSFER = UUID.fromString("c1d2e3f4-0000-4000-8000-000000000001");
@@ -43,6 +43,9 @@ class StuckTransferAlertTest {
 
     @Mock
     private SupersededTransferClosure closure;
+
+    @Mock
+    private DatabaseClockRepository databaseClock;
 
     private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
 
@@ -156,10 +159,11 @@ class StuckTransferAlertTest {
     }
 
     private StuckTransferAlert alert() {
+        lenient().when(databaseClock.currentMoment()).thenReturn(DATABASE_NOW);
         return new StuckTransferAlert(agedMessages, closure,
                 ImportSettings.defaults().stuckTransferThreshold(THRESHOLD).stuckTransferReportLimit(REPORT_LIMIT)
                         .build(),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                databaseClock);
     }
 
     private static BufferedTransfer transfer(UUID correlationId, Duration waiting, long parts) {
@@ -172,7 +176,7 @@ class StuckTransferAlertTest {
 
             @Override
             public Instant getFirstPartReceivedAt() {
-                return NOW.minus(waiting);
+                return DATABASE_NOW.minus(waiting);
             }
 
             @Override

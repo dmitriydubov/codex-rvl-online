@@ -31,6 +31,11 @@ public class ClockSteps {
         clock.stopAt(LocalDateTime.parse(moment, MOMENT).atZone(MOSCOW).toInstant());
     }
 
+    @Дано("часы экземпляра Дата-референса остановлены на {string} по Москве")
+    public void instanceClockStoppedAt(String moment) {
+        clockStoppedAt(moment);
+    }
+
     @Когда("на часах контура прошло {int} минут без одной секунды")
     public void minutesWithoutSecondPassed(int minutes) {
         clock.advance(Duration.ofMinutes(minutes).minus(ONE_SECOND));

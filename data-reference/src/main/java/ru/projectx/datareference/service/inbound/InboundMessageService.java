@@ -20,6 +20,7 @@ import ru.projectx.datareference.entity.inbound.InboundOutcome;
 import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -31,17 +32,19 @@ public class InboundMessageService {
     private final InboundMessageRepository repository;
     private final InboundRetryProperties retryProperties;
     private final Clock clock;
+    private final DatabaseClockRepository databaseClock;
     private final InboundTransitionMetrics transitions;
     private final FinalRejectionJournal rejections;
     private final Map<OneCStream, RejectionScope> scopes;
 
     public InboundMessageService(InboundMessageRepository repository, InboundRetryProperties retryProperties,
-            Clock clock, InboundTransitionMetrics transitions, FinalRejectionJournal rejections,
-            List<RejectionScope> scopes) {
+            Clock clock, DatabaseClockRepository databaseClock, InboundTransitionMetrics transitions,
+            FinalRejectionJournal rejections, List<RejectionScope> scopes) {
 
         this.repository = repository;
         this.retryProperties = retryProperties;
         this.clock = clock;
+        this.databaseClock = databaseClock;
         this.transitions = transitions;
         this.rejections = rejections;
         this.scopes = scopes.stream()
@@ -50,7 +53,7 @@ public class InboundMessageService {
 
     @Transactional
     public InboundMessage store(UUID messageId, OneCStream stream, String sourceQueue, String payload) {
-        InboundReceipt receipt = new InboundReceipt(messageId, stream, sourceQueue, clock.instant());
+        InboundReceipt receipt = new InboundReceipt(messageId, stream, sourceQueue, databaseClock.currentMoment());
         return repository.save(InboundMessage.receive(receipt, payload));
     }
 

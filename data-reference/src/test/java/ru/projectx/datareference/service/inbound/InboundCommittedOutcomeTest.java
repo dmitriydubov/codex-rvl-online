@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -31,6 +32,7 @@ import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.ParentKind;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -215,7 +217,7 @@ class InboundCommittedOutcomeTest {
     private InboundMessageService service() {
         return new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30), Duration.ofMinutes(5))),
-                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
+                Clock.fixed(NOW, ZoneOffset.UTC), mock(DatabaseClockRepository.class), new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
     }
 
     private static Logger serviceLog() {

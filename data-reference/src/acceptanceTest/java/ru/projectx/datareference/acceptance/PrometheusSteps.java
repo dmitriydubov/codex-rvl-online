@@ -1,6 +1,7 @@
 package ru.projectx.datareference.acceptance;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import io.cucumber.java.Before;
 import io.cucumber.java.ru.Тогда;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.web.server.LocalManagementPort;
 public class PrometheusSteps {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration GAUGE_TOLERANCE = Duration.ofMinutes(1);
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final URI scrape;
@@ -57,6 +59,13 @@ public class PrometheusSteps {
                 + "\")(?=[^}]*status=\"" + Pattern.quote(status) + "\")[^}]*} "))
                 .as("ряд %s{stream=\"%s\",status=\"%s\"}", name, stream, status)
                 .containsExactly((double) expected);
+    }
+
+    @Тогда("показатель Prometheus {string} с меткой stream {string} — {int} ч с точностью до минуты")
+    public void gaugeWithStreamInHours(String name, String stream, int hours) throws IOException, InterruptedException {
+        assertThat(valueOf(scrape(), name, stream))
+                .as("ряд %s{stream=\"%s\"}, секунды", name, stream)
+                .isCloseTo((double) Duration.ofHours(hours).toSeconds(), within((double) GAUGE_TOLERANCE.toSeconds()));
     }
 
     @Тогда("ряда Prometheus {string} нет")
