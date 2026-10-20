@@ -31,6 +31,11 @@ class ReferenceCacheNotificationPropertiesTest {
     }
 
     @Test
+    void zeroMaxDelay_failsStartup() {
+        assertStartupFailsOn("reconnect-max-delay=0s", "reconnectMaxDelay");
+    }
+
+    @Test
     void zeroRetries_failsStartup() {
         assertStartupFailsOn("reconnect-retries=0", "reconnectRetries");
     }

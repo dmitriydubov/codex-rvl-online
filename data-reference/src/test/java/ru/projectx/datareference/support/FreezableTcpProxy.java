@@ -72,17 +72,25 @@ public final class FreezableTcpProxy implements AutoCloseable {
     }
 
     private void acceptConnections() {
-        try {
-            while (!listening.isClosed()) {
-                Socket client = listening.accept();
-                Socket server = new Socket(targetHost, targetPort);
-                sockets.add(client);
-                sockets.add(server);
-                Thread.ofVirtual().start(() -> pump(client, server));
-                Thread.ofVirtual().start(() -> pump(server, client));
+        while (!listening.isClosed()) {
+            try {
+                forward(listening.accept());
+            } catch (IOException closedOrRefused) {
+                Thread.onSpinWait();
             }
-        } catch (IOException closed) {
-            sockets.clear();
+        }
+    }
+
+    private void forward(Socket client) throws IOException {
+        sockets.add(client);
+        try {
+            Socket server = new Socket(targetHost, targetPort);
+            sockets.add(server);
+            Thread.ofVirtual().start(() -> pump(client, server));
+            Thread.ofVirtual().start(() -> pump(server, client));
+        } catch (IOException targetRefused) {
+            client.close();
+            throw targetRefused;
         }
     }
 
