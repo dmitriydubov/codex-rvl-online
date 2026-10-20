@@ -72,3 +72,7 @@ ru.projectx.datareference.service.onec.PriceListTransferMarkup#lambda$counter$* 
 ru.projectx.datareference.service.onec.PriceListTransferMarkup#cidOf             NullReturnValsMutator                # finalMessage_carriesCountersOfWholeTransfer: isEqualTo((CID, 2, 3)) gets cid null
 ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                RemoveConditionalMutator_EQUAL_ELSE  # finalMessage_carriesCountersOfWholeTransfer: isEqualTo((CID, 2, 3)) gets (CID, null, 0)
 ru.projectx.datareference.service.onec.PriceListTransferMarkup#of                RemoveConditionalMutator_EQUAL_IF    # batch_hasNoExpectedBatches_andCountsItsOwnRows: isEqualTo((CID, null, 2)) gets a final
+
+ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator         # lockTtlNotLongerThanHeartbeat_failsStartup: 2s/2s starts
+ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE # defaults_holdTheLock...: defaults 30s/1s fail startup
+ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  BooleanTrueReturnValsMutator        # lockTtlNotLongerThanHeartbeat_failsStartup: 2s/2s starts
