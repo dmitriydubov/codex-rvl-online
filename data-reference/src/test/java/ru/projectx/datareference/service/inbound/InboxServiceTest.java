@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.inbound.InboxEntry;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboxRepository;
 import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.DatabaseCleaner;
@@ -24,6 +25,9 @@ class InboxServiceTest {
 
     @Autowired
     private InboxRepository repository;
+
+    @Autowired
+    private DatabaseClockRepository databaseClock;
 
     @BeforeEach
     void clearJournal() {
@@ -65,13 +69,14 @@ class InboxServiceTest {
     }
 
     @Test
-    void receivedAt_isTakenFromClock() {
+    void receivedAt_isTakenFromDatabaseClock_notFromInstanceClock() {
         UUID messageId = UUID.randomUUID();
+        Instant before = databaseClock.currentMoment();
 
         inboxService.registerIfNew(messageId);
 
-        assertThat(repository.findById(messageId))
-                .map(InboxEntry::receivedAt)
-                .contains(FixedClockConfig.NOW);
+        Instant receivedAt = repository.findById(messageId).orElseThrow().receivedAt();
+        assertThat(receivedAt).isBetween(before, databaseClock.currentMoment());
+        assertThat(receivedAt).isNotEqualTo(FixedClockConfig.NOW);
     }
 }

@@ -18,13 +18,13 @@ import ru.projectx.datareference.entity.inbound.InboundOutcome;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.BufferedTransfer;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.support.DatabaseCleaner;
-import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
@@ -61,9 +61,15 @@ class AgedInboundMessagesQueryTest {
     @Autowired
     private TestJdbc testJdbc;
 
+    @Autowired
+    private DatabaseClockRepository databaseClock;
+
+    private Instant databaseNow;
+
     @BeforeEach
     void clearTables() {
         databaseCleaner.clear();
+        databaseNow = databaseClock.currentMoment();
     }
 
     @Test
@@ -82,7 +88,7 @@ class AgedInboundMessagesQueryTest {
 
     @Test
     void forgetPayloads_skipsFreshOtherStreamAndErasedRows() {
-        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(30));
+        UUID fresh = store(OneCStream.POLICIES, Duration.ofDays(30).minusMinutes(1));
         UUID reference = store(OneCStream.MKB10, Duration.ofDays(40));
         store(OneCStream.POLICIES, Duration.ofDays(40));
         forget(10);
@@ -155,8 +161,8 @@ class AgedInboundMessagesQueryTest {
     void countPayloadsToForget_matchesWhatTheErasePassErases() {
         Stream.of(OneCStream.POLICIES, OneCStream.INSURANCE_CONTRACTS).forEach(stream -> storeWithOutcome(stream, "FAILED"));
         Stream.of("SKIPPED", "PROCESSED", "FAILED").forEach(status -> storeWithOutcome(OneCStream.PROGRAMS, status));
-        store(OneCStream.INSURANCE_CONTRACTS, Duration.ofDays(30));
-        Instant receivedBefore = FixedClockConfig.NOW.minus(Duration.ofDays(30));
+        store(OneCStream.INSURANCE_CONTRACTS, Duration.ofDays(29));
+        Instant receivedBefore = databaseNow.minus(Duration.ofDays(30));
 
         long counted = inboundMessageRepository.countPayloadsToForgetReceivedBefore(receivedBefore);
 
@@ -177,9 +183,9 @@ class AgedInboundMessagesQueryTest {
                         BufferedTransfer::getParts)
                 .containsExactly(
                         tuple(OLDER_TRANSFER,
-                                FixedClockConfig.NOW.minus(Duration.ofHours(5)), 1L),
+                                databaseNow.minus(Duration.ofHours(5)), 1L),
                         tuple(OLD_TRANSFER,
-                                FixedClockConfig.NOW.minus(Duration.ofHours(3)), 2L));
+                                databaseNow.minus(Duration.ofHours(3)), 2L));
         assertThat(agedMessages.transfersBufferedLongerThan(Duration.ofHours(1), 1))
                 .extracting(BufferedTransfer::getCorrelationId).containsExactly(OLDER_TRANSFER);
     }
@@ -224,7 +230,7 @@ class AgedInboundMessagesQueryTest {
         UUID messageId = UUID.randomUUID();
         quarantineService.quarantine(new RejectedMessage(messageId, OneCStream.POLICIES, QUEUE, new byte[] {1}), "22P05");
         testJdbc.update("update quarantine set received_at = ? where message_id = ?",
-                Timestamp.from(FixedClockConfig.NOW.minus(age)), messageId);
+                Timestamp.from(databaseNow.minus(age)), messageId);
         return messageId;
     }
 
@@ -242,7 +248,7 @@ class AgedInboundMessagesQueryTest {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope("{\"id\":\"%s\"}".formatted(messageId)));
         testJdbc.update("update inbound_message set received_at = ? where message_id = ?",
-                Timestamp.from(FixedClockConfig.NOW.minus(age)), messageId);
+                Timestamp.from(databaseNow.minus(age)), messageId);
         return messageId;
     }
 

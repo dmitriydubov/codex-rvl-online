@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static ru.projectx.datareference.support.FixedClockConfig.NOW;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundOutcome;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.IntegrationTest;
@@ -39,19 +41,23 @@ class InboundMessageServiceTest {
     @Autowired
     private InboundMessageRepository repository;
 
+    @Autowired
+    private DatabaseClockRepository databaseClock;
+
     @BeforeEach
     void clearRawMessages() {
         databaseCleaner.clear();
     }
 
     @Test
-    void storedMessage_startsAsNew() {
+    void storedMessage_startsAsNew_receivedByDatabaseClock() {
+        Instant before = databaseClock.currentMoment();
         UUID messageId = store();
 
         InboundMessage stored = repository.findById(messageId).orElseThrow();
         assertThat(stored.outcome().status()).isEqualTo(InboundStatus.NEW);
         assertThat(stored.outcome().attempt()).isZero();
-        assertThat(stored.receipt().receivedAt()).isEqualTo(NOW);
+        assertThat(stored.receipt().receivedAt()).isBetween(before, databaseClock.currentMoment());
         assertThat(stored.outcome().nextRetryAt()).isNull();
         assertThat(stored.outcome().lastError()).isNull();
     }

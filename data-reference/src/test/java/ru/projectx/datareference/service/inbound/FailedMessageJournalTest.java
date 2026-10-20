@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
@@ -29,6 +30,7 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundOutcome;
 import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.OneCStream;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.metrics.InboundTransitionMetrics;
 
@@ -157,7 +159,8 @@ class FailedMessageJournalTest {
 
     private InboundMessageService service() {
         return new InboundMessageService(repository, new InboundRetryProperties(BACKOFF),
-                Clock.fixed(NOW, ZoneOffset.UTC), new InboundTransitionMetrics(new SimpleMeterRegistry()),
+                Clock.fixed(NOW, ZoneOffset.UTC), mock(DatabaseClockRepository.class),
+                new InboundTransitionMetrics(new SimpleMeterRegistry()),
                 new FinalRejectionJournal(), List.of());
     }
 

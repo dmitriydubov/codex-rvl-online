@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +36,7 @@ import ru.projectx.datareference.entity.inbound.PriceListFinalization;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.mapper.ImportResult;
 import ru.projectx.datareference.mapper.stream.PriceListMapper;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.PriceListFinalizationRepository;
 import ru.projectx.datareference.service.inbound.FinalRejectionJournal;
@@ -484,6 +486,7 @@ class PriceListTransferAssemblerTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         InboundMessageService inboundMessageService = new InboundMessageService(
                 repository, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
+                mock(DatabaseClockRepository.class),
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
         PriceTransferOrder order = new PriceTransferOrder(finalizations, repository);
         PriceListReplacement replacement = new PriceListReplacement(priceListMapper, order, json, inboundMessageService);

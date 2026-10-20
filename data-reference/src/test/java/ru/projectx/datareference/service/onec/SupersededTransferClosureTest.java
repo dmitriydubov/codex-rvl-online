@@ -25,6 +25,7 @@ import ru.projectx.datareference.entity.inbound.InboundReceipt;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.PriceListFinalization;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.PriceListFinalizationRepository;
 import ru.projectx.datareference.service.inbound.FinalRejectionJournal;
@@ -170,7 +171,7 @@ class SupersededTransferClosureTest {
     private SupersededTransferClosure closure() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         InboundMessageService inboundMessageService = new InboundMessageService(
-                inbound, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock,
+                inbound, new InboundRetryProperties(List.of(Duration.ofSeconds(30))), clock, mock(DatabaseClockRepository.class),
                 new InboundTransitionMetrics(meters), new FinalRejectionJournal(), List.of());
         return new SupersededTransferClosure(inbound, new PriceTransferOrder(finalizations, inbound),
                 inboundMessageService, clock);

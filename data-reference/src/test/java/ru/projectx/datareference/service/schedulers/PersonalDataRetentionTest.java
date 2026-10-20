@@ -13,11 +13,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.onec.ReferenceImportService;
 import ru.projectx.datareference.support.DatabaseCleaner;
-import ru.projectx.datareference.support.FixedClockConfig;
 import ru.projectx.datareference.support.IntegrationTest;
 import ru.projectx.datareference.support.TestJdbc;
 
@@ -43,6 +43,9 @@ class PersonalDataRetentionTest {
 
     @Autowired
     private TestJdbc testJdbc;
+
+    @Autowired
+    private DatabaseClockRepository databaseClock;
 
     @BeforeEach
     void clearTables() {
@@ -98,7 +101,7 @@ class PersonalDataRetentionTest {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope("{\"id\":\"%s\"}".formatted(messageId)));
         testJdbc.update("update inbound_message set received_at = ? where message_id = ?",
-                Timestamp.from(FixedClockConfig.NOW.minus(age)), messageId);
+                Timestamp.from(databaseClock.currentMoment().minus(age)), messageId);
         return messageId;
     }
 }

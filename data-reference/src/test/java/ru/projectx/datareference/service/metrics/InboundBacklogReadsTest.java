@@ -1,18 +1,23 @@
 package ru.projectx.datareference.service.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.assertj.core.api.Assertions.within;
 import static ru.projectx.datareference.support.OneCMessages.envelope;
 
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import org.assertj.core.data.TemporalUnitOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.QuarantineService;
 import ru.projectx.datareference.support.DatabaseCleaner;
@@ -25,6 +30,7 @@ class InboundBacklogReadsTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_policies";
     private static final Instant NOW = FixedClockConfig.NOW;
+    private static final TemporalUnitOffset ON_TIME = within(1, ChronoUnit.SECONDS);
 
     @Autowired
     private InboundBacklogReads reads;
@@ -41,9 +47,15 @@ class InboundBacklogReadsTest {
     @Autowired
     private TestJdbc testJdbc;
 
+    @Autowired
+    private DatabaseClockRepository databaseClock;
+
+    private Instant databaseNow;
+
     @BeforeEach
     void clearTables() {
         databaseCleaner.clear();
+        databaseNow = databaseClock.currentMoment();
     }
 
     @Test
@@ -67,10 +79,14 @@ class InboundBacklogReadsTest {
 
         InboundBacklog backlog = reads.read();
 
-        assertThat(backlog.statuses()).containsExactlyInAnyOrder(
-                new InboundBacklog.StatusCount(OneCStream.POLICIES, InboundStatus.NEW, 2, NOW.minus(Duration.ofMinutes(40))),
-                new InboundBacklog.StatusCount(OneCStream.POLICIES, InboundStatus.FAILED, 1, NOW.minus(Duration.ofDays(2))),
-                new InboundBacklog.StatusCount(OneCStream.MKB10, InboundStatus.RETRY, 1, NOW.minus(Duration.ofMinutes(5))));
+        assertThat(backlog.statuses())
+                .extracting(InboundBacklog.StatusCount::stream, InboundBacklog.StatusCount::status,
+                        InboundBacklog.StatusCount::messages)
+                .containsExactlyInAnyOrder(tuple(OneCStream.POLICIES, InboundStatus.NEW, 2L),
+                        tuple(OneCStream.POLICIES, InboundStatus.FAILED, 1L), tuple(OneCStream.MKB10, InboundStatus.RETRY, 1L));
+        assertThat(oldest(backlog, OneCStream.POLICIES, InboundStatus.NEW)).isCloseTo(NOW.minus(Duration.ofMinutes(40)), ON_TIME);
+        assertThat(oldest(backlog, OneCStream.POLICIES, InboundStatus.FAILED)).isCloseTo(NOW.minus(Duration.ofDays(2)), ON_TIME);
+        assertThat(oldest(backlog, OneCStream.MKB10, InboundStatus.RETRY)).isCloseTo(NOW.minus(Duration.ofMinutes(5)), ON_TIME);
     }
 
     @Test
@@ -99,11 +115,19 @@ class InboundBacklogReadsTest {
         assertThat(reads.read().overdue()).isEqualTo(new InboundBacklog.Overdue(1, 2, 0));
     }
 
+    private static Instant oldest(InboundBacklog backlog, OneCStream stream, InboundStatus status) {
+        return backlog.statuses().stream()
+                .filter(count -> count.stream() == stream && count.status() == status)
+                .map(InboundBacklog.StatusCount::oldestReceivedAt)
+                .findFirst()
+                .orElseThrow();
+    }
+
     private UUID store(OneCStream stream, InboundStatus status, Duration age) {
         UUID messageId = UUID.randomUUID();
         inboundMessageService.store(messageId, stream, QUEUE, envelope("{\"id\":\"%s\"}".formatted(messageId)));
         testJdbc.update("update inbound_message set status = ?, received_at = ? where message_id = ?",
-                status.name(), Timestamp.from(NOW.minus(age)), messageId);
+                status.name(), Timestamp.from(databaseNow.minus(age)), messageId);
         return messageId;
     }
 
@@ -116,6 +140,6 @@ class InboundBacklogReadsTest {
         UUID messageId = UUID.randomUUID();
         quarantineService.quarantine(new RejectedMessage(messageId, OneCStream.POLICIES, QUEUE, new byte[] {1}), "22P05");
         testJdbc.update("update quarantine set received_at = ? where message_id = ?",
-                Timestamp.from(NOW.minus(age)), messageId);
+                Timestamp.from(databaseNow.minus(age)), messageId);
     }
 }

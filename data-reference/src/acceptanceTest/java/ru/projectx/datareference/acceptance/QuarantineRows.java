@@ -17,16 +17,14 @@ public class QuarantineRows {
     private static final String COUNT = "select count(*) from quarantine";
     private static final String CONTAINS = "select exists(select 1 from quarantine where message_id = :messageId)";
     private static final String AGE = """
-            update quarantine set received_at = cast(:now as timestamptz) - cast(:age as interval)
+            update quarantine set received_at = clock_timestamp() - cast(:age as interval)
              where message_id = :messageId
             """;
 
     private final JdbcClient jdbc;
-    private final StandClock clock;
 
-    public QuarantineRows(JdbcClient jdbc, StandClock clock) {
+    public QuarantineRows(JdbcClient jdbc) {
         this.jdbc = jdbc;
-        this.clock = clock;
     }
 
     public List<Row> rowsOf(UUID messageId) {
@@ -47,7 +45,6 @@ public class QuarantineRows {
 
     public void age(UUID messageId, Duration age) {
         int updated = jdbc.sql(AGE)
-                .param("now", clock.moment())
                 .param("age", age.toSeconds() + " seconds")
                 .param("messageId", messageId)
                 .update();

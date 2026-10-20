@@ -1,10 +1,12 @@
 package ru.projectx.datareference.service.metrics;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.datareference.config.ImportProperties;
+import ru.projectx.datareference.repository.database.DatabaseClockRepository;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.inbound.QuarantineRepository;
 import ru.projectx.datareference.repository.inbound.StatusBacklog;
@@ -18,31 +20,39 @@ public class InboundBacklogReads {
     private final ExpiredPolicyPersonalData expiredPolicies;
     private final ImportProperties properties;
     private final Clock clock;
+    private final DatabaseClockRepository databaseClock;
 
     public InboundBacklogReads(InboundMessageRepository inboundMessages, QuarantineRepository quarantine,
-            ExpiredPolicyPersonalData expiredPolicies, ImportProperties properties, Clock clock) {
+            ExpiredPolicyPersonalData expiredPolicies, ImportProperties properties, Clock clock,
+            DatabaseClockRepository databaseClock) {
 
         this.inboundMessages = inboundMessages;
         this.quarantine = quarantine;
         this.expiredPolicies = expiredPolicies;
         this.properties = properties;
         this.clock = clock;
+        this.databaseClock = databaseClock;
     }
 
     @Transactional(readOnly = true)
     public InboundBacklog read() {
         Instant now = clock.instant();
+        Instant databaseNow = databaseClock.currentMoment();
+        Duration instanceClockAhead = Duration.between(databaseNow, now);
         return new InboundBacklog(
-                inboundMessages.countUnfinishedByStreamAndStatus().stream().map(InboundBacklogReads::statusCount).toList(),
-                inboundMessages.countTransfersBufferedBefore(now.minus(properties.stuckTransferThreshold())),
+                inboundMessages.countUnfinishedByStreamAndStatus().stream()
+                        .map(row -> statusCount(row, instanceClockAhead))
+                        .toList(),
+                inboundMessages.countTransfersBufferedBefore(databaseNow.minus(properties.stuckTransferThreshold())),
                 new InboundBacklog.Overdue(
-                        inboundMessages.countPayloadsToForgetReceivedBefore(now.minus(properties.payloadTtl())),
-                        quarantine.countBodiesReceivedBefore(now.minus(properties.quarantineTtl())),
+                        inboundMessages.countPayloadsToForgetReceivedBefore(databaseNow.minus(properties.payloadTtl())),
+                        quarantine.countBodiesReceivedBefore(databaseNow.minus(properties.quarantineTtl())),
                         expiredPolicies.countAt(now)),
                 now);
     }
 
-    private static InboundBacklog.StatusCount statusCount(StatusBacklog row) {
-        return new InboundBacklog.StatusCount(row.getStream(), row.getStatus(), row.getMessages(), row.getOldestReceivedAt());
+    private static InboundBacklog.StatusCount statusCount(StatusBacklog row, Duration instanceClockAhead) {
+        return new InboundBacklog.StatusCount(row.getStream(), row.getStatus(), row.getMessages(),
+                row.getOldestReceivedAt().plus(instanceClockAhead));
     }
 }
