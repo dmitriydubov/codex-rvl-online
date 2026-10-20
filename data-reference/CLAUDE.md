@@ -536,10 +536,28 @@ GUID вида деятельности «РВЛ» — `f3876c53-c7d8-4620-b364-9
 (R-05) и `contract-view` — они участвуют в решениях. Что соседям нужно знать:
 - ответ может отставать от базы **до 10 минут** в двух случаях: правка базы мимо 1С и узкое окно, когда чтение
   совпало с фиксацией разбора (прочитало до фиксации, положило в кэш после сброса) — принято как остаточный риск;
-- кэш у каждой реплики свой. Сообщения 1С разбирает только ведущий экземпляр (Ш81, раздел «Структура пакетов»), и
-  событие сбрасывает кэш только у него; остальные реплики отстают до срока жизни. Стенд работает одной репликой;
-  сброс на всех репликах — шаг Ш82, до прода (решение владельца 2026-10-20: вторая реплика не включается как минимум
-  до прода).
+- кэш у каждой реплики свой, а сбрасывается на всех (Ш82, PR #205). Сообщения 1С разбирает только ведущий (Ш81). В той
+  же транзакции разбора он выполняет `pg_notify` (`service.cache.ReferenceCacheNotifications` по событию
+  `OneCMessageApplied` → `repository.database.CacheNotificationRepository`). PostgreSQL доставляет оповещение только
+  после фиксации, а откаченный разбор оповещения не шлёт. Каждый экземпляр, ведущий тоже, слушает канал подписчиком
+  Spring Integration `PostgresChannelMessageTableSubscriber` (`service.cache.ReferenceCacheNotificationsConfiguration`,
+  по подписке `StreamCacheSubscription` на поток) и сбрасывает кэши потока той же таблицей `ReferenceCacheDependencies`
+  (`ReferenceCacheEviction.evict`). Таблица сообщений канала и триггер Spring Integration не используются: имя канала
+  (`reference_cache_channel_message_notify`) и полезная нагрузка (`region + " " + UUIDConverter.getUUID(поток)`) —
+  внутреннее соглашение подписчика, оно собрано в `ReferenceCacheChannel` и закреплено `ReferenceCacheAcrossInstancesTest`.
+  При обновлении Spring Integration сверять. Подписчик держит отдельное соединение вне пулов
+  (`config.cache.ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`; настройки — с пула приёма,
+  `ListenerConnectionSettings`, `application_name` = `data-reference-cache-notifications`): +1 соединение на экземпляр.
+  После каждого подключения и переподключения он вызывает все подписки, то есть экземпляр сбрасывает весь кэш, и
+  пропущенное за обрыв не остаётся в кэше. Переподключение — серия `RetryTemplate`: пауза
+  `REFERENCE_CACHE_RECONNECT_DELAY` (1 с) с удвоением до `REFERENCE_CACHE_RECONNECT_MAX_DELAY` (10 с),
+  `projectx.cache.notifications.reconnect-retries` (10) повторов. После серии — ERROR и новая серия: накопление
+  исключений бесконечной серии в памяти так ограничено. Тишина дольше `silence-check` (60 с) — проверка соединения
+  `isValid`. Метрика `reference_cache_notifications_connected` (`config.FlagGauges`, `strongReference(true)`: Micrometer
+  держит источник слабой ссылкой, и флаг по ссылке на метод после сборки мусора давал `NaN`). Не подключился за 5 с при
+  старте — старт падает (`start()` подписчика). Остаточные риски, принятые владельцем («1) да 2) да» в PR #205):
+  переполнение очереди оповещений 8 ГБ тестом не покрыто (контроль — `pg_notification_queue_usage()` в
+  `docs/operations.md`); при плавной остановке экземпляр до 30 с отвечает на начатые запросы без оповещений.
 
 ### Сервис Заявок (он же сервис HR)
 
@@ -703,8 +721,8 @@ Central через прокси иногда отвечает 429 на пачк�
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С (`*Properties`) — в корне
-│   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С (`*Properties`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
+│   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел; соединение слушателя оповещений о сбросе вне пулов (`ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`, `ListenerConnectionSettings`) и его настройки (`ReferenceCacheNotificationProperties`)
 │   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него
 ├── entity/            — JPA-сущности
 │   ├── catalog/       — справочники 1С и общая основа `OneCEntity`
@@ -719,14 +737,14 @@ ru.projectx.datareference
 │   ├── catalog/       — справочники
 │   ├── policy/        — полисы, их поиск и проекция для Договоров
 │   ├── inbound/       — приём и разбор сообщений 1С
-│   └── database/      — настройки сеанса базы (`SessionSettingsRepository`), строка блокировки ведущего (`LeaderLockRepository`), часы базы для момента приёма (`DatabaseClockRepository`)
+│   └── database/      — настройки сеанса базы (`SessionSettingsRepository`), строка блокировки ведущего (`LeaderLockRepository`), часы базы для момента приёма (`DatabaseClockRepository`), оповещение о сбросе кэша (`CacheNotificationRepository`)
 ├── dto/               — тела ответов REST и единый формат ошибки; собираются из сущностей
 ├── service/           — бизнес-логика; в корне классов нет
 │   ├── lpu/ price/ policy/ insurancecontract/ mkb10/ program/
 │   │                  — REST-чтение по ресурсам: сервисы за интерфейсами `*Reads` и их правила
 │   ├── rest/          — общее для REST-чтений: `@RestReadTransaction`, московский день (`ReferenceCalendar`), ключ
 │   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`
-│   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`)
+│   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`), оповещение всех экземпляров (`ReferenceCacheNotifications`, `ReferenceCacheChannel`) и подписчик канала (`ReferenceCacheNotificationsConfiguration`, `StreamCacheSubscription`)
 │   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
 │   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
 │   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
