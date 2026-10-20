@@ -45,6 +45,7 @@ import ru.projectx.datareference.config.OneCJson;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
 import ru.projectx.datareference.service.inbound.QuarantineService;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
 @ExtendWith(MockitoExtension.class)
@@ -238,6 +239,22 @@ class OneCQueueListenerTest {
         verify(channel).basicNack(DELIVERY_TAG, false, true);
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
         verifyNoInteractions(consumers, quarantineService);
+        assertThat(outcomes()).containsExactly("returned");
+    }
+
+    @Test
+    void leadershipLostBeforeStoring_returnsMessageToQueueAndStopsConsumersWithoutPause() throws IOException {
+        when(ingestService.receive(any(), any(), any(), any()))
+                .thenThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c"));
+
+        listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
+
+        InOrder returnedThenStopped = inOrder(channel, consumers);
+        returnedThenStopped.verify(channel).basicNack(DELIVERY_TAG, false, true);
+        returnedThenStopped.verify(consumers).stopConsumers();
+        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(consumers, never()).pause(any());
+        verifyNoInteractions(quarantineService);
         assertThat(outcomes()).containsExactly("returned");
     }
 

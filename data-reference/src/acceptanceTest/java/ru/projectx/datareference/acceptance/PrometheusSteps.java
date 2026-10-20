@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 
@@ -37,6 +38,36 @@ public class PrometheusSteps {
         assertThat(now - valueOf(beforeScenario, name, stream))
                 .as("прирост %s{stream=\"%s\"} за сценарий", name, stream)
                 .isEqualTo(growth);
+    }
+
+    @Тогда("показатель Prometheus {string} равен {int}")
+    public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
+        assertThat(seriesValues(scrape(), Pattern.quote(name) + " "))
+                .as("ряд %s без меток", name)
+                .containsExactly((double) expected);
+    }
+
+    @Тогда("показатель Prometheus {string} с метками stream {string} и status {string} равен {int}")
+    public void gaugeWithStreamAndStatusEquals(String name, String stream, String status, int expected)
+            throws IOException, InterruptedException {
+
+        assertThat(seriesValues(scrape(), Pattern.quote(name) + "\\{(?=[^}]*stream=\"" + Pattern.quote(stream)
+                + "\")(?=[^}]*status=\"" + Pattern.quote(status) + "\")[^}]*} "))
+                .as("ряд %s{stream=\"%s\",status=\"%s\"}", name, stream, status)
+                .containsExactly((double) expected);
+    }
+
+    @Тогда("ряда Prometheus {string} нет")
+    public void noSeries(String name) throws IOException, InterruptedException {
+        assertThat(Pattern.compile("^" + Pattern.quote(name) + "[{ ]", Pattern.MULTILINE).matcher(scrape()).find())
+                .as("ряды %s в ответе /actuator/prometheus", name)
+                .isFalse();
+    }
+
+    private static List<Double> seriesValues(String exposition, String series) {
+        return Pattern.compile("^" + series + "(\\S+)$", Pattern.MULTILINE).matcher(exposition).results()
+                .map(match -> Double.parseDouble(match.group(1)))
+                .toList();
     }
 
     private String scrape() throws IOException, InterruptedException {

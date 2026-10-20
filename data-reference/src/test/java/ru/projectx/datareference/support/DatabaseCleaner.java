@@ -15,6 +15,7 @@ public class DatabaseCleaner {
               from pg_tables
              where schemaname = 'public'
                and tablename not like 'databasechangelog%'
+               and tablename <> 'leader_lock'
             """;
 
     private final DataSource dataSource;

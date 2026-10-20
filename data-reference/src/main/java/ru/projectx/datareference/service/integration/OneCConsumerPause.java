@@ -10,9 +10,6 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
-import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,16 +17,14 @@ public class OneCConsumerPause {
 
     private static final Logger log = LoggerFactory.getLogger(OneCConsumerPause.class);
 
-    private final ObjectProvider<RabbitListenerEndpointRegistry> containers;
+    private final OneCQueueContainers containers;
     private final IngestStorageProbe probe;
     private final Clock clock;
     private final OneCIngestMetrics metrics;
     private final Object lifecycle = new Object();
     private volatile @Nullable PauseState state;
 
-    public OneCConsumerPause(ObjectProvider<RabbitListenerEndpointRegistry> containers, IngestStorageProbe probe,
-            Clock clock, OneCIngestMetrics metrics) {
-
+    OneCConsumerPause(OneCQueueContainers containers, IngestStorageProbe probe, Clock clock, OneCIngestMetrics metrics) {
         this.containers = containers;
         this.probe = probe;
         this.clock = clock;
@@ -42,13 +37,13 @@ public class OneCConsumerPause {
                 log.debug("приём из 1С:УСК уже на паузе, повторный отказ хранилища: SQLSTATE {}", outage.sqlState());
                 return;
             }
-            Map<String, CompletableFuture<Void>> stops = runningQueues().stream()
+            Map<String, CompletableFuture<Void>> stops = containers.running().stream()
                     .collect(Collectors.toMap(queue -> queue, queue -> new CompletableFuture<>()));
             state = PauseState.of(outage, clock.instant(), stops);
             metrics.paused();
             log.warn("приём из 1С:УСК приостановлен до восстановления базы: {} SQLSTATE {}; останавливаются потребители {}",
                     outage.failureType(), outage.sqlState(), stops.keySet());
-            stops.forEach(this::stopConsumer);
+            stops.forEach((queue, stopped) -> containers.stop(queue, () -> stopped.complete(null)));
         }
     }
 
@@ -75,6 +70,21 @@ public class OneCConsumerPause {
         return current == null || current.consumersStopped().isDone();
     }
 
+    void startUnlessPaused() {
+        synchronized (lifecycle) {
+            if (state == null) {
+                containers.startExpected();
+            }
+        }
+    }
+
+    void stopConsumers() {
+        Optional<StorageOutage> outage = probe.outage();
+        synchronized (lifecycle) {
+            outage.ifPresentOrElse(this::pause, containers::stopRunning);
+        }
+    }
+
     private void resume(PauseState current) {
         if (!current.equals(state)) {
             return;
@@ -84,41 +94,9 @@ public class OneCConsumerPause {
             return;
         }
         state = null;
-        current.paused().queues().forEach(this::startConsumer);
-        log.info("база снова отвечает: потребители {} запущены, приём из 1С:УСК возобновлён", current.paused().queues());
-    }
-
-    private void startConsumer(String queue) {
-        try {
-            container(queue).start();
-        }
-        catch (RuntimeException notStarted) {
-            log.error("потребитель очереди {} не запущен после паузы: {}", queue, notStarted.getClass().getName());
-        }
-    }
-
-    private void stopConsumer(String queue, CompletableFuture<Void> stopped) {
-        try {
-            container(queue).stop(() -> stopped.complete(null));
-        }
-        catch (RuntimeException notStopped) {
-            log.warn("потребитель очереди {} не остановлен: {}", queue, notStopped.getClass().getName());
-            stopped.complete(null);
-        }
-    }
-
-    private Set<String> runningQueues() {
-        return Optional.ofNullable(containers.getIfAvailable())
-                .map(RabbitListenerEndpointRegistry::getListenerContainerIds)
-                .orElse(Set.of())
-                .stream()
-                .filter(queue -> container(queue).isRunning())
-                .collect(Collectors.toSet());
-    }
-
-    private MessageListenerContainer container(String queue) {
-        return Optional.ofNullable(containers.getObject().getListenerContainer(queue))
-                .orElseThrow(() -> new IllegalStateException("нет контейнера слушателя очереди " + queue));
+        containers.startExpected();
+        log.info("база снова отвечает: пауза приёма из 1С:УСК с {} снята, потребители запущены, если экземпляр ведущий",
+                current.paused().since());
     }
 
     public record Paused(StorageOutage outage, Instant since, Set<String> queues) {

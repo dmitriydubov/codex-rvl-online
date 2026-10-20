@@ -1,6 +1,9 @@
 package ru.projectx.datareference.service.onec;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -13,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.InboundMessageService;
 import ru.projectx.datareference.service.inbound.InboxService;
+import ru.projectx.datareference.service.leadership.LeadershipFence;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 
 @ExtendWith(MockitoExtension.class)
 class OneCIngestServiceTest {
@@ -26,6 +31,8 @@ class OneCIngestServiceTest {
 
     @Mock
     private InboundMessageService inboundMessageService;
+
+    private final LeadershipFence fence = mock(LeadershipFence.class);
 
     @Test
     void newMessage_isStoredWithItsStreamAndQueue() {
@@ -47,7 +54,17 @@ class OneCIngestServiceTest {
         verifyNoInteractions(inboundMessageService);
     }
 
+    @Test
+    void instanceThatLostTheLeaderLock_storesNothing() {
+        doThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c")).when(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> service().receive(MESSAGE_ID, OneCStream.MKB10, QUEUE, PAYLOAD))
+                .isInstanceOf(LeadershipLostException.class);
+
+        verifyNoInteractions(inboxService, inboundMessageService);
+    }
+
     private OneCIngestService service() {
-        return new OneCIngestService(inboxService, inboundMessageService);
+        return new OneCIngestService(inboxService, inboundMessageService, fence);
     }
 }

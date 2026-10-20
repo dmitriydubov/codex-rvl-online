@@ -112,6 +112,11 @@ projectx:
   scheduling:
     enabled: true
 
+  leadership:
+    group: data-reference
+    lock-ttl: ${LEADER_LOCK_TTL:30s}
+    heartbeat: 1s
+
   metrics:
     backlog-refresh-interval: 30s
 

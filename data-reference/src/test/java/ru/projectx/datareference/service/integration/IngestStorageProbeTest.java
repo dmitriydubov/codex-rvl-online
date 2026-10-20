@@ -119,6 +119,23 @@ class IngestStorageProbeTest {
     }
 
     @Test
+    void lockedTable_isAnOutageNamingItsCodeAndType() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(inbox.existsById(NEVER_STORED))
+                .thenThrow(new CannotAcquireLockException("lock", new SQLException("lock", "55P03")));
+
+        assertThat(probe().outage())
+                .hasValue(new StorageOutage("55P03", CannotAcquireLockException.class.getName()));
+    }
+
+    @Test
+    void readableTables_areNoOutage() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+
+        assertThat(probe().outage()).isEmpty();
+    }
+
+    @Test
     void noConnection_isUnavailable() {
         when(transactions.getTransaction(any())).thenThrow(
                 new org.springframework.transaction.CannotCreateTransactionException("нет соединения"));

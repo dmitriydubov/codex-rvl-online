@@ -32,6 +32,7 @@ class OneCStorageFailures {
             case OneCStorageFailure.Poison poison -> quarantine(delivery, messageId, poison.sqlState());
             case OneCStorageFailure.DuplicateRace ignored -> returnAfterPause(delivery, messageId, failure);
             case OneCStorageFailure.Outage outage -> pauseConsumers(delivery, messageId, outage.outage());
+            case OneCStorageFailure.LeadershipLost ignored -> standDown(delivery, messageId);
         }
     }
 
@@ -76,6 +77,14 @@ class OneCStorageFailures {
         pauseBeforeRedelivery();
         metrics.record(delivery, IngestOutcome.RETURNED);
         delivery.returnToQueue();
+    }
+
+    private void standDown(OneCDelivery delivery, UUID messageId) throws IOException {
+        log.info("сообщение {} возвращено в очередь {}: экземпляр больше не ведущий, потребители останавливаются",
+                messageId, delivery.queue());
+        metrics.record(delivery, IngestOutcome.RETURNED);
+        delivery.returnToQueue();
+        consumers.stopConsumers();
     }
 
     private void pauseConsumers(OneCDelivery delivery, UUID messageId, StorageOutage outage) {

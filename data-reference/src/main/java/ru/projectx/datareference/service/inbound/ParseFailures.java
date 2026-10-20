@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.service.database.DatabaseOutages;
 import ru.projectx.datareference.service.database.SqlStates;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 
 @Component
 public class ParseFailures {
@@ -15,6 +16,9 @@ public class ParseFailures {
     }
 
     public ParseFailure classify(RuntimeException failure) {
+        if (failure instanceof LeadershipLostException lost) {
+            throw lost;
+        }
         return outages.recognize(failure)
                 .<ParseFailure>map(ParseFailures::temporary)
                 .or(() -> outages.describe(failure).map(ParseFailures::rejectedByDatabase))

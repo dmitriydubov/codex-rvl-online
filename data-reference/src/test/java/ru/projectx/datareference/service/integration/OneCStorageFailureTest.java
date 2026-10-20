@@ -9,6 +9,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionSystemException;
+import ru.projectx.datareference.service.leadership.LeadershipLostException;
 
 class OneCStorageFailureTest {
 
@@ -20,6 +21,12 @@ class OneCStorageFailureTest {
         OneCStorageFailure failure = OneCStorageFailure.of(withSqlState(sqlState));
 
         assertThat(failure).isEqualTo(new OneCStorageFailure.Poison(sqlState));
+    }
+
+    @Test
+    void lostLeadership_isNeitherPoisonNorOutage() {
+        assertThat(OneCStorageFailure.of(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c")))
+                .isEqualTo(new OneCStorageFailure.LeadershipLost());
     }
 
     @Test

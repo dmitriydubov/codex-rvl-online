@@ -70,6 +70,46 @@ class InboundBacklogMetricsTest {
     }
 
     @Test
+    void withdraw_removesEverySnapshotSeries() {
+        metrics.withdraw();
+
+        assertThat(registry.find(InboundBacklogMetrics.MESSAGES).gauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.OLDEST_PENDING).timeGauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.STALENESS).timeGauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.STUCK_TRANSFERS).gauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.OVERDUE_PAYLOADS).gauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.OVERDUE_QUARANTINE_BODIES).gauges()).isEmpty();
+        assertThat(registry.find(InboundBacklogMetrics.OVERDUE_POLICIES).gauges()).isEmpty();
+        assertThat(registry.getMeters()).isEmpty();
+    }
+
+    @Test
+    void refreshAfterWithdraw_publishesTheFreshSnapshotAgainOnce() {
+        metrics.withdraw();
+        when(reads.read()).thenReturn(new InboundBacklog(List.of(
+                new InboundBacklog.StatusCount(OneCStream.POLICIES, InboundStatus.FAILED, 3, STARTED)),
+                0, new InboundBacklog.Overdue(0, 0, 0), REFRESHED));
+
+        metrics.refresh();
+        metrics.refresh();
+
+        assertThat(registry.find(InboundBacklogMetrics.MESSAGES).gauges())
+                .hasSize(OneCStream.values().length * 5);
+        assertThat(registry.get(InboundBacklogMetrics.MESSAGES).tag("stream", "POLICIES").tag("status", "FAILED")
+                .gauge().value()).isEqualTo(3.0);
+        assertThat(registry.find(InboundBacklogMetrics.STALENESS).timeGauges()).hasSize(1);
+    }
+
+    @Test
+    void withdrawBeforeBinding_changesNothing() {
+        InboundBacklogMetrics unbound = new InboundBacklogMetrics(reads, clock);
+
+        unbound.withdraw();
+
+        assertThat(registry.find(InboundBacklogMetrics.STALENESS).timeGauges()).hasSize(1);
+    }
+
+    @Test
     void beforeFirstRefresh_stalenessCountsFromEpoch() {
         assertThat(timeGauge(InboundBacklogMetrics.STALENESS).value(TimeUnit.SECONDS))
                 .isEqualTo((double) STARTED.getEpochSecond());

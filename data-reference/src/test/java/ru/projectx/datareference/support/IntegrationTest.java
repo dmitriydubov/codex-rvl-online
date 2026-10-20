@@ -14,6 +14,7 @@ import org.springframework.core.annotation.AliasFor;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.scheduling.enabled=false",
+        "projectx.leadership.group=${random.uuid}",
         "spring.autoconfigure.exclude=org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class, TestSupportConfig.class})
 public @interface IntegrationTest {

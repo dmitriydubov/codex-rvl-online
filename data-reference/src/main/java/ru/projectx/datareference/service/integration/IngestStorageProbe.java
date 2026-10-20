@@ -1,5 +1,6 @@
 package ru.projectx.datareference.service.integration;
 
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +34,18 @@ public class IngestStorageProbe {
     }
 
     public boolean storageAvailable() {
+        return outage().isEmpty();
+    }
+
+    public Optional<StorageOutage> outage() {
         try {
             readOnly.executeWithoutResult(status -> touchIngestTables());
-            return true;
+            return Optional.empty();
         }
         catch (RuntimeException unavailable) {
             log.info("таблицы приёма из 1С:УСК недоступны: {} SQLSTATE {}",
                     unavailable.getClass().getName(), SqlStates.deepestOrNone(unavailable));
-            return false;
+            return Optional.of(new StorageOutage(SqlStates.deepestOrNone(unavailable), unavailable.getClass().getName()));
         }
     }
 

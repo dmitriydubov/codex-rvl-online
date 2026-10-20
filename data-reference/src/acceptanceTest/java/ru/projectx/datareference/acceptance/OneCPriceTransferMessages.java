@@ -75,6 +75,16 @@ final class OneCPriceTransferMessages {
         return batchMessage(messageId, JSON.createObjectNode().put(KEY_VALUE, service), recordSet, InboundStatus.FAILED);
     }
 
+    static boolean batchWithoutItsFinal(OneCMessage message, List<OneCMessage> received) {
+        return BATCH_QUEUE.equals(message.queue())
+                && message.expected() == InboundStatus.PROCESSED
+                && received.stream().noneMatch(other -> FINAL_QUEUE.equals(other.queue()) && sameTransfer(other, message));
+    }
+
+    private static boolean sameTransfer(OneCMessage first, OneCMessage second) {
+        return first.data().path(CID).asString().equals(second.data().path(CID).asString());
+    }
+
     private static ObjectNode transferData(UUID cid, String service) {
         ObjectNode data = JSON.createObjectNode().put(CID, cid.toString());
         return NO_SERVICE.equals(service) ? data : data.put(KEY_VALUE, service);
