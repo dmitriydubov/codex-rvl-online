@@ -1,5 +1,7 @@
 package ru.projectx.datareference.service.leadership;
 
+import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.integration.leader.Candidate;
@@ -11,6 +13,7 @@ public class BackgroundLeadership implements Candidate {
 
     private final LeaderLock lock;
     private volatile boolean leader;
+    private volatile @Nullable Context election;
 
     public BackgroundLeadership(LeaderLock lock) {
         this.lock = lock;
@@ -28,6 +31,7 @@ public class BackgroundLeadership implements Candidate {
 
     @Override
     public void onGranted(Context context) {
+        election = context;
         leader = true;
         log.info("экземпляр {} стал ведущим: приём из 1С:УСК и задачи по расписанию идут на нём", lock.instanceId());
     }
@@ -57,6 +61,11 @@ public class BackgroundLeadership implements Candidate {
         }
         catch (LeadershipLostException lost) {
             log.info("проход по расписанию прерван: экземпляр {} больше не держит блокировку ведущего", lock.instanceId());
+            stepDown();
         }
+    }
+
+    public void stepDown() {
+        Optional.ofNullable(election).ifPresent(Context::yield);
     }
 }

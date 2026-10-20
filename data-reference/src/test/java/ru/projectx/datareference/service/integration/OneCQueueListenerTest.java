@@ -45,6 +45,7 @@ import ru.projectx.datareference.config.OneCJson;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.entity.inbound.RejectedMessage;
 import ru.projectx.datareference.service.inbound.QuarantineService;
+import ru.projectx.datareference.service.leadership.BackgroundLeadership;
 import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import ru.projectx.datareference.service.onec.OneCIngestService;
 
@@ -70,6 +71,9 @@ class OneCQueueListenerTest {
 
     @Mock
     private Channel channel;
+
+    @Mock
+    private BackgroundLeadership leadership;
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
@@ -243,15 +247,16 @@ class OneCQueueListenerTest {
     }
 
     @Test
-    void leadershipLostBeforeStoring_returnsMessageToQueueAndStopsConsumersWithoutPause() throws IOException {
+    void leadershipLostBeforeStoring_returnsMessageStopsConsumersAndStepsDownWithoutPause() throws IOException {
         when(ingestService.receive(any(), any(), any(), any()))
                 .thenThrow(new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c"));
 
         listener().receive(OneCStream.MKB10, delivery(envelope(MESSAGE_ID)), channel);
 
-        InOrder returnedThenStopped = inOrder(channel, consumers);
+        InOrder returnedThenStopped = inOrder(channel, consumers, leadership);
         returnedThenStopped.verify(channel).basicNack(DELIVERY_TAG, false, true);
         returnedThenStopped.verify(consumers).stopConsumers();
+        returnedThenStopped.verify(leadership).stepDown();
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
         verify(consumers, never()).pause(any());
         verifyNoInteractions(quarantineService);
@@ -391,7 +396,8 @@ class OneCQueueListenerTest {
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), ingestMetrics),
+                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL), ingestMetrics,
+                        leadership),
                 ingestMetrics);
     }
 

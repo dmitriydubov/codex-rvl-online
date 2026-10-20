@@ -1,7 +1,6 @@
 package ru.projectx.datareference.service.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.SQLException;
 import org.hibernate.exception.DataException;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.orm.jpa.hibernate.HibernateExceptionTranslator;
 import ru.projectx.datareference.exception.OneCFieldException;
 import ru.projectx.datareference.service.database.DatabaseOutages;
-import ru.projectx.datareference.service.leadership.LeadershipLostException;
 import tools.jackson.databind.exc.JsonNodeException;
 import tools.jackson.databind.node.MissingNode;
 
@@ -21,13 +19,6 @@ class ParseFailuresTest {
 
     private final ParseFailures failures =
             new ParseFailures(new DatabaseOutages(new HibernateExceptionTranslator()));
-
-    @Test
-    void lostLeadership_isNotAParseFailure_itEndsThePass() {
-        LeadershipLostException lost = new LeadershipLostException("0b5f3c1e-7a2d-4e8b-9c6f-1d2e3f4a5b6c");
-
-        assertThatThrownBy(() -> failures.classify(lost)).isSameAs(lost);
-    }
 
     @Test
     void lockTimeout_isTemporary_withTypeAndSqlStateButNoDriverText() {

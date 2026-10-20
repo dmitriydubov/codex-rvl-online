@@ -3,6 +3,7 @@ package ru.projectx.datareference.service.leadership;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -120,6 +121,35 @@ class BackgroundLeadershipTest {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
             assertThat(event.getFormattedMessage()).contains("прерван", LOCK.instanceId());
         });
+    }
+
+    @Test
+    void lockLostInTheMiddleOfThePass_givesTheRoleBackToTheElection() {
+        Context election = mock(Context.class);
+        leadership.onGranted(election);
+
+        leadership.runAsLeader(() -> {
+            throw new LeadershipLostException(LOCK.instanceId());
+        });
+
+        verify(election).yield();
+    }
+
+    @Test
+    void stepDown_yieldsTheElectionThatGrantedTheRole() {
+        Context election = mock(Context.class);
+        leadership.onGranted(election);
+
+        leadership.stepDown();
+
+        verify(election).yield();
+    }
+
+    @Test
+    void stepDownBeforeAnyGrant_changesNothing() {
+        leadership.stepDown();
+
+        assertThat(leadership.leader()).isFalse();
     }
 
     @Test

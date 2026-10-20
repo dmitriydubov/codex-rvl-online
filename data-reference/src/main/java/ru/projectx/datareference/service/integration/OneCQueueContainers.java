@@ -1,7 +1,10 @@
 package ru.projectx.datareference.service.integration;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +23,7 @@ class OneCQueueContainers {
     private final ObjectProvider<RabbitListenerEndpointRegistry> registry;
     private final ObjectProvider<RabbitProperties> rabbit;
     private final BackgroundLeadership leadership;
+    private final Map<String, CompletableFuture<Void>> stopping = new ConcurrentHashMap<>();
 
     OneCQueueContainers(ObjectProvider<RabbitListenerEndpointRegistry> registry, ObjectProvider<RabbitProperties> rabbit,
             BackgroundLeadership leadership) {
@@ -55,17 +59,24 @@ class OneCQueueContainers {
     }
 
     void stop(String queue, Runnable stopped) {
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        stopping.put(queue, done);
+        Runnable finished = () -> {
+            done.complete(null);
+            stopped.run();
+        };
         try {
-            container(queue).stop(stopped);
+            container(queue).stop(finished);
         }
         catch (RuntimeException notStopped) {
             log.warn("потребитель очереди {} не остановлен: {}", queue, notStopped.getClass().getName());
-            stopped.run();
+            finished.run();
         }
     }
 
     private void start(String queue) {
         try {
+            Optional.ofNullable(stopping.remove(queue)).ifPresent(CompletableFuture::join);
             container(queue).start();
         }
         catch (RuntimeException notStarted) {

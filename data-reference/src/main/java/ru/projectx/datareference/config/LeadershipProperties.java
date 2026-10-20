@@ -1,5 +1,6 @@
 package ru.projectx.datareference.config;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
@@ -14,4 +15,9 @@ public record LeadershipProperties(
         @DefaultValue("data-reference") @NotBlank @Size(max = 100) String group,
         @DefaultValue("30s") @DurationMin(seconds = 1) Duration lockTtl,
         @DefaultValue("1s") @DurationMin(millis = 1) Duration heartbeat) {
+
+    @AssertTrue(message = "срок блокировки ведущего должен быть больше шага её продления")
+    public boolean isLockTtlLongerThanHeartbeat() {
+        return lockTtl.compareTo(heartbeat) > 0;
+    }
 }

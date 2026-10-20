@@ -2,6 +2,8 @@ package ru.projectx.datareference.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,7 +15,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,7 @@ class OneCQueueContainersTest {
 
     private static final String POLICIES = "q-policies";
     private static final String MKB10 = "q-mkb10";
+    private static final long QUIET_MILLIS = 300;
 
     @Mock
     private ObjectProvider<RabbitListenerEndpointRegistry> registryProvider;
@@ -144,6 +149,24 @@ class OneCQueueContainersTest {
         assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.WARN)
                 .singleElement()
                 .satisfies(event -> assertThat(event.getFormattedMessage()).contains(POLICIES, "не остановлен"));
+    }
+
+    @Test
+    void startRightAfterStop_waitsUntilTheContainerHasStopped() {
+        AtomicReference<Runnable> stopFinishes = new AtomicReference<>();
+        doAnswer(invocation -> {
+            stopFinishes.set(invocation.getArgument(0, Runnable.class));
+            return null;
+        }).when(policies).stop(any(Runnable.class));
+        OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader());
+        containers.stopRunning();
+
+        CompletableFuture<Void> start = CompletableFuture.runAsync(containers::startExpected);
+
+        verify(policies, after(QUIET_MILLIS).never()).start();
+        stopFinishes.get().run();
+        start.join();
+        verify(policies).start();
     }
 
     @Test
