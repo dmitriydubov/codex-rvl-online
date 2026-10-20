@@ -41,15 +41,16 @@ class DatabaseClockRepositoryTest {
 
     @Test
     void currentMoment_isActualTimeOfTheCall_notStartOfTheTransaction() {
-        Instant[] startAndMoment = Objects.requireNonNull(new TransactionTemplate(transactions).execute(status -> {
+        Instant[] moments = Objects.requireNonNull(new TransactionTemplate(transactions).execute(status -> {
             Instant start = databaseMoment("select now()");
             JdbcClient.create(dataSource).sql("select pg_sleep(:seconds)")
                     .param("seconds", PAUSE_IN_DATABASE.toMillis() / 1000.0)
                     .query(Object.class).list();
-            return new Instant[] {start, databaseClock.currentMoment()};
+            return new Instant[] {start, databaseClock.currentMoment(), databaseMoment("select now()")};
         }));
 
-        assertThat(Duration.between(startAndMoment[0], startAndMoment[1])).isGreaterThanOrEqualTo(PAUSE_IN_DATABASE);
+        assertThat(moments[2]).as("начало транзакции после паузы — та же транзакция").isEqualTo(moments[0]);
+        assertThat(Duration.between(moments[0], moments[1])).isGreaterThanOrEqualTo(PAUSE_IN_DATABASE);
     }
 
     private Instant databaseMoment(String query) {
