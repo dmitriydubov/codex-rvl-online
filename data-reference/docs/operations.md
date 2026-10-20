@@ -36,7 +36,7 @@ BOM Spring Boot.
 | GET | `/internal/v1/policies/{id}`, `/internal/v1/policies?external_id=` или `?number=&contract_external_id=` | полис целиком, с персональными данными |
 | GET | `/internal/v1/policies/{id}/contract-view`, `/internal/v1/policies/contract-view?external_id=` | полис для сервиса Договоров, без персональных данных |
 | GET | `/internal/v1/insurance-contracts/{id}`, `/internal/v1/insurance-contracts?external_id=` | договор страхования со страхователем |
-| GET | `/internal/v1/insurance-contracts?insurer_external_id=` | единственный действующий сегодня (по Москве) договор страхования страхователя по его GUID в 1С:УСК; нет такого — 404 `INSURANCE_CONTRACT_NOT_FOUND`, несколько — 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов |
+| GET | `/internal/v1/insurance-contracts?insurer_external_id=` | единственный действующий сегодня договор страхования страхователя по его GUID в 1С:УСК; нет такого — 404 `INSURANCE_CONTRACT_NOT_FOUND`, несколько — 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов |
 | GET | `/internal/v1/programs/{id}` | страховую программу с перечнем услуг |
 
 Подробное описание полей и ошибок — в документе «ТЗ API Data-reference». Примеры запросов к стенду с
