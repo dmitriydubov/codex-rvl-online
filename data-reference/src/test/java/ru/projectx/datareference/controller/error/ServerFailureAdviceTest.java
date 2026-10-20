@@ -22,6 +22,7 @@ import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.RecoverableDataAccessException;
+import org.springframework.data.jpa.repository.query.BadJpqlGrammarException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
@@ -37,6 +38,7 @@ class ServerFailureAdviceTest {
 
     private static final String FOREIGN_TEXT = "Иванов Иван 1980-05-17";
     private static final String REQUEST_ID = "handler-test-1";
+    private static final String JPQL = "select p from Policy p where p.externalId = ?1";
 
     private final FailingController controller = new FailingController();
     private MockMvcTester mvc;
@@ -58,7 +60,8 @@ class ServerFailureAdviceTest {
                 new TransactionTimedOutException(FOREIGN_TEXT),
                 new JpaSystemException(new TransactionException("Transaction timeout expired")),
                 new org.hibernate.QueryTimeoutException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT, "57014"), FOREIGN_TEXT),
-                new TransactionException("Transaction timeout expired"));
+                new TransactionException("Transaction timeout expired"),
+                new BadJpqlGrammarException(FOREIGN_TEXT, JPQL, new TransactionTimedOutException(FOREIGN_TEXT)));
     }
 
     @ParameterizedTest
@@ -115,11 +118,33 @@ class ServerFailureAdviceTest {
         assertThat(output).contains("TransactionTimedOutException, sqlstate=нет, request_id=" + REQUEST_ID);
     }
 
+    @Test
+    void readDeadlineHiddenByDerivedQuery_isLoggedAsWarningWithWrapperAndRequestId_notAsError(CapturedOutput output) {
+        controller.failWith(new BadJpqlGrammarException(FOREIGN_TEXT, JPQL, new TransactionTimedOutException(FOREIGN_TEXT)));
+
+        request();
+
+        assertThat(output)
+                .contains("WARN", "BadJpqlGrammarException/TransactionTimedOutException, sqlstate=нет, request_id=" + REQUEST_ID)
+                .doesNotContain("ERROR", FOREIGN_TEXT);
+    }
+
+    @Test
+    void queryTextError_isLoggedAsError(CapturedOutput output) {
+        controller.failWith(new BadJpqlGrammarException(FOREIGN_TEXT, JPQL, new IllegalArgumentException(FOREIGN_TEXT)));
+
+        request();
+
+        assertThat(output).contains("ERROR", "BadJpqlGrammarException at ", "request_id=" + REQUEST_ID)
+                .doesNotContain("WARN", FOREIGN_TEXT);
+    }
+
     static Stream<RuntimeException> permanentFailures() {
         return Stream.of(
                 new InvalidDataAccessResourceUsageException(FOREIGN_TEXT),
                 new DataIntegrityViolationException(FOREIGN_TEXT),
                 new JpaSystemException(new IllegalStateException(FOREIGN_TEXT)),
+                new BadJpqlGrammarException(FOREIGN_TEXT, JPQL, new IllegalArgumentException(FOREIGN_TEXT)),
                 new org.hibernate.exception.ConstraintViolationException(FOREIGN_TEXT, new SQLException(FOREIGN_TEXT, "23505"), "uq"),
                 new IllegalStateException(FOREIGN_TEXT));
     }

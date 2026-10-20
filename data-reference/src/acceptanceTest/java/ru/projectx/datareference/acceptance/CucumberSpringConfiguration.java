@@ -87,7 +87,7 @@ public class CucumberSpringConfiguration {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String beanName) {
                     if (bean instanceof DataSource pool && DATA_SOURCE_BEAN.equals(beanName)) {
-                        return new SwitchableDataSource(pool);
+                        return new SwitchableDataSource(new LateFirstReadDataSource(pool));
                     }
                     return bean;
                 }
