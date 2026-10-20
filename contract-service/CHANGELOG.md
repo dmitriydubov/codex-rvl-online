@@ -105,6 +105,8 @@
   после всех повторов.
 - Настройки прохода запросов на выпуск полисов ЛМ (`LM_POLICY_REQUEST_INTERVAL`, `LM_POLICY_REQUEST_BATCH_SIZE`) — с
   умолчаниями.
+- Правила кода сервиса записаны в `docs/code-style.md`; кодировку, концы строк и отступы задают `.editorconfig` и
+  `.gitattributes` модуля.
 
 ### Изменено
 
@@ -147,8 +149,8 @@
 
 ### Перенос
 
-- **Документация:** каталог `docs/` (`design.md`, `operations.md`) переносится вместе с сервисом; README
-  ссылается на него.
+- **Документация:** каталог `docs/` (`design.md`, `operations.md`, `code-style.md`) переносится вместе с сервисом;
+  README ссылается на него. Файлы `.editorconfig` и `.gitattributes` в каталоге сервиса переносятся с ним.
 - **Миграции:** сервис применяет сам при старте (`db/changelog/001-enums.yaml` … `008-contract-documents.yaml`);
   пользователю базы нужны права на создание типов и таблиц в схеме `public`. Миграция `008` добавляет типы
   `printed_form_kind`, `printed_form_type` и таблицу `contract_documents`.

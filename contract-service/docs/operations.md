@@ -117,6 +117,11 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 Вне рабочего контура сборке нужны публичные репозитории: `./gradlew -PpublicRepositories=true …` или переменная
 `ORG_GRADLE_PROJECT_publicRepositories=true`. По умолчанию сборка берёт зависимости только из Nexus контура.
 
+Концы строк в git задаёт `.gitattributes` модуля: LF у текстовых файлов, CRLF у `*.bat`. Без него git на Windows с
+`core.autocrlf=true` кладёт в рабочую копию CRLF, и `gradlew` и `certs/import-ca.sh` падают в Linux-контейнере на «\r».
+Кодировку, концы строк и отступы для редактора задаёт `.editorconfig` модуля, правила кода —
+[code-style.md](code-style.md).
+
 Локально база и оба брокера поднимаются из `docker-compose.yml`, пароли — локального контура:
 
 ```shell
@@ -192,6 +197,7 @@ data-reference должен быть поднят раньше: на машин�
 
 - [CHANGELOG.md](../CHANGELOG.md) — версии, что нужно для установки каждой.
 - `src/main/resources/application.yml` — все настройки; почему они такие — [design.md](design.md).
+- [code-style.md](code-style.md) — как пишем код: размеры, слои, исключения, транзакции, персональные данные, тесты.
 - `.env.example` — шаблон переменных для `docker-compose.yml`.
 - `src/test/resources/data-reference/examples/` — примеры ответов сервиса справочных данных, на которых проверяется
   клиент справочников; это копии файлов его стенда, и при изменении примеров у него копии обновляются вручную.
