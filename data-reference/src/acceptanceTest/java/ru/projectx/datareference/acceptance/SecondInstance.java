@@ -57,6 +57,7 @@ public class SecondInstance {
     private final RabbitMQContainer broker;
     private final JdbcClient jdbc;
     private @Nullable CompletableFuture<ConfigurableApplicationContext> starting;
+    private CompletableFuture<ConfigurableApplicationContext> launched = new CompletableFuture<>();
     private int port;
 
     public SecondInstance(PostgreSQLContainer database, RabbitMQContainer broker) {
@@ -83,8 +84,10 @@ public class SecondInstance {
         application.setListeners(application.getListeners().stream()
                 .filter(listener -> !(listener instanceof LoggingApplicationListener))
                 .toList());
-        starting = CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER)
-                .orTimeout(START_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        CompletableFuture<ConfigurableApplicationContext> started =
+                CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER);
+        launched = started;
+        starting = started.copy().orTimeout(START_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
     }
 
     public int port() {
@@ -109,7 +112,8 @@ public class SecondInstance {
         Optional.ofNullable(starting).ifPresent(instance -> {
             allowConnections();
             Optional.ofNullable(instance.handle((context, failure) -> context).join())
-                    .ifPresent(ConfigurableApplicationContext::close);
+                    .ifPresentOrElse(ConfigurableApplicationContext::close,
+                            () -> launched.thenAccept(ConfigurableApplicationContext::close));
         });
         starting = null;
     }
