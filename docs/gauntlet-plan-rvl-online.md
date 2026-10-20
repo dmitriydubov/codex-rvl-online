@@ -3497,6 +3497,15 @@ Dockerfile и gradle без комментариев. Модель — Opus 5.5.
   `docs/operations.md`, «Выкатка и сеть»). «Безопасно для нескольких реплик» станет правдой после Ш81, Ш83 и Ш82 —
   тогда координатор переписывает строку README и раздел «Выкатка и сеть». Длина README — 3493 из 3500: ради места
   сжаты формулировки (таблица таймаутов, «Не наше», статусы, ссылки), смысл не менялся.
+- **Ш81, остановка перед PR (2026-10-20):** три мутанта RUN_ERROR в `config.LeadershipProperties#isLockTtlLongerThanHeartbeat`
+  (record с `@AssertTrue`: `ConditionalsBoundaryMutator`, `RemoveConditionalMutator_ORDER_ELSE`,
+  `BooleanTrueReturnValsMutator`). Координатор сверил тесты по ветке `claude/sh81-background-leader` (90c173c): метод —
+  `lockTtl.compareTo(heartbeat) > 0`; на 2s/2s граница и «всегда true» запускают контекст, и
+  `lockTtlNotLongerThanHeartbeat_failsStartup` падает на `getFailure()`; «всегда false» роняет старт на умолчаниях 30s/1s,
+  и `defaults_holdTheLock…` падает на `getBean`. Строки — PR координатора; парсер набора (`PitSummary`) на синтетическом
+  отчёте с ними пропускает три мутанта (exit 0), без них — нет (exit 1). Мерж PR владельцем — его решение. После мержа
+  Ш81 координатор правит README (переменная `LEADER_LOCK_TTL`, таблица `leader_lock`, деталь `role` в `onecIngest`,
+  метрика `onec_leader`, снимковые метрики только у ведущего), `data-reference/CLAUDE.md` и анализ многорепличности.
 
 Решения владельца 2026-10-07 по ревью Grok AI (PR #133, `docs/grok-review-data-reference.md`): комментарий координатора в
 PR #133 — «не нужно»; номер строки контакта (`rowNumber`, только выбор адреса среди равных) остаётся нестрогим — «да,
