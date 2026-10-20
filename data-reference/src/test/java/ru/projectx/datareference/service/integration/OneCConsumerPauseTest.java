@@ -27,9 +27,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -215,6 +217,25 @@ class OneCConsumerPauseTest {
         verify(stopped).start();
         verify(policies).start();
         verify(mkb10).start();
+    }
+
+    @Test
+    void roleGrantedRightAfterItWasLost_startsOnlyOnceTheStopHasFinished() {
+        AtomicReference<Runnable> stopFinishes = new AtomicReference<>();
+        doAnswer(invocation -> {
+            stopFinishes.set(invocation.getArgument(0, Runnable.class));
+            return null;
+        }).when(policies).stop(any(Runnable.class));
+        OneCConsumerPause pause = pause();
+        pause.stopConsumersWithoutProbe();
+
+        CompletableFuture<Void> granted = CompletableFuture.runAsync(pause::startUnlessPaused);
+
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(5)).until(() -> !granted.isDone());
+        verify(policies, never()).start();
+        stopFinishes.get().run();
+        granted.join();
+        verify(policies).start();
     }
 
     @Test

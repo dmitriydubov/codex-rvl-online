@@ -171,6 +171,20 @@ class OneCQueueContainersTest {
     }
 
     @Test
+    void stopThatOutlivesTheTimeout_isReportedAndNoLongerAwaited() {
+        doAnswer(invocation -> null).when(policies).stop(any(Runnable.class));
+        OneCQueueContainers containers =
+                QueueContainersFixture.containersStoppingWithin(registryProvider, Duration.ofMillis(QUIET_MILLIS));
+        containers.stopRunning();
+
+        containers.awaitStops();
+
+        assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.WARN)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains(POLICIES, "не остановились"));
+    }
+
+    @Test
     void awaitStopsWithNothingStopping_returnsAtOnceWithoutWarning() {
         QueueContainersFixture.containers(registryProvider, TestLeadership.leader()).awaitStops();
 

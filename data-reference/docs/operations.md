@@ -143,6 +143,7 @@ BOM Spring Boot.
 | `projectx.import.stuck-transfer-poll-interval` | `15m` | пауза между проверками зависших передач |
 | `projectx.import.parent-wait-report-limit`, `stuck-transfer-report-limit` | `20` | сколько GUID называет одна запись журнала |
 | `projectx.onec.ingest.storage-check-interval` | `10s` | проверка базы, пока приём на паузе |
+| `projectx.onec.ingest.consumer-stop-timeout` | `30s` | сколько получение роли ждёт конца остановки потребителей перед их запуском |
 | `projectx.onec.ingest.duplicate-delivery-backoff` | `5s` | пауза перед возвратом в очередь двух столкнувшихся доставок одного сообщения |
 | `projectx.onec.contract.rvl-activity-id` | `f3876c53-c7d8-4620-b364-9538164ba5d4` | GUID вида деятельности РВЛ в 1С:УСК; неверный GUID оставит справочник санаториев пустым |
 | `projectx.onec.contract.rvl-contract-property` | не задано | имя признака договора на РВЛ; пока не задано, договоры ЛПУ этим признаком не отбираются |

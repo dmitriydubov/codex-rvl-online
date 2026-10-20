@@ -288,7 +288,7 @@ class OneCQueueListenerJournalTest {
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10)), metrics,
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10), Duration.ofSeconds(30)), metrics,
                         TestLeadership.leader()),
                 metrics);
     }

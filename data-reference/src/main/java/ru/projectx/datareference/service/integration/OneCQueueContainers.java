@@ -1,6 +1,5 @@
 package ru.projectx.datareference.service.integration;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -15,6 +14,7 @@ import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.amqp.autoconfigure.RabbitProperties;
 import org.springframework.stereotype.Component;
+import ru.projectx.datareference.config.IngestProperties;
 import ru.projectx.datareference.service.leadership.BackgroundLeadership;
 
 @Component
@@ -22,19 +22,19 @@ class OneCQueueContainers {
 
     private static final Logger log = LoggerFactory.getLogger(OneCQueueContainers.class);
 
-    private static final Duration STOP_WAIT = Duration.ofSeconds(30);
-
     private final ObjectProvider<RabbitListenerEndpointRegistry> registry;
     private final ObjectProvider<RabbitProperties> rabbit;
     private final BackgroundLeadership leadership;
+    private final IngestProperties properties;
     private final Map<String, CompletableFuture<Void>> stopping = new ConcurrentHashMap<>();
 
     OneCQueueContainers(ObjectProvider<RabbitListenerEndpointRegistry> registry, ObjectProvider<RabbitProperties> rabbit,
-            BackgroundLeadership leadership) {
+            BackgroundLeadership leadership, IngestProperties properties) {
 
         this.registry = registry;
         this.rabbit = rabbit;
         this.leadership = leadership;
+        this.properties = properties;
     }
 
     boolean consumersExpected() {
@@ -52,12 +52,12 @@ class OneCQueueContainers {
 
     void awaitStops() {
         CompletableFuture.allOf(stopping.values().toArray(CompletableFuture[]::new))
-                .completeOnTimeout(null, STOP_WAIT.toMillis(), TimeUnit.MILLISECONDS)
+                .completeOnTimeout(null, properties.consumerStopTimeout().toMillis(), TimeUnit.MILLISECONDS)
                 .join();
         stopping.values().removeIf(CompletableFuture::isDone);
         if (!stopping.isEmpty()) {
             log.warn("потребители очередей {} не остановились за {}: их запуск может не пройти",
-                    stopping.keySet(), STOP_WAIT);
+                    stopping.keySet(), properties.consumerStopTimeout());
         }
     }
 
