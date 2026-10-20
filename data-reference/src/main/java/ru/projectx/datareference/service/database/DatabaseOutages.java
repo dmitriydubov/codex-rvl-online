@@ -1,36 +1,13 @@
 package ru.projectx.datareference.service.database;
 
 import jakarta.persistence.PersistenceException;
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Predicate;
-import org.springframework.core.NestedRuntimeException;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.dao.RecoverableDataAccessException;
-import org.springframework.dao.TransientDataAccessException;
 import org.springframework.dao.support.PersistenceExceptionTranslator;
-import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.CannotCreateTransactionException;
-import org.springframework.transaction.TransactionTimedOutException;
 
 @Component
 public class DatabaseOutages {
-
-    private static final List<Class<? extends RuntimeException>> TEMPORARY = List.of(
-            CannotCreateTransactionException.class,
-            DataAccessResourceFailureException.class,
-            RecoverableDataAccessException.class,
-            TransientDataAccessException.class);
-
-    private static final List<Predicate<Throwable>> TEMPORARY_RULES = List.of(
-            DatabaseOutages::isTemporaryType,
-            DatabaseOutages::hasExpiredDeadline,
-            DatabaseOutages::isExpiredHibernateTransaction,
-            DatabaseOutages::isSessionClosedForIdleTransaction);
-
-    private static final String IDLE_IN_TRANSACTION_SESSION_TIMEOUT = "25P03";
 
     private final PersistenceExceptionTranslator translator;
 
@@ -39,9 +16,7 @@ public class DatabaseOutages {
     }
 
     public Optional<Outage> recognize(Exception failure) {
-        return translated(failure)
-                .filter(DatabaseOutages::isTemporary)
-                .map(DatabaseOutages::outageOf);
+        return translated(failure).flatMap(DatabaseOutages::temporaryOutage);
     }
 
     public Optional<Outage> describe(Exception failure) {
@@ -58,48 +33,18 @@ public class DatabaseOutages {
         return Optional.of(translate(runtime));
     }
 
-    private static Outage outageOf(Throwable classified) {
-        return new Outage(typeOf(classified), sqlState(classified));
-    }
-
-    private static String typeOf(Throwable classified) {
-        String type = classified.getClass().getSimpleName();
-        if (isExpiredHibernateTransaction(classified)) {
-            return type + "/" + classified.getCause().getClass().getSimpleName();
-        }
-        if (hidesExpiredDeadline(classified)) {
-            return type + "/" + TransactionTimedOutException.class.getSimpleName();
-        }
-        return type;
-    }
-
     private Throwable translate(RuntimeException failure) {
         DataAccessException translated = translator.translateExceptionIfPossible(failure);
         return translated == null ? failure : translated;
     }
 
-    private static boolean isTemporary(Throwable failure) {
-        return TEMPORARY_RULES.stream().anyMatch(rule -> rule.test(failure));
+    private static Optional<Outage> temporaryOutage(Throwable classified) {
+        return TemporaryFailure.of(classified).map(kind -> new Outage(kind.typeOf(classified), sqlState(classified)));
     }
 
-    private static boolean isTemporaryType(Throwable failure) {
-        return TEMPORARY.stream().anyMatch(type -> type.isInstance(failure));
-    }
-
-    private static boolean hasExpiredDeadline(Throwable failure) {
-        return failure instanceof NestedRuntimeException nested && nested.contains(TransactionTimedOutException.class);
-    }
-
-    private static boolean hidesExpiredDeadline(Throwable failure) {
-        return hasExpiredDeadline(failure) && !(failure instanceof TransactionTimedOutException);
-    }
-
-    private static boolean isSessionClosedForIdleTransaction(Throwable failure) {
-        return SqlStates.deepest(failure).filter(IDLE_IN_TRANSACTION_SESSION_TIMEOUT::equals).isPresent();
-    }
-
-    private static boolean isExpiredHibernateTransaction(Throwable failure) {
-        return failure instanceof JpaSystemException && failure.getCause() instanceof org.hibernate.TransactionException;
+    private static Outage outageOf(Throwable classified) {
+        return temporaryOutage(classified)
+                .orElseGet(() -> new Outage(classified.getClass().getSimpleName(), sqlState(classified)));
     }
 
     private static String sqlState(Throwable failure) {

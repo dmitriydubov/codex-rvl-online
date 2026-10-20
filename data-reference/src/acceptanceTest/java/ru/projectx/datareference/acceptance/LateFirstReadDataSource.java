@@ -33,18 +33,25 @@ final class LateFirstReadDataSource extends DelegatingDataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return lateResults(Connection.class, super.getConnection(), this::statementWithLateResult);
+        return whileArmed(super.getConnection());
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        return lateResults(Connection.class, super.getConnection(username, password), this::statementWithLateResult);
+        return whileArmed(super.getConnection(username, password));
+    }
+
+    private Connection whileArmed(Connection connection) {
+        if (!firstResultOfNextReadLate.get()) {
+            return connection;
+        }
+        return intercepted(Connection.class, connection, this::statementWithLateResult);
     }
 
     private Object statementWithLateResult(MethodInvocation invocation) throws Throwable {
         Object result = invocation.proceed();
-        if (invocation.getMethod().getName().startsWith(PREPARE_STATEMENT)) {
-            return lateResults(PreparedStatement.class, result, this::resultAfterReadDeadline);
+        if (firstResultOfNextReadLate.get() && invocation.getMethod().getName().startsWith(PREPARE_STATEMENT)) {
+            return intercepted(PreparedStatement.class, result, this::resultAfterReadDeadline);
         }
         return result;
     }
@@ -63,7 +70,7 @@ final class LateFirstReadDataSource extends DelegatingDataSource {
                 && TransactionSynchronizationManager.isCurrentTransactionReadOnly();
     }
 
-    private static <T> T lateResults(Class<T> type, Object target, MethodInterceptor interceptor) {
+    private static <T> T intercepted(Class<T> type, Object target, MethodInterceptor interceptor) {
         ProxyFactory proxy = new ProxyFactory(target);
         proxy.addAdvice(interceptor);
         return type.cast(proxy.getProxy());

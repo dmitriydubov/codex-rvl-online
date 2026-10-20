@@ -87,6 +87,14 @@ class DatabaseOutagesTest {
                 .hasValue(new DatabaseOutages.Outage("BadJpqlGrammarException/TransactionTimedOutException", "нет"));
     }
 
+    @Test
+    void deadlineExpiredUnderWrapperOutsideSpring_isTemporary_namedByWrapperAndExpiredDeadline() {
+        var hidden = new UnsupportedOperationException(TEXT, new TransactionTimedOutException(TEXT));
+
+        assertThat(outages.recognize(hidden))
+                .hasValue(new DatabaseOutages.Outage("UnsupportedOperationException/TransactionTimedOutException", "нет"));
+    }
+
     static Stream<RuntimeException> springOutages() {
         return Stream.of(
                 new CannotCreateTransactionException(TEXT, new SQLException(TEXT, CONNECTION_FAILURE)),
