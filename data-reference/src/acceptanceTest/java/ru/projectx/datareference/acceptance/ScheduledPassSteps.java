@@ -14,9 +14,10 @@ public class ScheduledPassSteps {
 
     private final Map<String, Runnable> passes;
     private final OneCStuckTransferSteps stuckTransfers;
+    private final CacheNotificationsDelivered notifications;
 
     public ScheduledPassSteps(ScheduledPasses scheduled, InboundBacklogSchedule backlog, OneCConsumerPause pause,
-            OneCStuckTransferSteps stuckTransfers) {
+            OneCStuckTransferSteps stuckTransfers, CacheNotificationsDelivered notifications) {
 
         this.passes = Map.of(
                 "разбор сообщений 1С:УСК", scheduled::importOnSchedule,
@@ -25,6 +26,7 @@ public class ScheduledPassSteps {
                 "снимок метрик из базы", backlog::refreshOnSchedule,
                 "проба хранилища при паузе приёма", pause::resumeIfStorageAvailable);
         this.stuckTransfers = stuckTransfers;
+        this.notifications = notifications;
     }
 
     @Когда("по расписанию наступил проход {string}")
@@ -35,5 +37,6 @@ public class ScheduledPassSteps {
             return;
         }
         passes.get(pass).run();
+        notifications.awaitDelivered();
     }
 }

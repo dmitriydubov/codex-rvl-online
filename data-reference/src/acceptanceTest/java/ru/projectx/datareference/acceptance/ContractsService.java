@@ -29,6 +29,7 @@ public class ContractsService {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
+    private final JdkClientHttpRequestFactory requests;
     private final RestTestClient client;
     private final RestTestClient monitoringClient;
     private @Nullable ServiceResponse lastResponse;
@@ -39,7 +40,7 @@ public class ContractsService {
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(CONNECT_TIMEOUT)
                 .build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
+        this.requests = new JdkClientHttpRequestFactory(http);
         requests.setReadTimeout(READ_TIMEOUT);
         this.client = clientOn(requests, port);
         this.monitoringClient = clientOn(requests, managementPort);
@@ -50,8 +51,15 @@ public class ContractsService {
     }
 
     public ServiceResponse monitor(String path) {
-        requireAbsolutePath(path);
-        return remember(monitoringClient.get().uri(path).exchange().returnResult());
+        return monitorOn(monitoringClient, path);
+    }
+
+    public ServiceResponse requestAt(int port, String path) {
+        return exchange(clientOn(requests, port), HttpMethod.GET, path, headers -> { });
+    }
+
+    public ServiceResponse monitorAt(int managementPort, String path) {
+        return monitorOn(clientOn(requests, managementPort), path);
     }
 
     public ServiceResponse request(String path, String requestId) {
@@ -89,10 +97,21 @@ public class ContractsService {
     private ServiceResponse exchange(
             HttpMethod method, String path, Consumer<HttpHeaders> headers, Object... parameterValues) {
 
+        return exchange(client, method, path, headers, parameterValues);
+    }
+
+    private ServiceResponse exchange(RestTestClient target,
+            HttpMethod method, String path, Consumer<HttpHeaders> headers, Object... parameterValues) {
+
         requireAbsolutePath(path);
         Object[] variables = Stream.concat(Arrays.stream(uriVariables(path)), Arrays.stream(parameterValues))
                 .toArray();
-        return remember(client.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+        return remember(target.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+    }
+
+    private ServiceResponse monitorOn(RestTestClient target, String path) {
+        requireAbsolutePath(path);
+        return remember(target.get().uri(path).exchange().returnResult());
     }
 
     private ServiceResponse remember(ExchangeResult result) {

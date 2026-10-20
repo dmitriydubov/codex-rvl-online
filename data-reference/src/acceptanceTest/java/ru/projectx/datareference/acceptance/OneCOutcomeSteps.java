@@ -37,6 +37,7 @@ public class OneCOutcomeSteps {
 
         assertThat(last.status()).as("статус последнего сообщения").isEqualTo(InboundStatus.FAILED.name());
         assertThat(last.lastError()).as("причина отказа последнего сообщения").isEqualTo(reason);
+        inbox.settle(inbox.lastMessageId(), InboundStatus.FAILED);
     }
 
     @Тогда("сообщение 1С:УСК {string} отклонено без повторов с причиной {string}")
@@ -45,6 +46,7 @@ public class OneCOutcomeSteps {
 
         assertThat(row.status()).as("статус сообщения %s", messageId).isEqualTo(InboundStatus.FAILED.name());
         assertThat(row.lastError()).as("причина отказа сообщения %s", messageId).isEqualTo(reason);
+        inbox.settle(UUID.fromString(messageId), InboundStatus.FAILED);
     }
 
     @Тогда("последнее сообщение 1С:УСК отложено до повтора после попытки {int} с причиной {string}")
