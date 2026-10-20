@@ -2,13 +2,21 @@ package ru.projectx.datareference.acceptance;
 
 import static org.awaitility.Awaitility.await;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.TypeExcludeFilter;
+import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
@@ -26,6 +34,8 @@ public class SecondInstance {
     private static final String PASSWORD = "second-instance";
     private static final Duration DISCONNECT_TIMEOUT = Duration.ofSeconds(30);
     private static final String WITHOUT_ACCEPTANCE_STAND = "withoutAcceptanceStand";
+    private static final Duration START_TIMEOUT = Duration.ofMinutes(3);
+    private static final Executor STARTER = command -> Thread.ofPlatform().name("second-instance-start").start(command);
 
     private static final String CREATE_ROLE = """
             do $$
@@ -46,7 +56,9 @@ public class SecondInstance {
     private final PostgreSQLContainer database;
     private final RabbitMQContainer broker;
     private final JdbcClient jdbc;
-    private @Nullable ConfigurableApplicationContext running;
+    private @Nullable CompletableFuture<ConfigurableApplicationContext> starting;
+    private CompletableFuture<ConfigurableApplicationContext> launched = new CompletableFuture<>();
+    private int port;
 
     public SecondInstance(PostgreSQLContainer database, RabbitMQContainer broker) {
         this.database = database;
@@ -56,16 +68,30 @@ public class SecondInstance {
     }
 
     public void start() {
+        begin();
+        instance();
+    }
+
+    public void begin() {
         jdbc.sql(CREATE_ROLE.formatted(ROLE, PASSWORD, database.getUsername())).update();
         allowConnections();
-        running = new SpringApplicationBuilder(DataReferenceApplication.class)
+        int apiPort = freePort();
+        port = apiPort;
+        SpringApplication application = new SpringApplicationBuilder(DataReferenceApplication.class)
                 .initializers(context -> context.getBeanFactory()
                         .registerSingleton(WITHOUT_ACCEPTANCE_STAND, new WithoutAcceptanceStand()))
-                .run(arguments());
+                .application();
+        application.setListeners(application.getListeners().stream()
+                .filter(listener -> !(listener instanceof LoggingApplicationListener))
+                .toList());
+        CompletableFuture<ConfigurableApplicationContext> started =
+                CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER);
+        launched = started;
+        starting = started.copy().orTimeout(START_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
     }
 
     public int port() {
-        return localPort("local.server.port");
+        return port;
     }
 
     public int managementPort() {
@@ -83,11 +109,13 @@ public class SecondInstance {
     }
 
     public void stop() {
-        Optional.ofNullable(running).ifPresent(instance -> {
+        Optional.ofNullable(starting).ifPresent(instance -> {
             allowConnections();
-            instance.close();
+            Optional.ofNullable(instance.handle((context, failure) -> context).join())
+                    .ifPresentOrElse(ConfigurableApplicationContext::close,
+                            () -> launched.thenAccept(ConfigurableApplicationContext::close));
         });
-        running = null;
+        starting = null;
     }
 
     private long sessions() {
@@ -95,12 +123,24 @@ public class SecondInstance {
     }
 
     private int localPort(String property) {
-        ConfigurableApplicationContext instance = Optional.ofNullable(running)
-                .orElseThrow(() -> new IllegalStateException("второй экземпляр не запущен"));
-        return instance.getEnvironment().getRequiredProperty(property, Integer.class);
+        return instance().getEnvironment().getRequiredProperty(property, Integer.class);
     }
 
-    private String[] arguments() {
+    private ConfigurableApplicationContext instance() {
+        return Optional.ofNullable(starting)
+                .orElseThrow(() -> new IllegalStateException("второй экземпляр не запущен"))
+                .join();
+    }
+
+    private static int freePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+    }
+
+    private String[] arguments(int apiPort) {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("spring.datasource.url", database.getJdbcUrl());
         properties.put("spring.datasource.username", ROLE);
@@ -112,7 +152,7 @@ public class SecondInstance {
         properties.put("spring.rabbitmq.ssl.enabled", false);
         properties.put("spring.rabbitmq.listener.simple.auto-startup", true);
         properties.put("projectx.scheduling.enabled", false);
-        properties.put("server.port", 0);
+        properties.put("server.port", apiPort);
         properties.put("management.server.port", 0);
         return properties.entrySet().stream()
                 .map(property -> "--" + property.getKey() + "=" + property.getValue())
