@@ -3,11 +3,15 @@ package ru.projectx.datareference.service.cache;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,10 +27,13 @@ import org.springframework.integration.jdbc.channel.PostgresChannelMessageTableS
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.datareference.DataReferenceApplication;
+import ru.projectx.datareference.config.cache.ReconnectingListenerConnections;
+import ru.projectx.datareference.config.cache.ReferenceCacheListenerConfig;
 import ru.projectx.datareference.config.cache.ReferenceCaches;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 import ru.projectx.datareference.support.DatabaseCleaner;
+import ru.projectx.datareference.support.FreezableTcpProxy;
 import ru.projectx.datareference.support.IntegrationTest;
 
 @IntegrationTest
@@ -36,6 +43,9 @@ class ReferenceCacheAcrossInstancesTest {
     private static final String ANSWER = "ответ";
     private static final Duration NOTIFICATION_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration RECONNECT_TIMEOUT = Duration.ofSeconds(30);
+    private static final String JDBC_PREFIX = "jdbc:";
+    private static final String LOOPBACK = "127.0.0.1";
+    private static final String CONNECTED_GAUGE = "reference.cache.notifications.connected";
     private static final String LISTENER_SESSIONS = """
             select count(*) from pg_stat_activity where application_name = :name
             """;
@@ -58,6 +68,9 @@ class ReferenceCacheAcrossInstancesTest {
     @Autowired
     private DatabaseCleaner databaseCleaner;
 
+    @Autowired
+    private MeterRegistry meters;
+
     private ConfigurableApplicationContext secondInstance;
     private long listenersWithoutSecondInstance;
 
@@ -77,7 +90,7 @@ class ReferenceCacheAcrossInstancesTest {
 
     @Test
     void messageAppliedHere_clearsItsStreamCachesOnSecondInstance_leavesTheRest() {
-        transactions.executeWithoutResult(status -> events.publishEvent(new OneCMessageApplied(OneCStream.MKB10)));
+        commitApplied(OneCStream.MKB10);
 
         await().atMost(NOTIFICATION_TIMEOUT).until(() -> secondInstanceCache(ReferenceCaches.MKB10_CODES).get(KEY) == null);
         assertThat(secondInstanceCache(ReferenceCaches.MKB10_SEARCH).get(KEY)).isNull();
@@ -91,7 +104,7 @@ class ReferenceCacheAcrossInstancesTest {
             events.publishEvent(new OneCMessageApplied(OneCStream.INSURANCE_CONTRACTS));
             status.setRollbackOnly();
         });
-        transactions.executeWithoutResult(status -> events.publishEvent(new OneCMessageApplied(OneCStream.MKB10)));
+        commitApplied(OneCStream.MKB10);
 
         await().atMost(NOTIFICATION_TIMEOUT).until(() -> secondInstanceCache(ReferenceCaches.MKB10_CODES).get(KEY) == null);
         assertThat(secondInstanceCache(ReferenceCaches.INSURANCE_CONTRACTS_BY_ID).get(KEY)).isNotNull();
@@ -100,13 +113,73 @@ class ReferenceCacheAcrossInstancesTest {
     @Test
     void lostListenerConnection_clearsEveryCacheOfSecondInstanceAfterReconnect() {
         jdbc().sql(TERMINATE_LISTENER_SESSIONS)
-                .param("name", ReferenceCacheNotificationsConfiguration.LISTENER_APPLICATION_NAME)
+                .param("name", ReferenceCacheListenerConfig.LISTENER_APPLICATION_NAME)
                 .query()
                 .listOfRows();
 
         await().atMost(RECONNECT_TIMEOUT).until(() -> ReferenceCaches.ALL.stream()
                 .allMatch(name -> secondInstanceCache(name).get(KEY) == null));
         await().atMost(RECONNECT_TIMEOUT).until(() -> listenerSessions() == listenersWithoutSecondInstance + 1);
+    }
+
+    @Test
+    void everyOtherInstance_clearsItsStreamCaches() {
+        ConfigurableApplicationContext thirdInstance = start();
+        try {
+            await().atMost(NOTIFICATION_TIMEOUT)
+                    .until(() -> listenerSessions() == listenersWithoutSecondInstance + 2);
+            cacheOf(thirdInstance, ReferenceCaches.PROGRAMS).put(KEY, ANSWER);
+
+            commitApplied(OneCStream.PROGRAMS);
+
+            await().atMost(NOTIFICATION_TIMEOUT).until(() -> cacheOf(thirdInstance, ReferenceCaches.PROGRAMS).get(KEY) == null
+                    && secondInstanceCache(ReferenceCaches.PROGRAMS).get(KEY) == null);
+        } finally {
+            thirdInstance.close();
+        }
+    }
+
+    @Test
+    void sameStreamTwiceInOneTransaction_isDeliveredOnce() {
+        AtomicInteger mkb10 = countNotifications(secondInstance, OneCStream.MKB10);
+        AtomicInteger programs = countNotifications(secondInstance, OneCStream.PROGRAMS);
+
+        commitApplied(OneCStream.MKB10, OneCStream.MKB10);
+        commitApplied(OneCStream.PROGRAMS);
+
+        await().atMost(NOTIFICATION_TIMEOUT).until(() -> programs.get() == 1);
+        assertThat(mkb10).hasValue(1);
+    }
+
+    @Test
+    void hungListenerConnection_isFoundBySilenceCheck_andEveryCacheIsClearedAfterReconnect() throws Exception {
+        URI database = URI.create(databaseUrl().substring(JDBC_PREFIX.length()));
+        try (FreezableTcpProxy proxy = FreezableTcpProxy.to(database.getHost(), database.getPort())) {
+            String proxiedUrl = JDBC_PREFIX + database.getScheme() + "://" + LOOPBACK + ":" + proxy.port()
+                    + database.getRawPath() + Optional.ofNullable(database.getRawQuery()).map(query -> "?" + query).orElse("");
+            ConfigurableApplicationContext hungInstance = start(proxiedUrl,
+                    Map.of("projectx.cache.notifications.silence-check", "1s"));
+            try {
+                ReconnectingListenerConnections listener = hungInstance.getBean(ReconnectingListenerConnections.class);
+                await().atMost(NOTIFICATION_TIMEOUT).until(listener::connected);
+                cacheOf(hungInstance, ReferenceCaches.LPU_CARD).put(KEY, ANSWER);
+
+                proxy.freeze();
+                await().atMost(RECONNECT_TIMEOUT).until(() -> !listener.connected());
+                proxy.thaw();
+
+                await().atMost(RECONNECT_TIMEOUT).until(listener::connected);
+                await().atMost(NOTIFICATION_TIMEOUT).until(() -> cacheOf(hungInstance, ReferenceCaches.LPU_CARD).get(KEY) == null);
+            } finally {
+                proxy.thaw();
+                hungInstance.close();
+            }
+        }
+    }
+
+    @Test
+    void listenerGauge_showsConnectedInstance() {
+        assertThat(meters.get(CONNECTED_GAUGE).gauge().value()).isEqualTo(1);
     }
 
     @Test
@@ -121,12 +194,50 @@ class ReferenceCacheAcrossInstancesTest {
     }
 
     private Cache secondInstanceCache(String name) {
-        return Objects.requireNonNull(secondInstance.getBean(CacheManager.class).getCache(name), name);
+        return cacheOf(secondInstance, name);
+    }
+
+    private static Cache cacheOf(ConfigurableApplicationContext instance, String name) {
+        return Objects.requireNonNull(instance.getBean(CacheManager.class).getCache(name), name);
+    }
+
+    private String databaseUrl() {
+        return environment.getRequiredProperty("spring.datasource.url");
+    }
+
+    private static AtomicInteger countNotifications(ConfigurableApplicationContext instance, OneCStream stream) {
+        AtomicInteger received = new AtomicInteger();
+        instance.getBean(PostgresChannelMessageTableSubscriber.class).subscribe(
+                new PostgresChannelMessageTableSubscriber.Subscription() {
+                    @Override
+                    public void notifyUpdate() {
+                        received.incrementAndGet();
+                    }
+
+                    @Override
+                    public String getRegion() {
+                        return ReferenceCacheChannel.REGION;
+                    }
+
+                    @Override
+                    public Object getGroupId() {
+                        return stream.name();
+                    }
+                });
+        return received;
+    }
+
+    private void commitApplied(OneCStream... streams) {
+        transactions.executeWithoutResult(status -> {
+            for (OneCStream stream : streams) {
+                events.publishEvent(new OneCMessageApplied(stream));
+            }
+        });
     }
 
     private long listenerSessions() {
         return jdbc().sql(LISTENER_SESSIONS)
-                .param("name", ReferenceCacheNotificationsConfiguration.LISTENER_APPLICATION_NAME)
+                .param("name", ReferenceCacheListenerConfig.LISTENER_APPLICATION_NAME)
                 .query(Long.class)
                 .single();
     }
@@ -136,8 +247,12 @@ class ReferenceCacheAcrossInstancesTest {
     }
 
     private ConfigurableApplicationContext start() {
+        return start(databaseUrl(), Map.of());
+    }
+
+    private ConfigurableApplicationContext start(String databaseUrl, Map<String, Object> overrides) {
         Map<String, Object> properties = new HashMap<>();
-        properties.put("spring.datasource.url", environment.getRequiredProperty("spring.datasource.url"));
+        properties.put("spring.datasource.url", databaseUrl);
         properties.put("spring.datasource.username", environment.getRequiredProperty("spring.datasource.username"));
         properties.put("spring.datasource.password", environment.getRequiredProperty("spring.datasource.password"));
         properties.put("spring.autoconfigure.exclude",
@@ -147,6 +262,7 @@ class ReferenceCacheAcrossInstancesTest {
         properties.put("projectx.leadership.group", "instances-" + UUID.randomUUID());
         properties.put("projectx.cache.notifications.reconnect-delay", "100ms");
         properties.put("projectx.cache.notifications.reconnect-max-delay", "500ms");
+        properties.putAll(overrides);
         String[] arguments = properties.entrySet().stream()
                 .map(property -> "--" + property.getKey() + "=" + property.getValue())
                 .toArray(String[]::new);

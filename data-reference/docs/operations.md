@@ -114,7 +114,7 @@ BOM Spring Boot.
 | `REFERENCE_CACHE_TTL` | `10m` | срок жизни ответа в кэше |
 | `REFERENCE_CACHE_MAXIMUM_SIZE` | `1000` | предел ответов в каждом кэше |
 | `REFERENCE_CACHE_RECONNECT_DELAY` | `1s` | первая пауза перед повторным подключением слушателя оповещений о сбросе кэша; дальше пауза удваивается |
-| `REFERENCE_CACHE_RECONNECT_MAX_DELAY` | `10s` | наибольшая пауза между попытками подключить слушателя; не короче первой, иначе сервис не стартует |
+| `REFERENCE_CACHE_RECONNECT_MAX_DELAY` | `10s` | наибольшая пауза между попытками подключить слушателя, в том числе первая |
 | `MANAGEMENT_PORT` | `8081` | порт актуатора |
 | `MANAGEMENT_HEALTH_RABBIT_ENABLED` | `true` | компонент `rabbit` в `/actuator/health`; `false` — там, где брокера нет вовсе (так стенд в `docker-compose.yml`), иначе общий статус health — `DOWN` |
 | `PROJECTX_ONEC_CONTRACT_DMSPRODUCTTYPE` | `ЛичноеСтрахование,Личное страхование` | типы продукта ДМС, значения через запятую; заменяет список целиком |
@@ -150,6 +150,8 @@ BOM Spring Boot.
 | `projectx.onec.contract.rvl-activity-id` | `f3876c53-c7d8-4620-b364-9538164ba5d4` | GUID вида деятельности РВЛ в 1С:УСК; неверный GUID оставит справочник санаториев пустым |
 | `projectx.onec.contract.rvl-contract-property` | не задано | имя признака договора на РВЛ; пока не задано, договоры ЛПУ этим признаком не отбираются |
 | `projectx.metrics.backlog-refresh-interval` | `30s` | обновление снимка метрик разбора |
+| `projectx.cache.notifications.reconnect-retries` | `10` | повторов подключения слушателя оповещений в одной серии; после серии — ERROR в журнале и новая серия с первой паузы |
+| `projectx.cache.notifications.silence-check` | `60s` | после стольких секунд без оповещений слушатель проверяет соединение и переподключается, если оно не отвечает; не меньше 1 с |
 | `projectx.leadership.heartbeat` | `1s` | как часто ведущий продлевает блокировку, а остальные пробуют её взять |
 | `projectx.leadership.group` | `data-reference` | группа экземпляров, из которых выбирается ведущий; одна у всех экземпляров одной установки |
 | `projectx.api.zone` | `Europe/Moscow` | по какому дню считается «действует на сегодня» |
@@ -231,6 +233,7 @@ BOM Spring Boot.
 | `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор) и `rest-read` (REST-чтения) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`; `hikaricp_connections_pending{pool="rest-read"} > 0` дольше минуты — REST-чтений больше, чем успевает пул: следующий шаг нагрузки даёт 503 ([load-testing.md](load-testing.md)) |
 | `http_server_requests_seconds_count{status,uri}` | запросы REST по статусу и шаблону пути | доля `status="503"` среди `uri=~"/internal/v1/.*"` выше 5 % за 10 минут |
 | `cache_gets_total`, `cache_puts_total`, `cache_evictions_total`, `cache_size` с меткой `cache` | кэш ответов | — |
+| `reference_cache_notifications_connected` | 1 — экземпляр слушает оповещения о сбросе кэша; 0 — соединения слушателя нет | 0 дольше минуты: экземпляр не получает сбросов и отдаёт ответы, которые могут отставать до `REFERENCE_CACHE_TTL` |
 
 Метрики снимка из базы (`onec_inbound_messages`, `onec_inbound_pending_oldest_age_seconds`, `onec_price_transfers_stuck`,
 `onec_inbound_backlog_staleness_seconds`, `onec_retention_overdue_*`, `policies_retention_overdue_personal_data`) отдаёт
@@ -280,9 +283,10 @@ BOM Spring Boot.
     from pg_stat_activity where application_name = 'data-reference-cache-notifications';
   ```
 
-  Сеансов меньше, чем экземпляров, — в журнале экземпляра без сеанса WARN «нет соединения для оповещений о сбросе
-  кэша» с типом отказа и SQLSTATE. Подключение он повторяет сам, с паузами до `REFERENCE_CACHE_RECONNECT_MAX_DELAY`, а
-  подключившись, пишет INFO «соединение для оповещений о сбросе кэша открыто» и сбрасывает весь кэш. Ответ, который
+  Сеансов меньше, чем экземпляров, или `reference_cache_notifications_connected` равна 0 — в журнале экземпляра без
+  сеанса WARN «нет соединения для оповещений о сбросе кэша» с типом отказа и SQLSTATE, после серии попыток — ERROR.
+  Подключение он повторяет сам, с паузами до `REFERENCE_CACHE_RECONNECT_MAX_DELAY`, а подключившись, пишет INFO
+  «соединение для оповещений о сбросе кэша открыто» и сбрасывает весь кэш. Ответ, который
   должен смениться без сообщения 1С:УСК (правка базы вручную), обновится по сроку жизни; немедленно — перезапуском
   экземпляров. `pg_notification_queue_usage()` больше нуля дольше минуты — оповещения не разбирает какой-то слушающий
   сеанс; при заполнении очереди оповещений фиксация разбора падает и сообщения уходят на повтор.

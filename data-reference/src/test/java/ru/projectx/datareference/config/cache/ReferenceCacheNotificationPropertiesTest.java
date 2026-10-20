@@ -14,39 +14,37 @@ class ReferenceCacheNotificationPropertiesTest {
             .withUserConfiguration(NotificationPropertiesBinding.class);
 
     @Test
-    void defaults_reconnectAfterOneSecond_andWaitAtMostTenSecondsBetweenAttempts() {
+    void defaults_reconnectFromOneToTenSecondsInSeriesOfTen_andCheckSilentConnectionAfterMinute() {
         context.run(started -> {
             ReferenceCacheNotificationProperties properties =
                     started.getBean(ReferenceCacheNotificationProperties.class);
             assertThat(properties.reconnectDelay()).isEqualTo(Duration.ofSeconds(1));
             assertThat(properties.reconnectMaxDelay()).isEqualTo(Duration.ofSeconds(10));
+            assertThat(properties.reconnectRetries()).isEqualTo(10);
+            assertThat(properties.silenceCheck()).isEqualTo(Duration.ofSeconds(60));
         });
     }
 
     @Test
-    void maxDelayShorterThanDelay_failsStartup() {
-        context.withPropertyValues(
-                        "projectx.cache.notifications.reconnect-delay=5s",
-                        "projectx.cache.notifications.reconnect-max-delay=4s")
-                .run(started -> assertThat(started).getFailure()
-                        .hasRootCauseInstanceOf(BindValidationException.class)
-                        .rootCause().hasMessageContaining("maxDelayNotShorterThanDelay"));
-    }
-
-    @Test
-    void maxDelayEqualToDelay_isAccepted() {
-        context.withPropertyValues(
-                        "projectx.cache.notifications.reconnect-delay=5s",
-                        "projectx.cache.notifications.reconnect-max-delay=5s")
-                .run(started -> assertThat(started).hasNotFailed());
-    }
-
-    @Test
     void zeroDelay_failsStartup() {
-        context.withPropertyValues("projectx.cache.notifications.reconnect-delay=0s")
+        assertStartupFailsOn("reconnect-delay=0s", "reconnectDelay");
+    }
+
+    @Test
+    void zeroRetries_failsStartup() {
+        assertStartupFailsOn("reconnect-retries=0", "reconnectRetries");
+    }
+
+    @Test
+    void silenceCheckUnderSecond_failsStartup() {
+        assertStartupFailsOn("silence-check=999ms", "silenceCheck");
+    }
+
+    private void assertStartupFailsOn(String setting, String property) {
+        context.withPropertyValues("projectx.cache.notifications." + setting)
                 .run(started -> assertThat(started).getFailure()
                         .hasRootCauseInstanceOf(BindValidationException.class)
-                        .rootCause().hasMessageContaining("reconnectDelay"));
+                        .rootCause().hasMessageContaining(property));
     }
 
     @EnableConfigurationProperties(ReferenceCacheNotificationProperties.class)
