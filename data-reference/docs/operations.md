@@ -39,7 +39,9 @@ BOM Spring Boot.
 | GET | `/internal/v1/insurance-contracts?insurer_external_id=` | единственный действующий сегодня договор страхования страхователя по его GUID в 1С:УСК; нет такого — 404 `INSURANCE_CONTRACT_NOT_FOUND`, несколько — 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов |
 | GET | `/internal/v1/programs/{id}` | страховую программу с перечнем услуг |
 
-Подробное описание полей и ошибок — в документе «ТЗ API Data-reference». Примеры запросов к стенду с
+Ручки, параметры, поля ответов и коды ошибок описаны в [openapi.yaml](openapi.yaml) (OpenAPI 3.0.3): файл
+импортируется в Postman и открывается в Swagger UI; меняя ручку, меняйте и его. Бизнес-правила ручек — в документе
+«ТЗ API Data-reference». Примеры запросов к стенду с
 синтетическими данными — [src/test/resources/stand/README.md](../src/test/resources/stand/README.md).
 
 ## Очереди 1С:УСК
