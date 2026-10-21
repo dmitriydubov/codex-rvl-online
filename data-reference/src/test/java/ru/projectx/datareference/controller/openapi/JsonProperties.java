@@ -53,7 +53,7 @@ final class JsonProperties {
             Class<?> type, BeanPropertyDefinition property, SerializationConfig config, JsonInclude.Value beanInclusion) {
 
         Method accessor = property.getGetter().getAnnotated();
-        JsonInclude.Value inclusion = config.getDefaultInclusion(type, accessor.getReturnType(), beanInclusion)
+        JsonInclude.Value inclusion = config.getDefaultInclusion(accessor.getReturnType(), accessor.getReturnType(), beanInclusion)
                 .withOverrides(property.findInclusion());
         boolean alwaysWritten = ALWAYS_WRITTEN.contains(inclusion.getValueInclusion());
         boolean writtenAsNull = alwaysWritten && Nullness.forMethodReturnType(accessor) == Nullness.NULLABLE;

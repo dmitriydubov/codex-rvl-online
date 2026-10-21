@@ -17,7 +17,7 @@ final class OperationParameters {
         return bound.stream()
                 .flatMap(List::stream)
                 .collect(Collectors.toMap(ApiParameter::name, parameter -> merged(parameter, answering),
-                        (first, second) -> first, TreeMap::new));
+                        ApiParameter::orConflictWith, TreeMap::new));
     }
 
     static Map<String, ApiParameter> described(List<YamlNode> parameters) {

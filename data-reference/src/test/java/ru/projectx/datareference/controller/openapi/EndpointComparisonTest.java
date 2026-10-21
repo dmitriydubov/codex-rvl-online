@@ -78,6 +78,17 @@ class EndpointComparisonTest {
                         + "в описании string, format не задан");
     }
 
+    @Test
+    void parameterDeclaredWithDifferentTypesByTwoHandlersIsAConflictWhateverTheOrder() {
+        ApiParameter number = OperationParameters.of(List.of(handler("byNumber"), handler("byNumericNumber")))
+                .get("number");
+        ApiParameter reversed = OperationParameters.of(List.of(handler("byNumericNumber"), handler("byNumber")))
+                .get("number");
+
+        assertThat(number.schema()).startsWith("у обработчиков разное: ");
+        assertThat(reversed).isEqualTo(number);
+    }
+
     private static List<String> compare(String yaml) {
         Mismatches mismatches = new Mismatches();
         new EndpointComparison(OpenApiDescription.parse(yaml), mismatches).compare(Map.of(
@@ -98,6 +109,10 @@ class EndpointComparisonTest {
 
         public String byNumber(@RequestParam String number, @RequestParam(required = false) @Nullable Integer limit) {
             return number + limit;
+        }
+
+        public String byNumericNumber(@RequestParam("number") long number) {
+            return Long.toString(number);
         }
 
         public String withoutKey() {

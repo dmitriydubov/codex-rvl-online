@@ -31,7 +31,7 @@ final class HandlerParameters {
         }
         PathVariable path = parameter.getParameterAnnotation(PathVariable.class);
         if (path != null) {
-            return new ApiParameter(name(path.name(), parameter), ApiParameter.PATH, true, schema);
+            return new ApiParameter(name(path.name(), parameter), ApiParameter.PATH, path.required(), schema);
         }
         return new ApiParameter(name("", parameter), ApiParameter.UNMAPPED, false, schema);
     }
