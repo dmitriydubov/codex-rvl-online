@@ -27,7 +27,13 @@ final class JsonTypes {
             Map.entry(boolean.class, BOOLEAN),
             Map.entry(Boolean.class, BOOLEAN));
 
+    private static final Map<Class<?>, String> FORMATS = Map.of(UUID.class, "uuid", LocalDate.class, "date");
+
     private JsonTypes() {
+    }
+
+    static String formatOf(Class<?> type) {
+        return FORMATS.getOrDefault(type, SchemaView.NO_FORMAT);
     }
 
     static String of(Class<?> type) {

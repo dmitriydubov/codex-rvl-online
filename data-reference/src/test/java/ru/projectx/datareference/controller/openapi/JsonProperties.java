@@ -2,6 +2,7 @@ package ru.projectx.datareference.controller.openapi;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -36,6 +37,12 @@ final class JsonProperties {
         return bean.findProperties().stream()
                 .map(property -> describe(type, property, config, beanInclusion))
                 .toList();
+    }
+
+    Set<String> enumValues(Class<?> enumType) {
+        return Arrays.stream(enumType.getEnumConstants())
+                .map(constant -> mapper.valueToTree(constant).asString())
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     static Set<String> names(List<JsonProperty> properties) {

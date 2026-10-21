@@ -45,7 +45,7 @@ class SchemaComparisonTest {
     void propertyNamesComeFromTheConfiguredNamingStrategy() {
         String camelCase = PAGE.replace("item_name:", "itemName:");
 
-        assertThat(compare(camelCase.formatted(ALL_WRITTEN, "true", "integer"))).containsExactly(
+        assertThat(compare(camelCase.formatted("[itemName, note, owner]", "true", "integer"))).containsExactly(
                 "Page.items[]: поле «item_name» есть в коде, в описании нет",
                 "Page.items[]: поле «itemName» есть в описании, в коде нет");
     }

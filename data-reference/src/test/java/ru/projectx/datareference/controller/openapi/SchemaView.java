@@ -6,6 +6,8 @@ import java.util.Set;
 
 record SchemaView(YamlNode node, boolean nullable) {
 
+    static final String NO_FORMAT = "не задан";
+
     static SchemaView of(OpenApiDescription description, YamlNode schema) {
         YamlNode resolved = description.resolve(schema);
         List<YamlNode> allOf = resolved.get("allOf").items();
@@ -16,6 +18,14 @@ record SchemaView(YamlNode node, boolean nullable) {
 
     String type() {
         return node.get("type").text().orElse("не задан");
+    }
+
+    String format() {
+        return node.get("format").text().orElse(NO_FORMAT);
+    }
+
+    Set<String> enumValues() {
+        return node.get("enum").texts();
     }
 
     Map<String, YamlNode> properties() {

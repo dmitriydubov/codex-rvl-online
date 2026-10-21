@@ -80,6 +80,9 @@ class OpenApiContractTest {
                 .containsAll(ApiErrorCodes.declared());
         assertThat(ApiErrorCodes.handledFailures()).as("@ExceptionHandler без случая в ErrorCatalog")
                 .allMatch(handled -> failures.stream().anyMatch(handled::isInstance));
+        assertThat(AdviceHandlers.unreachedBy(failures))
+                .as("@ExceptionHandler, который не отвечает ни на один случай ErrorCatalog: добавьте случай")
+                .isEmpty();
     }
 
     @Test

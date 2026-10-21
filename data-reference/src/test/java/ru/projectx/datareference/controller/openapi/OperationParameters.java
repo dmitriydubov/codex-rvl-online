@@ -33,7 +33,7 @@ final class OperationParameters {
             return parameter;
         }
         boolean required = answering.stream().allMatch(handler -> requiredIn(handler, parameter.name()));
-        return new ApiParameter(parameter.name(), parameter.location(), required);
+        return parameter.withRequired(required);
     }
 
     private static boolean requiredIn(List<ApiParameter> handler, String name) {

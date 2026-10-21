@@ -27,6 +27,10 @@ final class Mismatches {
         missing(described, inCode).forEach(name -> add(where, kind + " «" + name + "» есть в описании, в коде нет"));
     }
 
+    void whenAbsent(String where, String absence, Set<String> names, Set<String> in) {
+        missing(names, in).forEach(name -> add(where, "«" + name + "» " + absence));
+    }
+
     List<String> found() {
         return List.copyOf(found);
     }

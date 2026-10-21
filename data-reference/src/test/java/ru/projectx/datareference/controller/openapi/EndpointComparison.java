@@ -48,5 +48,6 @@ final class EndpointComparison {
         String where = key + ", параметр «" + inCode.name() + "»";
         mismatches.whenDiffer(where, "расположение (in)", inCode.location(), described.location());
         mismatches.whenDiffer(where, "обязательность (required)", inCode.required(), described.required());
+        mismatches.whenDiffer(where, "схема (type, format)", inCode.schema(), described.schema());
     }
 }

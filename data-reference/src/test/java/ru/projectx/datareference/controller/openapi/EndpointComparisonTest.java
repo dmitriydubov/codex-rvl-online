@@ -21,13 +21,13 @@ class EndpointComparisonTest {
                 get:
                   parameters:
                     - {name: X-Request-Id, in: header, required: false}
-                    - {name: external_id, in: query, required: %s}
-                    - {name: number, in: query, required: false}
-                    - {name: limit, in: query, required: false}
+                    - {name: external_id, in: query, required: %s, schema: {type: string, format: uuid}}
+                    - {name: number, in: query, required: false, schema: {type: string}}
+                    - {name: limit, in: query, required: false, schema: {type: integer}}
               /api/items/{id}:
                 get:
                   parameters:
-                    - {name: id, in: %s, required: true}
+                    - {name: id, in: %s, required: true, schema: {type: string, format: uuid}}
               /livez:
                 get: {}
             """;
@@ -51,7 +51,7 @@ class EndpointComparisonTest {
 
     @Test
     void undescribedParameterAndOperationAreReported() {
-        String withoutNumber = ITEMS.replace("        - {name: number, in: query, required: false}\n", "")
+        String withoutNumber = ITEMS.replaceAll("(?m)^.*name: number.*\n", "")
                 .replace("  /livez:", "  /api/archive:\n    get: {}\n  /livez:");
 
         assertThat(compare(withoutNumber.formatted("false", "path"))).containsExactly(
@@ -64,8 +64,18 @@ class EndpointComparisonTest {
         Map<String, ApiParameter> parameters = OperationParameters.of(List.of(handler("byNumber"), handler("withoutKey")));
 
         assertThat(parameters.values()).containsExactly(
-                new ApiParameter("limit", ApiParameter.QUERY, false),
-                new ApiParameter("number", ApiParameter.QUERY, true));
+                new ApiParameter("limit", ApiParameter.QUERY, false, "integer, format не задан"),
+                new ApiParameter("number", ApiParameter.QUERY, true, "string, format не задан"));
+    }
+
+    @Test
+    void parameterWithAnotherSchemaIsReported() {
+        String limitAsText = ITEMS.replace("name: limit, in: query, required: false, schema: {type: integer}",
+                "name: limit, in: query, required: false, schema: {type: string}");
+
+        assertThat(compare(limitAsText.formatted("false", "path"))).containsExactly(
+                "GET /api/items, параметр «limit»: схема (type, format) — в коде integer, format не задан, "
+                        + "в описании string, format не задан");
     }
 
     private static List<String> compare(String yaml) {

@@ -23,15 +23,17 @@ final class HandlerParameters {
 
     private static ApiParameter describe(MethodParameter parameter) {
         parameter.initParameterNameDiscovery(NAMES);
+        String schema = ApiParameter.schema(parameter.getParameterType());
         RequestParam query = parameter.getParameterAnnotation(RequestParam.class);
         if (query != null) {
-            return new ApiParameter(name(query.name(), parameter), ApiParameter.QUERY, required(query, parameter));
+            return new ApiParameter(name(query.name(), parameter), ApiParameter.QUERY, required(query, parameter),
+                    schema);
         }
         PathVariable path = parameter.getParameterAnnotation(PathVariable.class);
         if (path != null) {
-            return new ApiParameter(name(path.name(), parameter), ApiParameter.PATH, true);
+            return new ApiParameter(name(path.name(), parameter), ApiParameter.PATH, true, schema);
         }
-        return new ApiParameter(name("", parameter), ApiParameter.UNMAPPED, false);
+        return new ApiParameter(name("", parameter), ApiParameter.UNMAPPED, false, schema);
     }
 
     private static boolean required(RequestParam query, MethodParameter parameter) {

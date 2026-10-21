@@ -31,7 +31,12 @@ final class SchemaComparison {
     }
 
     private void compareValue(ResolvableType type, SchemaView view, String where) {
-        mismatches.whenDiffer(where, "тип", JsonTypes.of(type.toClass()), view.type());
+        Class<?> javaType = type.toClass();
+        mismatches.whenDiffer(where, "тип", JsonTypes.of(javaType), view.type());
+        mismatches.whenDiffer(where, "формат (format)", JsonTypes.formatOf(javaType), view.format());
+        if (javaType.isEnum()) {
+            mismatches.compareNames(where, "значение enum", properties.enumValues(javaType), view.enumValues());
+        }
         ResolvableType collection = type.asCollection();
         if (collection != ResolvableType.NONE) {
             compare(collection.getGeneric(0), view.items(), where + "[]");
@@ -42,6 +47,7 @@ final class SchemaComparison {
         mismatches.whenDiffer(where, "тип", JsonTypes.OBJECT, view.type());
         List<JsonProperty> written = properties.of(type);
         mismatches.compareNames(where, "поле", JsonProperties.names(written), view.properties().keySet());
+        mismatches.whenAbsent(where, "есть в required, в properties нет", view.required(), view.properties().keySet());
         written.stream()
                 .filter(property -> view.properties().containsKey(property.name()))
                 .forEach(property -> compareProperty(property, view, where + "." + property.name()));
