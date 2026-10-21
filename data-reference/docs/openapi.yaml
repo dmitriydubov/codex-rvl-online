@@ -13,7 +13,9 @@ info:
     - Даты — `yyyy-mm-dd`. Открытая дата 1С (`3000-01-01`) отдаётся как `null`.
     - «Сегодня» и «действующий» считаются по московскому дню. Запись действует, если она не в архиве,
       `begin_date <= сегодня` и (`end_date` пустая или `end_date >= сегодня`).
-    - `id` — внутренний UUID сервиса, `external_id` — GUID записи в 1С:УСК.
+    - `id` — внутренний UUID сервиса, `external_id` — GUID записи в 1С:УСК. Параметр пути `{id}` во всех ручках —
+      внутренний `id`, не GUID 1С: его берут из ответов других ручек (у каждой ручки сказано, откуда). GUID 1С
+      принимается только параметрами запроса `external_id`, `contract_external_id` и `insurer_external_id`.
     - Денежные суммы и проценты — JSON-числа.
 
     ## Нумерация ручек
@@ -179,7 +181,8 @@ paths:
         - name: id
           in: path
           required: true
-          description: id услуги (из ответа услуг ЛПУ)
+          description: |
+            Внутренний id услуги ЛПУ в data-reference (UUID), не GUID 1С: `services[].id` в ответе R-03.
           schema: {type: string, format: uuid}
         - name: date_from
           in: query
@@ -324,6 +327,10 @@ paths:
         - name: id
           in: path
           required: true
+          description: |
+            Внутренний id полиса в data-reference (UUID, поле `id` ответов), не GUID 1С. Откуда взять: `items[].id`
+            подсказки R-04, `id` ответа R-05 или R-05д по `external_id`, `id` ответа R-05 по номеру. Полис по GUID 1С —
+            параметр `external_id`.
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -390,6 +397,10 @@ paths:
         - name: id
           in: path
           required: true
+          description: |
+            Внутренний id полиса в data-reference (UUID, поле `id` ответов), не GUID 1С. Откуда взять: `items[].id`
+            подсказки R-04, `id` ответа R-05 или R-05д по `external_id`, `id` ответа R-05 по номеру. Полис по GUID 1С —
+            параметр `external_id`.
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -412,6 +423,7 @@ paths:
         - name: external_id
           in: query
           required: true
+          description: GUID полиса в 1С:УСК (тот, что 1С присылает в потоке полисов)
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -434,6 +446,9 @@ paths:
         - name: id
           in: path
           required: true
+          description: |
+            Внутренний id договора страхования в data-reference (UUID), не GUID 1С. Откуда взять: `id` ответа R-08 по
+            `external_id` или `insurer_external_id`, `contract.id` в полисе R-05. Договор по GUID 1С — параметр `external_id`.
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -499,6 +514,10 @@ paths:
         - name: id
           in: path
           required: true
+          description: |
+            Внутренний id страховой программы в data-reference (UUID), не GUID программы в 1С:УСК (тот отдаётся в поле
+            `external_id`). Откуда взять: `programs[].program.id` в полисе R-05; сервис Заявок передаёт его сервису Договоров
+            в задаче как `program_id`. Ручки программы по GUID 1С нет.
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -558,7 +577,9 @@ components:
       name: id
       in: path
       required: true
-      description: id ЛПУ (из каталога)
+      description: |
+        Внутренний id ЛПУ в data-reference (UUID), не GUID 1С: `items[].id` каталога R-01, `services[].lpu_id`
+        программы R-09.
       schema: {type: string, format: uuid}
   headers:
     RequestId:
