@@ -536,10 +536,50 @@ GUID вида деятельности «РВЛ» — `f3876c53-c7d8-4620-b364-9
 (R-05) и `contract-view` — они участвуют в решениях. Что соседям нужно знать:
 - ответ может отставать от базы **до 10 минут** в двух случаях: правка базы мимо 1С и узкое окно, когда чтение
   совпало с фиксацией разбора (прочитало до фиксации, положило в кэш после сброса) — принято как остаточный риск;
-- кэш у каждой реплики свой. Сообщения 1С разбирает только ведущий экземпляр (Ш81, раздел «Структура пакетов»), и
-  событие сбрасывает кэш только у него; остальные реплики отстают до срока жизни. Стенд работает одной репликой;
-  сброс на всех репликах — шаг Ш82, до прода (решение владельца 2026-10-20: вторая реплика не включается как минимум
-  до прода).
+- кэш у каждой реплики свой, а сбрасывается на всех (Ш82, PR #205). Сообщения 1С разбирает только ведущий (Ш81). В той
+  же транзакции разбора он выполняет `pg_notify` (`service.cache.ReferenceCacheNotifications` по событию
+  `OneCMessageApplied` → `repository.database.CacheNotificationRepository`). PostgreSQL доставляет оповещение только
+  после фиксации, а откаченный разбор оповещения не шлёт. Каждый экземпляр, ведущий тоже, слушает канал подписчиком
+  Spring Integration `PostgresChannelMessageTableSubscriber` (`service.cache.ReferenceCacheNotificationsConfiguration`,
+  по подписке `StreamCacheSubscription` на поток) и сбрасывает кэши потока той же таблицей `ReferenceCacheDependencies`
+  (`ReferenceCacheEviction.evict`). Таблица сообщений канала и триггер Spring Integration не используются: имя канала
+  (`reference_cache_channel_message_notify`) и полезная нагрузка (`region + " " + UUIDConverter.getUUID(поток)`) —
+  внутреннее соглашение подписчика, оно собрано в `ReferenceCacheChannel` и закреплено `ReferenceCacheAcrossInstancesTest`.
+  При обновлении Spring Integration сверять. Подписчик держит отдельное соединение вне пулов
+  (`config.cache.ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`; настройки — с пула приёма,
+  `ListenerConnectionSettings`, `application_name` = `data-reference-cache-notifications`): +1 соединение на экземпляр.
+  После каждого подключения и переподключения он вызывает все подписки, то есть экземпляр сбрасывает весь кэш, и
+  пропущенное за обрыв не остаётся в кэше. Переподключение — серия `RetryTemplate`: пауза
+  `REFERENCE_CACHE_RECONNECT_DELAY` (1 с) с удвоением до `REFERENCE_CACHE_RECONNECT_MAX_DELAY` (10 с),
+  `projectx.cache.notifications.reconnect-retries` (10) повторов. После серии — ERROR и новая серия: накопление
+  исключений бесконечной серии в памяти так ограничено. Тишина дольше `silence-check` (60 с) — проверка соединения
+  `isValid`. Метрика `reference_cache_notifications_connected` (`config.FlagGauges`, `strongReference(true)`: Micrometer
+  держит источник слабой ссылкой, и флаг по ссылке на метод после сборки мусора давал `NaN`). Не подключился за 5 с при
+  старте — старт падает (`start()` подписчика). Остаточные риски, принятые владельцем («1) да 2) да» в PR #205):
+  переполнение очереди оповещений 8 ГБ тестом не покрыто (контроль — `pg_notification_queue_usage()` в
+  `docs/operations.md`); при плавной остановке экземпляр до 30 с отвечает на начатые запросы без оповещений.
+
+**Прогрев после старта (Ш80, PR #208).** Пробы Kubernetes — `/livez` и `/readyz` на порту API
+(`management.endpoint.health.probes.add-additional-paths`), от базы и брокера они не зависят. `/livez` отвечает 200 сразу,
+`/readyz` — только после прогрева. Прогрев — `ApplicationRunner` (`service.warmup.StartupWarmup`): Spring Boot выставляет
+`ReadinessState.ACCEPTING_TRAFFIC` только после runner'ов, а веб-сервер к этому моменту уже слушает. Прогрев читает
+ключи — первые по `id` неархивные записи договоров страхования, ЛПУ, программ и полисов, по
+`projectx.warmup.records-per-reference` (`WARMUP_RECORDS_PER_REFERENCE`, 100) каждого (`WarmupKeysReader`, транзакция
+REST-чтения). Затем по очереди идут HTTP-запросы JDK `HttpClient` к своему порту на localhost (`LocalApi`,
+`LocalApiClient`, `X-Request-Id: startup-warmup`) по путям `WarmupKeys`: договор страхования по `id`, по GUID и по GUID
+страхователя, каталог по договору, карточка и услуги ЛПУ с ценами и без, программа, `contract-view` полиса. Так
+прогреваются те же контроллеры, сервисы и кэши, что у соседей, а `contract-view` — только код: его ответ не кэшируется.
+Прогрев только читает: не пишет, не оповещает другие экземпляры, к соседям не обращается, в свою запись журнала не
+пишет ни ключей, ни ПДн. Подписчик Ш82 сбрасывает весь кэш при подключении раньше runner'ов (`start()` ждёт этого сброса), поэтому
+прогретое не стирается. Предел — `projectx.warmup.timeout` (`WARMUP_TIMEOUT`, 30 с, не меньше 1 с), отсчёт от начала
+прогрева, каждый запрос ограничен остатком предела (`WarmupRun`). Итог — одна запись `WarmupJournal`: INFO «прогрев
+закончен» или «пропущен» (порт API не запущен), WARN «прогрев прерван: <причина>» — отказ базы при чтении ключей, ответ
+5xx, отказ запроса, предел времени, остановка. Число чтений и длительность в записи есть. Прерванный прогрев готовности
+не мешает: экземпляр всё равно становится готовым, ведь недоступную базу перезапуск пода не починит. Запросы прогрева
+видны в метрике `http.server.requests`, а записи журнала во время них несут `requestId` `startup-warmup`. Пробы стенда
+(чарт `data-reference/devops/test/helm`): readiness —
+`initialDelaySeconds` 60, `periodSeconds` 10, `failureThreshold` 6; liveness — 120, 30, 3. Время старта с прогревом на
+поде 1 CPU / 1 ГБ не замерено — остаточный риск, принятый владельцем («3) да» в PR #208).
 
 ### Сервис Заявок (он же сервис HR)
 
@@ -703,8 +743,8 @@ Central через прокси иногда отвечает 429 на пачк�
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С (`*Properties`) — в корне
-│   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
+│   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел; соединение слушателя оповещений о сбросе вне пулов (`ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`, `ListenerConnectionSettings`) и его настройки (`ReferenceCacheNotificationProperties`)
 │   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него
 ├── entity/            — JPA-сущности
 │   ├── catalog/       — справочники 1С и общая основа `OneCEntity`
@@ -715,18 +755,18 @@ ru.projectx.datareference
 ├── mapper/            — разбор потоков 1С; в корне — контракт (`StreamMapper`, `ImportResult`) и основа мапперов
 │   ├── stream/        — по мапперу на поток ТЗ-1 … ТЗ-10, с помощниками
 │   └── value/         — правила значений 1С (`OneCValues`, `OneCGuid`, `OneCMoneyScale`, `OneCRawParser`, `OneCRequiredValues`)
-├── repository/        — Spring Data JPA
-│   ├── catalog/       — справочники
+├── repository/        — Spring Data JPA; в корне — общая проекция ключа справочника (`ReferenceId`)
+│   ├── catalog/       — справочники; проекция ключей договора страхования для прогрева (`InsuranceContractKey`)
 │   ├── policy/        — полисы, их поиск и проекция для Договоров
 │   ├── inbound/       — приём и разбор сообщений 1С
-│   └── database/      — настройки сеанса базы (`SessionSettingsRepository`), строка блокировки ведущего (`LeaderLockRepository`)
+│   └── database/      — настройки сеанса базы (`SessionSettingsRepository`), строка блокировки ведущего (`LeaderLockRepository`), часы базы для момента приёма (`DatabaseClockRepository`), оповещение о сбросе кэша (`CacheNotificationRepository`)
 ├── dto/               — тела ответов REST и единый формат ошибки; собираются из сущностей
 ├── service/           — бизнес-логика; в корне классов нет
 │   ├── lpu/ price/ policy/ insurancecontract/ mkb10/ program/
 │   │                  — REST-чтение по ресурсам: сервисы за интерфейсами `*Reads` и их правила
 │   ├── rest/          — общее для REST-чтений: `@RestReadTransaction`, московский день (`ReferenceCalendar`), ключ
 │   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`
-│   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`)
+│   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`), оповещение всех экземпляров (`ReferenceCacheNotifications`, `ReferenceCacheChannel`) и подписчик канала (`ReferenceCacheNotificationsConfiguration`, `StreamCacheSubscription`)
 │   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
 │   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
 │   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
@@ -734,6 +774,7 @@ ru.projectx.datareference
 │   ├── database/      — классы отказов и таймауты базы (`DatabaseOutages`, `SqlStates`, `DatabaseTimeoutsCheck`)
 │   ├── metrics/       — метрики приёма и разбора
 │   ├── retention/     — стирание персональных данных по сроку
+│   ├── warmup/        — прогрев после старта до готовности: runner (`StartupWarmup`), ключи (`WarmupKeysReader`, `WarmupKeys`), чтения своего API (`LocalApi`, `LocalApiClient`, `WarmupRun`), итог и журнал (`WarmupOutcome`, `WarmupResult`, `WarmupJournal`)
 │   └── schedulers/    — задачи по расписанию
 └── controller/        — REST-чтение справочников: контроллеры по ресурсам (ЛПУ, полисы, договоры
     │                     страхования, МКБ-10, программы) под общей аннотацией `@InternalApi`
@@ -856,8 +897,9 @@ upsert по `external_id`, а отказ, пришедший после фикс
 сообщение). Разбор, как и приём, идёт только на ведущем экземпляре (с Ш81, PR #199), поэтому выборка без
 блокировки строк остаётся верной и при нескольких репликах: каждая транзакция приёма, разбора и закрытия
 ожиданий читает строку блокировки ведущего `FOR SHARE` по своему `CLIENT_ID` (`LeadershipFence`), и экземпляр,
-потерявший роль, такую транзакцию не зафиксирует. Время приёма пока ставят часы ведущего (нужна синхронизация
-часов подов; перевод на часы базы — Ш83). Ручной
+потерявший роль, такую транзакцию не зафиксирует. Время приёма ставят часы базы (`clock_timestamp()`, с Ш83,
+PR #203), поэтому порядок разбора не зависит от часов экземпляров и после смены ведущего; синхронизация часов подов
+нужна только для момента перехода роли после гибели ведущего (срок блокировки — по часам экземпляра). Ручной
 возврат FAILED/SKIPPED → NEW опасен — регламент в `docs/operations.md`, раздел «Сбои и ручные операции».
 
 **Отметка в `inbox` и запись сырья в `inbound_message` — одна транзакция.** Сообщение, отмеченное
@@ -976,7 +1018,11 @@ upsert по `external_id`, а отказ, пришедший после фикс
 По той же причине **не `@CreationTimestamp`/`@UpdateTimestamp`**: везде, где нужно
 «сейчас», инъецируется `java.time.Clock`. Это то, чем тесты управляют временем без
 `Thread.sleep`. Аннотации Hibernate этот `Clock` не видят и штампуют момент из системных
-часов JVM в обход Spring.
+часов JVM в обход Spring. **Исключение — момент приёма сообщения 1С** (`received_at` в `inbound_message`, `inbox`,
+`quarantine`) и сроки, отсчитанные от него (срок хранения тел, возраст зависшей передачи, давность ожидания разбора):
+их ставят и сравнивают часы базы (`clock_timestamp()`, `repository.database.DatabaseClockRepository`; Ш83, PR #203),
+чтобы порядок разбора не зависел от часов экземпляров. Ожидание родителя, `next_retry_at`, моменты исхода и срок
+блокировки ведущего остаются по `Clock`: с моментом приёма они не сравниваются. Причины — `docs/design.md`.
 
 ### Надёжность и исключения
 

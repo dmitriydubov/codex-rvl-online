@@ -12,10 +12,12 @@ public class OneCSteps {
 
     private final OneCInbox inbox;
     private final ReferenceImportScheduler scheduler;
+    private final CacheNotificationsDelivered notifications;
 
-    public OneCSteps(OneCInbox inbox, ReferenceImportScheduler scheduler) {
+    public OneCSteps(OneCInbox inbox, ReferenceImportScheduler scheduler, CacheNotificationsDelivered notifications) {
         this.inbox = inbox;
         this.scheduler = scheduler;
+        this.notifications = notifications;
     }
 
     @Дано("1С:УСК прислала страхователя:")
@@ -76,6 +78,7 @@ public class OneCSteps {
     @Дано("Дата-референс разобрал присланные сообщения")
     public void receivedMessagesImported() {
         scheduler.importPendingMessages();
+        notifications.awaitDelivered();
 
         assertThat(inbox.statuses())
                 .as("статусы сырья после разбора, в порядке приёма")
@@ -85,5 +88,6 @@ public class OneCSteps {
     @Когда("Дата-референс разбирает присланные сообщения")
     public void receivedMessagesBeingImported() {
         scheduler.importPendingMessages();
+        notifications.awaitDelivered();
     }
 }

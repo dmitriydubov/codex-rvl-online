@@ -90,6 +90,11 @@ public class OneCInbox {
         received.add(message);
     }
 
+    public void settle(UUID messageId, InboundStatus outcome) {
+        List<UUID> firstReceipts = received.stream().map(OneCMessage::messageId).distinct().toList();
+        expectedStatuses.set(firstReceipts.indexOf(messageId), outcome.name());
+    }
+
     public List<UUID> messageIdsInOrder() {
         return jdbc.sql(MESSAGE_IDS).query(UUID.class).list();
     }
@@ -99,7 +104,11 @@ public class OneCInbox {
     }
 
     public InboundRow last() {
-        return row(received.getLast().messageId());
+        return row(lastMessageId());
+    }
+
+    public UUID lastMessageId() {
+        return received.getLast().messageId();
     }
 
     public InboundRow row(UUID messageId) {

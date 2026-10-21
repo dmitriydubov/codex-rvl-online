@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
+import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 
 @Component
@@ -21,7 +22,11 @@ public class ReferenceCacheEviction {
 
     @TransactionalEventListener
     public void onApplied(OneCMessageApplied event) {
-        ReferenceCacheDependencies.cachesOf(event.stream()).forEach(this::clear);
+        evict(event.stream());
+    }
+
+    public void evict(OneCStream stream) {
+        ReferenceCacheDependencies.cachesOf(stream).forEach(this::clear);
     }
 
     private void clear(String cacheName) {
