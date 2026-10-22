@@ -25,8 +25,8 @@ class RequestIssuanceTest {
 
     @Test
     void activeRecords_areFoundByParticipantWithTheirKind() {
-        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, contract));
-        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(DocumentKind.LM_POLICY, policy));
+        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
         assertThat(issuance.of(Tasks.INSURED)).isEmpty();
     }
 
@@ -42,7 +42,37 @@ class RequestIssuanceTest {
     void leftovers_areRecordsOfParticipantsNotForgotten() {
         issuance.forget(Tasks.SPOUSE);
 
-        assertThat(issuance.leftovers()).containsExactly(policy);
+        assertThat(issuance.leftovers()).containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
         assertThat(issuance.of(Tasks.SPOUSE)).isEmpty();
+    }
+
+    @Test
+    void issuedRecord_isPreferredToAnOpenOneOfTheSameParticipantWhicheverComesFirst() {
+        LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
+
+        assertThat(new RequestIssuance(List.of(), List.of(issued, policy)).policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(new RequestIssuance(List.of(), List.of(policy, issued)).policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(new RequestIssuance(List.of(), List.of(policy, issued)).leftovers())
+                .containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", issued));
+    }
+
+    @Test
+    void issuedPolicy_isPreferredToAnOpenContractOfTheSameParticipant() {
+        Contract childContract = Issuances.contract("3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", Tasks.CHILD,
+                "DKM-2026-000002");
+        LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
+
+        RequestIssuance mixed = new RequestIssuance(List.of(childContract), List.of(issued));
+
+        assertThat(mixed.policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(mixed.contractOf(Tasks.CHILD)).isEmpty();
+    }
+
+    @Test
+    void firstOfTwoIssuedRecords_isKept() {
+        LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
+        LmPolicy another = Issuances.issuedPolicy("9f3e1c28-6b55-4da1-93f4-82a1d7b56e40", Tasks.CHILD);
+
+        assertThat(new RequestIssuance(List.of(), List.of(issued, another)).policyOf(Tasks.CHILD)).contains(issued);
     }
 }

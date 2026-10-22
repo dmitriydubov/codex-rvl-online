@@ -62,8 +62,7 @@ class RequestStatusPublicationTest {
         given(snapshots.current(Tasks.REQUEST)).willReturn(COMPLETED);
         given(messages.write(eq(COMPLETED), any())).willReturn("{\"data\": {}}");
 
-        publication.afterTask(NOTHING, Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00")),
-                NOW);
+        publication.afterTask(NOTHING, Tasks.REQUEST, List.of(INSURED, SPOUSE_KM, CHILD_LM), NOW);
 
         ArgumentCaptor<IssuanceRequest> started = ArgumentCaptor.captor();
         verify(requests).save(started.capture());
@@ -96,7 +95,7 @@ class RequestStatusPublicationTest {
         given(requests.findById(Tasks.REQUEST)).willReturn(Optional.of(request));
         given(snapshots.current(Tasks.REQUEST)).willReturn(COMPLETED);
 
-        publication.afterTask(COMPLETED, Tasks.task(Tasks.insured("0.00")), NOW);
+        publication.afterTask(COMPLETED, Tasks.REQUEST, List.of(INSURED), NOW);
 
         verify(journal, never()).record(any(), any());
         assertThat(request.participants()).containsExactly(INSURED);

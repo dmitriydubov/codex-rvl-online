@@ -10,11 +10,9 @@ import ru.projectx.contracts.entity.IssuanceRequest;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.RequestParticipant;
-import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.StatusEvents;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
-import ru.projectx.contracts.service.DocumentKinds;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 
 @Service
@@ -41,9 +39,10 @@ public class RequestStatusPublication {
         return snapshots.current(individualRequestId);
     }
 
-    public void afterTask(IssuanceSnapshot before, ContractTask task, Instant now) {
-        IssuanceRequest request = requestOf(task.individualRequestId(), now);
-        request.takeComposition(composition(task), now);
+    public void afterTask(IssuanceSnapshot before, UUID individualRequestId, List<RequestParticipant> composition,
+            Instant now) {
+        IssuanceRequest request = requestOf(individualRequestId, now);
+        request.takeComposition(composition, now);
         publishIfChanged(request, before, now);
     }
 
@@ -67,12 +66,6 @@ public class RequestStatusPublication {
     private IssuanceRequest requestOf(UUID individualRequestId, Instant now) {
         return requests.findById(individualRequestId)
                 .orElseGet(() -> requests.save(IssuanceRequest.start(individualRequestId, now)));
-    }
-
-    private static List<RequestParticipant> composition(ContractTask task) {
-        return task.participants().stream()
-                .map(participant -> new RequestParticipant(participant.id(), DocumentKinds.of(participant)))
-                .toList();
     }
 
     private void record(IssuanceRequest request, IssuanceSnapshot snapshot, Instant now) {
