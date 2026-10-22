@@ -105,6 +105,17 @@ public class ServiceLogSteps {
         assertThat(matching).extracting(ILoggingEvent::getThrowableProxy).as("приложенное исключение").containsOnlyNulls();
     }
 
+    @Тогда("в журнале Договоров есть запись уровня WARN о прекращении работы по заявке {string} с причиной {string}")
+    public void cancellationWarningLogged(String requestId, String reason) {
+        String expected = "прекращение работы по заявке " + requestId + ": " + reason;
+        List<ILoggingEvent> matching = journal.events().stream()
+                .filter(event -> event.getLevel() == Level.WARN)
+                .filter(event -> event.getFormattedMessage().equals(expected))
+                .toList();
+        assertThat(matching).as("записи WARN о прекращении работы по заявке %s", requestId).hasSize(1);
+        assertThat(matching.get(0).getThrowableProxy()).as("приложенное исключение").isNull();
+    }
+
     @Тогда("значение поля {string} сообщения {string} есть в его теле, но не попало ни в причину исхода, ни в журнал Договоров")
     public void personalValueStaysInBody(String field, String messageId) {
         Optional<String> value = value(messages.read(published.of(messageId)), field);

@@ -1,7 +1,6 @@
 package ru.projectx.contracts.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -19,7 +18,6 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.LmPolicyStatus;
-import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
@@ -33,7 +31,8 @@ class TaskCancellationServiceTest {
 
     private final ContractRepository contracts = mock();
     private final LmPolicyRepository policies = mock();
-    private final TaskCancellationService service = new TaskCancellationService(contracts, policies);
+    private final CancellationUnknownReasons unknownReasons = mock();
+    private final TaskCancellationService service = new TaskCancellationService(contracts, policies, unknownReasons);
 
     @Test
     void cancellation_stopsEveryContractAndPolicyOfTheRequestWithMappedReasonCommentAndMoment() {
@@ -57,13 +56,32 @@ class TaskCancellationServiceTest {
     }
 
     @Test
-    void unknownReasonCode_isContractViolationBeforeAnyRecordIsTouched() {
+    void knownReasonCode_doesNotAskForTheUnknownCodeRule() {
+        service.apply(new ContractTaskCancellation(Tasks.REQUEST, CANCELLED_AT, "EXPIRED", null), NOW);
+
+        verifyNoInteractions(unknownReasons);
+    }
+
+    @Test
+    void unknownReasonCode_cancelsEveryRecordWithTheOutcomeOfTheUnknownCodeRule() {
+        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
+                new BigDecimal("34000.00")), NOW);
+        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.CHILD), NOW);
         ContractTaskCancellation cancellation =
                 new ContractTaskCancellation(Tasks.REQUEST, CANCELLED_AT, "SOMETHING_ELSE", null);
+        Cancellation asOther = new Cancellation(CancelReason.OTHER, "неизвестный код причины SOMETHING_ELSE",
+                CANCELLED_AT);
+        given(unknownReasons.asOther(cancellation)).willReturn(asOther);
+        given(contracts.findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
+                Set.of(ContractStatus.ISSUED, ContractStatus.CANCELLED))).willReturn(List.of(contract));
+        given(policies.findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
+                Set.of(LmPolicyStatus.ISSUED, LmPolicyStatus.CANCELLED))).willReturn(List.of(policy));
 
-        assertThatThrownBy(() -> service.apply(cancellation, NOW))
-                .isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля data.cancel_reason");
-        verifyNoInteractions(contracts, policies);
+        service.apply(cancellation, NOW);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+        assertThat(contract.state().cancellation()).contains(asOther);
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+        assertThat(policy.state().cancellation()).contains(asOther);
     }
 }

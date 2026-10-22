@@ -3,11 +3,9 @@ package ru.projectx.contracts.service;
 import java.time.Instant;
 import java.util.Set;
 import org.springframework.stereotype.Service;
-import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicyStatus;
-import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
@@ -20,16 +18,19 @@ public class TaskCancellationService {
 
     private final ContractRepository contracts;
     private final LmPolicyRepository policies;
+    private final CancellationUnknownReasons unknownReasons;
 
-    public TaskCancellationService(ContractRepository contracts, LmPolicyRepository policies) {
+    public TaskCancellationService(ContractRepository contracts, LmPolicyRepository policies,
+            CancellationUnknownReasons unknownReasons) {
         this.contracts = contracts;
         this.policies = policies;
+        this.unknownReasons = unknownReasons;
     }
 
     public void apply(ContractTaskCancellation cancellation, Instant now) {
-        CancelReason reason = CancelReasons.of(cancellation.cancelReason())
-                .orElseThrow(() -> ContractViolationException.invalidValue("data.cancel_reason"));
-        Cancellation outcome = new Cancellation(reason, cancellation.cancelComment(), cancellation.cancelledAt());
+        Cancellation outcome = CancelReasons.of(cancellation.cancelReason())
+                .map(reason -> new Cancellation(reason, cancellation.cancelComment(), cancellation.cancelledAt()))
+                .orElseGet(() -> unknownReasons.asOther(cancellation));
         contracts.findByRequestIndividualRequestIdAndStatusNotIn(cancellation.individualRequestId(), UNTOUCHED_CONTRACTS)
                 .forEach(contract -> contract.cancel(outcome, now));
         policies.findByRequestIndividualRequestIdAndStatusNotIn(cancellation.individualRequestId(), UNTOUCHED_POLICIES)

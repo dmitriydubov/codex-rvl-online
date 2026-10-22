@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.LmPolicyRequestProperties;
 import ru.projectx.contracts.config.OutboxProperties;
 
 public class ClockSteps {
@@ -20,11 +21,14 @@ public class ClockSteps {
     private final StandClock clock;
     private final InboxProperties inbox;
     private final OutboxProperties outbox;
+    private final LmPolicyRequestProperties lmPolicyRequests;
 
-    public ClockSteps(StandClock clock, InboxProperties inbox, OutboxProperties outbox) {
+    public ClockSteps(StandClock clock, InboxProperties inbox, OutboxProperties outbox,
+            LmPolicyRequestProperties lmPolicyRequests) {
         this.clock = clock;
         this.inbox = inbox;
         this.outbox = outbox;
+        this.lmPolicyRequests = lmPolicyRequests;
     }
 
     @Before
@@ -70,5 +74,10 @@ public class ClockSteps {
     @Когда("на часах Договоров прошло на час меньше срока хранения тел исходящих сообщений")
     public void outboxRetentionMinusHourPassed() {
         clock.advance(outbox.retention().payload().minus(ONE_HOUR));
+    }
+
+    @Когда("на часах Договоров прошёл порог ожидания ответа 1С:УСК")
+    public void awaitingThresholdPassed() {
+        clock.advance(lmPolicyRequests.awaitingThreshold());
     }
 }

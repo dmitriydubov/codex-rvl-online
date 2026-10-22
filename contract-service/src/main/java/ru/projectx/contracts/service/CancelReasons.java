@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import ru.projectx.contracts.entity.CancelReason;
 
 public final class CancelReasons {
@@ -12,11 +13,16 @@ public final class CancelReasons {
             "INSURED_REFUSED", CancelReason.INSURED_REFUSED,
             "EXPIRED", CancelReason.EXPIRED,
             "OTHER", CancelReason.OTHER);
+    private static final Pattern CODE = Pattern.compile("[A-Z][A-Z0-9_]{0,49}");
 
     private CancelReasons() {
     }
 
     public static Optional<CancelReason> of(String code) {
         return Optional.ofNullable(BY_CODE.get(code));
+    }
+
+    public static Optional<String> wellFormed(String code) {
+        return Optional.of(code).filter(candidate -> CODE.matcher(candidate).matches());
     }
 }

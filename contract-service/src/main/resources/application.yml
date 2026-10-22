@@ -12,7 +12,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 5
+        size: 6
 
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -166,6 +166,8 @@ projectx:
   lm-policy-requests:
     interval: ${LM_POLICY_REQUEST_INTERVAL:10s}
     batch-size: ${LM_POLICY_REQUEST_BATCH_SIZE:100}
+    awaiting-interval: ${LM_POLICY_REQUEST_AWAITING_INTERVAL:1m}
+    awaiting-threshold: ${LM_POLICY_REQUEST_AWAITING_THRESHOLD:1h}
 
   reference:
     url: ${REFERENCE_URL:}

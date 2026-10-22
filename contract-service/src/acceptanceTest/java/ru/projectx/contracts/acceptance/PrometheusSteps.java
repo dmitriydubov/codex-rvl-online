@@ -9,13 +9,18 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 
 public class PrometheusSteps {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    private static final Path OPERATIONS = Path.of("docs", "operations.md");
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final URI scrape;
@@ -45,6 +50,15 @@ public class PrometheusSteps {
         counterGrew(name, "kind", kind, growth);
     }
 
+    @Тогда("метрика Prometheus {string} равна {int}")
+    public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
+        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "(?:\\{[^}]*})? (\\S+)$", Pattern.MULTILINE);
+        List<Double> values = series.matcher(scrape()).results()
+                .map(match -> Double.parseDouble(match.group(1)))
+                .toList();
+        assertThat(values).as("значения ряда %s", name).containsExactly((double) expected);
+    }
+
     @Тогда("счётчик Prometheus {string} вырос за сценарий на {int}")
     public void counterGrew(String name, int growth) throws IOException, InterruptedException {
         double now = valueOf(scrape(), name);
@@ -53,11 +67,20 @@ public class PrometheusSteps {
     }
 
     private void counterGrew(String name, String label, String value, int growth) throws IOException, InterruptedException {
+        assertDocumented(name, label);
         double now = valueOf(scrape(), name, label, value);
 
         assertThat(now - valueOf(beforeScenario, name, label, value))
                 .as("прирост %s{%s=\"%s\"} за сценарий", name, label, value)
                 .isEqualTo(growth);
+    }
+
+    private static void assertDocumented(String name, String label) throws IOException {
+        Pattern row = Pattern.compile("^\\| `" + Pattern.quote(name) + "\\{(?:[a-z_]+, ?)*" + Pattern.quote(label)
+                + "(?:, ?[a-z_]+)*}` \\|", Pattern.MULTILINE);
+        assertThat(row.matcher(Files.readString(OPERATIONS, StandardCharsets.UTF_8)).find())
+                .as("счётчик %s с меткой %s в таблице метрик %s", name, label, OPERATIONS)
+                .isTrue();
     }
 
     private String scrape() throws IOException, InterruptedException {

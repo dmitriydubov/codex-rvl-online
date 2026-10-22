@@ -78,6 +78,14 @@ public class OutboxMessage extends JournalMessage {
         return id;
     }
 
+    public String aggregateType() {
+        return aggregateType;
+    }
+
+    public UUID aggregateId() {
+        return aggregateId;
+    }
+
     @Override
     public OutboxStatus status() {
         return status;
