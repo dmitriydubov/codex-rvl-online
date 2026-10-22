@@ -14,8 +14,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
@@ -54,6 +57,16 @@ class ContractAcceptanceIT {
 
     @Autowired
     private JdbcClient jdbc;
+
+    private final List<UUID> created = new ArrayList<>();
+
+    @AfterEach
+    void removeCreatedContracts() {
+        for (UUID contractId : created) {
+            jdbc.sql("delete from contract_acceptances where contract_id = :contract").param("contract", contractId).update();
+            contracts.deleteById(contractId);
+        }
+    }
 
     @Test
     void acceptance_isStoredWithTheAddressAsInetAndAcceptsTheContract() throws IOException, InterruptedException {
@@ -102,7 +115,9 @@ class ContractAcceptanceIT {
         Contract contract = Contract.open(new ContractDraft("DKM-IT-" + UUID.randomUUID().toString().substring(0, 8),
                 terms, UUID.randomUUID(), new BigDecimal("34000.00")), Instant.parse("2026-02-10T07:05:00Z"));
         contract.offerDraft();
-        return contracts.saveAndFlush(contract).id();
+        UUID contractId = contracts.saveAndFlush(contract).id();
+        created.add(contractId);
+        return contractId;
     }
 
     private HttpResponse<String> accept(UUID contractId, String ipAddress) throws IOException, InterruptedException {

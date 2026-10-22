@@ -1,7 +1,6 @@
 package ru.projectx.contracts.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -32,6 +31,7 @@ import ru.projectx.contracts.dto.AcceptanceResponse;
 import ru.projectx.contracts.dto.DocumentState;
 import ru.projectx.contracts.entity.AcceptanceChannel;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
+import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
@@ -97,7 +97,8 @@ class ContractAcceptanceControllerTest {
         "2026-02-10T10:04:58+03:00| вчера                        | accepted_at      | неверный формат",
         "\"WEB\"| \"SMS\"                                        | channel          | неверный формат",
         "10.20.30.40| 999.1.1.1                                  | ip_address       | неверный формат",
-        "10.20.30.40| 2001:db8::g                                | ip_address       | неверный формат"})
+        "10.20.30.40| 2001:db8::g                                | ip_address       | неверный формат",
+        "10.20.30.40| ::ffff:10.0.0.256                          | ip_address       | неверный формат"})
     void bodyOutOfFormat_isValidationErrorNamingTheJsonField(String original, String replacement, String field,
             String reason) throws Exception {
         accept(CONTRACT.toString(), BODY.replace(original.strip(), replacement == null ? "" : replacement.strip()))
@@ -123,6 +124,12 @@ class ContractAcceptanceControllerTest {
         assertThat(received.getValue().userAgent()).isNull();
     }
 
+    @ParameterizedTest
+    @CsvSource({"::ffff:10.0.0.1", "64:ff9b::192.0.2.33", "::1", "fe80::1"})
+    void ipv6AddressInAnyStandardForm_isAccepted(String address) throws Exception {
+        accept(CONTRACT.toString(), BODY.replace("10.20.30.40", address)).andExpect(status().isOk());
+    }
+
     @Test
     void bodyThatIsNotJson_isValidationErrorWithoutFields() throws Exception {
         accept(CONTRACT.toString(), "{\"contract_version\": 1, \"channel\": \"WEB\"")
@@ -144,13 +151,6 @@ class ContractAcceptanceControllerTest {
     }
 
     @Test
-    void refusalOfAnUnmappedType_isAnIllegalStateNamingTheType() {
-        assertThatThrownBy(() -> new AcceptanceErrorAdvice().refused(new IllegalArgumentException("вне перечня")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining(IllegalArgumentException.class.getName());
-    }
-
-    @Test
     void contractIdentifierThatIsNotAGuid_isValidationErrorOfThePathField() throws Exception {
         accept("not-a-guid", BODY)
                 .andExpect(status().isBadRequest())
@@ -165,7 +165,7 @@ class ContractAcceptanceControllerTest {
             case "CONTRACT_NOT_FOUND" -> new ContractNotFoundException(CONTRACT);
             case "ALREADY_ACCEPTED" -> new ContractAlreadyAcceptedException(CONTRACT, 2);
             case "INVALID_STATE" -> new ContractStateException(CONTRACT, "CANCELLED");
-            default -> new CannotAcquireLockException("строка договора занята");
+            default -> new ContractBusyException(CONTRACT, new CannotAcquireLockException("строка договора занята"));
         });
 
         accept(CONTRACT.toString(), BODY)

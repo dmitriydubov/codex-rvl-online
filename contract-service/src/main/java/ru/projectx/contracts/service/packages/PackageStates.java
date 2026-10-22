@@ -1,23 +1,33 @@
 package ru.projectx.contracts.service.packages;
 
-import java.util.Map;
-import java.util.Optional;
 import ru.projectx.contracts.dto.DocumentState;
 import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 
 final class PackageStates {
 
-    private static final Map<IssuanceStatus, DocumentState> RENAMED = Map.of(
-            ContractStatus.NEW, DocumentState.NOT_REQUIRED, ContractStatus.DRAFT_READY, DocumentState.DRAFTED,
-            ContractStatus.SUBMITTED, DocumentState.PAID, LmPolicyStatus.NEW, DocumentState.NOT_REQUIRED,
-            LmPolicyStatus.SUBMITTED, DocumentState.NOT_REQUIRED);
-
     private PackageStates() {
     }
 
-    static DocumentState of(IssuanceStatus status) {
-        return Optional.ofNullable(RENAMED.get(status)).orElseGet(() -> DocumentState.valueOf(status.toString()));
+    static DocumentState of(ContractStatus status) {
+        return switch (status) {
+            case NEW -> DocumentState.NOT_REQUIRED;
+            case DRAFT_READY -> DocumentState.DRAFTED;
+            case ACCEPTED -> DocumentState.ACCEPTED;
+            case INVOICE_ISSUED -> DocumentState.INVOICE_ISSUED;
+            case PAID, SUBMITTED -> DocumentState.PAID;
+            case ISSUED -> DocumentState.ISSUED;
+            case ERROR -> DocumentState.ERROR;
+            case CANCELLED -> DocumentState.CANCELLED;
+        };
+    }
+
+    static DocumentState of(LmPolicyStatus status) {
+        return switch (status) {
+            case NEW, SUBMITTED -> DocumentState.NOT_REQUIRED;
+            case ISSUED -> DocumentState.ISSUED;
+            case ERROR -> DocumentState.ERROR;
+            case CANCELLED -> DocumentState.CANCELLED;
+        };
     }
 }

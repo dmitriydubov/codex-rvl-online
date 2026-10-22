@@ -13,7 +13,9 @@ public final class IpAddressFormat {
             + "|(" + HEXTET + ":){1,3}(:" + HEXTET + "){1,4}"
             + "|(" + HEXTET + ":){1,2}(:" + HEXTET + "){1,5}"
             + "|" + HEXTET + ":(:" + HEXTET + "){1,6}"
-            + "|:((:" + HEXTET + "){1,7}|:))";
+            + "|:((:" + HEXTET + "){1,7}|:)"
+            + "|::(ffff(:0{1,4})?:)?" + IPV4
+            + "|(" + HEXTET + ":){1,4}:" + IPV4 + ")";
 
     public static final String PATTERN = IPV4 + "|" + IPV6;
 

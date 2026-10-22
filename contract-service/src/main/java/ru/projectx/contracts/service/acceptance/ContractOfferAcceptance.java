@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.AcceptanceRequest;
@@ -14,6 +15,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractAcceptance;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
+import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
@@ -39,13 +41,21 @@ public class ContractOfferAcceptance implements OfferAcceptances {
     @Override
     @Transactional
     public AcceptanceResponse accept(UUID contractId, AcceptanceRequest request) {
-        Contract contract = contracts.findLockedById(contractId)
-                .orElseThrow(() -> new ContractNotFoundException(contractId));
+        Contract contract = locked(contractId);
         ensureAcceptable(contract);
         ContractAcceptance acceptance = acceptances.findByContractId(contractId)
                 .map(previous -> repeated(previous, request))
                 .orElseGet(() -> first(contract, request));
         return new AcceptanceResponse(contractId, DocumentState.ACCEPTED, acceptance.offer().acceptedAt());
+    }
+
+    private Contract locked(UUID contractId) {
+        try {
+            return contracts.findLockedById(contractId).orElseThrow(() -> new ContractNotFoundException(contractId));
+        }
+        catch (PessimisticLockingFailureException busy) {
+            throw new ContractBusyException(contractId, busy);
+        }
     }
 
     private static void ensureAcceptable(Contract contract) {

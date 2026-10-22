@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.dto.AcceptanceRequest;
 import ru.projectx.contracts.dto.AcceptanceResponse;
@@ -31,7 +32,9 @@ import ru.projectx.contracts.entity.ContractAcceptance;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.OfferAcceptance;
+import ru.projectx.contracts.exception.AcceptanceRefusal;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
+import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
@@ -136,6 +139,18 @@ class ContractOfferAcceptanceTest {
 
         assertThatThrownBy(() -> service.accept(CONTRACT, request(1, null)))
                 .isInstanceOf(ContractNotFoundException.class).hasMessageContaining(CONTRACT.toString());
+    }
+
+    @Test
+    void contractRowHeldLongerThanTheLockTimeout_isBusyWithTheLockFailureAsCause() {
+        CannotAcquireLockException timeout = new CannotAcquireLockException("строка договора занята");
+        given(contracts.findLockedById(CONTRACT)).willThrow(timeout);
+
+        assertThatThrownBy(() -> service.accept(CONTRACT, request(1, null)))
+                .isInstanceOfSatisfying(ContractBusyException.class,
+                        busy -> assertThat(busy.refusal()).isEqualTo(AcceptanceRefusal.CONTRACT_BUSY))
+                .hasCause(timeout).hasMessageContaining(CONTRACT.toString());
+        verify(acceptances, never()).save(any());
     }
 
     private ContractAcceptance saved() {

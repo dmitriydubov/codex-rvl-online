@@ -48,7 +48,6 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
         return policy.submitted();
     }
 
-
     @Override
     protected boolean reviseTerms(LmPolicy policy, Issue issue, UUID program) {
         boolean periodMoved = policy.movePeriod(issue.period());

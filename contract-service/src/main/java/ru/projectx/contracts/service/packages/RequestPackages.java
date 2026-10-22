@@ -6,6 +6,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.PackageResponse;
 import ru.projectx.contracts.entity.ContractAcceptance;
@@ -31,7 +32,7 @@ public class RequestPackages implements RequestPackageReads {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PackageResponse packageOf(UUID individualRequestId) {
         if (!requests.existsById(individualRequestId)) {
             throw new RequestNotFoundException(individualRequestId);
