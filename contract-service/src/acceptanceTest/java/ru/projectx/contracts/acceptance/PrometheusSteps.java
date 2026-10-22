@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 
@@ -43,6 +44,15 @@ public class PrometheusSteps {
     @Тогда("счётчик Prometheus {string} с меткой kind {string} вырос за сценарий на {int}")
     public void counterGrewByKind(String name, String kind, int growth) throws IOException, InterruptedException {
         counterGrew(name, "kind", kind, growth);
+    }
+
+    @Тогда("метрика Prometheus {string} равна {int}")
+    public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
+        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "(?:\\{[^}]*})? (\\S+)$", Pattern.MULTILINE);
+        List<Double> values = series.matcher(scrape()).results()
+                .map(match -> Double.parseDouble(match.group(1)))
+                .toList();
+        assertThat(values).as("значения ряда %s", name).containsExactly((double) expected);
     }
 
     private void counterGrew(String name, String label, String value, int growth) throws IOException, InterruptedException {

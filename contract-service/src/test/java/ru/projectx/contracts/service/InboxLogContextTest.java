@@ -33,6 +33,16 @@ class InboxLogContextTest {
     }
 
     @Test
+    void run_makesTheMessageIdTheRequestIdOfCallsToTheReferenceService() {
+        AtomicReference<String> requestId = new AtomicReference<>();
+
+        InboxLogContext.run(RECEIPT, () -> requestId.set(RequestIds.current()));
+
+        assertThat(requestId.get()).isEqualTo("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11");
+        assertThat(MDC.get(RequestIds.MDC_KEY)).isNull();
+    }
+
+    @Test
     void run_removesIdentifiersWhenTheActionFailsAndPassesTheFailureOn() {
         assertThatThrownBy(() -> InboxLogContext.run(RECEIPT, () -> {
             throw new IOException("канал");
@@ -40,5 +50,6 @@ class InboxLogContextTest {
 
         assertThat(MDC.get(InboxLogContext.MESSAGE_ID)).isNull();
         assertThat(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID)).isNull();
+        assertThat(MDC.get(RequestIds.MDC_KEY)).isNull();
     }
 }

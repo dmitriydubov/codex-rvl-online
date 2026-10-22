@@ -6,6 +6,7 @@ import ru.projectx.contracts.exception.ParticipantDataException;
 public final class IssueErrors {
 
     static final String PROGRAM_REQUIRED = "PROGRAM_REQUIRED";
+    static final String LM_POLICY_REQUEST_UNDELIVERED = "LM_POLICY_REQUEST_UNDELIVERED";
 
     private IssueErrors() {
     }
@@ -17,5 +18,9 @@ public final class IssueErrors {
 
     public static IssueError programMissing() {
         return new IssueError(PROGRAM_REQUIRED, "у записи о выпуске нет программы страхования");
+    }
+
+    public static IssueError lmPolicyRequestUndelivered() {
+        return new IssueError(LM_POLICY_REQUEST_UNDELIVERED, "запрос на выпуск полиса ЛМ не доставлен в 1С:УСК");
     }
 }

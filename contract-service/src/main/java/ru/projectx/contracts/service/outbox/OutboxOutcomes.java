@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.OutboxProperties;
-import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.entity.OutboxStatus;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
@@ -21,14 +20,14 @@ public class OutboxOutcomes {
 
     private final OutboxMessageRepository messages;
     private final OutboxProperties.Retry retry;
-    private final OutboxMetrics metrics;
+    private final OutboxRejection rejection;
     private final Clock clock;
 
-    public OutboxOutcomes(OutboxMessageRepository messages, OutboxProperties properties, OutboxMetrics metrics,
+    public OutboxOutcomes(OutboxMessageRepository messages, OutboxProperties properties, OutboxRejection rejection,
             Clock clock) {
         this.retry = properties.retry();
         this.messages = messages;
-        this.metrics = metrics;
+        this.rejection = rejection;
         this.clock = clock;
     }
 
@@ -43,7 +42,7 @@ public class OutboxOutcomes {
         }
         switch (outcome) {
             case PublishOutcome.Delivered delivered -> message.markPublished(clock.instant());
-            case PublishOutcome.Refused refused -> reject(message, refused.reason());
+            case PublishOutcome.Refused refused -> rejection.reject(message, refused.reason(), clock.instant());
             case PublishOutcome.Rejected rejected -> retryOrReject(message, rejected.reason());
             case PublishOutcome.Unconfirmed unconfirmed -> retryOrReject(message, unconfirmed.reason());
         }
@@ -53,19 +52,11 @@ public class OutboxOutcomes {
         int attempt = message.attempts() + 1;
         Optional<Duration> delay = retry.delayAfterFailedAttempt(attempt);
         if (delay.isEmpty()) {
-            reject(message, "повторы исчерпаны на попытке " + attempt + ": " + reason);
+            rejection.reject(message, "повторы исчерпаны на попытке " + attempt + ": " + reason, clock.instant());
             return;
         }
         message.markRetry(reason, clock.instant().plus(delay.get()));
         log.warn("исходящее сообщение {} отложено до повтора после попытки {}: {}",
                 message.envelope().messageId(), attempt, reason);
-    }
-
-    private void reject(OutboxMessage message, String reason) {
-        message.markFailed(reason);
-        MessageEnvelope envelope = message.envelope();
-        log.error("исходящее сообщение {} отклонено окончательно: тип события {}, попытка {}, причина: {}",
-                envelope.messageId(), envelope.eventType(), message.attempts(), reason);
-        metrics.countFailed(envelope.eventType());
     }
 }

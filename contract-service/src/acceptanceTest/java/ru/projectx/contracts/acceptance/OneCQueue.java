@@ -43,6 +43,14 @@ public class OneCQueue implements StandQueue {
         return broker.execute(channel -> channel.queueDeclarePassive(queue));
     }
 
+    void declare() {
+        broker.execute(channel -> channel.queueDeclare(queue, DURABLE, EXCLUSIVE, AUTO_DELETE, null));
+    }
+
+    void delete() {
+        broker.execute(channel -> channel.queueDelete(queue));
+    }
+
     @Override
     public void purge() {
         broker.execute(channel -> channel.queuePurge(queue));

@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.lm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
@@ -13,6 +14,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.config.LmPolicyRequestProperties;
 import ru.projectx.contracts.entity.IssueError;
@@ -27,6 +30,7 @@ import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -43,7 +47,7 @@ class LmPolicyRequestsTest {
     private final LmPolicyRequestRecording recording = mock();
     private final ReferenceMetrics metrics = mock();
     private final LmPolicyRequests requests = new LmPolicyRequests(policies, references, recording, metrics,
-            new LmPolicyRequestProperties(Duration.ofSeconds(10), 7));
+            new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)));
     private final LmPolicy first = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
     private final LmPolicy second = Issuances.policy("9f3e1c28-6b55-4da1-83f4-82a1d7b56e4a", Tasks.SPOUSE);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
@@ -100,6 +104,30 @@ class LmPolicyRequestsTest {
                 .extracting(ILoggingEvent::getFormattedMessage)
                 .containsExactly("полис ЛМ " + first.id() + " участника " + Tasks.CHILD + " заявки " + Tasks.REQUEST
                         + ": справочный сервис недоступен, запрос отложен до следующего прохода");
+    }
+
+    @Test
+    void eachPolicy_isPreparedUnderItsOwnIdAsTheRequestIdOfCallsToTheReferenceService() {
+        List<String> requestIds = new ArrayList<>();
+        given(references.resolve(any())).willAnswer(call -> {
+            requestIds.add(RequestIds.current());
+            return new RequestResolution.Resolved(IDENTIFIERS);
+        });
+
+        requests.prepareDue();
+
+        assertThat(requestIds).containsExactly(first.id().toString(), second.id().toString());
+        assertThat(MDC.get(RequestIds.MDC_KEY)).isNull();
+    }
+
+    @Test
+    void requestId_isRemovedWhenThePreparationFails() {
+        given(references.resolve(any())).willThrow(new IllegalStateException("сбой"));
+
+        assertThatThrownBy(requests::prepareDue)
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(MDC.get(RequestIds.MDC_KEY)).isNull();
     }
 
     @Test
