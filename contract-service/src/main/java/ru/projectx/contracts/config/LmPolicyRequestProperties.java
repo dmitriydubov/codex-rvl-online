@@ -11,5 +11,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("projectx.lm-policy-requests")
 public record LmPolicyRequestProperties(
         @NotNull @DurationMin(millis = 1) Duration interval,
-        @Min(1) int batchSize) {
+        @Min(1) int batchSize,
+        @NotNull @DurationMin(millis = 1) Duration awaitingInterval,
+        @NotNull @DurationMin(seconds = 1) Duration awaitingThreshold) {
 }

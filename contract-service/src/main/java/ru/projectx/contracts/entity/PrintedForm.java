@@ -1,12 +1,14 @@
 package ru.projectx.contracts.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -69,6 +71,10 @@ public class PrintedForm {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Nullable
+    @Embedded
+    private ParticipantAttachment attachment;
+
     protected PrintedForm() {
     }
 
@@ -82,8 +88,24 @@ public class PrintedForm {
         this.createdAt = now;
     }
 
+    private PrintedForm(ParticipantAttachment attachment, StoredFile file, Instant now) {
+        this.attachment = attachment;
+        this.kind = PrintedFormKind.FINAL;
+        this.docType = PrintedFormType.MEDICAL_CERTIFICATE;
+        this.version = FIRST_VERSION;
+        this.fileKey = file.key();
+        this.fileHash = file.hash();
+        this.fileSize = file.size();
+        this.contentType = file.contentType();
+        this.createdAt = now;
+    }
+
     public static PrintedForm issuedForLmPolicy(UUID lmPolicyId, UskDocument document, Instant now) {
         return new PrintedForm(lmPolicyId, document, now);
+    }
+
+    public static PrintedForm receivedCertificate(ParticipantAttachment attachment, StoredFile file, Instant now) {
+        return new PrintedForm(attachment, file, now);
     }
 
     public UUID id() {
@@ -104,5 +126,22 @@ public class PrintedForm {
 
     public Optional<String> uskFileUrl() {
         return Optional.ofNullable(uskFileUrl);
+    }
+
+    public Optional<ParticipantAttachment> attachment() {
+        return Optional.ofNullable(attachment);
+    }
+
+    public Optional<StoredFile> storedFile() {
+        return Optional.ofNullable(fileKey).map(key -> new StoredFile(key, Objects.requireNonNull(fileHash),
+                Objects.requireNonNull(fileSize), Objects.requireNonNull(contentType)));
+    }
+
+    public Instant createdAt() {
+        return createdAt;
+    }
+
+    public int version() {
+        return version;
     }
 }

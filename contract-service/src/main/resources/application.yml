@@ -12,10 +12,16 @@ spring:
   task:
     scheduling:
       pool:
-        size: 5
+        size: 6
 
   jackson:
     property-naming-strategy: SNAKE_CASE
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+      file-size-threshold: 10MB
 
   autoconfigure:
     exclude:
@@ -55,6 +61,8 @@ spring:
 
 server:
   shutdown: graceful
+  tomcat:
+    max-swallow-size: 20MB
 
 logging:
   structured:
@@ -158,6 +166,8 @@ projectx:
   lm-policy-requests:
     interval: ${LM_POLICY_REQUEST_INTERVAL:10s}
     batch-size: ${LM_POLICY_REQUEST_BATCH_SIZE:100}
+    awaiting-interval: ${LM_POLICY_REQUEST_AWAITING_INTERVAL:1m}
+    awaiting-threshold: ${LM_POLICY_REQUEST_AWAITING_THRESHOLD:1h}
 
   reference:
     url: ${REFERENCE_URL:}
@@ -166,3 +176,24 @@ projectx:
     retry:
       max-retries: ${REFERENCE_MAX_RETRIES:3}
       delay: ${REFERENCE_RETRY_DELAY:1s}
+
+  storage:
+    endpoint: ${S3_ENDPOINT:}
+    region: ${S3_REGION:us-east-1}
+    bucket: ${S3_BUCKET:}
+    base-path: ${S3_BASE_PATH:certificates}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    ssl-bundle: ${S3_SSL_BUNDLE:}
+    timeouts:
+      connect: ${S3_CONNECT_TIMEOUT:2s}
+      read: ${S3_READ_TIMEOUT:10s}
+      write: ${S3_WRITE_TIMEOUT:10s}
+      call: ${S3_CALL_TIMEOUT:20s}
+
+  attachments:
+    max-file-size: ${ATTACHMENT_MAX_FILE_SIZE:5MB}
+    content-types:
+      "[image/jpeg]": jpg
+      "[image/png]": png
+      "[application/pdf]": pdf

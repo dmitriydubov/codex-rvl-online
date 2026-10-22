@@ -1,10 +1,13 @@
 package ru.projectx.contracts.repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 
@@ -16,4 +19,9 @@ public interface LmPolicyRepository extends JpaRepository<LmPolicy, UUID> {
     List<LmPolicy> findByRequestIndividualRequestId(UUID individualRequestId);
 
     List<LmPolicy> findByStatusOrderByCreatedAtAscIdAsc(LmPolicyStatus status, Limit limit);
+
+    @Query("select min(p.updatedAt) from LmPolicy p where p.status = :status")
+    Optional<Instant> findEarliestUpdateByStatus(LmPolicyStatus status);
+
+    long countByStatusAndUpdatedAtBefore(LmPolicyStatus status, Instant moment);
 }

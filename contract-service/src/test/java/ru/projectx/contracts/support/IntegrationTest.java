@@ -13,12 +13,17 @@ import org.springframework.core.annotation.AliasFor;
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("no-mutate")
 @SpringBootTest(properties = {
+        "projectx.scheduling.enabled=false",
         "management.health.brokers.enabled=false",
         "projectx.reference.url=http://reference.test:8080/internal/v1",
         "projectx.brokers.internal.connection.password=no-broker",
         "projectx.brokers.onec.connection.password=no-broker",
         "projectx.brokers.internal.listener-auto-startup=false",
-        "projectx.brokers.onec.listener-auto-startup=false"})
+        "projectx.brokers.onec.listener-auto-startup=false",
+        "projectx.storage.endpoint=http://storage.test:9000",
+        "projectx.storage.bucket=contracts-test",
+        "projectx.storage.access-key=no-storage",
+        "projectx.storage.secret-key=no-storage"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class})
 public @interface IntegrationTest {
 

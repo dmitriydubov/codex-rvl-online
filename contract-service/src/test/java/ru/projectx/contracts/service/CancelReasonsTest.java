@@ -24,4 +24,28 @@ class CancelReasonsTest {
     void unknownCode_hasNoReason() {
         assertThat(CancelReasons.of("SOMETHING_ELSE")).isEmpty();
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "SOMETHING_ELSE",
+            "X",
+            "A1_B2",
+            "CODE_0123456789_0123456789_0123456789_0123456789XX"})
+    void upperCaseLatinCodeUpToFiftyCharacters_isWellFormed(String code) {
+        assertThat(CancelReasons.wellFormed(code)).contains(code);
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {
+            "CODE_0123456789_0123456789_0123456789_0123456789XXX",
+            "отказ Тестова Т. Т.",
+            "something_else",
+            "1_CODE",
+            "_CODE",
+            "CODE-1",
+            "CODE ELSE",
+            "''"}, emptyValue = "")
+    void anythingElse_isNotWellFormed(String code) {
+        assertThat(CancelReasons.wellFormed(code)).isEmpty();
+    }
 }

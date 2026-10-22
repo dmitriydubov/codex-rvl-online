@@ -1,12 +1,15 @@
 package ru.projectx.contracts.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ContractTest {
@@ -151,6 +154,42 @@ class ContractTest {
         assertThat(contract.moveProgram(PROGRAM)).isFalse();
         assertThat(contract.moveProgram(OTHER_PROGRAM)).isTrue();
         assertThat(contract.state().programId()).contains(OTHER_PROGRAM);
+    }
+
+    @Test
+    void accept_turnsContractReadyForAcceptanceIntoAcceptedWithoutNewVersion() {
+        contract.offerDraft();
+
+        contract.accept();
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+        assertThat(contract.offerAccepted()).isTrue();
+        assertThat(contract.finished()).isFalse();
+    }
+
+    @Test
+    void accept_isRefusedOutsideReadyForAcceptanceAndChangesNothing() {
+        assertThatThrownBy(() -> contract.accept()).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("NEW");
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"ACCEPTED", "INVOICE_ISSUED", "PAID", "SUBMITTED"})
+    void offerAccepted_holdsFromAcceptanceUntilIssue(ContractStatus status) {
+        ReflectionTestUtils.setField(contract, "status", status);
+
+        assertThat(contract.offerAccepted()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"NEW", "DRAFT_READY", "ISSUED", "ERROR", "CANCELLED"})
+    void offerAccepted_doesNotHoldBeforeAcceptanceOrAfterTheEnd(ContractStatus status) {
+        ReflectionTestUtils.setField(contract, "status", status);
+
+        assertThat(contract.offerAccepted()).isFalse();
     }
 
     private static ContractDraft draft(String premium) {

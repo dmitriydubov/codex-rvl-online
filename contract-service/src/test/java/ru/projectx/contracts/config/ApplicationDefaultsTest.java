@@ -4,10 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
@@ -53,6 +57,51 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void storageDefaults_leaveAddressBucketAndKeysToTheEnvironment() {
+        assertThat(application.getProperty("projectx.storage.endpoint")).asString().isEqualTo("${S3_ENDPOINT:}");
+        assertThat(application.getProperty("projectx.storage.bucket")).asString().isEqualTo("${S3_BUCKET:}");
+        assertThat(application.getProperty("projectx.storage.access-key")).asString().isEqualTo("${S3_ACCESS_KEY:}");
+        assertThat(application.getProperty("projectx.storage.secret-key")).asString().isEqualTo("${S3_SECRET_KEY:}");
+        assertThat(application.getProperty("projectx.storage.ssl-bundle")).asString().isEqualTo("${S3_SSL_BUNDLE:}");
+        assertThat(application.getProperty("projectx.storage.region")).asString().isEqualTo("${S3_REGION:us-east-1}");
+        assertThat(application.getProperty("projectx.storage.base-path")).asString()
+                .isEqualTo("${S3_BASE_PATH:certificates}");
+    }
+
+    @Test
+    void storageTimeouts_endTheCallBeforeTheRequestsServiceGivesUp() {
+        assertThat(application.getProperty("projectx.storage.timeouts.connect")).asString()
+                .isEqualTo("${S3_CONNECT_TIMEOUT:2s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.read")).asString()
+                .isEqualTo("${S3_READ_TIMEOUT:10s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.write")).asString()
+                .isEqualTo("${S3_WRITE_TIMEOUT:10s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.call")).asString()
+                .isEqualTo("${S3_CALL_TIMEOUT:20s}");
+    }
+
+    @Test
+    void attachmentDefaults_acceptJpegPngAndPdfUpToFiveMebibytes() {
+        assertThat(application.getProperty("projectx.attachments.max-file-size")).asString()
+                .isEqualTo("${ATTACHMENT_MAX_FILE_SIZE:5MB}");
+        assertThat(application.getProperty("projectx.attachments.content-types[image/jpeg]")).isEqualTo("jpg");
+        assertThat(application.getProperty("projectx.attachments.content-types[image/png]")).isEqualTo("png");
+        assertThat(application.getProperty("projectx.attachments.content-types[application/pdf]")).isEqualTo("pdf");
+        assertThat(new Binder(ConfigurationPropertySources.from(application))
+                .bind("projectx.attachments.content-types", Bindable.mapOf(String.class, String.class)).get())
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("image/jpeg", "jpg", "image/png", "png", "application/pdf", "pdf"));
+    }
+
+    @Test
+    void multipartLimits_leaveRoomForTheAttachmentRuleAndKeepFilesInMemory() {
+        assertThat(application.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("10MB");
+        assertThat(application.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("10MB");
+        assertThat(application.getProperty("spring.servlet.multipart.file-size-threshold")).isEqualTo("10MB");
+        assertThat(application.getProperty("server.tomcat.max-swallow-size")).isEqualTo("20MB");
+    }
+
+    @Test
     void outboxDefaults_publishEveryFiveSecondsWithConfirmTimeoutLadderAndRetention() {
         assertThat(application.getProperty("projectx.outbox.publishing.interval")).asString()
                 .isEqualTo("${OUTBOX_PUBLISHING_INTERVAL:5s}");
@@ -79,8 +128,16 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void lmPolicyAwaitingDefaults_refreshEveryMinuteAndCountOverdueAfterAnHour() {
+        assertThat(application.getProperty("projectx.lm-policy-requests.awaiting-interval")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_AWAITING_INTERVAL:1m}");
+        assertThat(application.getProperty("projectx.lm-policy-requests.awaiting-threshold")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_AWAITING_THRESHOLD:1h}");
+    }
+
+    @Test
     void schedulerPool_hasAThreadPerScheduledPass() {
-        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("5");
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("6");
     }
 
     @Test

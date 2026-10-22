@@ -19,12 +19,14 @@ public final class InboxLogContext {
     public static <E extends Exception> void run(InboxReceipt receipt, Action<E> action) throws E {
         MDC.put(MESSAGE_ID, receipt.messageId().toString());
         MDC.put(INDIVIDUAL_REQUEST_ID, receipt.correlationId().toString());
+        MDC.put(RequestIds.MDC_KEY, receipt.messageId().toString());
         try {
             action.run();
         }
         finally {
             MDC.remove(MESSAGE_ID);
             MDC.remove(INDIVIDUAL_REQUEST_ID);
+            MDC.remove(RequestIds.MDC_KEY);
         }
     }
 }

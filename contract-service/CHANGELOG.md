@@ -53,7 +53,9 @@
   (`RELATION_TYPE_REQUIRED`, `UNKNOWN_DOCUMENT_TYPE`, `UNKNOWN_GENDER`).
 - Прекращение работы по заявке: договоры и полисы заявки переводятся в CANCELLED с причиной по словарю сервиса
   (`CKZ_REJECTED`, `HR_REJECTED` → `REQUEST_CANCELLED`; `INSURED_REFUSED`, `EXPIRED`, `OTHER` — одноимённо), комментарием
-  и моментом аннулирования из сообщения; история сохраняется.
+  и моментом аннулирования из сообщения; история сохраняется. Код причины вне словаря прекращение не отклоняет: оно
+  применяется с причиной `OTHER`, код — в комментарии прекращения (значение не по формату кода заменяется пометкой),
+  WARN в журнале и счётчик `contracts_cancel_reason_unknown_total{event_type}`.
 - Настройки обработки и стирания (`INBOX_*`) и часового пояса нумерации (`CONTRACT_NUMBERING_ZONE`) — с умолчаниями;
   выключатель расписаний `projectx.scheduling.enabled` для тестов.
 - Журнал исходящих сообщений (`outbox_messages`, перечисление `outbox_status`; таблица вложений `message_attachments`
@@ -105,8 +107,47 @@
   после всех повторов.
 - Настройки прохода запросов на выпуск полисов ЛМ (`LM_POLICY_REQUEST_INTERVAL`, `LM_POLICY_REQUEST_BATCH_SIZE`) — с
   умолчаниями.
+- Приём справок по форме 070/у от сервиса Заявок: `POST /internal/v1/requests/{individual_request_id}/participants/{participant_id}/attachments`
+  (multipart: `attachment_id`, `file`). Принимаются JPEG, PNG и PDF до 5 МиБ (`ATTACHMENT_MAX_FILE_SIZE`), содержимое не
+  проверяется; файл ложится в хранилище S3 под уникальной папкой, запись — в реестр документов (`contract_documents`:
+  хэш SHA-256, тип, размер, ключ объекта). Повтор того же вложения возвращает прежнюю запись; тот же идентификатор
+  вложения с другим содержимым или по другому участнику — 409 `ATTACHMENT_CONFLICT`; неизвестная заявка — 404
+  `REQUEST_NOT_FOUND`, участник не из состава — 404 `PARTICIPANT_NOT_FOUND`, прекращённая заявка — 409 `INVALID_STATE`;
+  хранилище недоступно — 503 `STORAGE_UNAVAILABLE`.
+- Общая основа синхронных вызовов: единый формат ошибки (`error.code`, `error.message`, `error.details[]`,
+  `error.request_id`), 400 `VALIDATION_ERROR` с названным полем, 500 `INTERNAL_ERROR`; сквозной `X-Request-Id` — из
+  запроса или новый UUID, в ответе, в теле ошибки и в журнале вызова.
+- Состояние пакета документов по заявке для личного кабинета: `GET /internal/v1/requests/{individual_request_id}/package`
+  — по каждому участнику последней задачи вид документа, номер и версия договора КМ, состояние (NOT_REQUIRED, DRAFTED,
+  ACCEPTED, ISSUED, ERROR, CANCELLED), премия, номер выпущенного полиса, сведения об акцепте, оплата (после акцепта —
+  PENDING на сумму премии без ссылки), постоянные ссылки на формы из 1С:УСК, код и текст ошибки; справки 070/у в пакет
+  не попадают; неизвестная заявка — 404 `REQUEST_NOT_FOUND`.
+- Акцепт оферты договора КМ: `POST /internal/v1/contracts/{contract_id}/acceptance` (`contract_version`, `accepted_by`,
+  `accepted_at`, `channel` WEB или MOBILE, необязательные `ip_address` и `user_agent`) записывает акцепт и переводит
+  договор в «акцептован»; повтор той же версии — 200 и прежняя запись; другая версия после акцепта — 409
+  `ALREADY_ACCEPTED`, устаревшая версия до акцепта — 409 `DOCUMENT_VERSION_MISMATCH` с актуальной версией, прекращённый
+  или ошибочный договор — 409 `INVALID_STATE`, неизвестный договор — 404 `CONTRACT_NOT_FOUND`, строка договора занята
+  дольше таймаута блокировки — 503 `SERVICE_UNAVAILABLE`; нечитаемое тело JSON — 400 `VALIDATION_ERROR`.
+- Акцептованный договор КМ не меняется повторной задачей: изменения не применяются, в журнал — WARN, ответа сервису
+  Заявок нет; прекращение работы прекращает и акцептованный договор.
+- Настройки хранилища S3 (`projectx.storage`: адрес, регион, бакет, начало ключа, ключи доступа, набор SSL с
+  сертификатом внутреннего УЦ, таймауты соединения, чтения, записи и всего вызова) и приёма справок
+  (`projectx.attachments`: предельный размер, допустимые типы).
+- Счётчики `contracts_attachments_stored_total`, `contracts_attachments_rejected_total{reason}` и
+  `contracts_storage_unavailable_total`.
 - Правила кода сервиса записаны в `docs/code-style.md`; кодировку, концы строк и отступы задают `.editorconfig` и
   `.gitattributes` модуля.
+- Окончательно не доставленный запрос на выпуск полиса ЛМ переводит полис в ERROR с кодом
+  `LM_POLICY_REQUEST_UNDELIVERED`, и сервис Заявок получает ошибку по участнику; новый запрос уходит по новой записи
+  после задачи с большей версией.
+- Сводка полисов ЛМ, ждущих ответа 1С:УСК: метрики `contracts_lm_policies_awaiting_oldest_seconds` и
+  `contracts_lm_policies_awaiting_overdue`, их пересчитывает отдельный проход; настройки
+  `LM_POLICY_REQUEST_AWAITING_INTERVAL` и `LM_POLICY_REQUEST_AWAITING_THRESHOLD` — с умолчаниями.
+- Процедура возврата отклонённого входящего сообщения в разбор с новым счётом попыток — в `docs/operations.md`.
+- Проверка таймаутов сеанса базы при старте: расхождение `lock_timeout`, `statement_timeout` или
+  `idle_in_transaction_session_timeout` пула с настройками даёт WARN, старт не останавливается.
+- Запрос к сервису справочных данных несёт в `X-Request-Id` `message_id` обрабатываемого входящего сообщения или
+  идентификатор полиса ЛМ, по которому готовится запрос в 1С:УСК.
 
 ### Изменено
 
@@ -124,7 +165,8 @@
 - Обработка журнала входящих разделена на подготовку вне транзакции и применение в транзакции: чтение справочников
   больше не попадает в транзакцию базы; временный отказ справочника откладывает сообщение по той же лестнице, что отказ
   базы.
-- Пул планировщика расширен до пяти потоков: добавился проход подготовки запросов на выпуск полисов ЛМ.
+- Пул планировщика расширен до шести потоков: добавились проходы подготовки запросов на выпуск полисов ЛМ и сводки
+  полисов ЛМ, ждущих ответа 1С:УСК.
 
 - У адреса сервиса справочных данных (`REFERENCE_URL`) больше нет умолчания: без него сервис не стартует и называет
   поле; адрес локального контура — в `docs/operations.md` и `.env.example`, профиль `app` compose задаёт его сам.
@@ -146,14 +188,51 @@
 - Health подключений не показывает учётные данные брокеров.
 - Текст ошибки базы не несёт значений строки (`logServerErrorDetail=false` у пула и в умолчании `DB_URL`).
 - Порт управления отделён от порта API.
+- Справка 070/у и имя её файла не попадают в журнал, метрики, тексты ошибок и ответы; имя файла не хранится. У ключей
+  доступа к S3 нет умолчания, в журнал они не пишутся.
+- IP-адрес и клиент принявшего оферту хранятся только в записи акцепта и не попадают в журнал, метрики и тексты ошибок.
 
 ### Перенос
 
+- **Переменные:** новые необязательные `LM_POLICY_REQUEST_AWAITING_INTERVAL` (`1m`) и
+  `LM_POLICY_REQUEST_AWAITING_THRESHOLD` (`1h`).
+- **Оповещение:** правило `contracts_lm_policies_awaiting_overdue > 0` — полис ЛМ ждёт ответа 1С:УСК дольше порога;
+  правило на `contracts_cancel_reason_unknown_total` — прекращение с кодом причины вне словаря; действия — в
+  `docs/operations.md`.
+- **Сервис Заявок:** новый код ошибки по участнику с полисом ЛМ — `LM_POLICY_REQUEST_UNDELIVERED`; прекращение с кодом
+  причины вне словаря больше не отклоняется.
 - **Документация:** каталог `docs/` (`design.md`, `operations.md`, `code-style.md`) переносится вместе с сервисом;
   README ссылается на него. Файлы `.editorconfig` и `.gitattributes` в каталоге сервиса переносятся с ним.
-- **Миграции:** сервис применяет сам при старте (`db/changelog/001-enums.yaml` … `008-contract-documents.yaml`);
+- **Миграции:** сервис применяет сам при старте (`db/changelog/001-enums.yaml` … `010-contract-acceptances.yaml`);
   пользователю базы нужны права на создание типов и таблиц в схеме `public`. Миграция `008` добавляет типы
   `printed_form_kind`, `printed_form_type` и таблицу `contract_documents`.
+- **Миграции:** `009` добавляет в `printed_form_type` значение `MEDICAL_CERTIFICATE`, в `contract_documents` — колонки
+  `individual_request_id`, `participant_id`, `attachment_id`, уникальный индекс по вложению и ограничения записи справки.
+- **Миграции:** `010` добавляет тип `acceptance_channel` и таблицу `contract_acceptances` (одна запись на договор КМ).
+- **Сервис Заявок:** новые синхронные вызовы — состояние пакета по заявке и акцепт оферты по версии договора; новый код
+  ответа 503 `SERVICE_UNAVAILABLE` у акцепта, когда договор занят, — повторить вызов. Договор КМ после акцепта в
+  состоянии выпуска по-прежнему DRAFTED, в состоянии пакета — ACCEPTED.
+- **Хранилище S3:** бакет справок заводится заранее, сервис его не создаёт; учётной записи сервиса нужны права записи
+  объектов под `S3_BASE_PATH`; на бакете — политика жизненного цикла для объектов без записи в реестре. Сетевой доступ
+  от сервиса к S3; сертификат внутреннего УЦ — набором SSL (`S3_SSL_BUNDLE`, см. `docs/operations.md`).
+- **Переменные:** новые обязательные без умолчания `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`; новые
+  необязательные `S3_REGION` (`us-east-1`), `S3_BASE_PATH` (`certificates`), `S3_SSL_BUNDLE` (пусто),
+  `S3_CONNECT_TIMEOUT` (`2s`), `S3_READ_TIMEOUT` (`10s`), `S3_WRITE_TIMEOUT` (`10s`), `S3_CALL_TIMEOUT` (`20s`),
+  `ATTACHMENT_MAX_FILE_SIZE` (`5MB`).
+- **Зависимости:** клиент S3 `io.minio:minio:8.6.0` с транзитивными `com.squareup.okhttp3:okhttp:5.1.0`,
+  `com.squareup.okhttp3:okhttp-jvm:5.1.0`, `com.squareup.okio:okio-jvm:3.15.0`,
+  `org.jetbrains.kotlin:kotlin-stdlib:2.2.21`, `com.google.guava:guava:33.4.8-jre`,
+  `com.fasterxml.jackson.core:jackson-databind:2.21.4`, `org.bouncycastle:bcprov-jdk18on:1.81`,
+  `org.apache.commons:commons-compress:1.28.0`, `commons-codec:commons-codec:1.19.0`,
+  `org.xerial.snappy:snappy-java:1.1.10.7`, `com.carrotsearch.thirdparty:simple-xml-safe:2.7.1`; для тестов —
+  `org.testcontainers:testcontainers-minio:2.0.5` и образ MinIO из корпоративного реестра (`TEST_MINIO_IMAGE`).
+- **Сервис Заявок:** синхронная загрузка справки (адрес и коды — в «Добавлено»); таймаут вызова на его стороне — не
+  меньше 30 с.
+- **Справки:** допустимые типы файлов — `image/jpeg`, `image/png` и `application/pdf` (`projectx.attachments.content-types`
+  в `application.yml`). Перечень из внешних настроек сливается с упакованным; если на контуре `application.yml` из jar
+  заменён своим файлом, в него добавляется `"[application/pdf]": pdf`.
+- **Оповещение:** правило на `contracts_storage_unavailable_total` — справки не принимаются, разбор по WARN журнала
+  сервиса (`docs/operations.md`).
 - **Брокер 1С:УСК:** учётной записи сервиса нужны права чтения (consume) на очередь результатов выпуска полисов ЛМ
   (`ONEC_QUEUE_LM_POLICY_ISSUES`) — без очереди сервис не стартует, как и без очереди задач, — и права публикации (write)
   в обменник по умолчанию с ключом очереди запросов (`ONEC_QUEUE_LM_POLICY_REQUESTS`); обе очереди заводит 1С:УСК, без
@@ -199,7 +278,7 @@
   порт его API); аутентификации между сервисами нет, доступ ограничивает сетевая политика контура. Адрес —
   `REFERENCE_URL`, обязателен.
 - **Переменные окружения.** Обязательные, без умолчания: `DB_PASSWORD`, `RABBITMQ_INTERNAL_PASSWORD`,
-  `RABBITMQ_ONEC_PASSWORD`, `REFERENCE_URL`. Остальные необязательны:
+  `RABBITMQ_ONEC_PASSWORD`, `REFERENCE_URL`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`. Остальные необязательны:
 
   | Переменная | Умолчание |
   |---|---|
