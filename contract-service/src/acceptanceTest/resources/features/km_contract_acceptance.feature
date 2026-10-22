@@ -145,10 +145,10 @@
       | ip_address       | <ip_address>       |
       | user_agent       | <user_agent>       |
     Тогда Договоры ответили на акцепт <код>:
-      | contract_id | как в пути    |
-      | state       | <state>       |
-      | accepted_at | <accepted_at> |
-      | payment     | нет           |
+      | contract_id | как в пути |
+      | state       | <state>    |
+      | accepted_at | <принят>   |
+      | payment     | нет        |
     И выпуск по участнику "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | документ | договор КМ |
       | статус   | <статус>   |
@@ -158,10 +158,10 @@
     И акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | <contract_version> |
       | accepted_by      | <accepted_by>      |
-      | accepted_at      | <accepted_at>      |
+      | accepted_at      | <принят>           |
       | channel          | <channel>          |
-      | ip_address       | <ip_address>       |
-      | user_agent       | <user_agent>       |
+      | ip_address       | <адрес в записи>   |
+      | user_agent       | <клиент в записи>  |
       | created_at       | <created_at>       |
     И записей об акцепте договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803" — <записей>
     И IP-адрес "<ip_address>" и клиент "<user_agent>" принявшего оферту не попали в журнал Договоров
@@ -172,9 +172,9 @@
     И в журнале Договоров нет записей уровня ERROR
 
     Примеры:
-      | contract_version | accepted_by                          | accepted_at               | channel | ip_address  | user_agent                               | код | state    | статус   | номер           | премия   | версия | created_at                | записей | исходы исходящих | получено |
-      | 1                | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 | 2026-02-10T10:04:58+03:00 | WEB     | 10.20.30.40 | Mozilla/5.0 (Стенд; вымышленный браузер) | 200 | ACCEPTED | ACCEPTED | DKM-2026-000001 | 34000.00 | 1      | 2026-02-10T10:05:00+03:00 | 1       | опубликовано     | 1        |
-      | 1                | 5c3e9a71-0d24-4b8f-a6e2-93f1b7c4d0a8 | 2026-02-10T07:04:30Z      | MOBILE  | 2001:db8::1 | RVL-Mobile/1.0 (Стенд; вымышленный)      | 200 | ACCEPTED | ACCEPTED | DKM-2026-000001 | 34000.00 | 1      | 2026-02-10T10:05:00+03:00 | 1       | опубликовано     | 1        |
+      | contract_version | accepted_by                          | accepted_at               | channel | ip_address  | user_agent                               | код | state    | принят               | адрес в записи | клиент в записи                          | статус   | номер           | премия   | версия | created_at                | записей | исходы исходящих | получено |
+      | 1                | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 | 2026-02-10T10:04:58+03:00 | WEB     | 10.20.30.40 | Mozilla/5.0 (Стенд; вымышленный браузер) | 200 | ACCEPTED | 2026-02-10T07:04:58Z | 10.20.30.40    | Mozilla/5.0 (Стенд; вымышленный браузер) | ACCEPTED | DKM-2026-000001 | 34000.00 | 1      | 2026-02-10T10:05:00+03:00 | 1       | опубликовано     | 1        |
+      | 1                | 5c3e9a71-0d24-4b8f-a6e2-93f1b7c4d0a8 | 2026-02-10T07:04:30Z      | MOBILE  | 2001:db8::1 | RVL-Mobile/1.0 (Стенд; вымышленный)      | 200 | ACCEPTED | 2026-02-10T07:04:30Z | 2001:db8::1    | RVL-Mobile/1.0 (Стенд; вымышленный)      | ACCEPTED | DKM-2026-000001 | 34000.00 | 1      | 2026-02-10T10:05:00+03:00 | 1       | опубликовано     | 1        |
 
   # [СЭ-03], [СД-А]: ip_address и user_agent необязательны; [К6b?]: без них акцепт принят, в записи эти поля не заполнены.
   Структура сценария: Акцепт без адреса и клиента принят — в записи акцепта они не заполнены
@@ -184,12 +184,12 @@
       | accepted_at      | <accepted_at>      |
       | channel          | <channel>          |
     Тогда Договоры ответили на акцепт <код>:
-      | state       | <state>       |
-      | accepted_at | <accepted_at> |
+      | state       | <state>  |
+      | accepted_at | <принят> |
     И акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | <contract_version> |
       | accepted_by      | <accepted_by>      |
-      | accepted_at      | <accepted_at>      |
+      | accepted_at      | <принят>           |
       | channel          | <channel>          |
       | ip_address       |                    |
       | user_agent       |                    |
@@ -199,8 +199,8 @@
       | статус   | <статус>   |
 
     Примеры:
-      | contract_version | accepted_by                          | accepted_at               | channel | код | state    | created_at                | статус   |
-      | 1                | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 | 2026-02-10T10:04:58+03:00 | MOBILE  | 200 | ACCEPTED | 2026-02-10T10:05:00+03:00 | ACCEPTED |
+      | contract_version | accepted_by                          | accepted_at               | channel | код | state    | принят               | created_at                | статус   |
+      | 1                | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 | 2026-02-10T10:04:58+03:00 | MOBILE  | 200 | ACCEPTED | 2026-02-10T07:04:58Z | 2026-02-10T10:05:00+03:00 | ACCEPTED |
 
   # [СЭ-03]: идемпотентность по contract_id — повтор с той же версией возвращает 200 и ранее созданную запись, состояние не
   # меняется; [СД-А]: запись неизменяема, одна на договор. [К6b?]: второй вызов пять минут спустя с другим моментом, каналом,
