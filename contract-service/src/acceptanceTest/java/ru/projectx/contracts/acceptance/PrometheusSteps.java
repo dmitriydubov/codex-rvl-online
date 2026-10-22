@@ -69,10 +69,11 @@ public class PrometheusSteps {
     }
 
     private static void assertDocumented(String name, String label) throws IOException {
-        String row = "| `" + name + "{" + label + "}` |";
-        assertThat(Files.readString(OPERATIONS, StandardCharsets.UTF_8))
+        Pattern row = Pattern.compile("^\\| `" + Pattern.quote(name) + "\\{(?:[a-z_]+, ?)*" + Pattern.quote(label)
+                + "(?:, ?[a-z_]+)*}` \\|", Pattern.MULTILINE);
+        assertThat(row.matcher(Files.readString(OPERATIONS, StandardCharsets.UTF_8)).find())
                 .as("счётчик %s с меткой %s в таблице метрик %s", name, label, OPERATIONS)
-                .contains(row);
+                .isTrue();
     }
 
     private String scrape() throws IOException, InterruptedException {
