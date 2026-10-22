@@ -244,7 +244,8 @@ def frozen_reason(rel):
 
 def command_violation(agent, command, ctx, shell_cwd=None):
     command = with_nested_commands(command)
-    reason = human_only(command, ctx) or frozen_spec_commits(command, ctx, shell_cwd or ctx.project)
+    start = shell_cwd if shell_cwd and os.path.isdir(shell_cwd) else ctx.project   # the shell keeps its `cd`
+    reason = human_only(command, ctx) or frozen_spec_commits(command, ctx, start)
     if reason:
         return reason
     scope = ctx.role_scope(agent)
@@ -252,7 +253,7 @@ def command_violation(agent, command, ctx, shell_cwd=None):
     protected = ctx.protected(agent)
     command = strip_heredocs(command)       # a heredoc body is data, not commands
     neutral = QUOTED.sub(lambda m: re.sub(r"[>;&|()]", "_", m.group(0)), command)  # '>' in quotes is text
-    cwd = ctx.project
+    cwd = start
     for segment in segments(neutral):
         words = words_of(segment)
         cwd = follow_cd(words, cwd, ctx.project)
@@ -274,7 +275,8 @@ def command_violation(agent, command, ctx, shell_cwd=None):
         # the whole command for inline code, otherwise outside quotes (a commit or stash message is not a path)
         if not tokens or unresolvable(segment, command):
             text = without_gradle_tasks(command if inline_code(words) else QUOTED.sub("''", command))
-            hit = next((p for p in protected if mentions(text, p)), None)
+            here = relative(cwd, ctx.project) or "."
+            hit = next((p for p in protected if mentions(text, p) or is_under(here, (p,))), None)
             if hit:
                 return protected_reason(agent, hit, ctx)
             if os.path.basename(BUILD_LOCK) in text:

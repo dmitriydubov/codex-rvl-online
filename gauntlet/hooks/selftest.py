@@ -89,8 +89,8 @@ def run_hook(repo, script, event, env=None, args=()):
     return r
 
 
-def guard(repo, agent, tool, **params):
-    event = {"session_id": "s1", "cwd": repo, "tool_name": tool, "tool_input": params}
+def guard(repo, agent, tool, cwd=None, **params):
+    event = {"session_id": "s1", "cwd": cwd or repo, "tool_name": tool, "tool_input": params}
     if agent != "main":
         event["agent_type"] = agent
     r = run_hook(repo, "guard.py", event)
@@ -324,6 +324,18 @@ def guard_tests(repo):
     expect_deny(repo, "git checkout base -- src when frozen", "main", "Bash", command=f"git checkout origin/main -- {M}src")
     expect_deny(repo, "cd then cp into features when frozen", "specifier", "Bash",
                 command=f"cd {M}src/acceptanceTest/resources && cp /tmp/x.feature features/order.feature")
+    in_features = os.path.join(repo, FEATURES)
+    r = guard(repo, "main", "Bash", cwd=in_features, command="sed -i 's/a/b/' order.feature")
+    check("shell already in the features dir: sed -i on a bare name when frozen", r is not None and "frozen" in r, repr(r))
+    r = guard(repo, "main", "Bash", cwd=in_features, command="cp /tmp/x.feature ./order.feature")
+    check("shell already in the features dir: cp onto a bare name when frozen", r is not None and "frozen" in r, repr(r))
+    r = guard(repo, "main", "Bash", cwd=os.path.join(repo, M + "src"), command="echo x > acceptanceTest/resources/features/order.feature")
+    check("shell already in src: redirect into features when frozen", r is not None and "frozen" in r, repr(r))
+    r = guard(repo, "main", "Bash", cwd=in_features, command="python3 -c \"open('order.feature', 'a').write('x')\"")
+    check("shell already in the features dir: inline python write when frozen", r is not None and "frozen" in r, repr(r))
+    expect_allow(repo, "shell already in the features dir: reading is fine", "main", "Bash", command="cat order.feature")
+    r = guard(repo, "main", "Bash", cwd=os.path.join(repo, "gauntlet"), command="sed -i 's/a/b/' CLAUDE.md")
+    check("shell already in gauntlet/: sed -i on its CLAUDE.md", r is not None, repr(r))
     head = git(repo, "rev-parse", "HEAD")
     git(repo, "checkout", "-q", "--detach", "origin/main")
     expect_deny(repo, "detached HEAD at base is frozen", "specifier", "Write", file_path=FEATURES + "/other.feature", content="x")
