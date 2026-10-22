@@ -42,12 +42,12 @@ class OutboxOutcomesTest {
 
     private final OutboxMessageRepository messages = mock();
     private final OutboxMetrics metrics = mock();
-    private final OutboxOutcomes outcomes = new OutboxOutcomes(messages, properties(), metrics,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    private final OutboxOutcomes outcomes = new OutboxOutcomes(messages, properties(),
+            new OutboxRejection(metrics, List.of()), Clock.fixed(NOW, ZoneOffset.UTC));
     private final OutboxMessage message = OutboxMessage.compose(
             new OutboxDraft("INDIVIDUAL_REQUEST", REQUEST, ENVELOPE, "{}"), NOW.minusSeconds(5));
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
-    private final Logger log = (Logger) LoggerFactory.getLogger(OutboxOutcomes.class);
+    private final Logger log = (Logger) LoggerFactory.getLogger(OutboxOutcomes.class.getPackageName());
 
     @BeforeEach
     void messageIsStored() {

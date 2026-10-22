@@ -119,8 +119,16 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void lmPolicyAwaitingDefaults_refreshEveryMinuteAndCountOverdueAfterAnHour() {
+        assertThat(application.getProperty("projectx.lm-policy-requests.awaiting-interval")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_AWAITING_INTERVAL:1m}");
+        assertThat(application.getProperty("projectx.lm-policy-requests.awaiting-threshold")).asString()
+                .isEqualTo("${LM_POLICY_REQUEST_AWAITING_THRESHOLD:1h}");
+    }
+
+    @Test
     void schedulerPool_hasAThreadPerScheduledPass() {
-        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("5");
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("6");
     }
 
     @Test
