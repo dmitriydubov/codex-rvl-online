@@ -1,0 +1,1042 @@
+openapi: 3.0.3
+info:
+  title: data-reference REST API
+  version: 1.0.0-SNAPSHOT
+  description: |
+    Справочники и полисы РВЛ ОНЛАЙН для сервисов Заявок и Договоров. Данные приходят из 1С:УСК; REST только читает,
+    в 1С сервис ничего не пишет.
+
+    ## Общие правила
+
+    - Все ручки — `GET` под префиксом `/internal/v1`, ответы — JSON, поля в `snake_case`.
+    - Своей авторизации нет: ручки защищает сетевая политика контура.
+    - Даты — `yyyy-mm-dd`. Открытая дата 1С (`3000-01-01`) отдаётся как `null`.
+    - «Сегодня» и «действующий» считаются по московскому дню. Запись действует, если она не в архиве,
+      `begin_date <= сегодня` и (`end_date` пустая или `end_date >= сегодня`).
+    - `id` — внутренний UUID сервиса, `external_id` — GUID записи в 1С:УСК. Параметр пути `{id}` во всех ручках —
+      внутренний `id`, не GUID 1С: его берут из ответов других ручек (у каждой ручки сказано, откуда). GUID 1С
+      принимается только параметрами запроса `external_id`, `contract_external_id` и `insurer_external_id`.
+    - Параметр запроса считается переданным, если его имя есть в строке запроса, даже с пустым значением: `external_id=`
+      вместе с другим ключом — это два ключа и 400, а не «пустой ключ игнорируется».
+    - Денежные суммы и проценты — JSON-числа.
+
+    ## Нумерация ручек
+
+    Номера R-01…R-09 в названиях ручек — нумерация «ТЗ API Data-reference» и журнала решений REST. В исходном ТЗ
+    ручек восемь (R-01…R-08); R-09 — программа страхования для сервиса Договоров, R-05д — полис без персональных
+    данных для сервиса Договоров (проекция R-05). У R-08 три способа найти договор: по `id`, по `external_id` и
+    действующий договор страхователя по `insurer_external_id`.
+
+    ## X-Request-Id
+
+    Заголовок `X-Request-Id` принимается, если он совпадает с `[A-Za-z0-9._-]{1,64}`; иначе сервис выдаёт свой UUID.
+    Значение возвращается в заголовке ответа и в `error.request_id`, по нему запрос находится в журнале сервиса.
+
+    ## Ошибки
+
+    Тело любой ошибки:
+
+    ```json
+    {"error": {"code": "...", "message": "...", "details": [], "request_id": "..."}}
+    ```
+
+    `details` — всегда массив; состав элемента зависит от кода. `message` — для журнала, не для показа пользователю.
+
+    | HTTP | code | Когда |
+    |---|---|---|
+    | 400 | `VALIDATION_ERROR` | параметр не того формата, обязательного нет, недопустимое сочетание; `details`: `{field, reason}` |
+    | 404 | `NOT_FOUND` | нет такого пути |
+    | 404 | `INSURANCE_CONTRACT_NOT_FOUND`, `POLICY_NOT_FOUND`, `LPU_NOT_FOUND`, `SERVICE_NOT_FOUND`, `PROGRAM_NOT_FOUND` | записи нет (или она не подходит ручке) |
+    | 405 | `METHOD_NOT_ALLOWED` | метод не `GET`; заголовок `Allow` |
+    | 406 | `NOT_ACCEPTABLE` | `Accept` не допускает JSON |
+    | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны; в `details` — кандидаты |
+    | 422 | `NO_ACTIVE_PRICE_CONTRACT`, `PRICE_NOT_COVERED` | данных 1С не хватает для ответа |
+    | 500 | `INTERNAL_ERROR` | необработанная ошибка сервиса |
+    | 503 | `SERVICE_UNAVAILABLE` | база недоступна или не ответила за 3 с (`API_READ_TIMEOUT_SECONDS`); повторить позже, ограниченное число раз |
+
+    Запрос длиннее 8 КБ (строка запроса с заголовками) отбивает встроенный Tomcat: 400 в HTML, без `X-Request-Id`.
+
+    ## Кэш
+
+    Каталог, карточка и услуги ЛПУ, стоимость услуги, МКБ-10, договор страхования и программа отдаются из кэша в
+    памяти. Сообщение 1С:УСК сбрасывает кэш своего справочника сразу на всех экземплярах; срок жизни записи —
+    10 мин (`REFERENCE_CACHE_TTL`), поэтому правка базы мимо 1С видна с задержкой до 10 мин. Отказы не кэшируются.
+    Поиск полисов, полис и полис для Договоров не кэшируются.
+security: []
+servers:
+  - url: http://localhost:8080
+    description: экземпляр сервиса (порт API)
+  - url: https://s00-0000-rvl8.sogaz.ru/data-reference
+    description: тестовый стенд через ingress; снаружи доступны только /internal/v1/lpu… и /internal/v1/insurance-contracts…
+tags:
+  - name: ЛПУ
+    description: каталог санаториев, карточка, услуги и цены
+  - name: Стоимость
+    description: стоимость услуги за период проживания
+  - name: МКБ-10
+    description: подсказка и перечень кодов
+  - name: Полисы
+    description: подсказка, полис целиком (для Заявок) и полис без персональных данных (для Договоров)
+  - name: Договоры страхования
+    description: договор страхования со страхователем
+  - name: Программы
+    description: страховая программа с перечнем учреждений
+  - name: Пробы
+    description: пробы Kubernetes на порту API
+paths:
+  /internal/v1/lpu:
+    get:
+      tags: [ЛПУ]
+      operationId: lpuCatalog
+      summary: R-01. Каталог ЛПУ договора страхования
+      description: |
+        Санатории, доступные застрахованным договора страхования: учреждения из программ РВЛ действующих полисов
+        договора, по видам обращения РВЛ. В `items` — только ЛПУ, у которых однозначно определяется действующий
+        прайсовый договор; ЛПУ с несколькими кандидатами — в `skipped` с причиной `AMBIGUOUS_PRICE_CONTRACT`, ЛПУ без
+        прайсового договора в ответ не попадают. Договор страхования должен действовать сегодня.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: contract_external_id
+          in: query
+          required: true
+          description: GUID договора страхования в 1С:УСК
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: каталог (может быть пустым)
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LpuCatalog'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404':
+          description: '`INSURANCE_CONTRACT_NOT_FOUND` — договора нет или он не действует сегодня'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/lpu/{id}:
+    get:
+      tags: [ЛПУ]
+      operationId: lpuCard
+      summary: R-02. Карточка ЛПУ с прайсовым договором
+      description: |
+        Прайсовый договор — действующий сегодня договор ЛПУ, по которому берутся цены: доп. соглашение со своими ценами
+        (`kind: DOPS`), а если такого нет — основной договор (`kind: MAIN`).
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/LpuId'
+      responses:
+        '200':
+          description: карточка
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LpuCard'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/LpuNotFound'}
+        '409': {$ref: '#/components/responses/AmbiguousPriceContract'}
+        '422': {$ref: '#/components/responses/NoActivePriceContract'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/lpu/{id}/services:
+    get:
+      tags: [ЛПУ]
+      operationId: lpuServices
+      summary: R-03. Услуги ЛПУ по прайсовому договору
+      description: |
+        Неархивные услуги прайсового договора ЛПУ с видами обращения РВЛ (список видов — настройка
+        `projectx.api.rvl-appeal-types`), по наименованию. С `need_prices=true` у каждой услуги есть `prices` — строки
+        прайса, которые действуют сегодня или начнутся позже (по `valid_from`); без него поля `prices` в ответе нет.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/LpuId'
+        - name: need_prices
+          in: query
+          required: false
+          description: отдать строки прайса
+          schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: услуги
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LpuServices'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/LpuNotFound'}
+        '409': {$ref: '#/components/responses/AmbiguousPriceContract'}
+        '422': {$ref: '#/components/responses/NoActivePriceContract'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/services/{id}/price:
+    get:
+      tags: [Стоимость]
+      operationId: servicePrice
+      summary: R-06. Стоимость услуги за период проживания
+      description: |
+        Период — ночи с `date_from` (заезд) до `date_to` (выезд, не входит), не больше 366 ночей. Период делится на
+        отрезки по строкам прайса; у каждого отрезка — цена за ночь и сумма. `total.amount_with_discount` есть, только
+        если скидочная цена есть на всех отрезках; тогда `total.basis = DISCOUNT`, иначе `BASE`. Услуга должна
+        относиться к прайсовому договору своего ЛПУ и иметь вид обращения РВЛ.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id услуги ЛПУ в data-reference (UUID), не GUID 1С: `services[].id` в ответе R-03.
+          schema: {type: string, format: uuid}
+        - name: date_from
+          in: query
+          required: true
+          description: дата заезда
+          schema: {type: string, format: date}
+        - name: date_to
+          in: query
+          required: true
+          description: дата выезда; позже `date_from`, не больше 366 ночей после неё
+          schema: {type: string, format: date}
+      responses:
+        '200':
+          description: расчёт
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ServicePrice'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404':
+          description: '`SERVICE_NOT_FOUND` — услуги нет, она в архиве или ЛПУ её не отдаёт; `LPU_NOT_FOUND` — ЛПУ услуги нет или оно в архиве'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '409':
+          description: |
+            `AMBIGUOUS_PRICE` — на одни сутки периода действует больше одной строки прайса; `details`: `{valid_from, valid_to}`.
+            `AMBIGUOUS_PRICE_CONTRACT` — у ЛПУ больше одного кандидата на прайсовый договор; `details`: `{lpu_contract_id}`.
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '422':
+          description: |
+            `PRICE_NOT_COVERED` — в периоде есть сутки без строки прайса; `details`: `{date_from, date_to}` непокрытых интервалов.
+            `NO_ACTIVE_PRICE_CONTRACT` — у ЛПУ нет прайсового договора или услуга к нему не относится.
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/mkb10:
+    get:
+      tags: [МКБ-10]
+      operationId: mkb10
+      summary: R-07. Подсказка по МКБ-10 или перечень кодов
+      description: |
+        Нужен ровно один из параметров `query` или `codes`; оба вместе или ни одного — 400.
+
+        - `query` — подсказка среди неархивных кодов, по коду. Строка, которая начинается с буквы и цифры (`J4`,
+          `j45.0`), ищется как начало кода без учёта регистра, остальное — как часть наименования. Длина — в символах Unicode:
+          не больше 100 в строке, как она пришла (до обрезки пробелов), и не меньше 2 после обрезки пробелов по краям.
+          Например, `AB` и 99 пробелов — 101 символ, это 400 по полю `query`.
+        - `codes` — коды разом, включая архивные: `codes=J45.0,I10` одним параметром или `codes=J45.0&codes=I10`;
+          смешивать нельзя. Не больше 100 элементов в перечне, как он пришёл (пустые элементы и повторы тоже считаются);
+          затем регистр приводится, пустые и повторы отбрасываются; неизвестные коды просто не попадают в ответ.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: query
+          in: query
+          required: false
+          description: начало кода или часть наименования; не больше 100 символов до обрезки пробелов, не меньше 2 после обрезки
+          schema: {type: string, minLength: 2, maxLength: 100}
+        - name: limit
+          in: query
+          required: false
+          description: только с `query`; от 1 до 100
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - name: codes
+          in: query
+          required: false
+          description: коды МКБ-10; не больше 100 элементов, считая пустые и повторы
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 100
+            items: {type: string}
+      responses:
+        '200':
+          description: коды по `code`
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Mkb10List'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies/search:
+    get:
+      tags: [Полисы]
+      operationId: policySearch
+      summary: R-04. Подсказка по ФИО или номеру среди действующих полисов договора
+      description: |
+        Ищет среди действующих полисов РВЛ договора страхования (договор должен действовать сегодня). Строка с цифрой
+        ищется по номеру полиса: точное совпадение, затем начало номера, затем вхождение. Строка без цифр — по словам:
+        каждое слово — начало фамилии или имени, без учёта регистра, `ё` равно `е`; выше те, где совпали и фамилия, и
+        имя. Дальше — по фамилии и имени. Подсказка не кэшируется.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: contract_external_id
+          in: query
+          required: true
+          description: GUID договора страхования в 1С:УСК
+          schema: {type: string, format: uuid}
+        - name: query
+          in: query
+          required: true
+          description: часть ФИО или номера; не больше 100 символов в строке, как она пришла (до обрезки пробелов), не меньше 2 после обрезки и схлопывания пробелов
+          schema: {type: string, minLength: 2, maxLength: 100}
+        - name: limit
+          in: query
+          required: false
+          description: от 1 до 50
+          schema: {type: integer, minimum: 1, maximum: 50, default: 10}
+      responses:
+        '200':
+          description: найденные полисы (может быть пусто)
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PolicySearch'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404':
+          description: '`INSURANCE_CONTRACT_NOT_FOUND` — договора нет или он не действует сегодня'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies/{id}:
+    get:
+      tags: [Полисы]
+      operationId: policy
+      summary: R-05. Полис целиком, с персональными данными (для сервиса Заявок)
+      description: |
+        Полис отдаётся и архивный, и закончившийся. ФИО, дата рождения и e-mail хранятся, пока полис действует, и ещё
+        `POLICY_PERSONAL_DATA_GRACE` (30 суток) после окончания или перевода в архив; потом стираются: поля `null`,
+        `personal_data_erased: true`. В `programs` — только программы РВЛ, которые есть в справочнике и не в архиве.
+        Не кэшируется.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id полиса в data-reference (UUID, поле `id` ответов), не GUID 1С. Откуда взять: `items[].id`
+            подсказки R-04, `id` ответа R-05 или R-05д по `external_id`, `id` ответа R-05 по номеру. Полис по GUID 1С —
+            параметр `external_id`.
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: полис
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Policy'}
+              examples:
+                stand: {$ref: '#/components/examples/Policy'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/PolicyNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies:
+    get:
+      tags: [Полисы]
+      operationId: policyByKey
+      summary: R-05. Полис по GUID 1С или по номеру в договоре
+      description: |
+        Ровно один способ: `external_id`, или `number` вместе с `contract_external_id`. Другие сочетания — 400, в том
+        числе с пустым `external_id=` рядом с `number`: параметр считается переданным и без значения;
+        параметр `contract_id` не принимается (договор передаётся `contract_external_id`). Ответ — как у
+        `/internal/v1/policies/{id}`.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: external_id
+          in: query
+          required: false
+          description: GUID полиса в 1С:УСК
+          schema: {type: string, format: uuid}
+        - name: number
+          in: query
+          required: false
+          description: номер полиса; только вместе с `contract_external_id`
+          schema: {type: string}
+        - name: contract_external_id
+          in: query
+          required: false
+          description: GUID договора страхования в 1С:УСК; только вместе с `number`
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: полис
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Policy'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/PolicyNotFound'}
+        '409':
+          description: '`AMBIGUOUS_POLICY` — по номеру в договоре больше одного полиса; `details`: `{policy_id}`'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies/{id}/contract-view:
+    get:
+      tags: [Полисы]
+      operationId: policyContractView
+      summary: R-05д. Полис без персональных данных (для сервиса Договоров)
+      description: Номер, GUID 1С, период действия и признак архива. Не кэшируется.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id полиса в data-reference (UUID, поле `id` ответов), не GUID 1С. Откуда взять: `items[].id`
+            подсказки R-04, `id` ответа R-05 или R-05д по `external_id`, `id` ответа R-05 по номеру. Полис по GUID 1С —
+            параметр `external_id`.
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: полис без ПДн
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PolicyContractView'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/PolicyNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies/contract-view:
+    get:
+      tags: [Полисы]
+      operationId: policyContractViewByExternalId
+      summary: R-05д. Полис без персональных данных по GUID 1С
+      description: Найти `id` полиса по его GUID в 1С:УСК; без `external_id` — 400.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: external_id
+          in: query
+          required: true
+          description: GUID полиса в 1С:УСК (тот, что 1С присылает в потоке полисов)
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: полис без ПДн
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PolicyContractView'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/PolicyNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/insurance-contracts/{id}:
+    get:
+      tags: [Договоры страхования]
+      operationId: insuranceContract
+      summary: R-08. Договор страхования по id
+      description: Договор отдаётся и архивный, и закончившийся. `insurer` — `null`, если страхователя нет в справочнике.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id договора страхования в data-reference (UUID), не GUID 1С. Откуда взять: `id` ответа R-08 по
+            `external_id` или `insurer_external_id`, `contract.id` в полисе R-05. Договор по GUID 1С — параметр `external_id`.
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: договор
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InsuranceContract'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/InsuranceContractNotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/insurance-contracts:
+    get:
+      tags: [Договоры страхования]
+      operationId: insuranceContractByKey
+      summary: R-08. Договор страхования по GUID 1С или действующий договор страхователя
+      description: |
+        Ровно один ключ:
+
+        - `external_id` — договор по его GUID в 1С:УСК, любой (и архивный);
+        - `insurer_external_id` — единственный действующий сегодня договор страхователя по GUID контрагента-страхователя
+          в 1С:УСК — это `companyId` из токена B2B-портала, его знает сервис Заявок. `id` из ответа сервис Заявок хранит
+          как `insurance_contract_id`. Нет действующего договора — 404, два и больше — 409 с кандидатами.
+
+        Оба ключа вместе — 400 по полю `external_id`, в том числе если один из них пустой
+        (`external_id=&insurer_external_id=…`): параметр считается переданным, даже без значения. Без ключа — 400
+        «нужен external_id либо insurer_external_id».
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: external_id
+          in: query
+          required: false
+          description: GUID договора страхования в 1С:УСК
+          schema: {type: string, format: uuid}
+        - name: insurer_external_id
+          in: query
+          required: false
+          description: GUID контрагента-страхователя в 1С:УСК — `companyId` из токена B2B-портала
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: договор
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InsuranceContract'}
+              examples:
+                stand: {$ref: '#/components/examples/InsuranceContract'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404': {$ref: '#/components/responses/InsuranceContractNotFound'}
+        '409':
+          description: '`AMBIGUOUS_INSURANCE_CONTRACT` — у страхователя больше одного действующего договора; `details`: `{insurance_contract_id}`, порядок не задан'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/programs/{id}:
+    get:
+      tags: [Программы]
+      operationId: program
+      summary: R-09. Страховая программа с перечнем учреждений
+      description: Программа отдаётся и архивная. Строки `services` — в устойчивом порядке.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id страховой программы в data-reference (UUID), не GUID программы в 1С:УСК (тот отдаётся в поле
+            `external_id`). Откуда взять: `programs[].program.id` в полисе R-05; сервис Заявок передаёт его сервису Договоров
+            в задаче как `program_id`. Ручки программы по GUID 1С нет.
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: программа
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Program'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404':
+          description: '`PROGRAM_NOT_FOUND`'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /livez:
+    get:
+      tags: [Пробы]
+      operationId: livez
+      summary: Проба живости
+      description: 200, как только приложение запущено; от базы и брокера не зависит.
+      responses:
+        '200':
+          description: жив
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProbeStatus'}
+  /readyz:
+    get:
+      tags: [Пробы]
+      operationId: readyz
+      summary: Проба готовности
+      description: |
+        200 только после прогрева после старта (до `WARMUP_TIMEOUT`, 30 с); до этого 503 со статусом
+        `OUT_OF_SERVICE`. От базы и брокера не зависит: прерванный прогрев готовности не мешает.
+      responses:
+        '200':
+          description: готов
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProbeStatus'}
+        '503':
+          description: идёт прогрев
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProbeStatus'}
+components:
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: идентификатор запроса для журнала; `[A-Za-z0-9._-]{1,64}`, иначе сервис выдаёт свой UUID
+      schema: {type: string, pattern: '^[A-Za-z0-9._-]{1,64}$'}
+    LpuId:
+      name: id
+      in: path
+      required: true
+      description: |
+        Внутренний id ЛПУ в data-reference (UUID), не GUID 1С: `items[].id` каталога R-01, `services[].lpu_id`
+        программы R-09.
+      schema: {type: string, format: uuid}
+  headers:
+    RequestId:
+      description: присланный `X-Request-Id` или выданный сервисом UUID
+      schema: {type: string}
+  responses:
+    ValidationError:
+      description: '`VALIDATION_ERROR` — параметр не того формата, обязательного нет или недопустимое сочетание; `details`: `{field, reason}`'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: нарушен формат запроса
+              details: [{field: id, reason: ожидается UUID}]
+              request_id: 3f1c2a9e-5b7d-4c11-9a2e-7d0f6b8e1a42
+    ServiceUnavailable:
+      description: '`SERVICE_UNAVAILABLE` — база недоступна или не ответила вовремя; повторить позже'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: сервис временно недоступен, повторите запрос позже
+              details: []
+              request_id: postman-12
+    LpuNotFound:
+      description: '`LPU_NOT_FOUND` — ЛПУ нет или оно в архиве'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    PolicyNotFound:
+      description: '`POLICY_NOT_FOUND`'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    InsuranceContractNotFound:
+      description: '`INSURANCE_CONTRACT_NOT_FOUND` — договора нет; по `insurer_external_id` — у страхователя нет действующего договора'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    AmbiguousPriceContract:
+      description: '`AMBIGUOUS_PRICE_CONTRACT` — у ЛПУ больше одного действующего кандидата на прайсовый договор; `details`: `{lpu_contract_id}`'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NoActivePriceContract:
+      description: '`NO_ACTIVE_PRICE_CONTRACT` — у ЛПУ нет действующего договора, по которому брать цены'
+      headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  examples:
+    Policy:
+      summary: полис стенда (данные вымышлены)
+      value:
+        id: 6b1f0a52-3c4e-4d8a-9f21-0c7e5d9a4b13
+        external_id: 9e6ee30d-2275-417d-a44c-039d3b8c2ac5
+        number: СТЕНД-0001
+        last_name: Тестов
+        first_name: Тест
+        middle_name: Тестович
+        date_of_birth: '1990-01-01'
+        gender: М
+        email: insured@example.com
+        begin_date: '2026-01-01'
+        end_date: '2099-12-31'
+        availability: true
+        is_archive: false
+        personal_data_erased: false
+        contract:
+          id: 1d4c7e90-8a2b-4f3c-b5e6-2a9d0c8f7e14
+          external_id: 77ff17b5-e659-4720-b57f-e8a19c00fcea
+          number: СТЕНД-ДМС-0001
+        programs:
+          - program:
+              id: 5a9e2c71-0b4d-4e8f-a3c6-9d1b7f2e6a05
+              external_id: 995448e7-dd5b-499a-8a4e-97b363d06dd3
+              name: 'Стенд: восстановительное лечение'
+            limit_amount: 150000.00
+            begin_date: '2026-01-01'
+            end_date: '2099-12-31'
+            availability: true
+            services:
+              - layer_number: 1
+                copayment: 20.00
+                begin_date: '2026-01-01'
+                end_date: '2099-12-31'
+                availability: true
+    InsuranceContract:
+      summary: договор стенда (данные вымышлены)
+      value:
+        id: 1d4c7e90-8a2b-4f3c-b5e6-2a9d0c8f7e14
+        external_id: 77ff17b5-e659-4720-b57f-e8a19c00fcea
+        number: СТЕНД-ДМС-0001
+        begin_date: '2026-01-01'
+        end_date: null
+        is_archive: false
+        insurer:
+          id: 8c3b1e6f-7d2a-4a90-b4e5-6f0d9c2a1b37
+          external_id: d23f3088-f547-4755-b93e-ae192a89d166
+          name: ООО «Стенд»
+          full_name: Общество с ограниченной ответственностью «Стенд»
+          inn: '7700000000'
+          kpp: '770001001'
+  schemas:
+    NamedRef:
+      type: object
+      required: [id, external_id, name]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid, description: 'GUID в 1С:УСК'}
+        name: {type: string}
+    LpuCatalog:
+      type: object
+      required: [items, skipped]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/LpuCatalogItem'}
+        skipped:
+          type: array
+          description: ЛПУ, исключённые из каталога из-за неоднозначных данных 1С
+          items: {$ref: '#/components/schemas/LpuSkipped'}
+    LpuCatalogItem:
+      type: object
+      required: [id, external_id, name, region, inn, kpp]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        name: {type: string}
+        region: {type: string, nullable: true}
+        inn: {type: string, nullable: true}
+        kpp: {type: string, nullable: true}
+    LpuSkipped:
+      type: object
+      required: [lpu_id, reason]
+      properties:
+        lpu_id: {type: string, format: uuid}
+        reason: {type: string, enum: [AMBIGUOUS_PRICE_CONTRACT]}
+    PriceContractRef:
+      type: object
+      description: прайсовый договор ЛПУ — действующий сегодня договор, по которому берутся цены
+      required: [id, external_id, number, begin_date, end_date, uploaded_to_sob, kind]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string, nullable: true}
+        begin_date: {type: string, format: date}
+        end_date: {type: string, format: date, nullable: true}
+        uploaded_to_sob: {type: boolean, description: 'признак выгрузки в СОБ из 1С; на отбор не влияет'}
+        kind:
+          type: string
+          enum: [MAIN, DOPS]
+          description: '`MAIN` — основной договор, `DOPS` — доп. соглашение со своими ценами'
+    LpuCard:
+      type: object
+      required: [id, external_id, name, region, inn, kpp, address, price_contract]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        name: {type: string}
+        region: {type: string, nullable: true}
+        inn: {type: string, nullable: true}
+        kpp: {type: string, nullable: true}
+        address: {type: string, nullable: true}
+        price_contract: {$ref: '#/components/schemas/PriceContractRef'}
+    LpuServices:
+      type: object
+      required: [lpu, price_contract, services]
+      properties:
+        lpu: {$ref: '#/components/schemas/NamedRef'}
+        price_contract: {$ref: '#/components/schemas/PriceContractRef'}
+        services:
+          type: array
+          items: {$ref: '#/components/schemas/LpuService'}
+    LpuService:
+      type: object
+      required: [id, external_id, code, name, appeal_type]
+      properties:
+        id: {type: string, format: uuid, description: 'id услуги — для расчёта стоимости'}
+        external_id: {type: string, format: uuid}
+        code: {type: string, nullable: true}
+        name: {type: string}
+        appeal_type: {$ref: '#/components/schemas/NamedRef'}
+        prices:
+          type: array
+          description: только при `need_prices=true`
+          items: {$ref: '#/components/schemas/PriceRow'}
+    PriceRow:
+      type: object
+      required: [price, price_with_discount, service_name, service_code, valid_from, valid_to]
+      properties:
+        price: {type: number, description: 'цена за ночь'}
+        price_with_discount: {type: number, nullable: true}
+        service_name: {type: string, nullable: true, description: 'наименование услуги в строке прайса'}
+        service_code: {type: string, nullable: true}
+        valid_from: {type: string, format: date}
+        valid_to: {type: string, format: date, nullable: true}
+    ServicePrice:
+      type: object
+      required: [service, date_from, date_to, segments, total]
+      properties:
+        service: {$ref: '#/components/schemas/NamedRef'}
+        date_from: {type: string, format: date}
+        date_to: {type: string, format: date}
+        segments:
+          type: array
+          items: {$ref: '#/components/schemas/PriceSegment'}
+        total: {$ref: '#/components/schemas/PriceTotal'}
+    PriceSegment:
+      type: object
+      description: часть периода с одной строкой прайса; `date_to` не входит
+      required: [date_from, date_to, nights, price, price_with_discount, amount, amount_with_discount]
+      properties:
+        date_from: {type: string, format: date}
+        date_to: {type: string, format: date}
+        nights: {type: integer}
+        price: {type: number}
+        price_with_discount: {type: number, nullable: true}
+        amount: {type: number, description: 'price × nights'}
+        amount_with_discount: {type: number, nullable: true}
+    PriceTotal:
+      type: object
+      required: [nights, amount, amount_with_discount, basis]
+      properties:
+        nights: {type: integer}
+        amount: {type: number}
+        amount_with_discount: {type: number, nullable: true, description: 'есть, только если скидочная цена есть на всех отрезках'}
+        basis:
+          type: string
+          enum: [DISCOUNT, BASE]
+          description: какую сумму считать основной
+    Mkb10List:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Mkb10Code'}
+    Mkb10Code:
+      type: object
+      required: [id, external_id, code, name, hierarchy_level, parent_code, is_archive]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        hierarchy_level: {type: integer, nullable: true}
+        parent_code: {type: string, nullable: true}
+        is_archive: {type: boolean}
+    PolicySearch:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/PolicySearchItem'}
+    PolicySearchItem:
+      type: object
+      required: [id, external_id, number, last_name, first_name, middle_name]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string}
+        last_name: {type: string}
+        first_name: {type: string}
+        middle_name: {type: string, nullable: true}
+    Policy:
+      type: object
+      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender, email, begin_date,
+                 end_date, availability, is_archive, personal_data_erased, contract, programs]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string}
+        last_name: {type: string, nullable: true}
+        first_name: {type: string, nullable: true}
+        middle_name: {type: string, nullable: true}
+        date_of_birth: {type: string, format: date, nullable: true}
+        gender: {type: string, nullable: true, description: 'как в 1С:УСК (`М`, `Ж`)'}
+        email: {type: string, nullable: true}
+        begin_date: {type: string, format: date}
+        end_date: {type: string, format: date, nullable: true}
+        availability: {type: boolean, description: 'признак доступности полиса из 1С:УСК'}
+        is_archive: {type: boolean}
+        personal_data_erased: {type: boolean, description: 'ФИО, дата рождения и e-mail стёрты по сроку'}
+        contract:
+          type: object
+          nullable: true
+          description: договор страхования полиса; `null`, если его нет в справочнике
+          allOf: [{$ref: '#/components/schemas/ContractRef'}]
+        programs:
+          type: array
+          items: {$ref: '#/components/schemas/PolicyProgram'}
+    ContractRef:
+      type: object
+      required: [id, external_id, number]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string}
+    PolicyProgram:
+      type: object
+      required: [program, limit_amount, begin_date, end_date, availability, services]
+      properties:
+        program: {$ref: '#/components/schemas/NamedRef'}
+        limit_amount: {type: number}
+        begin_date: {type: string, format: date}
+        end_date: {type: string, format: date, nullable: true}
+        availability: {type: boolean}
+        services:
+          type: array
+          description: условия обслуживания по слоям программы
+          items: {$ref: '#/components/schemas/PolicyServiceLine'}
+    PolicyServiceLine:
+      type: object
+      required: [layer_number, copayment, begin_date, end_date, availability]
+      properties:
+        layer_number: {type: integer}
+        copayment: {type: number, description: 'процент сооплаты'}
+        begin_date: {type: string, format: date, nullable: true}
+        end_date: {type: string, format: date, nullable: true}
+        availability: {type: boolean}
+    PolicyContractView:
+      type: object
+      required: [id, external_id, number, begin_date, end_date, is_archive]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string}
+        begin_date: {type: string, format: date}
+        end_date: {type: string, format: date, nullable: true}
+        is_archive: {type: boolean}
+    InsuranceContract:
+      type: object
+      required: [id, external_id, number, begin_date, end_date, is_archive, insurer]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        number: {type: string}
+        begin_date: {type: string, format: date}
+        end_date: {type: string, format: date, nullable: true}
+        is_archive: {type: boolean}
+        insurer:
+          type: object
+          nullable: true
+          description: страхователь; `null`, если его нет в справочнике (не пришёл из 1С:УСК или физлицо)
+          allOf: [{$ref: '#/components/schemas/Organization'}]
+    Organization:
+      type: object
+      required: [id, external_id, name, full_name, inn, kpp]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        name: {type: string}
+        full_name: {type: string, nullable: true}
+        inn: {type: string, nullable: true}
+        kpp: {type: string, nullable: true}
+    Program:
+      type: object
+      required: [id, external_id, name, type_programm, is_archive, services]
+      properties:
+        id: {type: string, format: uuid}
+        external_id: {type: string, format: uuid}
+        name: {type: string}
+        type_programm: {type: string, nullable: true, description: 'тип программы из 1С:УСК'}
+        is_archive: {type: boolean}
+        services:
+          type: array
+          items: {$ref: '#/components/schemas/ProgramService'}
+    ProgramService:
+      type: object
+      description: учреждение программы с условиями
+      required: [lpu_id, lpu_external_id, lpu_name, appeal_type_external_id, begin_date, end_date, layer_number,
+                 direct_attachment, percent_copayment, coverage_type]
+      properties:
+        lpu_id: {type: string, format: uuid}
+        lpu_external_id: {type: string, format: uuid}
+        lpu_name: {type: string}
+        appeal_type_external_id: {type: string, format: uuid, nullable: true}
+        begin_date: {type: string, format: date, nullable: true}
+        end_date: {type: string, format: date, nullable: true}
+        layer_number: {type: integer}
+        direct_attachment: {type: boolean, description: 'прямое прикрепление'}
+        percent_copayment: {type: number, description: 'процент сооплаты'}
+        coverage_type:
+          type: string
+          enum: [R, D]
+          description: '`R` — рисковая часть, `D` — депозитная'
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, details, request_id]
+          properties:
+            code: {type: string, description: 'машинный код ошибки'}
+            message: {type: string, description: 'для журнала, не для показа пользователю'}
+            details:
+              type: array
+              items: {$ref: '#/components/schemas/ErrorDetail'}
+            request_id: {type: string, nullable: true}
+    ErrorDetail:
+      description: состав зависит от кода ошибки
+      oneOf:
+        - title: нарушение по полю запроса (400)
+          type: object
+          required: [field, reason]
+          properties:
+            field: {type: string}
+            reason: {type: string}
+        - title: кандидат-полис (AMBIGUOUS_POLICY)
+          type: object
+          required: [policy_id]
+          properties:
+            policy_id: {type: string, format: uuid}
+        - title: кандидат-договор ЛПУ (AMBIGUOUS_PRICE_CONTRACT)
+          type: object
+          required: [lpu_contract_id]
+          properties:
+            lpu_contract_id: {type: string, format: uuid}
+        - title: кандидат-договор страхования (AMBIGUOUS_INSURANCE_CONTRACT)
+          type: object
+          required: [insurance_contract_id]
+          properties:
+            insurance_contract_id: {type: string, format: uuid}
+        - title: строка прайса (AMBIGUOUS_PRICE)
+          type: object
+          required: [valid_from, valid_to]
+          properties:
+            valid_from: {type: string, format: date}
+            valid_to: {type: string, format: date, nullable: true}
+        - title: непокрытый интервал (PRICE_NOT_COVERED)
+          type: object
+          required: [date_from, date_to]
+          properties:
+            date_from: {type: string, format: date}
+            date_to: {type: string, format: date}
+    ProbeStatus:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [UP, OUT_OF_SERVICE, DOWN]}
