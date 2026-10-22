@@ -2,8 +2,11 @@ package ru.projectx.contracts.service.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.AttachmentResponse;
 import ru.projectx.contracts.entity.ParticipantAttachment;
@@ -33,5 +36,16 @@ class AttachmentResponsesTest {
 
         assertThatThrownBy(() -> AttachmentResponses.of(form)).isInstanceOf(IllegalStateException.class)
                 .hasMessageEndingWith("не справка участника");
+    }
+
+    @Test
+    void certificateWithoutFile_isNotAnswered() {
+        PrintedForm certificate = mock();
+        given(certificate.attachment()).willReturn(Optional.of(
+                new ParticipantAttachment(Uploads.REQUEST, Uploads.PARTICIPANT, Uploads.ATTACHMENT)));
+        given(certificate.storedFile()).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> AttachmentResponses.of(certificate)).isInstanceOf(IllegalStateException.class)
+                .hasMessageEndingWith("нет файла");
     }
 }

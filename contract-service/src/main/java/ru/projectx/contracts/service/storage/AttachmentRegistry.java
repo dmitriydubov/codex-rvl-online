@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.AttachmentResponse;
 import ru.projectx.contracts.entity.IssuanceRequest;
+import ru.projectx.contracts.entity.ParticipantAttachment;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.entity.StoredFile;
@@ -46,16 +47,20 @@ public class AttachmentRegistry {
 
     @Transactional
     public AttachmentResponse register(CertificateUpload upload, StoredFile file) {
-        PrintedForm certificate = PrintedForm.receivedCertificate(upload.owner(), file, clock.instant());
+        PrintedForm certificate = PrintedForm.receivedCertificate(owner(upload), file, clock.instant());
         return AttachmentResponses.of(documents.saveAndFlush(certificate));
     }
 
     private static AttachmentResponse sameUpload(PrintedForm certificate, CertificateUpload upload, String fileHash) {
-        boolean sameOwner = certificate.attachment().filter(upload.owner()::equals).isPresent();
+        boolean sameOwner = certificate.attachment().filter(owner(upload)::equals).isPresent();
         boolean sameContent = certificate.storedFile().map(StoredFile::hash).filter(fileHash::equals).isPresent();
         if (!sameOwner || !sameContent) {
             throw new AttachmentConflictException(upload.attachmentId());
         }
         return AttachmentResponses.of(certificate);
+    }
+
+    private static ParticipantAttachment owner(CertificateUpload upload) {
+        return new ParticipantAttachment(upload.individualRequestId(), upload.participantId(), upload.attachmentId());
     }
 }

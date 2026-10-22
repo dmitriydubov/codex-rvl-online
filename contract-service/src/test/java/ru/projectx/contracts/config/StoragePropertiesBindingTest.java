@@ -41,21 +41,17 @@ class StoragePropertiesBindingTest {
             assertThat(storage.secretKey()).isEqualTo("contracts-secret");
             assertThat(storage.timeouts()).isEqualTo(new StorageProperties.Timeouts(Duration.ofSeconds(2),
                     Duration.ofSeconds(10), Duration.ofSeconds(10), Duration.ofSeconds(20)));
-            assertThat(storage.certificateBundle()).isEmpty();
+            assertThat(storage.sslBundle()).isNull();
         });
     }
+
 
     @Test
     void certificateBundle_isTakenByName() {
         contexts.withPropertyValues(PREFIX + ".ssl-bundle=storage").run(context ->
-                assertThat(context.getBean(StorageProperties.class).certificateBundle()).contains("storage"));
+                assertThat(context.getBean(StorageProperties.class).sslBundle()).isEqualTo("storage"));
     }
 
-    @Test
-    void blankCertificateBundle_meansTheDefaultTrust() {
-        contexts.withPropertyValues(PREFIX + ".ssl-bundle=").run(context ->
-                assertThat(context.getBean(StorageProperties.class).certificateBundle()).isEmpty());
-    }
 
     @ParameterizedTest
     @CsvSource({

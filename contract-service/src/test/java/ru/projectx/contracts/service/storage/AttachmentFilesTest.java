@@ -46,6 +46,17 @@ class AttachmentFilesTest {
     }
 
     @Test
+    void typeStartingWithParameters_hasNoMediaTypeEvenWhenConfiguredLiterally() {
+        AttachmentFiles literal = new AttachmentFiles(
+                new AttachmentProperties(DataSize.ofBytes(LIMIT), Map.of(";name=x", "jpg")),
+                new AttachmentMetrics(registry));
+
+        assertThatThrownBy(() -> literal.accept(Uploads.sized(";name=x", 76)))
+                .isInstanceOfSatisfying(AttachmentRejectedException.class,
+                        rejected -> assertThat(rejected.defect()).isEqualTo(AttachmentDefect.CONTENT_TYPE));
+    }
+
+    @Test
     void missingType_isRejectedAsContentType() {
         assertThatThrownBy(() -> files.accept(Uploads.sized(null, 76)))
                 .isInstanceOfSatisfying(AttachmentRejectedException.class,

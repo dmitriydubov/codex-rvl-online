@@ -2,16 +2,24 @@ package ru.projectx.contracts.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
+import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.MinioClient;
+import io.minio.http.Method;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
+import javax.net.ssl.TrustManager;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.ssl.SslAutoConfiguration;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
+import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
+import org.springframework.boot.ssl.SslManagerBundle;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import ru.projectx.contracts.config.StorageProperties;
 
@@ -33,6 +41,7 @@ class StorageHttpClientsTest {
             assertThat(client.readTimeoutMillis()).isEqualTo(10_000);
             assertThat(client.writeTimeoutMillis()).isEqualTo(11_000);
             assertThat(client.callTimeoutMillis()).isEqualTo(20_000);
+            assertThat(client.retryOnConnectionFailure()).isTrue();
         });
     }
 
@@ -59,6 +68,31 @@ class StorageHttpClientsTest {
         contexts.run(context -> assertThatThrownBy(
                 () -> StorageHttpClients.of(settings("missing"), context.getBean(SslBundles.class)))
                 .isInstanceOf(NoSuchSslBundleException.class));
+    }
+
+    @Test
+    void bundleWithoutX509Trust_failsStartup() {
+        SslBundle bundle = mock();
+        given(bundle.getManagers()).willReturn(SslManagerBundle.from(new TrustManager() {
+        }));
+        SslBundles bundles = mock();
+        given(bundles.getBundle("storage")).willReturn(bundle);
+
+        assertThatThrownBy(() -> StorageHttpClients.of(settings("storage"), bundles))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("X.509");
+    }
+
+    @Test
+    void minioClient_signsRequestsForTheConfiguredEndpointBucketRegionAndKey() {
+        contexts.run(context -> {
+            MinioClient client = StorageHttpClients.minio(settings(null), context.getBean(SslBundles.class));
+
+            String url = client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder().method(Method.PUT)
+                    .bucket("rvl-contracts").object("certificates/a.jpg").build());
+
+            assertThat(url).startsWith("https://s3.contour.example:9000/rvl-contracts/certificates/a.jpg?")
+                    .contains("X-Amz-Credential=access%2F").contains("%2Fus-east-1%2Fs3%2F");
+        });
     }
 
     private static String[] subjects(OkHttpClient client) {

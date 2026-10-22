@@ -21,7 +21,7 @@ public class AttachmentFiles {
     }
 
     public AcceptedFile accept(CertificateUpload upload) {
-        String type = upload.declaredType().map(AttachmentFiles::mediaType)
+        String type = Optional.ofNullable(upload.contentType()).map(AttachmentFiles::mediaType)
                 .filter(settings.contentTypes()::containsKey)
                 .orElseThrow(() -> rejected(AttachmentDefect.CONTENT_TYPE));
         if (upload.size() < 1 || upload.size() > settings.maxFileSize().toBytes()) {
@@ -31,9 +31,7 @@ public class AttachmentFiles {
     }
 
     private static String mediaType(String declared) {
-        return Optional.of(declared.indexOf(PARAMETERS)).filter(position -> position >= 0)
-                .map(position -> declared.substring(0, position)).orElse(declared)
-                .strip().toLowerCase(Locale.ROOT);
+        return declared.split(PARAMETERS, 2)[0].strip().toLowerCase(Locale.ROOT);
     }
 
     private AttachmentRejectedException rejected(AttachmentDefect defect) {

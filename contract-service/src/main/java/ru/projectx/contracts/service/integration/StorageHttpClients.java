@@ -38,8 +38,12 @@ final class StorageHttpClients {
                 .readTimeout(timeouts.read())
                 .writeTimeout(timeouts.write())
                 .callTimeout(timeouts.call());
-        settings.certificateBundle().map(bundles::getBundle).ifPresent(bundle -> trust(client, bundle));
+        certificateBundle(settings).map(bundles::getBundle).ifPresent(bundle -> trust(client, bundle));
         return client.build();
+    }
+
+    private static Optional<String> certificateBundle(StorageProperties settings) {
+        return Optional.ofNullable(settings.sslBundle()).filter(name -> !name.isBlank());
     }
 
     private static void trust(OkHttpClient.Builder client, SslBundle bundle) {

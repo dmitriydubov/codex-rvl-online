@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.unit.DataSize;
@@ -53,6 +54,17 @@ class AttachmentPropertiesBindingTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("contentTypes");
+                });
+    }
+
+    @Test
+    void noMaxFileSize_failsStartupAsAMissingField() {
+        new ApplicationContextRunner().withUserConfiguration(Attachments.class)
+                .withPropertyValues(PREFIX + ".content-types.[image/png]=png")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).rootCause()
+                            .isInstanceOf(BindValidationException.class).hasMessageContaining("maxFileSize");
                 });
     }
 
