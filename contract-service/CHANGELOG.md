@@ -106,7 +106,7 @@
 - Настройки прохода запросов на выпуск полисов ЛМ (`LM_POLICY_REQUEST_INTERVAL`, `LM_POLICY_REQUEST_BATCH_SIZE`) — с
   умолчаниями.
 - Приём справок по форме 070/у от сервиса Заявок: `POST /internal/v1/requests/{individual_request_id}/participants/{participant_id}/attachments`
-  (multipart: `attachment_id`, `file`). Принимаются JPEG и PNG до 5 МиБ (`ATTACHMENT_MAX_FILE_SIZE`), содержимое не
+  (multipart: `attachment_id`, `file`). Принимаются JPEG, PNG и PDF до 5 МиБ (`ATTACHMENT_MAX_FILE_SIZE`), содержимое не
   проверяется; файл ложится в хранилище S3 под уникальной папкой, запись — в реестр документов (`contract_documents`:
   хэш SHA-256, тип, размер, ключ объекта). Повтор того же вложения возвращает прежнюю запись; тот же идентификатор
   вложения с другим содержимым или по другому участнику — 409 `ATTACHMENT_CONFLICT`; неизвестная заявка — 404
@@ -189,6 +189,9 @@
   `org.testcontainers:testcontainers-minio:2.0.5` и образ MinIO из корпоративного реестра (`TEST_MINIO_IMAGE`).
 - **Сервис Заявок:** синхронная загрузка справки (адрес и коды — в «Добавлено»); таймаут вызова на его стороне — не
   меньше 30 с.
+- **Справки:** допустимые типы файлов — `image/jpeg`, `image/png` и `application/pdf` (`projectx.attachments.content-types`
+  в `application.yml`). Перечень из внешних настроек сливается с упакованным; если на контуре `application.yml` из jar
+  заменён своим файлом, в него добавляется `"[application/pdf]": pdf`.
 - **Оповещение:** правило на `contracts_storage_unavailable_total` — справки не принимаются, разбор по WARN журнала
   сервиса (`docs/operations.md`).
 - **Брокер 1С:УСК:** учётной записи сервиса нужны права чтения (consume) на очередь результатов выпуска полисов ЛМ

@@ -4,10 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
@@ -77,11 +81,16 @@ class ApplicationDefaultsTest {
     }
 
     @Test
-    void attachmentDefaults_acceptJpegAndPngUpToFiveMebibytes() {
+    void attachmentDefaults_acceptJpegPngAndPdfUpToFiveMebibytes() {
         assertThat(application.getProperty("projectx.attachments.max-file-size")).asString()
                 .isEqualTo("${ATTACHMENT_MAX_FILE_SIZE:5MB}");
         assertThat(application.getProperty("projectx.attachments.content-types[image/jpeg]")).isEqualTo("jpg");
         assertThat(application.getProperty("projectx.attachments.content-types[image/png]")).isEqualTo("png");
+        assertThat(application.getProperty("projectx.attachments.content-types[application/pdf]")).isEqualTo("pdf");
+        assertThat(new Binder(ConfigurationPropertySources.from(application))
+                .bind("projectx.attachments.content-types", Bindable.mapOf(String.class, String.class)).get())
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("image/jpeg", "jpg", "image/png", "png", "application/pdf", "pdf"));
     }
 
     @Test

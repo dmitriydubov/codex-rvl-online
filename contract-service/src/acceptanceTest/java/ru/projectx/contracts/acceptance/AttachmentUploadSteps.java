@@ -20,7 +20,7 @@ public class AttachmentUploadSteps {
     private static final int OVER_LIMIT = 5_242_881;
 
     private static final Map<String, UnaryOperator<AttachmentRequest>> DEFECTS = Map.ofEntries(
-            Map.entry("тип файла application/pdf", request -> withFile(request, "application/pdf", content(CONTENT))),
+            Map.entry("тип файла image/tiff", request -> withFile(request, "image/tiff", content(CONTENT))),
             Map.entry("тип файла image/gif", request -> withFile(request, "image/gif", content(CONTENT))),
             Map.entry("тип файла не указан", request -> withFile(request, null, content(CONTENT))),
             Map.entry("пустой файл", request -> withFile(request, JPEG, new byte[0])),

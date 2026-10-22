@@ -194,3 +194,4 @@ projectx:
     content-types:
       "[image/jpeg]": jpg
       "[image/png]": png
+      "[application/pdf]": pdf

@@ -20,7 +20,8 @@ class AttachmentFilesTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final AttachmentFiles files = new AttachmentFiles(
-            new AttachmentProperties(DataSize.ofBytes(LIMIT), Map.of("image/jpeg", "jpg", "image/png", "png")),
+            new AttachmentProperties(DataSize.ofBytes(LIMIT),
+                    Map.of("image/jpeg", "jpg", "image/png", "png", "application/pdf", "pdf")),
             new AttachmentMetrics(registry));
 
     @ParameterizedTest
@@ -28,6 +29,7 @@ class AttachmentFilesTest {
         "image/jpeg, image/jpeg, jpg",
         "image/png, image/png, png",
         "IMAGE/PNG, image/png, png",
+        "application/pdf, application/pdf, pdf",
         "' image/jpeg ; name=x', image/jpeg, jpg"})
     void configuredType_isAcceptedWithItsExtension(String declared, String type, String extension) {
         assertThat(files.accept(Uploads.sized(declared, 76)))
@@ -36,7 +38,7 @@ class AttachmentFilesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"application/pdf", "image/gif", "", "image/jpeg2", "jpeg"})
+    @ValueSource(strings = {"image/tiff", "image/gif", "", "image/jpeg2", "jpeg"})
     void otherType_isRejectedAsContentTypeAndCounted(String declared) {
         assertThatThrownBy(() -> files.accept(Uploads.sized(declared, 76)))
                 .isInstanceOfSatisfying(AttachmentRejectedException.class,
@@ -80,7 +82,7 @@ class AttachmentFilesTest {
 
     @Test
     void wrongTypeAndSize_isRejectedForTheTypeFirst() {
-        assertThatThrownBy(() -> files.accept(Uploads.sized("application/pdf", 0)))
+        assertThatThrownBy(() -> files.accept(Uploads.sized("image/gif", 0)))
                 .isInstanceOfSatisfying(AttachmentRejectedException.class,
                         rejected -> assertThat(rejected.defect()).isEqualTo(AttachmentDefect.CONTENT_TYPE));
     }
