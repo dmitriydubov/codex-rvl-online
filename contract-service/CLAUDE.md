@@ -121,7 +121,7 @@ GitHub) и в рабочий контур не переносится. По пр
 ответе, принимается в формате `[A-Za-z0-9._-]{1,64}`, иначе выдаётся новый UUID. Коды — сводный перечень в ТЗ СЭ:
 `VALIDATION_ERROR` 400, `*_NOT_FOUND` 404, `ALREADY_ACCEPTED`, `DOCUMENT_VERSION_MISMATCH`, `INVALID_STATE`,
 `ATTACHMENT_CONFLICT` 409, `INTERNAL_ERROR` 500, `STORAGE_UNAVAILABLE`, `SERVICE_UNAVAILABLE`, `ORDERING_UNAVAILABLE`
-(этап оплаты), `REFERENCE_UNAVAILABLE` 503. Текст ошибки — для журнала, не для показа пользователю. Время ответа СЭ-01 и
+(этап оплаты) 503; `REFERENCE_UNAVAILABLE` из ТЗ не используется — синхронные вызовы справочники не читают. Текст ошибки — для журнала, не для показа пользователю. Время ответа СЭ-01 и
 СЭ-03 — до 1 с на 95 % запросов без учёта Ordering.
 Общая основа — аннотация `@InternalApi`, фильтр `RequestIdFilter`, `ErrorResponse` и советники ошибок; новый вызов не
 заводит своего формата ошибки и своего обработчика непредвиденных отказов.
