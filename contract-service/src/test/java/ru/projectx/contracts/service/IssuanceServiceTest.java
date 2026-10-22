@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
@@ -69,6 +71,19 @@ class IssuanceServiceTest {
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(2)), Optional.of(policy), NOW);
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.NEW);
+    }
+
+    @Test
+    void activeContract_isLockedAndReadAfreshBeforeItsIssuanceSeesIt() {
+        Contract contract = contract();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(contract), List.of());
+
+        service.apply(task, NOW);
+
+        InOrder order = inOrder(contracts, kmContracts);
+        order.verify(contracts).lockFresh(contract);
+        order.verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
     }
 
     @Test

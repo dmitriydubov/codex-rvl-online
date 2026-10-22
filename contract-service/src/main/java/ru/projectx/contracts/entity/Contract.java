@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -14,6 +16,9 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "contracts")
 public class Contract extends IssuanceRecord {
+
+    private static final Set<ContractStatus> OFFER_ACCEPTED = EnumSet.of(ContractStatus.ACCEPTED,
+            ContractStatus.INVOICE_ISSUED, ContractStatus.PAID, ContractStatus.SUBMITTED);
 
     @Column(nullable = false, updatable = false)
     private String number;
@@ -57,6 +62,17 @@ public class Contract extends IssuanceRecord {
         if (status == ContractStatus.NEW) {
             this.status = ContractStatus.DRAFT_READY;
         }
+    }
+
+    public void accept() {
+        if (status != ContractStatus.DRAFT_READY) {
+            throw new IllegalStateException("договор КМ " + id() + " в статусе " + status + " не принимает акцепт");
+        }
+        this.status = ContractStatus.ACCEPTED;
+    }
+
+    public boolean offerAccepted() {
+        return OFFER_ACCEPTED.contains(status);
     }
 
     @Override

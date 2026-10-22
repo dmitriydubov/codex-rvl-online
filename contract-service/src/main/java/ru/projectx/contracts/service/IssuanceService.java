@@ -1,11 +1,13 @@
 package ru.projectx.contracts.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
+import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
@@ -48,8 +50,12 @@ public class IssuanceService {
     }
 
     private RequestIssuance active(UUID individualRequestId) {
-        return new RequestIssuance(
-                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, FINISHED_CONTRACTS),
+        List<Contract> activeContracts =
+                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, FINISHED_CONTRACTS);
+        for (Contract contract : activeContracts) {
+            contracts.lockFresh(contract);
+        }
+        return new RequestIssuance(activeContracts,
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, FINISHED_POLICIES));
     }
 

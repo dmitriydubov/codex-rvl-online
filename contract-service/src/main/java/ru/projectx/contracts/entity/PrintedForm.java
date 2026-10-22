@@ -140,4 +140,8 @@ public class PrintedForm {
     public Instant createdAt() {
         return createdAt;
     }
+
+    public int version() {
+        return version;
+    }
 }
