@@ -38,9 +38,10 @@ public class MinioCertificateStore implements CertificateStore {
     }
 
     private void put(StoredFile file, InputStream stream) {
+        PutObjectArgs object = PutObjectArgs.builder().bucket(bucket).object(file.key())
+                .stream(stream, file.size(), AUTOMATIC_PART_SIZE).contentType(file.contentType()).build();
         try {
-            client.putObject(PutObjectArgs.builder().bucket(bucket).object(file.key())
-                    .stream(stream, file.size(), AUTOMATIC_PART_SIZE).contentType(file.contentType()).build());
+            client.putObject(object);
         } catch (ErrorResponseException refused) {
             log.warn("хранилище справок отказало в записи объекта: код {}", refused.errorResponse().code());
             throw new StorageUnavailableException(refused);

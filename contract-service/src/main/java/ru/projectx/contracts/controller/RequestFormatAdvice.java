@@ -26,6 +26,10 @@ public class RequestFormatAdvice {
 
     private final AttachmentMetrics metrics;
 
+    public RequestFormatAdvice(AttachmentMetrics metrics) {
+        this.metrics = metrics;
+    }
+
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> invalidValue(MethodArgumentTypeMismatchException invalid) {
         return ApiErrors.invalidField(invalid.getName(), INVALID_FORMAT);
@@ -39,10 +43,6 @@ public class RequestFormatAdvice {
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> missingPart(MissingServletRequestPartException missing) {
         return ApiErrors.invalidField(missing.getRequestPartName(), MISSING);
-    }
-
-    public RequestFormatAdvice(AttachmentMetrics metrics) {
-        this.metrics = metrics;
     }
 
     @ExceptionHandler
