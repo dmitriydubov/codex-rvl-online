@@ -5,7 +5,8 @@ Keeps agents from changing their own constraints:
   1. nobody edits the gauntlet itself (gauntlet/, .claude/, CLAUDE.md, the CI workflow) or the user-level
      Claude Code settings (~/.claude/), which could switch the hooks off;
   2. only the `specifier` subagent writes the Gherkin specification, and once the specification is
-     committed on the branch (= approved by the human in the chat) it is frozen for every agent;
+     committed on the branch (= approved by the human in the chat) it is frozen for every agent: no edit of
+     it, and no commit that carries a change to it, however the files were changed (a script, a patch);
   3. role scopes: specifier -> specs only, hardener -> test code only, reviewer -> read-only;
   4. human-only actions are refused: merging the PR, rewriting or re-pointing the branch (--amend,
      rebase, force push, reset/checkout -B/branch -f to another revision), pushing to the base branch,
@@ -96,7 +97,7 @@ def main():
         path = params.get("file_path") or params.get("notebook_path") or ""
         reason = user_config_violation(path) or path_violation(agent, relative(path, project), ctx)
     elif tool == "Bash":
-        reason = command_violation(agent, params.get("command", ""), ctx)
+        reason = command_violation(agent, params.get("command", ""), ctx, event.get("cwd"))
     else:
         reason = None
     if reason:
@@ -171,7 +172,11 @@ class Context:
         return paths
 
     def is_spec(self, path):
-        return path in [d.rstrip("/") for d in self.features_dirs]
+        return path in self.spec_dirs
+
+    @property
+    def spec_dirs(self):
+        return [d.rstrip("/") for d in self.features_dirs]
 
 
 # ----------------------------------------------------------------------------- paths
@@ -237,9 +242,10 @@ def frozen_reason(rel):
 
 # ----------------------------------------------------------------------------- shell
 
-def command_violation(agent, command, ctx):
+def command_violation(agent, command, ctx, shell_cwd=None):
     command = with_nested_commands(command)
-    reason = human_only(command, ctx)
+    start = shell_cwd if isinstance(shell_cwd, str) and shell_cwd and os.path.isdir(shell_cwd) else ctx.project
+    reason = human_only(command, ctx) or frozen_spec_commits_or_none(command, ctx, start)
     if reason:
         return reason
     scope = ctx.role_scope(agent)
@@ -247,7 +253,7 @@ def command_violation(agent, command, ctx):
     protected = ctx.protected(agent)
     command = strip_heredocs(command)       # a heredoc body is data, not commands
     neutral = QUOTED.sub(lambda m: re.sub(r"[>;&|()]", "_", m.group(0)), command)  # '>' in quotes is text
-    cwd = ctx.project
+    cwd = start
     for segment in segments(neutral):
         words = words_of(segment)
         cwd = follow_cd(words, cwd, ctx.project)
@@ -269,7 +275,8 @@ def command_violation(agent, command, ctx):
         # the whole command for inline code, otherwise outside quotes (a commit or stash message is not a path)
         if not tokens or unresolvable(segment, command):
             text = without_gradle_tasks(command if inline_code(words) else QUOTED.sub("''", command))
-            hit = next((p for p in protected if mentions(text, p)), None)
+            here = relative(cwd, ctx.project) or "."
+            hit = next((p for p in protected if mentions(text, p) or is_under(here, (p,))), None)
             if hit:
                 return protected_reason(agent, hit, ctx)
             if os.path.basename(BUILD_LOCK) in text:
@@ -426,6 +433,285 @@ def git_human_only(args, ctx):
                                for a in rest):
         return "Moving, forcing or deleting branches is reserved for the human."
     return None
+
+
+# ----------------------------------------------------------------------------- frozen spec at commit and push time
+#
+# The Edit/Write and shell checks cannot see every way to write a file (a script file, a patch, code fed to an
+# interpreter on stdin). A change to the specification counts only once it is committed and pushed, so while the spec
+# is frozen every git command that creates commits is checked for what it would commit, and every push for what it
+# would put on the remote branch. Content already on the base branch or on the task's own remote branch (only guarded
+# pushes and the human write there) is trusted: merging the base brings other tasks' approved specs, and pulling the
+# own branch brings the human's fixes.
+
+COMMIT_CREATING = {"commit", "merge", "cherry-pick", "am"}
+COMMIT_PLUMBING = {"commit-tree", "fast-import"}
+MERGE_VALUE_OPTIONS = {"-m", "-F", "-s", "-X", "--message", "--file", "--strategy", "--strategy-option",
+                       "--into-name", "--cleanup"}
+CHERRY_PICK_VALUE_OPTIONS = {"-m", "--mainline", "-X", "--strategy", "--strategy-option", "--cleanup"}
+AM_VALUE_OPTIONS = {"-C", "--whitespace", "--resolvemsg", "--quoted-cr", "--empty", "--patch-format"}
+AM_PATH_REMAPPING = ("-p", "--directory", "--include", "--exclude")
+PUSH_VALUE_OPTIONS = {"--repo", "-o", "--push-option", "--receive-pack", "--exec", "--signed"}
+PUSH_EVERYTHING = ("--all", "--mirror", "--branches")
+SEQUENCER_EXITS = ("--abort", "--quit", "--skip", "--show-current-patch")
+SEQUENCER_CONCLUDES = {"--continue", "--resolved", "-r", "--allow-empty"}
+OTHER_LOCATION_ENV = re.compile(r"\bGIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)=")
+OTHER_LOCATION_OPTION = re.compile(r"^--git-dir\b|^--work-tree\b|core\.worktree|core\.bare")
+PATCH_PATH = re.compile(r'^(?:diff --git "?a/(\S+?)"? "?b/(\S+?)"?|(?:---|\+\+\+) "?[ab]/(\S+?)"?(?:\t.*)?|'
+                        r'(?:rename|copy) (?:from|to) "?(\S+?)"?)$', re.M)
+
+
+def frozen_spec_commits_or_none(command, ctx, cwd):
+    try:
+        return frozen_spec_commits(command, ctx, cwd)
+    except (ValueError, TypeError, OSError):
+        return None                       # fails open on malformed input, like the rest of the hook
+
+
+def frozen_spec_commits(command, ctx, cwd):
+    command = strip_heredocs(command)        # a heredoc body (a commit message) is text, not commands
+    unquoted = QUOTED.sub("''", command)
+    # in single quotes everything is literal; in double quotes $( and ` still run, separators and newlines do not
+    inert = QUOTED.sub(lambda m: re.sub(r"[;&|()`\n]" if m.group(0)[0] == "'" else r"[;&|\n]", "_", m.group(0)),
+                       command)
+    for segment in segments(inert):
+        words = words_of(segment)
+        cwd = follow_cd(words, cwd, ctx.project)
+        if len(words) > 1 and os.path.basename(words[0]) == "git":
+            reason = frozen_spec_commit(words[1:], ctx, cwd, unquoted)
+            if reason:
+                return reason
+    return None
+
+
+def frozen_spec_commit(args, ctx, cwd, command):
+    sub = git_subcommand(args)
+    if sub not in COMMIT_CREATING and sub not in COMMIT_PLUMBING and sub != "push":
+        return None
+    rest = args[args.index(sub) + 1:]
+    repo = repository_of(args, cwd)
+    if repo is None:
+        return None
+    spec = ctx if os.path.realpath(repo) == os.path.realpath(ctx.project) else Context(repo)
+    if sub in COMMIT_PLUMBING:
+        return plumbing_reason(sub) if ctx.frozen or spec.frozen else None
+    if any(a.startswith(SEQUENCER_EXITS) for a in rest):
+        return None
+    if OTHER_LOCATION_ENV.search(command) or any(OTHER_LOCATION_OPTION.search(a) for a in args[:args.index(sub)]):
+        return location_reason(sub) if spec.frozen else None
+    if sub == "push":
+        changed = pushed_spec_changes(rest, spec)
+    else:
+        changed = spec_changes(sub, rest, spec, cwd)
+    if not changed or not spec.frozen:
+        return None
+    return frozen_commit_reason(sub, changed)
+
+
+def repository_of(args, cwd):
+    """The working tree a git command acts on: `git -C dir ...` (several compose) relative to the shell's directory."""
+    directory = cwd
+    i = 0
+    while i < len(args) and args[i].startswith("-"):
+        if args[i] == "-C" and i + 1 < len(args):
+            target = os.path.expanduser(args[i + 1])
+            directory = os.path.realpath(target if os.path.isabs(target) else os.path.join(directory, target))
+        i += 2 if args[i] in ("-C", "-c") else 1
+    return git(directory, "rev-parse", "--show-toplevel") or None
+
+
+def spec_changes(sub, rest, spec, cwd):
+    if sub == "commit" or SEQUENCER_CONCLUDES & set(rest):
+        return pending_spec_changes(spec)
+    if sub == "merge":
+        return merged_spec_changes(rest, spec)
+    if sub == "cherry-pick":
+        return picked_spec_changes(rest, spec)
+    return patched_spec_changes(rest, spec, cwd)
+
+
+def pending_spec_changes(spec):
+    """Spec files that differ from HEAD in the index or the working tree. While a merge of trusted content is being
+    concluded, a file that is exactly the merged-in version, or exactly git's own automatic merge of both sides, is
+    not the agent's change."""
+    dirs = spec.spec_dirs
+    paths = set(lines(git(spec.project, "diff", "--name-only", "HEAD", "--", *dirs)))
+    paths |= set(lines(git(spec.project, "diff", "--cached", "--name-only", "HEAD", "--", *dirs)))
+    merge_head = git(spec.project, "rev-parse", "-q", "--verify", "MERGE_HEAD") if paths else ""
+    if merge_head and trusted(spec, merge_head):
+        automatic = lines(git(spec.project, "merge-tree", "--write-tree", "HEAD", merge_head))[:1]
+        paths = {p for p in paths if not same_as(spec, merge_head, p)
+                 and not (automatic and same_as(spec, automatic[0], p))}
+    return sorted(paths)
+
+
+def merged_spec_changes(rest, spec):
+    changed = set()
+    for ref in positional(rest, MERGE_VALUE_OPTIONS):
+        rev = git(spec.project, "rev-parse", "-q", "--verify", ref + "^{commit}")
+        if not rev:
+            continue
+        fork = git(spec.project, "merge-base", "HEAD", rev) or "HEAD"
+        paths = set(lines(git(spec.project, "diff", "--name-only", fork, rev, "--", *spec.spec_dirs)))
+        if paths and not trusted(spec, rev):
+            changed |= paths
+    return sorted(changed)
+
+
+def picked_spec_changes(rest, spec):
+    if "--stdin" in rest:
+        return ["(revisions read from standard input)"]
+    changed = set()
+    for arg in positional(rest, CHERRY_PICK_VALUE_OPTIONS):
+        revs = lines(git(spec.project, "rev-list", arg)) if ".." in arg else \
+            [git(spec.project, "rev-parse", "-q", "--verify", arg + "^{commit}")]
+        for rev in filter(None, revs):
+            paths = set(lines(git(spec.project, "diff-tree", "--no-commit-id", "--name-only", "-r", "-m", "--root",
+                                  rev, "--", *spec.spec_dirs)))
+            if paths and not trusted(spec, rev):
+                changed |= paths
+    return sorted(changed)
+
+
+def patched_spec_changes(rest, spec, cwd):
+    """`git am`: the patches are read before they are applied; a patch the guard cannot read counts as a change."""
+    if any(a.startswith(AM_PATH_REMAPPING) for a in rest):
+        return ["(patch paths remapped)"]
+    files, rest, from_stdin = redirected_inputs(rest)
+    files += positional(rest, AM_VALUE_OPTIONS)
+    if from_stdin or not files:
+        return ["(patch read from standard input)"]
+    changed = set()
+    for name in files:
+        path = os.path.expanduser(name)
+        path = path if os.path.isabs(path) else os.path.join(cwd, path)
+        if os.path.isdir(path):
+            return [f"(patches in {name})"]
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except (OSError, ValueError):
+            continue                      # git am fails on a missing file by itself
+        for match in PATCH_PATH.finditer(text):
+            changed |= {p for p in match.groups() if p and is_under(p, spec.features_dirs)}
+    return sorted(changed)
+
+
+def pushed_spec_changes(rest, spec):
+    """What a push would change in the spec on each remote branch it updates: a pushed commit carries the spec as the
+    remote branch has it, except for files that are exactly the base's version (the base branch merged in). A branch
+    the remote does not have yet is not compared: there is nothing approved on it to protect."""
+    if any(a in PUSH_EVERYTHING for a in rest):
+        return ["(every local branch)"]
+    words = positional(rest, PUSH_VALUE_OPTIONS)
+    remote = words[0] if words else (git(spec.project, "config", f"branch.{current_branch(spec)}.remote") or "origin")
+    refspecs = words[1:] or ["HEAD"]
+    changed = set()
+    for refspec in refspecs:
+        source, _, target = refspec.lstrip("+").partition(":")
+        if not source or source.startswith("refs/tags/"):
+            continue                      # deleting a remote branch, or a tag: no branch content is pushed
+        target = target or (current_branch(spec) if source == "HEAD" else source)
+        branch = target[len("refs/heads/"):] if target.startswith("refs/heads/") else target
+        if not branch or branch.startswith("refs/"):
+            continue
+        rev = git(spec.project, "rev-parse", "-q", "--verify", source + "^{commit}")
+        remote_tip = git(spec.project, "rev-parse", "-q", "--verify", f"refs/remotes/{remote}/{branch}^{{commit}}")
+        if not rev or not remote_tip:
+            continue
+        paths = lines(git(spec.project, "diff", "--name-only", remote_tip, rev, "--", *spec.spec_dirs))
+        if not paths:
+            continue
+        automatic = lines(git(spec.project, "merge-tree", "--write-tree", remote_tip, spec.base_ref))[:1]
+        changed |= {p for p in paths if not same_content(spec, rev, spec.base_ref, p)
+                    and not (automatic and same_content(spec, rev, automatic[0], p))}
+    return sorted(changed)
+
+
+def same_content(spec, one, other, path):
+    return git_code(spec.project, "diff", "--quiet", one, other, "--", path) == 0
+
+
+def current_branch(spec):
+    return git(spec.project, "symbolic-ref", "-q", "--short", "HEAD")
+
+
+def redirected_inputs(rest):
+    """`git am < file` reads the file (it can be inspected); a heredoc or a pipe cannot."""
+    files, others, from_stdin, i = [], [], False, 0
+    while i < len(rest):
+        token = rest[i]
+        if token.startswith("<<"):
+            from_stdin = True
+            i += 2 if token in ("<<", "<<-") else 1
+            continue
+        if token == "<" and i + 1 < len(rest):
+            files.append(rest[i + 1])
+            i += 2
+            continue
+        if token.startswith("<") and len(token) > 1:
+            files.append(token[1:])
+        else:
+            others.append(token)
+        i += 1
+    return files, others, from_stdin
+
+
+def positional(rest, value_options):
+    found, skip = [], False
+    for a in rest:
+        if skip:
+            skip = False
+        elif a == "--":
+            continue
+        elif a in value_options:
+            skip = True
+        elif not a.startswith("-"):
+            found.append(a)
+    return found
+
+
+def trusted(spec, rev):
+    """The commit is already on the base branch or on the task's own remote branch."""
+    upstream = git(spec.project, "rev-parse", "-q", "--verify", "@{upstream}")
+    if upstream and git_code(spec.project, "merge-base", "--is-ancestor", rev, upstream) == 0:
+        return True
+    return from_base(spec, rev)
+
+
+def from_base(spec, rev):
+    if git_code(spec.project, "merge-base", "--is-ancestor", rev, spec.base_ref) == 0:
+        return True
+    return spec._refresh_base() and git_code(spec.project, "merge-base", "--is-ancestor", rev, spec.base_ref) == 0
+
+
+def same_as(spec, rev, path):
+    return (git_code(spec.project, "diff", "--quiet", rev, "--", path) == 0
+            and git_code(spec.project, "diff", "--cached", "--quiet", rev, "--", path) == 0)
+
+
+def lines(text):
+    return [line for line in text.splitlines() if line.strip()]
+
+
+def frozen_commit_reason(sub, changed):
+    shown = ", ".join(changed[:3]) + (f" and {len(changed) - 3} more" if len(changed) > 3 else "")
+    action = "push" if sub == "push" else "commit"
+    return (f"The specification is frozen (committed on this branch, approved by the human), and this git {sub} would "
+            f"{action} a change to it: {shown}. However the files were changed, only the human changes an approved spec "
+            f"(on GitHub, or in a session with GAUNTLET_GUARD=off); an approved file left out of the spec commit is "
+            f"committed by the human too. Leave the feature files as committed, stop and describe the problem to the "
+            f"human.")
+
+
+def plumbing_reason(sub):
+    return (f"git {sub} builds commits the guard cannot inspect, and the specification is frozen. Use git commit; "
+            f"plumbing commits are reserved for the human.")
+
+
+def location_reason(sub):
+    return (f"This git {sub} uses another git directory, work tree or index, which the guard cannot inspect, and the "
+            f"specification is frozen. Run it in the task's working tree as it is.")
 
 
 def skips_git_hooks(args):

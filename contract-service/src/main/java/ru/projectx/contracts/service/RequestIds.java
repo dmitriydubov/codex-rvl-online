@@ -3,6 +3,7 @@ package ru.projectx.contracts.service;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.MDC;
 
 public final class RequestIds {
@@ -16,7 +17,11 @@ public final class RequestIds {
     }
 
     public static String current() {
-        return Optional.ofNullable(MDC.get(MDC_KEY))
+        return received(MDC.get(MDC_KEY));
+    }
+
+    public static String received(@Nullable String header) {
+        return Optional.ofNullable(header)
                 .filter(RequestIds::acceptable)
                 .orElseGet(() -> UUID.randomUUID().toString());
     }

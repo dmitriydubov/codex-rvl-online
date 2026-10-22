@@ -53,6 +53,46 @@ class ApplicationDefaultsTest {
     }
 
     @Test
+    void storageDefaults_leaveAddressBucketAndKeysToTheEnvironment() {
+        assertThat(application.getProperty("projectx.storage.endpoint")).asString().isEqualTo("${S3_ENDPOINT:}");
+        assertThat(application.getProperty("projectx.storage.bucket")).asString().isEqualTo("${S3_BUCKET:}");
+        assertThat(application.getProperty("projectx.storage.access-key")).asString().isEqualTo("${S3_ACCESS_KEY:}");
+        assertThat(application.getProperty("projectx.storage.secret-key")).asString().isEqualTo("${S3_SECRET_KEY:}");
+        assertThat(application.getProperty("projectx.storage.ssl-bundle")).asString().isEqualTo("${S3_SSL_BUNDLE:}");
+        assertThat(application.getProperty("projectx.storage.region")).asString().isEqualTo("${S3_REGION:us-east-1}");
+        assertThat(application.getProperty("projectx.storage.base-path")).asString()
+                .isEqualTo("${S3_BASE_PATH:certificates}");
+    }
+
+    @Test
+    void storageTimeouts_endTheCallBeforeTheRequestsServiceGivesUp() {
+        assertThat(application.getProperty("projectx.storage.timeouts.connect")).asString()
+                .isEqualTo("${S3_CONNECT_TIMEOUT:2s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.read")).asString()
+                .isEqualTo("${S3_READ_TIMEOUT:10s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.write")).asString()
+                .isEqualTo("${S3_WRITE_TIMEOUT:10s}");
+        assertThat(application.getProperty("projectx.storage.timeouts.call")).asString()
+                .isEqualTo("${S3_CALL_TIMEOUT:20s}");
+    }
+
+    @Test
+    void attachmentDefaults_acceptJpegAndPngUpToFiveMebibytes() {
+        assertThat(application.getProperty("projectx.attachments.max-file-size")).asString()
+                .isEqualTo("${ATTACHMENT_MAX_FILE_SIZE:5MB}");
+        assertThat(application.getProperty("projectx.attachments.content-types[image/jpeg]")).isEqualTo("jpg");
+        assertThat(application.getProperty("projectx.attachments.content-types[image/png]")).isEqualTo("png");
+    }
+
+    @Test
+    void multipartLimits_leaveRoomForTheAttachmentRuleAndKeepFilesInMemory() {
+        assertThat(application.getProperty("spring.servlet.multipart.max-file-size")).isEqualTo("10MB");
+        assertThat(application.getProperty("spring.servlet.multipart.max-request-size")).isEqualTo("10MB");
+        assertThat(application.getProperty("spring.servlet.multipart.file-size-threshold")).isEqualTo("10MB");
+        assertThat(application.getProperty("server.tomcat.max-swallow-size")).isEqualTo("20MB");
+    }
+
+    @Test
     void outboxDefaults_publishEveryFiveSecondsWithConfirmTimeoutLadderAndRetention() {
         assertThat(application.getProperty("projectx.outbox.publishing.interval")).asString()
                 .isEqualTo("${OUTBOX_PUBLISHING_INTERVAL:5s}");

@@ -55,6 +55,28 @@ class RequestIdsTest {
     }
 
     @Test
+    void acceptableHeader_isTakenAsReceived() {
+        assertThat(RequestIds.received("Req-01._x")).isEqualTo("Req-01._x");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "req/01", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0"})
+    void unacceptableHeader_isReplacedByFreshUuid(String header) {
+        String issued = RequestIds.received(header);
+
+        assertThat(issued).isNotEqualTo(header);
+        assertThat(UUID.fromString(issued)).hasToString(issued);
+    }
+
+    @Test
+    void missingHeader_isReplacedByFreshUuidEachTime() {
+        String issued = RequestIds.received(null);
+
+        assertThat(UUID.fromString(issued)).hasToString(issued);
+        assertThat(RequestIds.received(null)).isNotEqualTo(issued);
+    }
+
+    @Test
     void header_isTheContourTraceHeader() {
         assertThat(RequestIds.HEADER).isEqualTo("X-Request-Id");
         assertThat(RequestIds.MDC_KEY).isEqualTo("requestId");

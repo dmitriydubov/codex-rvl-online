@@ -1,0 +1,21 @@
+package ru.projectx.contracts.service.storage;
+
+import ru.projectx.contracts.dto.AttachmentResponse;
+import ru.projectx.contracts.entity.ParticipantAttachment;
+import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.StoredFile;
+
+final class AttachmentResponses {
+
+    private AttachmentResponses() {
+    }
+
+    static AttachmentResponse of(PrintedForm certificate) {
+        ParticipantAttachment owner = certificate.attachment().orElseThrow(
+                () -> new IllegalStateException("документ " + certificate.id() + " — не справка участника"));
+        StoredFile file = certificate.storedFile().orElseThrow(
+                () -> new IllegalStateException("у справки " + certificate.id() + " нет файла"));
+        return new AttachmentResponse(certificate.id(), owner.attachmentId(), owner.individualRequestId(),
+                owner.participantId(), file.contentType(), file.size(), file.hash(), certificate.createdAt());
+    }
+}
