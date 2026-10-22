@@ -24,6 +24,8 @@ public class RequestFormatAdvice {
     static final String MISSING = "обязательное поле не передано";
     static final String TOO_LARGE = "размер файла больше допустимого";
 
+    private final AttachmentMetrics metrics;
+
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> invalidValue(MethodArgumentTypeMismatchException invalid) {
         return ApiErrors.invalidField(invalid.getName(), INVALID_FORMAT);
@@ -38,8 +40,6 @@ public class RequestFormatAdvice {
     public ResponseEntity<ErrorResponse> missingPart(MissingServletRequestPartException missing) {
         return ApiErrors.invalidField(missing.getRequestPartName(), MISSING);
     }
-
-    private final AttachmentMetrics metrics;
 
     public RequestFormatAdvice(AttachmentMetrics metrics) {
         this.metrics = metrics;
