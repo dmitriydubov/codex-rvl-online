@@ -1278,7 +1278,10 @@ S3 с таймаутами и приём файла — без тонкой се
   `MinIOContainer` из `testcontainers-minio` 2.0.5 по умолчанию берёт именно `minio/minio`; `quay.io` и `min.io` из сессии
   закрыты; в контуре medius берёт `nexus.sogaz.ru/minio/minio:latest`. **Решено владельцем 2026-10-22 «1) а»:** в тестах —
   `quay.io/minio/minio` с закреплённым тегом (выбирает сессия по дате сборки); `quay.io` (и CDN слоёв `cdn*.quay.io`)
-  владелец открывает в Network access окружения шагов до старта К6c, координатор проверяет pull из сессии. Имя образа —
+  владелец открывает в Network access окружения шагов до старта К6c; **проверка — первый шаг сессии К6c**: `docker pull`
+  образа с закреплённым тегом, упавший домен сессия называет (владелец 2026-10-22 «1) да»). Из сессии координатора
+  2026-10-22 07:53 UTC после добавления доменов: `cdn.quay.io` и `cdn01.quay.io` проходят, `quay.io` прокси ещё
+  отклоняет. Имя образа —
   настройка теста (в контуре — образ из Nexus): префикс `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX` действует только для
   Docker Hub. `MinIOContainer` 2.0.5 проверяет имя (`assertCompatibleWith("minio/minio")`), поэтому образ с реестром
   объявляется заменой: `DockerImageName.parse(…).asCompatibleSubstituteFor("minio/minio")`
