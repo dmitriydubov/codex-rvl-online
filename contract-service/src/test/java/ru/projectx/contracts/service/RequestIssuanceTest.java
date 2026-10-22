@@ -47,29 +47,29 @@ class RequestIssuanceTest {
     }
 
     @Test
-    void openRecord_isPreferredToAnIssuedOneOfTheSameParticipantWhicheverComesFirst() {
+    void issuedRecord_isPreferredToAnOpenOneOfTheSameParticipantWhicheverComesFirst() {
         LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
 
-        assertThat(new RequestIssuance(List.of(), List.of(issued, policy)).of(Tasks.CHILD))
-                .contains(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
-        assertThat(new RequestIssuance(List.of(), List.of(policy, issued)).of(Tasks.CHILD))
-                .contains(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
+        assertThat(new RequestIssuance(List.of(), List.of(issued, policy)).policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(new RequestIssuance(List.of(), List.of(policy, issued)).policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(new RequestIssuance(List.of(), List.of(policy, issued)).leftovers())
+                .containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", issued));
     }
 
     @Test
-    void openContract_isPreferredToAnIssuedPolicyOfTheSameParticipant() {
+    void issuedPolicy_isPreferredToAnOpenContractOfTheSameParticipant() {
         Contract childContract = Issuances.contract("3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", Tasks.CHILD,
                 "DKM-2026-000002");
         LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
 
         RequestIssuance mixed = new RequestIssuance(List.of(childContract), List.of(issued));
 
-        assertThat(mixed.contractOf(Tasks.CHILD)).contains(childContract);
-        assertThat(mixed.policyOf(Tasks.CHILD)).isEmpty();
+        assertThat(mixed.policyOf(Tasks.CHILD)).contains(issued);
+        assertThat(mixed.contractOf(Tasks.CHILD)).isEmpty();
     }
 
     @Test
-    void issuedRecord_isKeptWhenNoOpenRecordOfTheParticipantFollows() {
+    void firstOfTwoIssuedRecords_isKept() {
         LmPolicy issued = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
         LmPolicy another = Issuances.issuedPolicy("9f3e1c28-6b55-4da1-93f4-82a1d7b56e40", Tasks.CHILD);
 

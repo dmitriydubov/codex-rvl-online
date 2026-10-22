@@ -131,15 +131,33 @@ class IssuanceServiceIssuedRecordsTest {
     }
 
     @Test
-    void openRecordBesideAnIssuedOne_isCancelledWhenTheParticipantIsExcluded() {
+    void openContractBesideAnIssuedPolicy_neitherHidesThePolicyNorOpensAnotherOneWhenThePaymentIsGone() {
+        Contract openContract = Issuances.contract("3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", Tasks.CHILD,
+                "DKM-2026-000002");
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.child("0.00"));
+        active(List.of(openContract), List.of(policy));
+
+        List<RequestParticipant> composition = service.apply(task, NOW);
+
+        verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.of(policy), NOW);
+        verifyNoInteractions(kmContracts);
+        assertThat(openContract.status()).isEqualTo(ContractStatus.NEW);
+        assertThat(composition).contains(new RequestParticipant(Tasks.CHILD, DocumentKind.LM_POLICY));
+    }
+
+    @Test
+    void openPolicyBesideAnIssuedOne_isLeftAndNoContractIsOpenedWhenThePaymentAppears() {
         LmPolicy open = Issuances.policy("9f3e1c28-6b55-4da1-93f4-82a1d7b56e40", Tasks.CHILD);
-        active(List.of(), List.of(policy, open));
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.relative(1, Tasks.CHILD, "5000.00", "CHILD"));
+        active(List.of(), List.of(open, policy));
 
-        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+        List<RequestParticipant> composition = service.apply(task, NOW);
 
-        assertThat(open.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+        verifyNoInteractions(kmContracts, lmPolicies);
+        assertThat(open.status()).isEqualTo(LmPolicyStatus.NEW);
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.ISSUED);
-        assertThat(journal.list).isEmpty();
+        assertThat(composition).contains(new RequestParticipant(Tasks.CHILD, DocumentKind.LM_POLICY));
+        assertThat(warnings()).hasSize(1);
     }
 
     @Test
