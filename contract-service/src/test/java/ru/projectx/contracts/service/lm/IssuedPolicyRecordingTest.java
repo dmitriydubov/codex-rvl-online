@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.CannotAcquireLockException;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.IssueError;
@@ -64,6 +65,7 @@ class IssuedPolicyRecordingTest {
     void submittedPolicyIsStored() {
         policy.submit(NOW);
         given(policies.findById(POLICY_ID)).willReturn(Optional.of(policy));
+        given(policies.findLockedById(POLICY_ID)).willReturn(Optional.of(policy));
         given(statuses.watch(Tasks.REQUEST)).willReturn(before);
         journal.start();
         logger().addAppender(journal);
@@ -103,6 +105,17 @@ class IssuedPolicyRecordingTest {
 
         assertThatThrownBy(() -> recording.expect(unknown)).isInstanceOf(ContractViolationException.class)
                 .hasMessage("полиса ЛМ " + unknown + " в Договорах нет");
+    }
+
+    @Test
+    void resultForAnUnknownPolicy_isContractViolationNamingTheIdentifier() {
+        UUID unknown = UUID.fromString("00000000-0000-4000-8000-000000000001");
+        given(policies.findLockedById(unknown)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> recording.recordIssued(unknown, ISSUED, List.of(FORM), NOW))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("полиса ЛМ " + unknown + " в Договорах нет");
+        verifyNoInteractions(statuses, forms);
     }
 
     @Test
@@ -163,6 +176,50 @@ class IssuedPolicyRecordingTest {
                 .containsOnly("полис ЛМ " + POLICY_ID + " участника " + Tasks.CHILD + " заявки " + Tasks.REQUEST
                         + ": результат выпуска получен по полису ЛМ в статусе CANCELLED, запись не изменена")
                 .hasSize(3);
+    }
+
+    @Test
+    void result_isDecidedOnThePolicyReadWithTheRowLock_notOnTheUnlockedRead() {
+        LmPolicy undelivered = Issuances.policy(POLICY_ID.toString(), Tasks.CHILD);
+        undelivered.submit(NOW);
+        undelivered.markError(new IssueError("LM_POLICY_REQUEST_UNDELIVERED", "не доставлен"), NOW);
+        given(policies.findLockedById(POLICY_ID)).willReturn(Optional.of(undelivered));
+
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.AWAITING_RESULT);
+        recording.recordIssued(POLICY_ID, ISSUED, List.of(FORM), NOW);
+
+        assertThat(undelivered.status()).isEqualTo(LmPolicyStatus.ERROR);
+        assertThat(undelivered.issued()).isEmpty();
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.SUBMITTED);
+        verify(forms, never()).saveAll(any());
+        verifyNoInteractions(statuses);
+        assertThat(journal.list).singleElement().satisfies(event -> assertThat(event.getFormattedMessage())
+                .endsWith("результат выпуска получен по полису ЛМ в статусе ERROR, запись не изменена"));
+    }
+
+    @Test
+    void expectationAndLateResult_readWithoutTheRowLock() {
+        given(policies.findLockedById(POLICY_ID)).willThrow(new CannotAcquireLockException("строка полиса занята"));
+
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.AWAITING_RESULT);
+        recording.recordLate(POLICY_ID);
+
+        assertThat(journal.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
+    }
+
+    @Test
+    void policyRowHeldLongerThanTheLockTimeout_failsTheResultBeforeAnyDecision() {
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка полиса занята");
+        given(policies.findLockedById(POLICY_ID)).willThrow(busy);
+
+        assertThatThrownBy(() -> recording.recordIssued(POLICY_ID, ISSUED, List.of(FORM), NOW)).isSameAs(busy);
+        assertThatThrownBy(() -> recording.recordFailure(POLICY_ID, NOT_COVERED, NOW)).isSameAs(busy);
+
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.SUBMITTED);
+        verify(forms, never()).saveAll(any());
+        verify(policies, never()).findById(any());
+        verifyNoInteractions(statuses);
+        assertThat(journal.list).isEmpty();
     }
 
     private static Logger logger() {
