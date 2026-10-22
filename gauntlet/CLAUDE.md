@@ -341,7 +341,7 @@
 |---|---|
 | Правила и контракт `data-reference` | `data-reference/CLAUDE.md`: «Контракт 1С:УСК», «Соседи по контуру», «Структура пакетов», «Как пишем код» |
 | Потоки 1С:УСК ТЗ-01…ТЗ-10, структура БД 1С | `project_files/data-reference/1C_data/*.pdf`, `project_files/contract-service/1C_data/*.pdf` (ТЗ-5 v2.0 — договоры ЛПУ; там же копии потоков 1С под номерами KDMS) вместе с `data-reference/CLAUDE.md`, «Контракт 1С:УСК» (как сервис работает сейчас; при расхождении с документами прав он); предлагаемые правки документов — `project_files/data-reference/edit/` (комплект 2026-10-16) |
-| REST `data-reference` | `project_files/data-reference/ТЗ API Data-reference.pdf` вместе с `project_files/data-reference/Журнал решений REST.md` (правила В-4…В-9 и решения владельца; при расхождении прав журнал); предлагаемые правки ТЗ — `project_files/data-reference/edit/` |
+| REST `data-reference` | `project_files/data-reference/Журнал решений REST.md` — основной источник (правила В-4…В-13 и решения владельца) — вместе с действующей редакцией ТЗ `project_files/data-reference/edited/ТЗ API Data-reference — редакция 2.md` (подтягивается к журналу; при расхождении прав журнал); исходная версия `ТЗ API Data-reference.pdf` (21.09.2026) и правки `edit/` — история |
 | Точки интеграции, схемы процесса | `project_files/common/Точки интеграции РВЛ и 1С_УСК.pdf`, `project_files/contract-service/Точки интеграций сервис Договоров и Заявок.pdf`, `project_files/common/RVL on-line. Схемы процесса и флоу.pdf` |
 | Структуры данных, ФТ, вопросы и ответы | `project_files/data-reference/Структура БД v.0.2.pdf`, `project_files/contract-service/Структура данных (Сервис договоров).pdf`, `project_files/common/Структура данных Сервис Заявок v.2.pdf`, `project_files/contract-service/Сервис договоров_синхронные эндпоинты.pdf`, `project_files/common/ФТ к модулю РВЛ на базе платформы B2B-портала.pdf`, `project_files/common/Вопросы и ответы по РВЛ.pdf` |
 | ЛК застрахованного (`contract-service`) | `project_files/contract-service/` (требования к лендингу и ЛК `requirements_landing_lk (003).docx`, копии контрактов Договоров под номерами KDMS в `1C_data/`); документы Ordering `project_files/contract-service/ordering/` — только после решения владельца о включении в источники (до этапа оплаты) |
@@ -349,6 +349,16 @@
 PDF читаются инструментом Read (страницами). Фичи и записи плана до 2026-10-07 называют документы по старым путям
 `project_files/<файл>` — теперь файл лежит в `project_files/common/` или `project_files/data-reference/`. Документы противоречат друг другу или коду — остановись и
 спроси владельца, не выбирай сам.
+
+**Решения владельца, записанные в журнал решений, — источник бизнес-правил** (решение владельца 2026-10-22): журнал REST
+(`project_files/data-reference/Журнал решений REST.md`), «Контракт 1С:УСК» в `data-reference/CLAUDE.md`, журнал Договоров
+(`project_files/contract-service/Журнал решений Договоров.md`). Документ расходится с журналом своего сервиса — прав журнал,
+и это не повод останавливаться. ТЗ сервисов владельца (`data-reference`, `contract-service`) ведутся здесь же, вслед за
+журналом, владелец переносит их в Confluence. Где лежит новая редакция и как её правит шаг — правило модуля:
+`data-reference` — `project_files/data-reference/edited/` (Markdown-исходник и `.docx`, сборка —
+`python3 project_files/md2docx.py "<файл.md>"`; `data-reference/CLAUDE.md`, «Описание REST»), `contract-service` —
+`contract-service/CLAUDE.md`. Документы 1С:УСК и соседей не правятся: предлагаемые правки к ним — копии в `edit/`
+каталога сервиса.
 
 **Технологии** (версия из сборки → источник той же версии):
 
