@@ -17,15 +17,17 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
     private static final Logger log = LoggerFactory.getLogger(RecordIssuance.class);
 
     private final PartySnapshotStore parties;
+    private final String frozenBecause;
 
-    protected RecordIssuance(PartySnapshotStore parties) {
+    protected RecordIssuance(PartySnapshotStore parties, String frozenBecause) {
         this.parties = parties;
+        this.frozenBecause = frozenBecause;
     }
 
     public void reconcile(Issue issue, Optional<R> existing, Instant now) {
-        Optional<R> submitted = existing.filter(this::submitted);
-        if (submitted.isPresent()) {
-            keepSubmitted(submitted.get(), issue);
+        Optional<R> frozen = existing.filter(this::frozen);
+        if (frozen.isPresent()) {
+            keepFrozen(frozen.get(), issue);
             return;
         }
         IssueData data;
@@ -50,7 +52,7 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
 
     protected abstract PersonOwner owner(R record);
 
-    protected abstract boolean submitted(R record);
+    protected abstract boolean frozen(R record);
 
     protected abstract boolean reviseTerms(R record, Issue issue, UUID program);
 
@@ -66,27 +68,28 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
         }
     }
 
-    private void keepSubmitted(R record, Issue issue) {
+    private void keepFrozen(R record, Issue issue) {
         if (!changesFor(record, issue)) {
             return;
         }
-        log.warn("{} {} участника {} заявки {}: {} передан в 1С:УСК, изменения из задачи версии {} не применены",
+        log.warn("{} {} участника {} заявки {}: {} {}, изменения из задачи версии {} не применены",
                 kind(), record.id(), record.participantId(), issue.task().individualRequestId(), kind(),
-                issue.task().entityVersion());
+                frozenBecause, issue.task().entityVersion());
     }
 
     private boolean changesFor(R record, Issue issue) {
         try {
             IssueData data = read(issue);
-            return !sameTerms(record.state(), issue, data) || parties.differ(owner(record), data.snapshot());
+            return !keepsTerms(record, issue, data.program()) || parties.differ(owner(record), data.snapshot());
         }
         catch (ParticipantDataException invalid) {
             return true;
         }
     }
 
-    private static boolean sameTerms(IssuanceState state, Issue issue, IssueData data) {
-        return state.period().equals(issue.period()) && state.programId().filter(data.program()::equals).isPresent();
+    protected boolean keepsTerms(R record, Issue issue, UUID program) {
+        IssuanceState state = record.state();
+        return state.period().equals(issue.period()) && state.programId().filter(program::equals).isPresent();
     }
 
     private record IssueData(List<Party> snapshot, UUID program) {

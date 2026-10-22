@@ -15,12 +15,13 @@ import ru.projectx.contracts.repository.ContractRepository;
 public class KmContractIssuance extends RecordIssuance<Contract> {
 
     static final String KIND = "договор КМ";
+    static final String ACCEPTED = "акцептован";
 
     private final ContractRepository contracts;
     private final ContractNumbers numbers;
 
     public KmContractIssuance(ContractRepository contracts, ContractNumbers numbers, PartySnapshotStore parties) {
-        super(parties);
+        super(parties, ACCEPTED);
         this.contracts = contracts;
         this.numbers = numbers;
     }
@@ -51,8 +52,14 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     }
 
     @Override
-    protected boolean submitted(Contract contract) {
-        return false;
+    protected boolean frozen(Contract contract) {
+        return contract.offerAccepted();
+    }
+
+    @Override
+    protected boolean keepsTerms(Contract contract, Issue issue, UUID program) {
+        return super.keepsTerms(contract, issue, program)
+                && contract.premiumAmount().compareTo(issue.participant().amountDue()) == 0;
     }
 
     @Override

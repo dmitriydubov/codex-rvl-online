@@ -14,11 +14,12 @@ import ru.projectx.contracts.repository.LmPolicyRepository;
 public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
 
     static final String KIND = "полис ЛМ";
+    static final String SUBMITTED = "передан в 1С:УСК";
 
     private final LmPolicyRepository policies;
 
     public LmPolicyIssuance(LmPolicyRepository policies, PartySnapshotStore parties) {
-        super(parties);
+        super(parties, SUBMITTED);
         this.policies = policies;
     }
 
@@ -43,9 +44,10 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
     }
 
     @Override
-    protected boolean submitted(LmPolicy policy) {
+    protected boolean frozen(LmPolicy policy) {
         return policy.submitted();
     }
+
 
     @Override
     protected boolean reviseTerms(LmPolicy policy, Issue issue, UUID program) {

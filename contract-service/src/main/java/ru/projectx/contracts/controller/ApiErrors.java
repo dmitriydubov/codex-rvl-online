@@ -23,6 +23,14 @@ final class ApiErrors {
                 List.of(new ErrorResponse.FieldViolation(field, reason)));
     }
 
+    static ResponseEntity<ErrorResponse> invalidFields(List<ErrorResponse.FieldViolation> violations) {
+        return of(HttpStatus.BAD_REQUEST, VALIDATION_ERROR, "запрос не соответствует формату", violations);
+    }
+
+    static ResponseEntity<ErrorResponse> conflictOnField(String code, String message, String field, String reason) {
+        return of(HttpStatus.CONFLICT, code, message, List.of(new ErrorResponse.FieldViolation(field, reason)));
+    }
+
     private static ResponseEntity<ErrorResponse> of(HttpStatus status, String code, String message,
             List<ErrorResponse.FieldViolation> details) {
         return ResponseEntity.status(status).body(ErrorResponse.of(code, message, details, RequestIds.current()));

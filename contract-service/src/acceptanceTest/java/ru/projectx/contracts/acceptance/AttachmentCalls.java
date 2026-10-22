@@ -88,4 +88,16 @@ public class AttachmentCalls {
             }
         }));
     }
+
+    void exchange(String method, String path, Optional<String> requestId, Optional<String> json)
+            throws IOException, InterruptedException {
+        HttpRequest.Builder call = HttpRequest.newBuilder(URI.create(base + path)).timeout(TIMEOUT)
+                .method(method, json.map(body -> HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                        .orElseGet(HttpRequest.BodyPublishers::noBody));
+        json.ifPresent(body -> call.header("Content-Type", "application/json"));
+        requestId.ifPresent(value -> call.header(REQUEST_ID, value));
+        HttpResponse<String> response = http.send(call.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        answers.add(new Answer(response.statusCode(), response.headers().firstValue(REQUEST_ID), requestId,
+                response.body()));
+    }
 }
