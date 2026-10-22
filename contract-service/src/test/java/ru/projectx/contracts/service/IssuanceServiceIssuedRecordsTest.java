@@ -117,6 +117,32 @@ class IssuanceServiceIssuedRecordsTest {
     }
 
     @Test
+    void insuredWithIssuedContractWhoStopsPaying_keepsTheContractInTheCompositionAndWarns() {
+        Contract insuredContract = Issuances.issuedContract("4a2b3c5d-6e7f-4081-9a2b-1c2d3e4f5a6b", Tasks.INSURED,
+                "DKM-2026-000002");
+        active(List.of(insuredContract), List.of());
+
+        List<RequestParticipant> composition = service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        assertThat(insuredContract.status()).isEqualTo(ContractStatus.ISSUED);
+        verifyNoInteractions(kmContracts, lmPolicies);
+        assertThat(composition).containsExactly(new RequestParticipant(Tasks.INSURED, DocumentKind.KM_CONTRACT));
+        assertThat(warnings()).hasSize(1);
+    }
+
+    @Test
+    void openRecordBesideAnIssuedOne_isCancelledWhenTheParticipantIsExcluded() {
+        LmPolicy open = Issuances.policy("9f3e1c28-6b55-4da1-93f4-82a1d7b56e40", Tasks.CHILD);
+        active(List.of(), List.of(policy, open));
+
+        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        assertThat(open.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.ISSUED);
+        assertThat(journal.list).isEmpty();
+    }
+
+    @Test
     void participantWithIssuedContractMissingFromTask_keepsTheContractAndWarns() {
         active(List.of(contract), List.of());
 

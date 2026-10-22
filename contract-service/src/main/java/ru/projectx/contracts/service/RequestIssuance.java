@@ -14,10 +14,14 @@ public final class RequestIssuance {
     private final Map<UUID, ActiveIssuance> byParticipant = new LinkedHashMap<>();
 
     public RequestIssuance(List<Contract> contracts, List<LmPolicy> policies) {
-        contracts.forEach(contract -> byParticipant.put(contract.participantId(),
-                new ActiveIssuance(DocumentKind.KM_CONTRACT, KmContractIssuance.KIND, contract)));
-        policies.forEach(policy -> byParticipant.put(policy.participantId(),
-                new ActiveIssuance(DocumentKind.LM_POLICY, LmPolicyIssuance.KIND, policy)));
+        contracts.forEach(contract -> byParticipant.merge(contract.participantId(),
+                new ActiveIssuance(DocumentKind.KM_CONTRACT, KmContractIssuance.KIND, contract), RequestIssuance::open));
+        policies.forEach(policy -> byParticipant.merge(policy.participantId(),
+                new ActiveIssuance(DocumentKind.LM_POLICY, LmPolicyIssuance.KIND, policy), RequestIssuance::open));
+    }
+
+    private static ActiveIssuance open(ActiveIssuance known, ActiveIssuance another) {
+        return known.issued() && !another.issued() ? another : known;
     }
 
     public Optional<ActiveIssuance> of(UUID participantId) {

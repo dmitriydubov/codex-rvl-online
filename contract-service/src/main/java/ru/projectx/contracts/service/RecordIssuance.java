@@ -32,7 +32,7 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
         }
         IssueData data;
         try {
-            data = new IssueData(parties(issue), issue.program());
+            data = IssueData.of(parties(issue), issue);
         }
         catch (ParticipantDataException invalid) {
             IssueError error = new IssueError(invalid.code(), invalid.getMessage());
@@ -82,7 +82,7 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
 
     private boolean changesFor(R record, Issue issue) {
         try {
-            IssueData data = new IssueData(parties(issue), issue.program());
+            IssueData data = IssueData.of(parties(issue), issue);
             return !keepsTerms(record, issue, data.program()) || parties.differ(owner(record), data.snapshot());
         }
         catch (ParticipantDataException invalid) {
@@ -96,5 +96,9 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
     }
 
     private record IssueData(List<Party> snapshot, UUID program) {
+
+        static IssueData of(List<Party> snapshot, Issue issue) {
+            return new IssueData(snapshot, issue.program());
+        }
     }
 }
