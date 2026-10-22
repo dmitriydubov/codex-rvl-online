@@ -112,7 +112,7 @@ class LmPolicyRaceIT {
             usk.setAutoCommit(false);
             issueUncommitted(usk);
             Future<?> rejection = inAnotherThread(() -> outcomes.record(requestMessageId, NO_ROUTE));
-            commitOnceTheOtherWaitsForTheRow(usk);
+            commitOnceTheOtherWaitsForTheRow(usk, rejection);
             awaitOutcome(rejection);
         }
 
@@ -131,7 +131,7 @@ class LmPolicyRaceIT {
             publisher.setAutoCommit(false);
             markUndeliveredUncommitted(publisher);
             Future<?> issue = inAnotherThread(() -> recording.recordIssued(policyId, ISSUED, List.of(FORM), NOW));
-            commitOnceTheOtherWaitsForTheRow(publisher);
+            commitOnceTheOtherWaitsForTheRow(publisher, issue);
             awaitOutcome(issue);
         }
 
@@ -210,8 +210,8 @@ class LmPolicyRaceIT {
         }
     }
 
-    private void commitOnceTheOtherWaitsForTheRow(Connection connection) throws SQLException {
-        Awaitility.await().atMost(LOCK_WAIT).until(() -> jdbc.sql("select count(*) from pg_stat_activity"
+    private void commitOnceTheOtherWaitsForTheRow(Connection connection, Future<?> other) throws SQLException {
+        Awaitility.await().atMost(LOCK_WAIT).until(() -> other.isDone() || jdbc.sql("select count(*) from pg_stat_activity"
                 + " where datname = current_database() and wait_event_type = 'Lock'").query(Integer.class).single() > 0);
         connection.commit();
     }

@@ -94,13 +94,14 @@ class UndeliveredLmPolicyRequestsTest {
     void issuedPolicy_keepsTheIssueWithoutErrorOrAnswer() {
         policy.submit(Issuances.OPENED);
         policy.markIssued(ISSUED, NOW);
+        int issuedVersion = policy.state().entityVersion();
 
         undelivered.rejected(POLICY_ID, NOW);
 
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.ISSUED);
         assertThat(policy.issued()).contains(ISSUED);
         assertThat(policy.state().error()).isEmpty();
-        assertThat(policy.state().entityVersion()).isEqualTo(3);
+        assertThat(policy.state().entityVersion()).isEqualTo(issuedVersion);
         verifyNoInteractions(statuses);
     }
 
