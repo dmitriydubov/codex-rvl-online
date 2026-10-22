@@ -92,7 +92,7 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 | `S3_ENDPOINT` | — | адрес S3 со схемой и портом, без слэша на конце, например `https://s3.contour:9000` |
 | `S3_REGION` | `us-east-1` | регион S3; без него клиент спрашивал бы регион бакета отдельным запросом |
 | `S3_BUCKET` | — | бакет справок |
-| `S3_BASE_PATH` | `certificates` | начало ключа объекта без слэшей по краям: `{base-path}/{uuid}/{вложение}.{jpg\|png}` |
+| `S3_BASE_PATH` | `certificates` | начало ключа объекта без слэшей по краям: `{base-path}/{uuid}/{вложение}.{jpg\|png\|pdf}` |
 | `S3_ACCESS_KEY` | — | ключ доступа; только из окружения |
 | `S3_SECRET_KEY` | — | секретный ключ; только из окружения |
 | `S3_SSL_BUNDLE` | пусто | имя набора SSL Spring Boot с сертификатом внутреннего УЦ; пусто — доверие JVM |
@@ -105,7 +105,7 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 Сертификат внутреннего УЦ для S3 задаётся набором SSL Spring Boot, например:
 `SPRING_SSL_BUNDLE_PEM_STORAGE_TRUSTSTORE_CERTIFICATE=file:/etc/contract-service/s3-ca.pem` и `S3_SSL_BUNDLE=storage`.
 Каждая одновременная загрузка держит файл в памяти, до 10 МБ: кучу считают от ожидаемого числа одновременных
-загрузок справок. Допустимые типы файлов справки — `image/jpeg` и `image/png`, список с расширениями объектов — в `application.yml`
+загрузок справок. Допустимые типы файлов справки — `image/jpeg`, `image/png` и `application/pdf`, список с расширениями объектов — в `application.yml`
 (`projectx.attachments.content-types`).
 
 Брокеры настраиваются одинаково, у каждого свой префикс: `RABBITMQ_INTERNAL_*` — межсервисный брокер контура,
@@ -208,7 +208,7 @@ data-reference должен быть поднят раньше: на машин�
 | `contracts_lm_policies_awaiting_overdue` | сколько полисов ЛМ ждут ответа 1С:УСК дольше `LM_POLICY_REQUEST_AWAITING_THRESHOLD`; снимок того же прохода |
 | `contracts_reference_unavailable_total{kind}` | справочный сервис не ответил после всех повторов; `kind` — `program`, `insurance_contract`, `policy` |
 | `contracts_attachments_stored_total` | справка 070/у впервые записана в реестр документов (повтор того же вложения не считается) |
-| `contracts_attachments_rejected_total{reason}` | файл справки отклонён; `reason` — `content_type` (тип не JPEG и не PNG), `size` (пустой, больше предела справки или больше предела контейнера) |
+| `contracts_attachments_rejected_total{reason}` | файл справки отклонён; `reason` — `content_type` (тип не JPEG, не PNG и не PDF), `size` (пустой, больше предела справки или больше предела контейнера) |
 | `contracts_storage_unavailable_total` | загрузка справки получила 503: хранилище S3 не ответило успехом |
 
 Пул соединений базы — метрики `hikaricp_*` с меткой `pool="application"`. Подключения брокеров — метрики `rabbitmq_*`
