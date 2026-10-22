@@ -1,7 +1,6 @@
 package ru.projectx.contracts.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.entry;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -13,16 +12,13 @@ class DatabaseTimeoutsPropertiesTest {
             .withUserConfiguration(Timeouts.class);
 
     @Test
-    void completeConfiguration_bindsTheThreeSessionTimeoutsByPostgresParameter() {
+    void completeConfiguration_bindsTheThreeSessionTimeouts() {
         runner.withPropertyValues(
                 "projectx.database.session-timeouts.lock-timeout=5s",
                 "projectx.database.session-timeouts.statement-timeout=30s",
                 "projectx.database.session-timeouts.idle-in-transaction-session-timeout=1min")
-                .run(context -> assertThat(context.getBean(DatabaseTimeoutsProperties.class).byParameter())
-                        .containsExactly(
-                                entry("lock_timeout", "5s"),
-                                entry("statement_timeout", "30s"),
-                                entry("idle_in_transaction_session_timeout", "1min")));
+                .run(context -> assertThat(context.getBean(DatabaseTimeoutsProperties.class))
+                        .isEqualTo(new DatabaseTimeoutsProperties("5s", "30s", "1min")));
     }
 
     @Test

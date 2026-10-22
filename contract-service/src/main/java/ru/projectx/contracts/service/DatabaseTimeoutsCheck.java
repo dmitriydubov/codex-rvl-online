@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,14 +20,14 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseTimeoutsCheck.class);
 
-    private final DatabaseTimeoutsProperties configured;
+    private final Map<String, String> configured;
     private final SessionSettingsRepository sessionSettings;
     private final List<String> parameters;
 
-    public DatabaseTimeoutsCheck(DatabaseTimeoutsProperties configured, SessionSettingsRepository sessionSettings) {
-        this.configured = configured;
+    public DatabaseTimeoutsCheck(DatabaseTimeoutsProperties timeouts, SessionSettingsRepository sessionSettings) {
+        this.configured = byParameter(timeouts);
         this.sessionSettings = sessionSettings;
-        this.parameters = List.copyOf(configured.byParameter().keySet());
+        this.parameters = List.copyOf(configured.keySet());
     }
 
     @Override
@@ -46,7 +47,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
     }
 
     private void check(Map<String, Duration> actual) {
-        for (Map.Entry<String, String> setting : configured.byParameter().entrySet()) {
+        for (Map.Entry<String, String> setting : configured.entrySet()) {
             checkParameter(setting.getKey(), setting.getValue(), actual);
         }
     }
@@ -62,5 +63,13 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
             log.warn("таймаут сеанса PostgreSQL расходится с настройкой: параметр={}, ожидается={}, фактически={}",
                     parameter, expected.get(), found.map(Duration::toString).orElse("неизвестно"));
         }
+    }
+
+    private static Map<String, String> byParameter(DatabaseTimeoutsProperties timeouts) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("lock_timeout", timeouts.lockTimeout());
+        values.put("statement_timeout", timeouts.statementTimeout());
+        values.put("idle_in_transaction_session_timeout", timeouts.idleInTransactionSessionTimeout());
+        return values;
     }
 }
