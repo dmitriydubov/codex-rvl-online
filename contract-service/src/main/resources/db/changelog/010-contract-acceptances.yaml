@@ -1,0 +1,35 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 010-contract-acceptances
+      author: contract-service
+      comment: >
+        Акцепт оферты договора КМ: одна неизменяемая запись на договор. Застрахованное лицо принимает
+        оферту по данным договора той версии, которую видело в личном кабинете, поэтому запись хранит
+        версию договора, а не документ: проекта печатной формы у сервиса нет. Кто принял оферту — пользователь
+        сервиса Заявок, когда — момент на стороне сервиса Заявок, канал — веб или мобильное приложение;
+        адрес и клиент принявшего необязательны и хранятся только здесь. Уникальность по договору не даёт
+        записать второй акцепт.
+      changes:
+        - sql:
+            sql: CREATE TYPE acceptance_channel AS ENUM ('WEB', 'MOBILE');
+        - createTable:
+            tableName: contract_acceptances
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_contract_acceptances, nullable: false } }
+              - column: { name: contract_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_contract_acceptances_contract, references: contracts(id) } }
+              - column: { name: contract_version, type: int, constraints: { nullable: false } }
+              - column: { name: accepted_by, type: uuid, constraints: { nullable: false } }
+              - column: { name: accepted_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: channel, type: acceptance_channel, constraints: { nullable: false } }
+              - column: { name: ip_address, type: inet }
+              - column: { name: user_agent, type: text }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: contract_acceptances
+            columnNames: contract_id
+            constraintName: uq_contract_acceptances_contract_id
+      rollback:
+        - dropTable: { tableName: contract_acceptances }
+        - sql:
+            sql: DROP TYPE acceptance_channel;

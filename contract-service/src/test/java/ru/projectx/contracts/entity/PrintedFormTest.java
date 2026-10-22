@@ -49,6 +49,14 @@ class PrintedFormTest {
     }
 
     @Test
+    void lmPolicyForm_isTheFirstVersion() {
+        PrintedForm form = PrintedForm.issuedForLmPolicy(ATTACHMENT.participantId(),
+                new UskDocument(PrintedFormType.POLICY, "https://s3.example.test/lm/0555123456.pdf", 96256L), NOW);
+
+        assertThat(form.version()).isEqualTo(1);
+    }
+
+    @Test
     void onlyContractPolicyAndAppendix_areIssuedByTheUsk() {
         assertThat(PrintedFormType.values()).filteredOn(PrintedFormType::issuedByUsk)
                 .containsExactly(PrintedFormType.CONTRACT, PrintedFormType.POLICY, PrintedFormType.APPENDIX);

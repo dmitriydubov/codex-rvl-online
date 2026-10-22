@@ -32,6 +32,7 @@ public class IssuanceRecords {
             order by created_at, id
             """;
     private static final String LM_POLICY = "полис ЛМ";
+    private static final String KM_CONTRACT = "договор КМ";
 
     private static final String PERSONS = """
             select role::text as role, participant_id, last_name, first_name, middle_name, birth_date, gender::text as gender,
@@ -100,5 +101,14 @@ public class IssuanceRecords {
                 row.getString("first_name"), row.getString("middle_name"), row.getObject("birth_date", LocalDate.class),
                 row.getString("gender"), row.getString("relation_type"), row.getString("document_type"),
                 row.getString("document_series"), row.getString("document_number"));
+    }
+
+    UUID latestContractId(String participantId, String requestId) {
+        List<Record> contracts = of(participantId, requestId).stream()
+                .filter(record -> KM_CONTRACT.equals(record.document())).toList();
+        if (contracts.isEmpty()) {
+            throw new AssertionError("у участника " + participantId + " заявки " + requestId + " нет договора КМ");
+        }
+        return contracts.get(contracts.size() - 1).id();
     }
 }
