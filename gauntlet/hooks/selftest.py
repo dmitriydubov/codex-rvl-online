@@ -694,17 +694,46 @@ def gradle_properties_tests(repo):
 
 def frozen_commit_tests():
     """However the frozen spec was changed (a script, a patch, an interpreter fed on stdin - ways the edit checks
-    cannot see), no git command may commit the change; merging the base branch still brings its approved specs."""
+    cannot see), no git command may commit or push the change; merging the base branch still brings its approved specs,
+    and the task's own remote branch brings the human's fixes."""
     repo = make_repo()
     root = os.path.dirname(repo)
     feature = FEATURES + "/order.feature"
+    shared = FEATURES + "/shared.feature"
     code = M + "src/main/java/com/example/service/domain/Order.java"
+    shared_lines = ["# language: ru", "Функция: Общая", "", "  Сценарий: первый", "    Дано a", "",
+                    "  Сценарий: второй", "    Дано b", ""]
     try:
+        git(repo, "checkout", "-q", "-b", "next-main", "origin/main")
+        write(repo, shared, "\n".join(shared_lines))
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "spec: shared, an earlier task")
+        git(repo, "push", "-q", "origin", "next-main:main")
+        git(repo, "checkout", "-q", "claude/feature-x")
+        git(repo, "fetch", "-q", "origin")
+        git(repo, "merge", "-q", "--ff-only", "origin/main")
+
         write(repo, feature, "# language: ru\nФункция: Заказ\n")
+        write(repo, shared, "\n".join(["# language: ru", "Функция: Общая, дополнена задачей"] + shared_lines[2:]))
         git(repo, "add", "-A")
         expect_allow(repo, "spec commit itself (draft, not frozen yet)", "main", "Bash", command="git commit -m 'spec: order'")
         git(repo, "commit", "-q", "-m", "spec: order")
         spec_head = git(repo, "rev-parse", "HEAD")
+        expect_allow(repo, "first push of the task branch", "main", "Bash", command="git push -u origin HEAD")
+        git(repo, "push", "-q", "-u", "origin", "claude/feature-x")
+
+        git(repo, "checkout", "-q", "-b", "human", "origin/claude/feature-x")
+        write(repo, feature, "# language: ru\nФункция: Заказ, исправлен человеком\n")
+        git(repo, "commit", "-q", "-am", "spec: fix by the human")
+        git(repo, "push", "-q", "origin", "human:claude/feature-x")
+        git(repo, "checkout", "-q", "claude/feature-x")
+        git(repo, "branch", "-q", "-D", "human")
+        git(repo, "fetch", "-q", "origin")
+        for name, command in [("pull --ff-only", "git pull --ff-only"), ("merge @{u}", "git merge @{u}"),
+                              ("merge the own remote branch", "git fetch origin && git merge origin/claude/feature-x")]:
+            expect_allow(repo, f"frozen: human's spec fix from the own remote branch, {name}", "main", "Bash",
+                         command=command)
+        git(repo, "merge", "-q", "--ff-only", "origin/claude/feature-x")
 
         write(repo, feature, "# language: ru\nФункция: Заказ изменён скриптом\n")
         git(repo, "add", "-A")
@@ -712,7 +741,7 @@ def frozen_commit_tests():
                               ("git -C repo commit", f"git -C {repo} commit -m x"),
                               ("cd repo && commit", f"cd {repo} && git commit -m x"),
                               ("bash -c commit", "bash -c 'git commit -m x'"),
-                              ("commit after a heredoc script", f"python3 - <<'EOF'\nprint(1)\nEOF\ngit commit -m x")]:
+                              ("commit after a heredoc script", "python3 - <<'EOF'\nprint(1)\nEOF\ngit commit -m x")]:
             r = guard(repo, "main", "Bash", command=command)
             check(f"frozen: staged spec change, {name}", r is not None and "frozen" in r, repr(r))
         git(repo, "reset", "-q")
@@ -720,7 +749,15 @@ def frozen_commit_tests():
         check("frozen: unstaged spec change blocks any commit", r is not None and "frozen" in r, repr(r))
         r = guard(repo, "hardener", "Bash", command="git commit -m tests")
         check("frozen: hardener commit with a spec change", r is not None and "frozen" in r, repr(r))
-        git(repo, "checkout", "-q", "--", feature)
+        git(repo, "stash", "-q")
+        r = guard(repo, "main", "Bash", command="git push origin 'stash@{0}:refs/heads/claude/feature-x'")
+        check("frozen: push of a stash carrying a spec change", r is not None and "frozen" in r, repr(r))
+        git(repo, "branch", "-q", "smuggle", "stash@{0}")
+        r = guard(repo, "main", "Bash", command="git push origin smuggle:claude/feature-x")
+        check("frozen: push of a branch made from a stash", r is not None and "frozen" in r, repr(r))
+        git(repo, "branch", "-q", "-D", "smuggle")
+        git(repo, "stash", "drop", "-q")
+        expect_deny(repo, "frozen: push of every branch", "main", "Bash", command="git push --all origin")
 
         write(repo, code, "package com.example.service.domain;\npublic class Order { }\n")
         git(repo, "add", "-A")
@@ -729,12 +766,24 @@ def frozen_commit_tests():
                      command="git commit -m 'explain --work-tree and GIT_DIR=x'")
         expect_allow(repo, "frozen: heredoc message with a git am line", "main", "Bash",
                      command="git commit -F - <<'EOF'\ngit am notes\nEOF")
+        expect_allow(repo, "frozen: git am mentioned in a quoted PR body", "main", "Bash",
+                     command="gh pr create --title t --body 'Applied by hand, not with `git am`.'")
+        expect_allow(repo, "frozen: commit message naming git cherry-pick", "main", "Bash",
+                     command="git commit -m \"code\n\ngit cherry-pick HEAD~1 is not needed\"")
+        expect_allow(repo, "frozen: read-only --git-dir next to a commit", "main", "Bash",
+                     command="git rev-parse --git-dir && git commit -am code")
         expect_deny(repo, "frozen: commit with another work tree", "main", "Bash", command="GIT_WORK_TREE=/tmp/x git commit -a")
         expect_deny(repo, "frozen: --work-tree commit", "main", "Bash", command="git --work-tree=/tmp/x commit -am x")
         expect_deny(repo, "frozen: commit with another index", "main", "Bash", command="GIT_INDEX_FILE=/tmp/i git commit -m x")
         expect_deny(repo, "frozen: commit-tree", "main", "Bash", command="git commit-tree HEAD^{tree} -p HEAD -m x")
         expect_deny(repo, "frozen: fast-import", "main", "Bash", command="git fast-import < /tmp/stream")
+        for form in ("--show-current-patch=diff", "-r", "--allow-empty"):
+            expect_allow(repo, f"frozen: git am {form} without a spec change", "main", "Bash", command=f"git am {form}")
         git(repo, "commit", "-q", "-m", "code")
+        expect_allow(repo, "frozen: push of code commits", "main", "Bash", command="git push")
+        expect_allow(repo, "frozen: push -u origin HEAD", "main", "Bash", command="git push -u origin HEAD")
+        r = run_hook(repo, "guard.py", {"tool_name": "Bash", "cwd": ["a"], "tool_input": {"command": "git commit -m x"}})
+        check("frozen: malformed cwd fails open", r.returncode == 0 and not r.stdout.strip(), r.stdout + r.stderr)
 
         side = os.path.join(root, "side")
         git(repo, "worktree", "add", "-q", "-b", "side", side, "HEAD")
@@ -773,21 +822,35 @@ def frozen_commit_tests():
         expect_deny(repo, "frozen: am with remapped paths", "main", "Bash", command=f"git am --directory=x {code_patch}")
         expect_allow(repo, "frozen: am --abort", "main", "Bash", command="git am --abort")
 
-        git(repo, "checkout", "-q", "-b", "next-main", "origin/main")
+        git(repo, "checkout", "-q", "next-main")
+        git(repo, "merge", "-q", "--ff-only", "origin/main")
         write(repo, FEATURES + "/approved_elsewhere.feature", "# language: ru\nФункция: Уже утверждена в другой задаче\n")
+        write(repo, shared, "\n".join(shared_lines[:-2] + ["    Дано b, уточнено другой задачей", ""]))
+        write(repo, code, "package com.example.service.domain;\npublic class Order { long y; }\n")
         git(repo, "add", "-A")
-        git(repo, "commit", "-q", "-m", "spec: another task")
+        git(repo, "commit", "-q", "-m", "another task")
         git(repo, "push", "-q", "origin", "next-main:main")
         git(repo, "checkout", "-q", "claude/feature-x")
         git(repo, "fetch", "-q", "origin")
+        expect_allow(repo, "frozen: cherry-pick a base commit", "main", "Bash", command="git cherry-pick origin/main")
         expect_allow(repo, "frozen: merge the base branch with another task's spec", "main", "Bash",
                      command="git fetch origin main && git merge origin/main")
-        git(repo, "merge", "-q", "--no-commit", "--no-ff", "origin/main")
-        expect_allow(repo, "frozen: conclude the base merge", "main", "Bash", command="git commit -m 'merge main'")
+        sh(repo, "git", "merge", "--no-commit", "--no-ff", "origin/main")
+        write(repo, code, "package com.example.service.domain;\npublic class Order { long y; }\n")
+        git(repo, "add", code)
+        expect_allow(repo, "frozen: conclude the base merge (code conflict, shared spec merged by git)", "main", "Bash",
+                     command="git commit -m 'merge main'")
         expect_allow(repo, "frozen: merge --continue on the base merge", "main", "Bash", command="git merge --continue")
         write(repo, FEATURES + "/approved_elsewhere.feature", "# language: ru\nФункция: Изменена при слиянии\n")
         r = guard(repo, "main", "Bash", command="git commit -m 'merge main'")
         check("frozen: base merge with a changed spec file", r is not None and "frozen" in r, repr(r))
+        git(repo, "checkout", "-q", "MERGE_HEAD", "--", FEATURES + "/approved_elsewhere.feature")
+        git(repo, "commit", "-q", "-m", "merge main")
+        expect_allow(repo, "frozen: push after the base merge", "main", "Bash", command="git push")
+        write(repo, feature, "# language: ru\nФункция: Заказ, закоммичен в обход\n")
+        git(repo, "commit", "-q", "-am", "spec change that got past the commit check")
+        r = guard(repo, "main", "Bash", command="git push")
+        check("frozen: push of a committed spec change", r is not None and "frozen" in r, repr(r))
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

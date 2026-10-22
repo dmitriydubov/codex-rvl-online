@@ -244,8 +244,8 @@ def frozen_reason(rel):
 
 def command_violation(agent, command, ctx, shell_cwd=None):
     command = with_nested_commands(command)
-    start = shell_cwd if shell_cwd and os.path.isdir(shell_cwd) else ctx.project   # the shell keeps its `cd`
-    reason = human_only(command, ctx) or frozen_spec_commits(command, ctx, start)
+    start = shell_cwd if isinstance(shell_cwd, str) and shell_cwd and os.path.isdir(shell_cwd) else ctx.project
+    reason = human_only(command, ctx) or frozen_spec_commits_or_none(command, ctx, start)
     if reason:
         return reason
     scope = ctx.role_scope(agent)
@@ -435,11 +435,14 @@ def git_human_only(args, ctx):
     return None
 
 
-# ----------------------------------------------------------------------------- frozen spec at commit time
+# ----------------------------------------------------------------------------- frozen spec at commit and push time
 #
 # The Edit/Write and shell checks cannot see every way to write a file (a script file, a patch, code fed to an
-# interpreter on stdin). A change to the specification counts only once it is committed, so while the spec is frozen
-# every git command that creates commits is checked for what it would commit.
+# interpreter on stdin). A change to the specification counts only once it is committed and pushed, so while the spec
+# is frozen every git command that creates commits is checked for what it would commit, and every push for what it
+# would put on the remote branch. Content already on the base branch or on the task's own remote branch (only guarded
+# pushes and the human write there) is trusted: merging the base brings other tasks' approved specs, and pulling the
+# own branch brings the human's fixes.
 
 COMMIT_CREATING = {"commit", "merge", "cherry-pick", "am"}
 COMMIT_PLUMBING = {"commit-tree", "fast-import"}
@@ -448,17 +451,30 @@ MERGE_VALUE_OPTIONS = {"-m", "-F", "-s", "-X", "--message", "--file", "--strateg
 CHERRY_PICK_VALUE_OPTIONS = {"-m", "--mainline", "-X", "--strategy", "--strategy-option", "--cleanup"}
 AM_VALUE_OPTIONS = {"-C", "--whitespace", "--resolvemsg", "--quoted-cr", "--empty", "--patch-format"}
 AM_PATH_REMAPPING = ("-p", "--directory", "--include", "--exclude")
+PUSH_VALUE_OPTIONS = {"--repo", "-o", "--push-option", "--receive-pack", "--exec", "--signed"}
+PUSH_EVERYTHING = ("--all", "--mirror", "--branches")
 SEQUENCER_EXITS = ("--abort", "--quit", "--skip", "--show-current-patch")
-OTHER_LOCATION = re.compile(r"\bGIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)=|--git-dir\b|--work-tree\b"
-                            r"|core\.worktree|core\.bare")
+SEQUENCER_CONCLUDES = {"--continue", "--resolved", "-r", "--allow-empty"}
+OTHER_LOCATION_ENV = re.compile(r"\bGIT_(?:DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR)=")
+OTHER_LOCATION_OPTION = re.compile(r"^--git-dir\b|^--work-tree\b|core\.worktree|core\.bare")
 PATCH_PATH = re.compile(r'^(?:diff --git "?a/(\S+?)"? "?b/(\S+?)"?|(?:---|\+\+\+) "?[ab]/(\S+?)"?(?:\t.*)?|'
                         r'(?:rename|copy) (?:from|to) "?(\S+?)"?)$', re.M)
+
+
+def frozen_spec_commits_or_none(command, ctx, cwd):
+    try:
+        return frozen_spec_commits(command, ctx, cwd)
+    except (ValueError, TypeError, OSError):
+        return None                       # fails open on malformed input, like the rest of the hook
 
 
 def frozen_spec_commits(command, ctx, cwd):
     command = strip_heredocs(command)        # a heredoc body (a commit message) is text, not commands
     unquoted = QUOTED.sub("''", command)
-    for segment in segments(command):
+    # in single quotes everything is literal; in double quotes $( and ` still run, separators and newlines do not
+    inert = QUOTED.sub(lambda m: re.sub(r"[;&|()`\n]" if m.group(0)[0] == "'" else r"[;&|\n]", "_", m.group(0)),
+                       command)
+    for segment in segments(inert):
         words = words_of(segment)
         cwd = follow_cd(words, cwd, ctx.project)
         if len(words) > 1 and os.path.basename(words[0]) == "git":
@@ -470,7 +486,7 @@ def frozen_spec_commits(command, ctx, cwd):
 
 def frozen_spec_commit(args, ctx, cwd, command):
     sub = git_subcommand(args)
-    if sub not in COMMIT_CREATING and sub not in COMMIT_PLUMBING:
+    if sub not in COMMIT_CREATING and sub not in COMMIT_PLUMBING and sub != "push":
         return None
     rest = args[args.index(sub) + 1:]
     repo = repository_of(args, cwd)
@@ -479,11 +495,14 @@ def frozen_spec_commit(args, ctx, cwd, command):
     spec = ctx if os.path.realpath(repo) == os.path.realpath(ctx.project) else Context(repo)
     if sub in COMMIT_PLUMBING:
         return plumbing_reason(sub) if ctx.frozen or spec.frozen else None
-    if any(a in SEQUENCER_EXITS for a in rest):
+    if any(a.startswith(SEQUENCER_EXITS) for a in rest):
         return None
-    if OTHER_LOCATION.search(command):
+    if OTHER_LOCATION_ENV.search(command) or any(OTHER_LOCATION_OPTION.search(a) for a in args[:args.index(sub)]):
         return location_reason(sub) if spec.frozen else None
-    changed = spec_changes(sub, rest, spec, cwd)
+    if sub == "push":
+        changed = pushed_spec_changes(rest, spec)
+    else:
+        changed = spec_changes(sub, rest, spec, cwd)
     if not changed or not spec.frozen:
         return None
     return frozen_commit_reason(sub, changed)
@@ -502,7 +521,7 @@ def repository_of(args, cwd):
 
 
 def spec_changes(sub, rest, spec, cwd):
-    if sub == "commit" or "--continue" in rest or "--resolved" in rest:
+    if sub == "commit" or SEQUENCER_CONCLUDES & set(rest):
         return pending_spec_changes(spec)
     if sub == "merge":
         return merged_spec_changes(rest, spec)
@@ -512,14 +531,17 @@ def spec_changes(sub, rest, spec, cwd):
 
 
 def pending_spec_changes(spec):
-    """Spec files that differ from HEAD in the index or the working tree; while a merge of the base branch is being
-    concluded, a file that is exactly the base's version is the base's own change, not the agent's."""
+    """Spec files that differ from HEAD in the index or the working tree. While a merge of trusted content is being
+    concluded, a file that is exactly the merged-in version, or exactly git's own automatic merge of both sides, is
+    not the agent's change."""
     dirs = spec.spec_dirs
     paths = set(lines(git(spec.project, "diff", "--name-only", "HEAD", "--", *dirs)))
     paths |= set(lines(git(spec.project, "diff", "--cached", "--name-only", "HEAD", "--", *dirs)))
-    merge_head = git(spec.project, "rev-parse", "-q", "--verify", "MERGE_HEAD")
-    if paths and merge_head and from_base(spec, merge_head):
-        paths = {p for p in paths if not same_as(spec, merge_head, p)}
+    merge_head = git(spec.project, "rev-parse", "-q", "--verify", "MERGE_HEAD") if paths else ""
+    if merge_head and trusted(spec, merge_head):
+        automatic = lines(git(spec.project, "merge-tree", "--write-tree", "HEAD", merge_head))[:1]
+        paths = {p for p in paths if not same_as(spec, merge_head, p)
+                 and not (automatic and same_as(spec, automatic[0], p))}
     return sorted(paths)
 
 
@@ -527,10 +549,12 @@ def merged_spec_changes(rest, spec):
     changed = set()
     for ref in positional(rest, MERGE_VALUE_OPTIONS):
         rev = git(spec.project, "rev-parse", "-q", "--verify", ref + "^{commit}")
-        if not rev or from_base(spec, rev):
+        if not rev:
             continue
         fork = git(spec.project, "merge-base", "HEAD", rev) or "HEAD"
-        changed |= set(lines(git(spec.project, "diff", "--name-only", fork, rev, "--", *spec.spec_dirs)))
+        paths = set(lines(git(spec.project, "diff", "--name-only", fork, rev, "--", *spec.spec_dirs)))
+        if paths and not trusted(spec, rev):
+            changed |= paths
     return sorted(changed)
 
 
@@ -542,8 +566,10 @@ def picked_spec_changes(rest, spec):
         revs = lines(git(spec.project, "rev-list", arg)) if ".." in arg else \
             [git(spec.project, "rev-parse", "-q", "--verify", arg + "^{commit}")]
         for rev in filter(None, revs):
-            changed |= set(lines(git(spec.project, "diff-tree", "--no-commit-id", "--name-only", "-r", "-m", "--root",
-                                     rev, "--", *spec.spec_dirs)))
+            paths = set(lines(git(spec.project, "diff-tree", "--no-commit-id", "--name-only", "-r", "-m", "--root",
+                                  rev, "--", *spec.spec_dirs)))
+            if paths and not trusted(spec, rev):
+                changed |= paths
     return sorted(changed)
 
 
@@ -564,11 +590,50 @@ def patched_spec_changes(rest, spec, cwd):
         try:
             with open(path, encoding="utf-8", errors="replace") as f:
                 text = f.read()
-        except OSError:
+        except (OSError, ValueError):
             continue                      # git am fails on a missing file by itself
         for match in PATCH_PATH.finditer(text):
             changed |= {p for p in match.groups() if p and is_under(p, spec.features_dirs)}
     return sorted(changed)
+
+
+def pushed_spec_changes(rest, spec):
+    """What a push would change in the spec on each remote branch it updates: a pushed commit carries the spec as the
+    remote branch has it, except for files that are exactly the base's version (the base branch merged in). A branch
+    the remote does not have yet is not compared: there is nothing approved on it to protect."""
+    if any(a in PUSH_EVERYTHING for a in rest):
+        return ["(every local branch)"]
+    words = positional(rest, PUSH_VALUE_OPTIONS)
+    remote = words[0] if words else (git(spec.project, "config", f"branch.{current_branch(spec)}.remote") or "origin")
+    refspecs = words[1:] or ["HEAD"]
+    changed = set()
+    for refspec in refspecs:
+        source, _, target = refspec.lstrip("+").partition(":")
+        if not source or source.startswith("refs/tags/"):
+            continue                      # deleting a remote branch, or a tag: no branch content is pushed
+        target = target or (current_branch(spec) if source == "HEAD" else source)
+        branch = target[len("refs/heads/"):] if target.startswith("refs/heads/") else target
+        if not branch or branch.startswith("refs/"):
+            continue
+        rev = git(spec.project, "rev-parse", "-q", "--verify", source + "^{commit}")
+        remote_tip = git(spec.project, "rev-parse", "-q", "--verify", f"refs/remotes/{remote}/{branch}^{{commit}}")
+        if not rev or not remote_tip:
+            continue
+        paths = lines(git(spec.project, "diff", "--name-only", remote_tip, rev, "--", *spec.spec_dirs))
+        if not paths:
+            continue
+        automatic = lines(git(spec.project, "merge-tree", "--write-tree", remote_tip, spec.base_ref))[:1]
+        changed |= {p for p in paths if not same_content(spec, rev, spec.base_ref, p)
+                    and not (automatic and same_content(spec, rev, automatic[0], p))}
+    return sorted(changed)
+
+
+def same_content(spec, one, other, path):
+    return git_code(spec.project, "diff", "--quiet", one, other, "--", path) == 0
+
+
+def current_branch(spec):
+    return git(spec.project, "symbolic-ref", "-q", "--short", "HEAD")
 
 
 def redirected_inputs(rest):
@@ -606,8 +671,15 @@ def positional(rest, value_options):
     return found
 
 
+def trusted(spec, rev):
+    """The commit is already on the base branch or on the task's own remote branch."""
+    upstream = git(spec.project, "rev-parse", "-q", "--verify", "@{upstream}")
+    if upstream and git_code(spec.project, "merge-base", "--is-ancestor", rev, upstream) == 0:
+        return True
+    return from_base(spec, rev)
+
+
 def from_base(spec, rev):
-    """The commit is already on the base branch (merging the base brings the other tasks' approved specs)."""
     if git_code(spec.project, "merge-base", "--is-ancestor", rev, spec.base_ref) == 0:
         return True
     return spec._refresh_base() and git_code(spec.project, "merge-base", "--is-ancestor", rev, spec.base_ref) == 0
@@ -624,10 +696,12 @@ def lines(text):
 
 def frozen_commit_reason(sub, changed):
     shown = ", ".join(changed[:3]) + (f" and {len(changed) - 3} more" if len(changed) > 3 else "")
+    action = "push" if sub == "push" else "commit"
     return (f"The specification is frozen (committed on this branch, approved by the human), and this git {sub} would "
-            f"commit a change to it: {shown}. However the files were changed, only the human changes an approved spec "
-            f"(on GitHub, or in a session with GAUNTLET_GUARD=off). Leave the feature files as committed, stop and "
-            f"describe the problem to the human.")
+            f"{action} a change to it: {shown}. However the files were changed, only the human changes an approved spec "
+            f"(on GitHub, or in a session with GAUNTLET_GUARD=off); an approved file left out of the spec commit is "
+            f"committed by the human too. Leave the feature files as committed, stop and describe the problem to the "
+            f"human.")
 
 
 def plumbing_reason(sub):
