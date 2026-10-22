@@ -62,7 +62,7 @@ public class IssuedPolicyRecording {
     }
 
     private void applyResult(UUID policyId, Instant now, Consumer<LmPolicy> result) {
-        LmPolicy policy = load(policyId);
+        LmPolicy policy = policies.findLockedById(policyId).orElseThrow(() -> unknown(policyId));
         if (!policy.submitted()) {
             warnUnchanged(policy);
             return;
@@ -82,7 +82,10 @@ public class IssuedPolicyRecording {
     }
 
     private LmPolicy load(UUID policyId) {
-        return policies.findById(policyId)
-                .orElseThrow(() -> new ContractViolationException("полиса ЛМ " + policyId + " в Договорах нет"));
+        return policies.findById(policyId).orElseThrow(() -> unknown(policyId));
+    }
+
+    private static ContractViolationException unknown(UUID policyId) {
+        return new ContractViolationException("полиса ЛМ " + policyId + " в Договорах нет");
     }
 }

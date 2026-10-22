@@ -1,8 +1,10 @@
 package ru.projectx.contracts.service.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Limit;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.config.OutboxProperties;
@@ -114,6 +117,20 @@ class OutboxPublisherTest {
 
         verifyNoInteractions(broker);
         verify(outcomes).record(erased.id(), new PublishOutcome.Refused("тело сообщения стёрто по сроку хранения"));
+    }
+
+    @Test
+    void failedOutcomeRecording_endsThePassWithTheFailureBeforeTheNextMessage() {
+        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        PublishOutcome.Refused refused = new PublishOutcome.Refused("брокер вернул сообщение: NO_ROUTE (312)");
+        given(broker.publish(any())).willReturn(refused);
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка полиса занята");
+        willThrow(busy).given(outcomes).record(first.id(), refused);
+
+        assertThatThrownBy(publisher::publishDue).isSameAs(busy);
+
+        verify(broker).publish(any());
+        verify(outcomes, never()).record(second.id(), refused);
     }
 
     @Test

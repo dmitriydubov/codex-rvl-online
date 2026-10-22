@@ -32,7 +32,7 @@ public class UndeliveredLmPolicyRequests implements RejectedOutboxMessages {
 
     @Override
     public void rejected(UUID policyId, Instant now) {
-        LmPolicy policy = policies.findById(policyId)
+        LmPolicy policy = policies.findLockedById(policyId)
                 .orElseThrow(() -> new IllegalStateException("полиса ЛМ " + policyId + " нет"));
         if (!policy.submitted()) {
             log.warn("запрос на выпуск полиса ЛМ {} не доставлен, полис уже в статусе {} и не меняется",
