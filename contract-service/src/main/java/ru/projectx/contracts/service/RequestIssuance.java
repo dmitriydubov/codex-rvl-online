@@ -7,7 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.DocumentKind;
-import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.LmPolicy;
 
 public final class RequestIssuance {
@@ -16,9 +15,9 @@ public final class RequestIssuance {
 
     public RequestIssuance(List<Contract> contracts, List<LmPolicy> policies) {
         contracts.forEach(contract -> byParticipant.put(contract.participantId(),
-                new ActiveIssuance(DocumentKind.KM_CONTRACT, contract)));
+                new ActiveIssuance(DocumentKind.KM_CONTRACT, KmContractIssuance.KIND, contract)));
         policies.forEach(policy -> byParticipant.put(policy.participantId(),
-                new ActiveIssuance(DocumentKind.LM_POLICY, policy)));
+                new ActiveIssuance(DocumentKind.LM_POLICY, LmPolicyIssuance.KIND, policy)));
     }
 
     public Optional<ActiveIssuance> of(UUID participantId) {
@@ -39,7 +38,7 @@ public final class RequestIssuance {
         byParticipant.remove(participantId);
     }
 
-    public List<IssuanceRecord> leftovers() {
-        return byParticipant.values().stream().map(ActiveIssuance::record).toList();
+    public List<ActiveIssuance> leftovers() {
+        return List.copyOf(byParticipant.values());
     }
 }

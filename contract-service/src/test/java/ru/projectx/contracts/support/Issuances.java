@@ -6,7 +6,9 @@ import java.util.UUID;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
+import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.IssuanceTerms;
+import ru.projectx.contracts.entity.IssuedPolicy;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.RequestReference;
@@ -33,6 +35,20 @@ public final class Issuances {
     public static LmPolicy policy(String id, UUID participant) {
         LmPolicy policy = LmPolicy.open(new LmPolicyDraft(TERMS, participant), OPENED);
         ReflectionTestUtils.setField(policy, "id", UUID.fromString(id));
+        return policy;
+    }
+
+    public static Contract issuedContract(String id, UUID participant, String number) {
+        Contract contract = contract(id, participant, number);
+        ReflectionTestUtils.setField(contract, "status", ContractStatus.ISSUED);
+        return contract;
+    }
+
+    public static LmPolicy issuedPolicy(String id, UUID participant) {
+        LmPolicy policy = policy(id, participant);
+        policy.submit(OPENED);
+        policy.markIssued(new IssuedPolicy(UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
+                UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456"), OPENED);
         return policy;
     }
 }

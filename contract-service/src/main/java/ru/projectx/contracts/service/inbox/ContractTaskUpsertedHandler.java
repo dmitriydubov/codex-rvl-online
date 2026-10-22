@@ -1,6 +1,8 @@
 package ru.projectx.contracts.service.inbox;
 
+import java.util.List;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskEvents;
 import ru.projectx.contracts.service.IssuanceService;
@@ -29,8 +31,8 @@ public class ContractTaskUpsertedHandler extends ParsedEventHandler<ContractTask
     protected InboxWork work(ContractTask task) {
         return now -> {
             IssuanceSnapshot before = statuses.watch(task.individualRequestId());
-            issuance.apply(task, now);
-            statuses.afterTask(before, task, now);
+            List<RequestParticipant> composition = issuance.apply(task, now);
+            statuses.afterTask(before, task.individualRequestId(), composition, now);
         };
     }
 }

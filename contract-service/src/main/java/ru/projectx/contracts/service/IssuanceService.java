@@ -1,7 +1,9 @@
 package ru.projectx.contracts.service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskParticipant;
 import ru.projectx.contracts.repository.ContractRepository;
@@ -23,10 +26,8 @@ public class IssuanceService {
     static final String EXCLUDED_FROM_TRIP = "участник исключён из состава поездки";
     static final String KIND_CHANGED = "вид документа по участнику изменён";
 
-    private static final Set<ContractStatus> FINISHED_CONTRACTS =
-            Set.of(ContractStatus.ISSUED, ContractStatus.ERROR, ContractStatus.CANCELLED);
-    private static final Set<LmPolicyStatus> FINISHED_POLICIES =
-            Set.of(LmPolicyStatus.ISSUED, LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED);
+    private static final Set<ContractStatus> STOPPED_CONTRACTS = Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED);
+    private static final Set<LmPolicyStatus> STOPPED_POLICIES = Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED);
 
     private final ContractRepository contracts;
     private final LmPolicyRepository policies;
@@ -41,36 +42,58 @@ public class IssuanceService {
         this.lmPolicies = lmPolicies;
     }
 
-    public void apply(ContractTask task, Instant now) {
+    public List<RequestParticipant> apply(ContractTask task, Instant now) {
         RequestIssuance current = active(task.individualRequestId());
+        List<RequestParticipant> composition = new ArrayList<>();
         for (TaskParticipant participant : task.participants()) {
-            reconcile(task, participant, current, now);
+            composition.add(new RequestParticipant(participant.id(), reconcile(task, participant, current, now)));
+            current.forget(participant.id());
         }
-        current.leftovers().forEach(record -> cancel(record, EXCLUDED_FROM_TRIP, now));
+        for (ActiveIssuance leftover : current.leftovers()) {
+            exclude(leftover, task, now);
+        }
+        return composition;
     }
 
     private RequestIssuance active(UUID individualRequestId) {
         List<Contract> activeContracts =
-                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, FINISHED_CONTRACTS);
+                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_CONTRACTS);
         for (Contract contract : activeContracts) {
             contracts.lockFresh(contract);
         }
         return new RequestIssuance(activeContracts,
-                policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, FINISHED_POLICIES));
+                policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES));
     }
 
-    private void reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current, Instant now) {
+    private DocumentKind reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current,
+            Instant now) {
         DocumentKind kind = DocumentKinds.of(participant);
-        current.of(participant.id())
-                .filter(active -> active.kind() != kind)
-                .ifPresent(active -> cancel(active.record(), KIND_CHANGED, now));
-        Issue issue = new Issue(task, participant);
+        Optional<ActiveIssuance> replaced = current.of(participant.id()).filter(active -> active.kind() != kind);
+        Optional<ActiveIssuance> issued = replaced.filter(ActiveIssuance::issued);
+        if (issued.isPresent()) {
+            IssuedRecords.keepOnKindChange(issued.get(), task);
+            return issued.get().kind();
+        }
+        replaced.ifPresent(active -> cancel(active.record(), KIND_CHANGED, now));
+        issue(kind, new Issue(task, participant), current, now);
+        return kind;
+    }
+
+    private void issue(DocumentKind kind, Issue issue, RequestIssuance current, Instant now) {
+        UUID participantId = issue.participant().id();
         switch (kind) {
-            case KM_CONTRACT -> kmContracts.reconcile(issue, current.contractOf(participant.id()), now);
-            case LM_POLICY -> lmPolicies.reconcile(issue, current.policyOf(participant.id()), now);
+            case KM_CONTRACT -> kmContracts.reconcile(issue, current.contractOf(participantId), now);
+            case LM_POLICY -> lmPolicies.reconcile(issue, current.policyOf(participantId), now);
             default -> { }
         }
-        current.forget(participant.id());
+    }
+
+    private static void exclude(ActiveIssuance leftover, ContractTask task, Instant now) {
+        if (leftover.issued()) {
+            IssuedRecords.keepOnExclusion(leftover, task);
+            return;
+        }
+        cancel(leftover.record(), EXCLUDED_FROM_TRIP, now);
     }
 
     private static void cancel(IssuanceRecord record, String comment, Instant now) {

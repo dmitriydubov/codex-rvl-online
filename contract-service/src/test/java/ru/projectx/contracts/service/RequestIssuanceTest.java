@@ -25,8 +25,8 @@ class RequestIssuanceTest {
 
     @Test
     void activeRecords_areFoundByParticipantWithTheirKind() {
-        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, contract));
-        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(DocumentKind.LM_POLICY, policy));
+        assertThat(issuance.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+        assertThat(issuance.of(Tasks.CHILD)).contains(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
         assertThat(issuance.of(Tasks.INSURED)).isEmpty();
     }
 
@@ -42,7 +42,7 @@ class RequestIssuanceTest {
     void leftovers_areRecordsOfParticipantsNotForgotten() {
         issuance.forget(Tasks.SPOUSE);
 
-        assertThat(issuance.leftovers()).containsExactly(policy);
+        assertThat(issuance.leftovers()).containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
         assertThat(issuance.of(Tasks.SPOUSE)).isEmpty();
     }
 }

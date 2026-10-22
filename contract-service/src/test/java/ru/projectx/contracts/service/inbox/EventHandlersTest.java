@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 import ru.projectx.contracts.service.IssuanceService;
@@ -34,6 +36,8 @@ class EventHandlersTest {
         IssuanceSnapshot before = new IssuanceSnapshot(REQUEST, false, List.of(), List.of(), List.of(), List.of());
         given(parser.parse("body")).willReturn(task);
         given(statuses.watch(REQUEST)).willReturn(before);
+        List<RequestParticipant> composition = List.of(new RequestParticipant(Tasks.INSURED, DocumentKind.NONE));
+        given(issuance.apply(task, NOW)).willReturn(composition);
         ContractTaskUpsertedHandler handler = new ContractTaskUpsertedHandler(parser, issuance, statuses);
 
         InboxWork work = handler.prepare("body");
@@ -45,7 +49,7 @@ class EventHandlersTest {
         InOrder order = inOrder(statuses, issuance);
         order.verify(statuses).watch(REQUEST);
         order.verify(issuance).apply(task, NOW);
-        order.verify(statuses).afterTask(before, task, NOW);
+        order.verify(statuses).afterTask(before, REQUEST, composition, NOW);
     }
 
     @Test

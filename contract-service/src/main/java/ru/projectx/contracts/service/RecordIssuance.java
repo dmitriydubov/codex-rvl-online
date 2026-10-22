@@ -25,14 +25,14 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
     }
 
     public void reconcile(Issue issue, Optional<R> existing, Instant now) {
-        Optional<R> frozen = existing.filter(this::frozen);
-        if (frozen.isPresent()) {
-            keepFrozen(frozen.get(), issue);
+        Optional<String> keptBecause = existing.flatMap(this::keptBecause);
+        if (keptBecause.isPresent()) {
+            keepFrozen(existing.get(), issue, keptBecause.get());
             return;
         }
         IssueData data;
         try {
-            data = read(issue);
+            data = new IssueData(parties(issue), issue.program());
         }
         catch (ParticipantDataException invalid) {
             IssueError error = new IssueError(invalid.code(), invalid.getMessage());
@@ -56,8 +56,11 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
 
     protected abstract boolean reviseTerms(R record, Issue issue, UUID program);
 
-    private IssueData read(Issue issue) {
-        return new IssueData(parties(issue), issue.program());
+    private Optional<String> keptBecause(R record) {
+        if (record.status().issued()) {
+            return Optional.of(IssuedRecords.ISSUED);
+        }
+        return Optional.of(frozenBecause).filter(reason -> frozen(record));
     }
 
     private void revise(R record, Issue issue, IssueData data, Instant now) {
@@ -68,18 +71,18 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
         }
     }
 
-    private void keepFrozen(R record, Issue issue) {
+    private void keepFrozen(R record, Issue issue, String keptBecause) {
         if (!changesFor(record, issue)) {
             return;
         }
         log.warn("{} {} участника {} заявки {}: {} {}, изменения из задачи версии {} не применены",
                 kind(), record.id(), record.participantId(), issue.task().individualRequestId(), kind(),
-                frozenBecause, issue.task().entityVersion());
+                keptBecause, issue.task().entityVersion());
     }
 
     private boolean changesFor(R record, Issue issue) {
         try {
-            IssueData data = read(issue);
+            IssueData data = new IssueData(parties(issue), issue.program());
             return !keepsTerms(record, issue, data.program()) || parties.differ(owner(record), data.snapshot());
         }
         catch (ParticipantDataException invalid) {

@@ -22,9 +22,11 @@ import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
@@ -55,7 +57,18 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void activeRecords_areLoadedAmongUnfinishedOnlyAndHandedToTheirIssuance() {
+    void composition_namesEachParticipantOfTheTaskWithTheDocumentDueToThem() {
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00"));
+        active(List.of(), List.of());
+
+        assertThat(service.apply(task, NOW)).containsExactly(
+                new RequestParticipant(Tasks.INSURED, DocumentKind.NONE),
+                new RequestParticipant(Tasks.SPOUSE, DocumentKind.KM_CONTRACT),
+                new RequestParticipant(Tasks.CHILD, DocumentKind.LM_POLICY));
+    }
+
+    @Test
+    void activeRecords_areLoadedAmongNotStoppedOnlyAndHandedToTheirIssuance() {
         Contract contract = contract();
         LmPolicy policy = policy();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00"));
@@ -64,9 +77,9 @@ class IssuanceServiceTest {
         service.apply(task, NOW);
 
         verify(contracts).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
-                Set.of(ContractStatus.ISSUED, ContractStatus.ERROR, ContractStatus.CANCELLED));
+                Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED));
         verify(policies).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
-                Set.of(LmPolicyStatus.ISSUED, LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED));
+                Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED));
         verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(2)), Optional.of(policy), NOW);
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
