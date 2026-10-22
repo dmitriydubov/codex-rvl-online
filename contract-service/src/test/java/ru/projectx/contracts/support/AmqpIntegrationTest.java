@@ -16,7 +16,11 @@ import org.springframework.context.annotation.Import;
         "projectx.reference.url=http://reference.test:8080/internal/v1",
         "projectx.brokers.onec.connection.tls.enabled=false",
         "projectx.brokers.internal.listener-auto-startup=true",
-        "projectx.brokers.onec.listener-auto-startup=true"})
+        "projectx.brokers.onec.listener-auto-startup=true",
+        "projectx.storage.endpoint=http://storage.test:9000",
+        "projectx.storage.bucket=contracts-test",
+        "projectx.storage.access-key=no-storage",
+        "projectx.storage.secret-key=no-storage"})
 @Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class})
 public @interface AmqpIntegrationTest {
 }

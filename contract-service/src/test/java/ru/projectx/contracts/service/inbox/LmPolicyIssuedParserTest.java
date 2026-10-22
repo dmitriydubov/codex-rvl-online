@@ -88,6 +88,14 @@ class LmPolicyIssuedParserTest {
     }
 
     @Test
+    void medicalCertificateType_isNotADocumentTheUskIssues() {
+        assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.issued()
+                .withDocumentField(0, "doc_type", "MEDICAL_CERTIFICATE").toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.documents[0].doc_type");
+    }
+
+    @Test
     void documentWithoutUrl_isViolationNamingTheField() {
         assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.issued()
                 .withDocumentField(0, "file_url", null).toJson()))

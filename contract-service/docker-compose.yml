@@ -80,6 +80,10 @@ services:
       RABBITMQ_ONEC_SSL_ENABLED: "false"
       RABBITMQ_ONEC_LISTENER_AUTO_STARTUP: ${RABBITMQ_ONEC_LISTENER_AUTO_STARTUP:-false}
       REFERENCE_URL: ${REFERENCE_URL:-http://data-reference-stand:8080/internal/v1}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://s3.local:9000}
+      S3_BUCKET: ${S3_BUCKET:-contracts}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-local-secret}
       MANAGEMENT_PORT: ${MANAGEMENT_PORT:-8081}
     networks:
       - default

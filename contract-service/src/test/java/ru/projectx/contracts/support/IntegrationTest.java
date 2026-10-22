@@ -18,7 +18,11 @@ import org.springframework.core.annotation.AliasFor;
         "projectx.brokers.internal.connection.password=no-broker",
         "projectx.brokers.onec.connection.password=no-broker",
         "projectx.brokers.internal.listener-auto-startup=false",
-        "projectx.brokers.onec.listener-auto-startup=false"})
+        "projectx.brokers.onec.listener-auto-startup=false",
+        "projectx.storage.endpoint=http://storage.test:9000",
+        "projectx.storage.bucket=contracts-test",
+        "projectx.storage.access-key=no-storage",
+        "projectx.storage.secret-key=no-storage"})
 @Import({PostgresTestcontainer.class, FixedClockConfig.class})
 public @interface IntegrationTest {
 

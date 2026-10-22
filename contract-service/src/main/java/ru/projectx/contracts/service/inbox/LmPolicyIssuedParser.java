@@ -54,6 +54,7 @@ public class LmPolicyIssuedParser implements PayloadParser<LmPolicyResult> {
     private static IssuedDocument document(JsonFields document) {
         String type = document.text("doc_type");
         Enums.named(PrintedFormType.class, type)
+                .filter(PrintedFormType::issuedByUsk)
                 .orElseThrow(() -> ContractViolationException.invalidValue(document.pathOf("doc_type")));
         return new IssuedDocument(type, document.text("file_url"), document.longOrNull("file_size"));
     }

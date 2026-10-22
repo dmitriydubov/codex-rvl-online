@@ -72,12 +72,14 @@ dependencies {
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.jspecify:jspecify'
     implementation 'tools.jackson.core:jackson-databind'
+    implementation "io.minio:minio:${minioVersion}"
     runtimeOnly 'org.postgresql:postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testImplementation 'org.testcontainers:testcontainers-rabbitmq'
+    testImplementation 'org.testcontainers:testcontainers-minio'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }

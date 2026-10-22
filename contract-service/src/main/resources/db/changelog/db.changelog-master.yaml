@@ -15,3 +15,5 @@ databaseChangeLog:
       file: db/changelog/007-issuance-requests.yaml
   - include:
       file: db/changelog/008-contract-documents.yaml
+  - include:
+      file: db/changelog/009-participant-certificates.yaml

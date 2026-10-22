@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.contracts.config.InternalBrokerProperties;
@@ -26,7 +27,13 @@ import ru.projectx.contracts.service.integration.OneCBroker;
         "projectx.brokers.internal.connection.tls.enabled=false",
         "projectx.brokers.onec.connection.tls.enabled=false",
         "projectx.brokers.internal.listener-auto-startup=true",
-        "projectx.brokers.onec.listener-auto-startup=true"})
+        "projectx.brokers.onec.listener-auto-startup=true",
+        "projectx.storage.bucket=contracts-stand",
+        "projectx.storage.base-path=certificates",
+        "projectx.storage.timeouts.connect=1s",
+        "projectx.storage.timeouts.read=2s",
+        "projectx.storage.timeouts.write=2s",
+        "projectx.storage.timeouts.call=3s"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 
@@ -73,6 +80,25 @@ public class CucumberSpringConfiguration {
                     registry.add(prefix + "username", container::getAdminUsername);
                     registry.add(prefix + "password", container::getAdminPassword);
                 }
+            };
+        }
+
+        @Bean
+        StandStorage standStorage() throws IOException {
+            return StandStorage.container();
+        }
+
+        @Bean
+        MinIOContainer storageContainer(StandStorage storage) {
+            return storage.startable();
+        }
+
+        @Bean
+        DynamicPropertyRegistrar standStorageAccess(StandStorage storage, MinIOContainer storageContainer) {
+            return registry -> {
+                registry.add("projectx.storage.endpoint", storage::endpoint);
+                registry.add("projectx.storage.access-key", storage::accessKey);
+                registry.add("projectx.storage.secret-key", storage::secretKey);
             };
         }
 

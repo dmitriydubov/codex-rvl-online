@@ -105,6 +105,21 @@
   после всех повторов.
 - Настройки прохода запросов на выпуск полисов ЛМ (`LM_POLICY_REQUEST_INTERVAL`, `LM_POLICY_REQUEST_BATCH_SIZE`) — с
   умолчаниями.
+- Приём справок по форме 070/у от сервиса Заявок: `POST /internal/v1/requests/{individual_request_id}/participants/{participant_id}/attachments`
+  (multipart: `attachment_id`, `file`). Принимаются JPEG и PNG до 5 МиБ (`ATTACHMENT_MAX_FILE_SIZE`), содержимое не
+  проверяется; файл ложится в хранилище S3 под уникальной папкой, запись — в реестр документов (`contract_documents`:
+  хэш SHA-256, тип, размер, ключ объекта). Повтор того же вложения возвращает прежнюю запись; тот же идентификатор
+  вложения с другим содержимым или по другому участнику — 409 `ATTACHMENT_CONFLICT`; неизвестная заявка — 404
+  `REQUEST_NOT_FOUND`, участник не из состава — 404 `PARTICIPANT_NOT_FOUND`, прекращённая заявка — 409 `INVALID_STATE`;
+  хранилище недоступно — 503 `STORAGE_UNAVAILABLE`.
+- Общая основа синхронных вызовов: единый формат ошибки (`error.code`, `error.message`, `error.details[]`,
+  `error.request_id`), 400 `VALIDATION_ERROR` с названным полем, 500 `INTERNAL_ERROR`; сквозной `X-Request-Id` — из
+  запроса или новый UUID, в ответе, в теле ошибки и в журнале вызова.
+- Настройки хранилища S3 (`projectx.storage`: адрес, регион, бакет, начало ключа, ключи доступа, набор SSL с
+  сертификатом внутреннего УЦ, таймауты соединения, чтения, записи и всего вызова) и приёма справок
+  (`projectx.attachments`: предельный размер, допустимые типы).
+- Счётчики `contracts_attachments_stored_total`, `contracts_attachments_rejected_total{reason}` и
+  `contracts_storage_unavailable_total`.
 - Правила кода сервиса записаны в `docs/code-style.md`; кодировку, концы строк и отступы задают `.editorconfig` и
   `.gitattributes` модуля.
 
@@ -146,14 +161,36 @@
 - Health подключений не показывает учётные данные брокеров.
 - Текст ошибки базы не несёт значений строки (`logServerErrorDetail=false` у пула и в умолчании `DB_URL`).
 - Порт управления отделён от порта API.
+- Справка 070/у и имя её файла не попадают в журнал, метрики, тексты ошибок и ответы; имя файла не хранится. У ключей
+  доступа к S3 нет умолчания, в журнал они не пишутся.
 
 ### Перенос
 
 - **Документация:** каталог `docs/` (`design.md`, `operations.md`, `code-style.md`) переносится вместе с сервисом;
   README ссылается на него. Файлы `.editorconfig` и `.gitattributes` в каталоге сервиса переносятся с ним.
-- **Миграции:** сервис применяет сам при старте (`db/changelog/001-enums.yaml` … `008-contract-documents.yaml`);
+- **Миграции:** сервис применяет сам при старте (`db/changelog/001-enums.yaml` … `009-participant-certificates.yaml`);
   пользователю базы нужны права на создание типов и таблиц в схеме `public`. Миграция `008` добавляет типы
   `printed_form_kind`, `printed_form_type` и таблицу `contract_documents`.
+- **Миграции:** `009` добавляет в `printed_form_type` значение `MEDICAL_CERTIFICATE`, в `contract_documents` — колонки
+  `individual_request_id`, `participant_id`, `attachment_id`, уникальный индекс по вложению и ограничения записи справки.
+- **Хранилище S3:** бакет справок заводится заранее, сервис его не создаёт; учётной записи сервиса нужны права записи
+  объектов под `S3_BASE_PATH`; на бакете — политика жизненного цикла для объектов без записи в реестре. Сетевой доступ
+  от сервиса к S3; сертификат внутреннего УЦ — набором SSL (`S3_SSL_BUNDLE`, см. `docs/operations.md`).
+- **Переменные:** новые обязательные без умолчания `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`; новые
+  необязательные `S3_REGION` (`us-east-1`), `S3_BASE_PATH` (`certificates`), `S3_SSL_BUNDLE` (пусто),
+  `S3_CONNECT_TIMEOUT` (`2s`), `S3_READ_TIMEOUT` (`10s`), `S3_WRITE_TIMEOUT` (`10s`), `S3_CALL_TIMEOUT` (`20s`),
+  `ATTACHMENT_MAX_FILE_SIZE` (`5MB`).
+- **Зависимости:** клиент S3 `io.minio:minio:8.6.0` с транзитивными `com.squareup.okhttp3:okhttp:5.1.0`,
+  `com.squareup.okhttp3:okhttp-jvm:5.1.0`, `com.squareup.okio:okio-jvm:3.15.0`,
+  `org.jetbrains.kotlin:kotlin-stdlib:2.2.21`, `com.google.guava:guava:33.4.8-jre`,
+  `com.fasterxml.jackson.core:jackson-databind:2.21.4`, `org.bouncycastle:bcprov-jdk18on:1.81`,
+  `org.apache.commons:commons-compress:1.28.0`, `commons-codec:commons-codec:1.19.0`,
+  `org.xerial.snappy:snappy-java:1.1.10.7`, `com.carrotsearch.thirdparty:simple-xml-safe:2.7.1`; для тестов —
+  `org.testcontainers:testcontainers-minio:2.0.5` и образ MinIO из корпоративного реестра (`TEST_MINIO_IMAGE`).
+- **Сервис Заявок:** синхронная загрузка справки (адрес и коды — в «Добавлено»); таймаут вызова на его стороне — не
+  меньше 30 с.
+- **Оповещение:** правило на `contracts_storage_unavailable_total` — справки не принимаются, разбор по WARN журнала
+  сервиса (`docs/operations.md`).
 - **Брокер 1С:УСК:** учётной записи сервиса нужны права чтения (consume) на очередь результатов выпуска полисов ЛМ
   (`ONEC_QUEUE_LM_POLICY_ISSUES`) — без очереди сервис не стартует, как и без очереди задач, — и права публикации (write)
   в обменник по умолчанию с ключом очереди запросов (`ONEC_QUEUE_LM_POLICY_REQUESTS`); обе очереди заводит 1С:УСК, без
@@ -199,7 +236,7 @@
   порт его API); аутентификации между сервисами нет, доступ ограничивает сетевая политика контура. Адрес —
   `REFERENCE_URL`, обязателен.
 - **Переменные окружения.** Обязательные, без умолчания: `DB_PASSWORD`, `RABBITMQ_INTERNAL_PASSWORD`,
-  `RABBITMQ_ONEC_PASSWORD`, `REFERENCE_URL`. Остальные необязательны:
+  `RABBITMQ_ONEC_PASSWORD`, `REFERENCE_URL`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`. Остальные необязательны:
 
   | Переменная | Умолчание |
   |---|---|
