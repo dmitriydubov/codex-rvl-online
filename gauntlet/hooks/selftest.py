@@ -680,6 +680,106 @@ def gradle_properties_tests(repo):
           r.stdout + r.stderr)
 
 
+def frozen_commit_tests():
+    """However the frozen spec was changed (a script, a patch, an interpreter fed on stdin - ways the edit checks
+    cannot see), no git command may commit the change; merging the base branch still brings its approved specs."""
+    repo = make_repo()
+    root = os.path.dirname(repo)
+    feature = FEATURES + "/order.feature"
+    code = M + "src/main/java/com/example/service/domain/Order.java"
+    try:
+        write(repo, feature, "# language: ru\nФункция: Заказ\n")
+        git(repo, "add", "-A")
+        expect_allow(repo, "spec commit itself (draft, not frozen yet)", "main", "Bash", command="git commit -m 'spec: order'")
+        git(repo, "commit", "-q", "-m", "spec: order")
+        spec_head = git(repo, "rev-parse", "HEAD")
+
+        write(repo, feature, "# language: ru\nФункция: Заказ изменён скриптом\n")
+        git(repo, "add", "-A")
+        for name, command in [("commit", "git commit -m x"), ("commit -am", "git commit -am x"),
+                              ("git -C repo commit", f"git -C {repo} commit -m x"),
+                              ("cd repo && commit", f"cd {repo} && git commit -m x"),
+                              ("bash -c commit", "bash -c 'git commit -m x'"),
+                              ("commit after a heredoc script", f"python3 - <<'EOF'\nprint(1)\nEOF\ngit commit -m x")]:
+            r = guard(repo, "main", "Bash", command=command)
+            check(f"frozen: staged spec change, {name}", r is not None and "frozen" in r, repr(r))
+        git(repo, "reset", "-q")
+        r = guard(repo, "main", "Bash", command="git commit -m code")
+        check("frozen: unstaged spec change blocks any commit", r is not None and "frozen" in r, repr(r))
+        r = guard(repo, "hardener", "Bash", command="git commit -m tests")
+        check("frozen: hardener commit with a spec change", r is not None and "frozen" in r, repr(r))
+        git(repo, "checkout", "-q", "--", feature)
+
+        write(repo, code, "package com.example.service.domain;\npublic class Order { }\n")
+        git(repo, "add", "-A")
+        expect_allow(repo, "frozen: code-only commit", "main", "Bash", command="git commit -m 'code'")
+        expect_allow(repo, "frozen: commit message about --work-tree in quotes", "main", "Bash",
+                     command="git commit -m 'explain --work-tree and GIT_DIR=x'")
+        expect_allow(repo, "frozen: heredoc message with a git am line", "main", "Bash",
+                     command="git commit -F - <<'EOF'\ngit am notes\nEOF")
+        expect_deny(repo, "frozen: commit with another work tree", "main", "Bash", command="GIT_WORK_TREE=/tmp/x git commit -a")
+        expect_deny(repo, "frozen: --work-tree commit", "main", "Bash", command="git --work-tree=/tmp/x commit -am x")
+        expect_deny(repo, "frozen: commit with another index", "main", "Bash", command="GIT_INDEX_FILE=/tmp/i git commit -m x")
+        expect_deny(repo, "frozen: commit-tree", "main", "Bash", command="git commit-tree HEAD^{tree} -p HEAD -m x")
+        expect_deny(repo, "frozen: fast-import", "main", "Bash", command="git fast-import < /tmp/stream")
+        git(repo, "commit", "-q", "-m", "code")
+
+        side = os.path.join(root, "side")
+        git(repo, "worktree", "add", "-q", "-b", "side", side, "HEAD")
+        write(side, feature, "# language: ru\nФункция: Заказ в другом рабочем каталоге\n")
+        git(side, "add", "-A")
+        r = guard(repo, "main", "Bash", command=f"git -C {side} commit -m x")
+        check("frozen: commit in another worktree via -C", r is not None and "frozen" in r, repr(r))
+        r = guard(repo, "main", "Bash", command=f"cd {side} && git commit -m x")
+        check("frozen: commit in another worktree via cd", r is not None and "frozen" in r, repr(r))
+        git(side, "commit", "-q", "-m", "spec change on a side branch")
+        spec_sha = git(side, "rev-parse", "HEAD")
+        write(side, code, "package com.example.service.domain;\npublic class Order { int x; }\n")
+        git(side, "add", "-A")
+        git(side, "commit", "-q", "-m", "code on a side branch")
+        code_sha = git(side, "rev-parse", "HEAD")
+        git(repo, "worktree", "remove", "--force", side)
+        expect_deny(repo, "frozen: merge a branch that changes the spec", "main", "Bash", command="git merge side")
+        expect_deny(repo, "frozen: cherry-pick a spec change", "main", "Bash", command=f"git cherry-pick {spec_sha}")
+        expect_deny(repo, "frozen: cherry-pick a range with a spec change", "main", "Bash",
+                    command=f"git cherry-pick {spec_head}..{code_sha}")
+        expect_allow(repo, "frozen: cherry-pick a code change", "main", "Bash", command=f"git cherry-pick {code_sha}")
+        expect_allow(repo, "frozen: merge --abort", "main", "Bash", command="git merge --abort")
+        expect_allow(repo, "frozen: cherry-pick --abort", "main", "Bash", command="git cherry-pick --abort")
+
+        patches = os.path.join(root, "patches")
+        git(repo, "format-patch", "-q", "-1", spec_sha, "-o", patches)
+        spec_patch = os.path.join(patches, os.listdir(patches)[0])
+        git(repo, "format-patch", "-q", "-1", code_sha, "-o", os.path.join(root, "code-patches"))
+        code_patch = os.path.join(root, "code-patches", os.listdir(os.path.join(root, "code-patches"))[0])
+        expect_deny(repo, "frozen: am a patch that changes the spec", "main", "Bash", command=f"git am {spec_patch}")
+        expect_allow(repo, "frozen: am a code patch", "main", "Bash", command=f"git am {code_patch}")
+        expect_deny(repo, "frozen: am from a pipe", "main", "Bash", command=f"cat {code_patch} | git am")
+        expect_deny(repo, "frozen: am from a heredoc", "main", "Bash", command="git am <<'EOF'\nFrom x\nEOF")
+        expect_deny(repo, "frozen: am of a redirected spec patch", "main", "Bash", command=f"git am < {spec_patch}")
+        expect_allow(repo, "frozen: am of a redirected code patch", "main", "Bash", command=f"git am < {code_patch}")
+        expect_deny(repo, "frozen: am with remapped paths", "main", "Bash", command=f"git am --directory=x {code_patch}")
+        expect_allow(repo, "frozen: am --abort", "main", "Bash", command="git am --abort")
+
+        git(repo, "checkout", "-q", "-b", "next-main", "origin/main")
+        write(repo, FEATURES + "/approved_elsewhere.feature", "# language: ru\nФункция: Уже утверждена в другой задаче\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "spec: another task")
+        git(repo, "push", "-q", "origin", "next-main:main")
+        git(repo, "checkout", "-q", "claude/feature-x")
+        git(repo, "fetch", "-q", "origin")
+        expect_allow(repo, "frozen: merge the base branch with another task's spec", "main", "Bash",
+                     command="git fetch origin main && git merge origin/main")
+        git(repo, "merge", "-q", "--no-commit", "--no-ff", "origin/main")
+        expect_allow(repo, "frozen: conclude the base merge", "main", "Bash", command="git commit -m 'merge main'")
+        expect_allow(repo, "frozen: merge --continue on the base merge", "main", "Bash", command="git merge --continue")
+        write(repo, FEATURES + "/approved_elsewhere.feature", "# language: ru\nФункция: Изменена при слиянии\n")
+        r = guard(repo, "main", "Bash", command="git commit -m 'merge main'")
+        check("frozen: base merge with a changed spec file", r is not None and "frozen" in r, repr(r))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def stale_base_tests():
     """The branch was cut from a base newer than the local remote-tracking ref: the base's own spec commit must not
     freeze the branch - the guard fetches the base before answering "frozen"; without the remote it stays frozen."""
@@ -752,6 +852,7 @@ def main():
         finally:
             shutil.rmtree(os.path.dirname(repo), ignore_errors=True)
         stale_base_tests()
+        frozen_commit_tests()
     for f in failures:
         print("FAIL", f)
     print(f"{passed} passed, {len(failures)} failed")
