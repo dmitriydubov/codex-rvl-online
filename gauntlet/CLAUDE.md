@@ -354,10 +354,11 @@ PDF читаются инструментом Read (страницами). Фи�
 (`project_files/data-reference/Журнал решений REST.md`), «Контракт 1С:УСК» в `data-reference/CLAUDE.md`, журнал Договоров
 (`project_files/contract-service/Журнал решений Договоров.md`). Документ расходится с журналом своего сервиса — прав журнал,
 и это не повод останавливаться. ТЗ сервисов владельца (`data-reference`, `contract-service`) ведутся здесь же, вслед за
-журналом: новые редакции — в `project_files/<сервис>/edited/` (Markdown-исходник и `.docx` для Confluence, сборка —
-`python3 project_files/md2docx.py "<файл.md>"`); шаг, меняющий контракт, правит их в своём PR по правилу модуля
-(`data-reference/CLAUDE.md`, «Описание REST»). Документы 1С:УСК и соседей не правятся: предлагаемые правки к ним — в
-`project_files/<сервис>/edit/`.
+журналом, владелец переносит их в Confluence. Где лежит новая редакция и как её правит шаг — правило модуля:
+`data-reference` — `project_files/data-reference/edited/` (Markdown-исходник и `.docx`, сборка —
+`python3 project_files/md2docx.py "<файл.md>"`; `data-reference/CLAUDE.md`, «Описание REST»), `contract-service` —
+`contract-service/CLAUDE.md`. Документы 1С:УСК и соседей не правятся: предлагаемые правки к ним — копии в `edit/`
+каталога сервиса.
 
 **Технологии** (версия из сборки → источник той же версии):
 
