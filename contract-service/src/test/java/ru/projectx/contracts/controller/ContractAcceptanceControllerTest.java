@@ -1,6 +1,7 @@
 package ru.projectx.contracts.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -130,6 +131,23 @@ class ContractAcceptanceControllerTest {
                 .andExpect(jsonPath("$.error.message").value("тело запроса не разобрано как JSON"))
                 .andExpect(jsonPath("$.error.details.length()").value(0));
         verifyNoInteractions(acceptances);
+    }
+
+    @Test
+    void bodyThatIsAJsonArrayInsteadOfAnObject_isValidationErrorWithoutFields() throws Exception {
+        accept(CONTRACT.toString(), "[1, 2]")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").value("тело запроса не разобрано как JSON"))
+                .andExpect(jsonPath("$.error.details.length()").value(0));
+        verifyNoInteractions(acceptances);
+    }
+
+    @Test
+    void refusalOfAnUnmappedType_isAnIllegalStateNamingTheType() {
+        assertThatThrownBy(() -> new AcceptanceErrorAdvice().refused(new IllegalArgumentException("вне перечня")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(IllegalArgumentException.class.getName());
     }
 
     @Test
