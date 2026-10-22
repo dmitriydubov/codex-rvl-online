@@ -98,11 +98,12 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 | `S3_READ_TIMEOUT` | `10s` | таймаут ожидания ответа |
 | `S3_WRITE_TIMEOUT` | `10s` | таймаут передачи данных |
 | `S3_CALL_TIMEOUT` | `20s` | предел всего вызова с повторами соединения; меньше 30 с, которые ждёт сервис Заявок |
-| `ATTACHMENT_MAX_FILE_SIZE` | `5MB` | наибольший размер файла справки (5 МиБ); больше 10 МБ не поднимать — это предел контейнера сервлетов |
+| `ATTACHMENT_MAX_FILE_SIZE` | `5MB` | наибольший размер файла справки (5 МиБ); больше 10 МБ не поднимать — это предел контейнера сервлетов; выше 5 МиБ файл уходит в S3 частями, и `S3_CALL_TIMEOUT` действует на каждую |
 
 Сертификат внутреннего УЦ для S3 задаётся набором SSL Spring Boot, например:
 `SPRING_SSL_BUNDLE_PEM_STORAGE_TRUSTSTORE_CERTIFICATE=file:/etc/contract-service/s3-ca.pem` и `S3_SSL_BUNDLE=storage`.
-Допустимые типы файлов справки — `image/jpeg` и `image/png`, список с расширениями объектов — в `application.yml`
+Каждая одновременная загрузка держит файл в памяти, до 10 МБ: кучу считают от ожидаемого числа одновременных
+загрузок справок. Допустимые типы файлов справки — `image/jpeg` и `image/png`, список с расширениями объектов — в `application.yml`
 (`projectx.attachments.content-types`).
 
 Брокеры настраиваются одинаково, у каждого свой префикс: `RABBITMQ_INTERNAL_*` — межсервисный брокер контура,
@@ -202,7 +203,7 @@ data-reference должен быть поднят раньше: на машин�
 | `contracts_outbox_failed_total{event_type}` | исходящее сообщение не доставлено: возврат `NO_ROUTE`, для типа события нет очереди или исчерпана лестница повторов |
 | `contracts_reference_unavailable_total{kind}` | справочный сервис не ответил после всех повторов; `kind` — `program`, `insurance_contract`, `policy` |
 | `contracts_attachments_stored_total` | справка 070/у впервые записана в реестр документов (повтор того же вложения не считается) |
-| `contracts_attachments_rejected_total{reason}` | файл справки отклонён; `reason` — `content_type` (тип не JPEG и не PNG), `size` (пустой или больше предела) |
+| `contracts_attachments_rejected_total{reason}` | файл справки отклонён; `reason` — `content_type` (тип не JPEG и не PNG), `size` (пустой, больше предела справки или больше предела контейнера) |
 | `contracts_storage_unavailable_total` | загрузка справки получила 503: хранилище S3 не ответило успехом |
 
 Пул соединений базы — метрики `hikaricp_*` с меткой `pool="application"`. Подключения брокеров — метрики `rabbitmq_*`

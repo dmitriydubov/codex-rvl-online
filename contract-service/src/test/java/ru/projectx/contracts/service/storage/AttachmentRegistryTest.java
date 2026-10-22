@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -105,6 +106,7 @@ class AttachmentRegistryTest {
 
     @Test
     void register_savesTheCertificateOfTheParticipantAtTheCurrentInstant() {
+        knownRequest(false, Uploads.PARTICIPANT);
         when(documents.saveAndFlush(any(PrintedForm.class))).thenAnswer(saved -> saved.getArgument(0));
 
         AttachmentResponse response = registry.register(Uploads.jpeg(), FILE);
@@ -117,6 +119,25 @@ class AttachmentRegistryTest {
         assertThat(saved.getValue().createdAt()).isEqualTo(NOW);
         assertThat(response.fileHash()).isEqualTo(Uploads.CONTENT_HASH);
         assertThat(response.createdAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void requestCancelledWhileTheFileWasStored_isNotRegistered() {
+        knownRequest(true, Uploads.PARTICIPANT);
+
+        assertThatThrownBy(() -> registry.register(Uploads.jpeg(), FILE)).isInstanceOf(RequestCancelledException.class);
+
+        verify(documents, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void participantExcludedWhileTheFileWasStored_isNotRegistered() {
+        knownRequest(false, Uploads.OTHER_PARTICIPANT);
+
+        assertThatThrownBy(() -> registry.register(Uploads.jpeg(), FILE))
+                .isInstanceOf(ParticipantNotFoundException.class);
+
+        verify(documents, never()).saveAndFlush(any());
     }
 
     private void knownRequest(boolean cancelled, UUID... participants) {

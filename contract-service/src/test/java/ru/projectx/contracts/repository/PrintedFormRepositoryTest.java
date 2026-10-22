@@ -103,8 +103,24 @@ class PrintedFormRepositoryTest {
     }
 
     @Test
+    void medicalCertificateTypeOutsideAParticipantAttachment_isRefusedByTheDatabase() {
+        assertThatThrownBy(() -> jdbc.sql("insert into contract_documents (id, kind, doc_type, version, created_at, "
+                        + "individual_request_id, usk_file_url) values (gen_random_uuid(), 'FINAL', 'MEDICAL_CERTIFICATE', 1, "
+                        + "now(), :request, 'https://s3.example.test/x.pdf')").param("request", REQUEST).update())
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.sql("insert into contract_documents (id, kind, doc_type, version, created_at, "
+                        + "individual_request_id, participant_id, attachment_id, file_key, file_hash, file_size, content_type) "
+                        + "values (gen_random_uuid(), 'FINAL', 'POLICY', 1, now(), :request, :participant, :attachment, "
+                        + "'k', 'h', 1, 'image/png')")
+                .param("request", REQUEST).param("participant", PARTICIPANT).param("attachment", ATTACHMENT).update())
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_contract_documents_certificate_type");
+    }
+
+    @Test
     void documentWithoutAnyOwner_isRefusedByTheDatabase() {
-        assertThatThrownBy(() -> insert("file_key", "'k'"))
+        assertThatThrownBy(() -> jdbc.sql("insert into contract_documents (id, kind, doc_type, version, created_at, file_key) "
+                        + "values (gen_random_uuid(), 'FINAL', 'POLICY', 1, now(), 'k')").update())
                 .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_contract_documents_single_owner");
     }
 

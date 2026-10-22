@@ -20,7 +20,8 @@ databaseChangeLog:
         договору КМ или полису ЛМ: у неё заполнены заявка, участник и идентификатор вложения сервиса
         Заявок, а договор и полис пусты. Идентификатор вложения уникален: повторная загрузка того же
         вложения не создаёт второй записи. У справки всегда есть ключ объекта в хранилище, хеш
-        содержимого, размер и MIME-тип.
+        содержимого, размер и MIME-тип. Вид «медицинская справка» бывает только у справки участника, чтобы
+        справка не стала печатной формой договора или полиса.
       changes:
         - addColumn:
             tableName: contract_documents
@@ -40,6 +41,8 @@ databaseChangeLog:
                 CHECK (attachment_id IS NULL
                     OR (file_key IS NOT NULL AND file_hash IS NOT NULL AND file_size IS NOT NULL
                         AND content_type IS NOT NULL));
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_certificate_type
+                CHECK ((doc_type = 'MEDICAL_CERTIFICATE') = (attachment_id IS NOT NULL));
         - createIndex:
             tableName: contract_documents
             indexName: uq_contract_documents_attachment_id
@@ -56,6 +59,7 @@ databaseChangeLog:
         - sql:
             sql: >
               DELETE FROM contract_documents WHERE individual_request_id IS NOT NULL;
+              ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_certificate_type;
               ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_attachment_file;
               ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_participant_attachment;
               ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_single_owner;

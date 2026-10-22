@@ -17,9 +17,7 @@ public final class RequestIds {
     }
 
     public static String current() {
-        return Optional.ofNullable(MDC.get(MDC_KEY))
-                .filter(RequestIds::acceptable)
-                .orElseGet(() -> UUID.randomUUID().toString());
+        return received(MDC.get(MDC_KEY));
     }
 
     public static String received(@Nullable String header) {

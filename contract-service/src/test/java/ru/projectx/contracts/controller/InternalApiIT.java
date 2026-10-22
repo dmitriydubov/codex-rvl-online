@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import ru.projectx.contracts.service.RequestIds;
@@ -26,6 +28,7 @@ class InternalApiIT {
     private static final String TRACE = "a41f8c02-7d3b-4e19-9a55-2c7e0b6f1d84";
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final int ELEVEN_MEGABYTES = 11 * 1024 * 1024;
+    private static final int FIFTEEN_MEGABYTES = 15 * 1024 * 1024;
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final JsonMapper json = JsonMapper.builder().build();
@@ -33,9 +36,11 @@ class InternalApiIT {
     @LocalServerPort
     private int port;
 
-    @Test
-    void fileLargerThanTheContainerAccepts_isValidationErrorOfTheFilePart() throws IOException, InterruptedException {
-        HttpResponse<String> response = upload(UUID.randomUUID(), new byte[ELEVEN_MEGABYTES]);
+    @ParameterizedTest
+    @ValueSource(ints = {ELEVEN_MEGABYTES, FIFTEEN_MEGABYTES})
+    void fileLargerThanTheContainerAccepts_isValidationErrorOfTheFilePart(int size)
+            throws IOException, InterruptedException {
+        HttpResponse<String> response = upload(UUID.randomUUID(), new byte[size]);
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(response.headers().firstValue(RequestIds.HEADER)).contains(TRACE);

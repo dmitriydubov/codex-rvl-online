@@ -1,5 +1,7 @@
 package ru.projectx.contracts.controller;
 
+import java.util.EnumMap;
+import java.util.Map;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -19,8 +21,9 @@ import ru.projectx.contracts.exception.StorageUnavailableException;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class DomainErrorAdvice {
 
-    static final String UNSUPPORTED_TYPE = "тип файла не допускается";
-    static final String SIZE_OUT_OF_RANGE = "размер файла вне допустимого";
+    private static final Map<AttachmentDefect, String> DEFECT_REASONS = new EnumMap<>(Map.of(
+            AttachmentDefect.CONTENT_TYPE, "тип файла не допускается",
+            AttachmentDefect.SIZE, "размер файла вне допустимого"));
 
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> requestNotFound(RequestNotFoundException notFound) {
@@ -45,8 +48,7 @@ public class DomainErrorAdvice {
 
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> attachmentRejected(AttachmentRejectedException rejected) {
-        return ApiErrors.invalidField(ApiErrors.FILE_FIELD,
-                rejected.defect() == AttachmentDefect.CONTENT_TYPE ? UNSUPPORTED_TYPE : SIZE_OUT_OF_RANGE);
+        return ApiErrors.invalidField(ApiErrors.FILE_FIELD, DEFECT_REASONS.get(rejected.defect()));
     }
 
     @ExceptionHandler

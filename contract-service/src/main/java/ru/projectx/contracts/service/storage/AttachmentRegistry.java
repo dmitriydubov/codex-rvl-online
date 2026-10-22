@@ -32,6 +32,19 @@ public class AttachmentRegistry {
 
     @Transactional(readOnly = true)
     public Optional<AttachmentResponse> accepted(CertificateUpload upload, String fileHash) {
+        ensureOpenFor(upload);
+        return documents.findByAttachmentAttachmentId(upload.attachmentId())
+                .map(certificate -> sameUpload(certificate, upload, fileHash));
+    }
+
+    @Transactional
+    public AttachmentResponse register(CertificateUpload upload, StoredFile file) {
+        ensureOpenFor(upload);
+        PrintedForm certificate = PrintedForm.receivedCertificate(owner(upload), file, clock.instant());
+        return AttachmentResponses.of(documents.saveAndFlush(certificate));
+    }
+
+    private void ensureOpenFor(CertificateUpload upload) {
         IssuanceRequest request = requests.findById(upload.individualRequestId())
                 .orElseThrow(() -> new RequestNotFoundException(upload.individualRequestId()));
         if (request.participants().stream().map(RequestParticipant::participantId)
@@ -41,14 +54,6 @@ public class AttachmentRegistry {
         if (request.cancelled()) {
             throw new RequestCancelledException(upload.individualRequestId());
         }
-        return documents.findByAttachmentAttachmentId(upload.attachmentId())
-                .map(certificate -> sameUpload(certificate, upload, fileHash));
-    }
-
-    @Transactional
-    public AttachmentResponse register(CertificateUpload upload, StoredFile file) {
-        PrintedForm certificate = PrintedForm.receivedCertificate(owner(upload), file, clock.instant());
-        return AttachmentResponses.of(documents.saveAndFlush(certificate));
     }
 
     private static AttachmentResponse sameUpload(PrintedForm certificate, CertificateUpload upload, String fileHash) {

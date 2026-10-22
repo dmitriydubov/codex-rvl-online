@@ -16,6 +16,7 @@ import io.minio.messages.ErrorResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -101,13 +102,36 @@ class MinioCertificateStoreTest {
     }
 
     @Test
-    void unreadableContent_isStorageUnavailableWithoutCallingTheStorage() {
+    void unreadableContent_isAFailureOfTheUploadAndNotOfTheStorage() {
         ContentSource unreadable = () -> {
             throw new IOException("поток закрыт");
         };
 
-        assertThatThrownBy(() -> store.store(FILE, unreadable)).isInstanceOf(StorageUnavailableException.class);
+        assertThatThrownBy(() -> store.store(FILE, unreadable)).isInstanceOf(UncheckedIOException.class)
+                .hasMessage("файл справки не прочитан");
 
         verifyNoInteractions(client);
+    }
+
+    @Test
+    void failureTheClientWrapsUnchecked_isStorageUnavailable() throws Exception {
+        RuntimeException interrupted = new RuntimeException(new InterruptedException());
+        when(client.putObject(any())).thenThrow(interrupted);
+
+        assertThatThrownBy(() -> store.store(FILE, () -> new ByteArrayInputStream(CONTENT)))
+                .isInstanceOf(StorageUnavailableException.class).hasCause(interrupted);
+    }
+
+    @Test
+    void streamThatCannotBeClosed_isAFailureOfTheUpload() {
+        InputStream content = new ByteArrayInputStream(CONTENT) {
+            @Override
+            public void close() throws IOException {
+                throw new IOException("не закрыт");
+            }
+        };
+
+        assertThatThrownBy(() -> store.store(FILE, () -> content)).isInstanceOf(UncheckedIOException.class)
+                .hasMessage("файл справки не закрыт после записи");
     }
 }

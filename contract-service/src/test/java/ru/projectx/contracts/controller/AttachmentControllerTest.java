@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,7 @@ import ru.projectx.contracts.exception.RequestCancelledException;
 import ru.projectx.contracts.exception.RequestNotFoundException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.service.RequestIds;
+import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.AttachmentUploads;
 import ru.projectx.contracts.service.storage.CertificateUpload;
 import tools.jackson.databind.PropertyNamingStrategies;
@@ -52,8 +54,10 @@ class AttachmentControllerTest {
     private static final String TRACE = "a41f8c02-7d3b-4e19-9a55-2c7e0b6f1d84";
 
     private final AttachmentUploads uploads = mock(AttachmentUploads.class);
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    private final AttachmentMetrics metrics = new AttachmentMetrics(meters);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new AttachmentController(uploads))
-            .setControllerAdvice(new RequestFormatAdvice(), new DomainErrorAdvice(), new UnexpectedErrorAdvice())
+            .setControllerAdvice(new RequestFormatAdvice(metrics), new DomainErrorAdvice(), new UnexpectedErrorAdvice())
             .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
                     .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()))
             .addFilters(new RequestIdFilter())
@@ -133,7 +137,7 @@ class AttachmentControllerTest {
                         .content("{\"attachment_id\":\"" + ATTACHMENT + "\"}").header(RequestIds.HEADER, TRACE))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.message").value("тело запроса не в формате multipart"))
+                .andExpect(jsonPath("$.error.message").value("тело запроса не в ожидаемом формате"))
                 .andExpect(jsonPath("$.error.details").isEmpty())
                 .andExpect(jsonPath("$.error.request_id").value(TRACE));
     }
@@ -189,7 +193,7 @@ class AttachmentControllerTest {
 
     @Test
     void uploadTooLargeForTheContainer_isValidationErrorOfTheFilePart() {
-        assertThat(new RequestFormatAdvice().tooLarge(
+        assertThat(new RequestFormatAdvice(metrics).tooLarge(
                 new MaxUploadSizeExceededException(10_485_760)).getBody())
                 .satisfies(body -> {
                     assertThat(body.error().code()).isEqualTo("VALIDATION_ERROR");
@@ -198,6 +202,7 @@ class AttachmentControllerTest {
                         assertThat(violation.reason()).isEqualTo("размер файла больше допустимого");
                     });
                 });
+        assertThat(meters.get("contracts.attachments.rejected").tag("reason", "size").counter().count()).isEqualTo(1);
     }
 
     private void expectError(RuntimeException failure, int status, String code, String message) throws Exception {

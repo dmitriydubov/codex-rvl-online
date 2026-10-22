@@ -180,9 +180,13 @@
   необязательные `S3_REGION` (`us-east-1`), `S3_BASE_PATH` (`certificates`), `S3_SSL_BUNDLE` (пусто),
   `S3_CONNECT_TIMEOUT` (`2s`), `S3_READ_TIMEOUT` (`10s`), `S3_WRITE_TIMEOUT` (`10s`), `S3_CALL_TIMEOUT` (`20s`),
   `ATTACHMENT_MAX_FILE_SIZE` (`5MB`).
-- **Зависимости:** клиент S3 `io.minio:minio:8.6.0` с транзитивными OkHttp, Kotlin, Guava, Jackson 2, Bouncy Castle,
-  commons-compress, snappy-java и simple-xml-safe; для тестов — модуль Testcontainers `testcontainers-minio` и образ
-  MinIO из корпоративного реестра (`TEST_MINIO_IMAGE`).
+- **Зависимости:** клиент S3 `io.minio:minio:8.6.0` с транзитивными `com.squareup.okhttp3:okhttp:5.1.0`,
+  `com.squareup.okhttp3:okhttp-jvm:5.1.0`, `com.squareup.okio:okio-jvm:3.15.0`,
+  `org.jetbrains.kotlin:kotlin-stdlib:2.2.21`, `com.google.guava:guava:33.4.8-jre`,
+  `com.fasterxml.jackson.core:jackson-databind:2.21.4`, `org.bouncycastle:bcprov-jdk18on:1.81`,
+  `org.apache.commons:commons-compress:1.28.0`, `commons-codec:commons-codec:1.19.0`,
+  `org.xerial.snappy:snappy-java:1.1.10.7`, `com.carrotsearch.thirdparty:simple-xml-safe:2.7.1`; для тестов —
+  `org.testcontainers:testcontainers-minio:2.0.5` и образ MinIO из корпоративного реестра (`TEST_MINIO_IMAGE`).
 - **Сервис Заявок:** синхронная загрузка справки (адрес и коды — в «Добавлено»); таймаут вызова на его стороне — не
   меньше 30 с.
 - **Оповещение:** правило на `contracts_storage_unavailable_total` — справки не принимаются, разбор по WARN журнала
