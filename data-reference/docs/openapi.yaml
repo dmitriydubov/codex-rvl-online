@@ -47,7 +47,7 @@ info:
     | 400 | `VALIDATION_ERROR` | параметр не того формата, обязательного нет, недопустимое сочетание; `details`: `{field, reason}` |
     | 404 | `NOT_FOUND` | нет такого пути |
     | 404 | `INSURANCE_CONTRACT_NOT_FOUND`, `POLICY_NOT_FOUND`, `LPU_NOT_FOUND`, `SERVICE_NOT_FOUND`, `PROGRAM_NOT_FOUND` | записи нет (или она не подходит ручке) |
-    | 405 | `METHOD_NOT_ALLOWED` | метод не `GET`; заголовок `Allow` |
+    | 405 | `METHOD_NOT_ALLOWED` | метод, кроме `GET`, `HEAD` и `OPTIONS`; заголовок `Allow` |
     | 406 | `NOT_ACCEPTABLE` | `Accept` не допускает JSON |
     | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны; в `details` — кандидаты |
     | 422 | `NO_ACTIVE_PRICE_CONTRACT`, `PRICE_NOT_COVERED` | данных 1С не хватает для ответа |
