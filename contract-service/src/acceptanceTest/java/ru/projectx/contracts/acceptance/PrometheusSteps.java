@@ -45,6 +45,13 @@ public class PrometheusSteps {
         counterGrew(name, "kind", kind, growth);
     }
 
+    @Тогда("счётчик Prometheus {string} вырос за сценарий на {int}")
+    public void counterGrew(String name, int growth) throws IOException, InterruptedException {
+        double now = valueOf(scrape(), name);
+
+        assertThat(now - valueOf(beforeScenario, name)).as("прирост %s за сценарий", name).isEqualTo(growth);
+    }
+
     private void counterGrew(String name, String label, String value, int growth) throws IOException, InterruptedException {
         double now = valueOf(scrape(), name, label, value);
 
@@ -63,6 +70,13 @@ public class PrometheusSteps {
     private static double valueOf(String exposition, String name, String label, String value) {
         Pattern series = Pattern.compile("^" + Pattern.quote(name) + "\\{[^}]*" + label + "=\"" + Pattern.quote(value)
                 + "\"[^}]*} (\\S+)$", Pattern.MULTILINE);
+        return series.matcher(exposition).results()
+                .mapToDouble(match -> Double.parseDouble(match.group(1)))
+                .sum();
+    }
+
+    private static double valueOf(String exposition, String name) {
+        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "(?:\\{[^}]*})? (\\S+)$", Pattern.MULTILINE);
         return series.matcher(exposition).results()
                 .mapToDouble(match -> Double.parseDouble(match.group(1)))
                 .sum();

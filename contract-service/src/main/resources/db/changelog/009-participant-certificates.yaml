@@ -1,0 +1,68 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 009-participant-certificates-type
+      author: contract-service
+      comment: >
+        Вид документа «медицинская справка» для справок по форме 070/у, которые сервис Заявок
+        загружает по участнику заявки. Значение добавляется отдельным набором изменений: новое
+        значение перечисления PostgreSQL нельзя использовать в той же транзакции, где его добавили.
+      changes:
+        - sql:
+            sql: ALTER TYPE printed_form_type ADD VALUE IF NOT EXISTS 'MEDICAL_CERTIFICATE';
+      rollback: []
+
+  - changeSet:
+      id: 009-participant-certificates
+      author: contract-service
+      comment: >
+        Реестр справок 070/у в contract_documents. Справка принадлежит участнику заявки, а не
+        договору КМ или полису ЛМ: у неё заполнены заявка, участник и идентификатор вложения сервиса
+        Заявок, а договор и полис пусты. Идентификатор вложения уникален: повторная загрузка того же
+        вложения не создаёт второй записи. У справки всегда есть ключ объекта в хранилище, хеш
+        содержимого, размер и MIME-тип.
+      changes:
+        - addColumn:
+            tableName: contract_documents
+            columns:
+              - column: { name: individual_request_id, type: uuid, constraints: { foreignKeyName: fk_contract_documents_request, references: issuance_requests(individual_request_id) } }
+              - column: { name: participant_id, type: uuid }
+              - column: { name: attachment_id, type: uuid }
+        - sql:
+            sql: >
+              ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_single_owner;
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_single_owner
+                CHECK (num_nonnulls(contract_id, lm_policy_id, individual_request_id) = 1);
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_participant_attachment
+                CHECK ((individual_request_id IS NULL) = (participant_id IS NULL)
+                   AND (individual_request_id IS NULL) = (attachment_id IS NULL));
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_attachment_file
+                CHECK (attachment_id IS NULL
+                    OR (file_key IS NOT NULL AND file_hash IS NOT NULL AND file_size IS NOT NULL
+                        AND content_type IS NOT NULL));
+        - createIndex:
+            tableName: contract_documents
+            indexName: uq_contract_documents_attachment_id
+            unique: true
+            columns:
+              - column: { name: attachment_id }
+        - createIndex:
+            tableName: contract_documents
+            indexName: ix_contract_documents_participant
+            columns:
+              - column: { name: individual_request_id }
+              - column: { name: participant_id }
+      rollback:
+        - sql:
+            sql: >
+              DELETE FROM contract_documents WHERE individual_request_id IS NOT NULL;
+              ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_attachment_file;
+              ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_participant_attachment;
+              ALTER TABLE contract_documents DROP CONSTRAINT ck_contract_documents_single_owner;
+              ALTER TABLE contract_documents ADD CONSTRAINT ck_contract_documents_single_owner
+                CHECK ((contract_id IS NULL) <> (lm_policy_id IS NULL));
+        - dropIndex: { tableName: contract_documents, indexName: ix_contract_documents_participant }
+        - dropIndex: { tableName: contract_documents, indexName: uq_contract_documents_attachment_id }
+        - dropColumn: { tableName: contract_documents, columnName: attachment_id }
+        - dropColumn: { tableName: contract_documents, columnName: participant_id }
+        - dropColumn: { tableName: contract_documents, columnName: individual_request_id }
