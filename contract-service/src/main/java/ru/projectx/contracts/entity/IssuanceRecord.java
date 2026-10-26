@@ -63,9 +63,7 @@ public abstract class IssuanceRecord {
         this.updatedAt = now;
     }
 
-    protected abstract void enterError();
-
-    protected abstract void enterCancelled();
+    protected abstract void enter(IssuanceTransition transition);
 
     public abstract IssuanceStatus status();
 
@@ -75,15 +73,20 @@ public abstract class IssuanceRecord {
         return status().finished();
     }
 
+    public void submit(Instant now) {
+        enter(IssuanceTransition.SUBMITTED);
+        advanceVersion(now);
+    }
+
     public void markError(IssueError failure, Instant now) {
         this.error = failure;
-        enterError();
+        enter(IssuanceTransition.ERROR);
         advanceVersion(now);
     }
 
     public void cancel(Cancellation reason, Instant now) {
         this.cancellation = reason;
-        enterCancelled();
+        enter(IssuanceTransition.CANCELLED);
         advanceVersion(now);
     }
 
@@ -114,6 +117,6 @@ public abstract class IssuanceRecord {
 
     public IssuanceState state() {
         return new IssuanceState(request, policyholderParticipantId, Optional.ofNullable(programId), period,
-                Optional.ofNullable(error), Optional.ofNullable(cancellation), entityVersion);
+                Optional.ofNullable(error), Optional.ofNullable(cancellation), entityVersion, updatedAt);
     }
 }

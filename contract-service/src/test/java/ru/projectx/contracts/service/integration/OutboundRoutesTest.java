@@ -30,6 +30,11 @@ class OutboundRoutesTest {
     }
 
     @Test
+    void kmContractSubmissions_goToTheSubmissionQueueOfTheOneCBroker() {
+        assertThat(routes.of("KmContractSubmitted")).contains(new OutboundRoute(onecTemplate, "km-submissions"));
+    }
+
+    @Test
     void unknownEventType_hasNoRoute() {
         assertThat(routes.of("ContractTaskUpserted")).isEmpty();
     }

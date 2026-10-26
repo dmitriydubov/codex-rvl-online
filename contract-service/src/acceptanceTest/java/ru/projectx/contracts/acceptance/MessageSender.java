@@ -6,7 +6,7 @@ import java.util.Set;
 enum MessageSender {
 
     REQUESTS("сервиса Заявок", Set.of()),
-    ONEC("1С:УСК", Set.of("LmPolicyIssued"));
+    ONEC("1С:УСК", Set.of("LmPolicyIssued", "KmContractRegistered"));
 
     static final String PATTERN = "сервиса Заявок|1С:УСК";
 

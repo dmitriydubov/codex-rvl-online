@@ -38,6 +38,14 @@ public final class Issuances {
         return policy;
     }
 
+    public static Contract paidContract(String id, UUID participant, String number, Instant paidAt) {
+        Contract contract = contract(id, participant, number);
+        contract.offerDraft();
+        contract.accept();
+        contract.markPaid(paidAt, paidAt);
+        return contract;
+    }
+
     public static Contract issuedContract(String id, UUID participant, String number) {
         Contract contract = contract(id, participant, number);
         ReflectionTestUtils.setField(contract, "status", ContractStatus.ISSUED);

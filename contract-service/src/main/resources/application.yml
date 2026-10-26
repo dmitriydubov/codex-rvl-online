@@ -169,6 +169,13 @@ projectx:
     awaiting-interval: ${LM_POLICY_REQUEST_AWAITING_INTERVAL:1m}
     awaiting-threshold: ${LM_POLICY_REQUEST_AWAITING_THRESHOLD:1h}
 
+  km-contract-submissions:
+    interval: ${KM_CONTRACT_SUBMISSION_INTERVAL:10s}
+    batch-size: ${KM_CONTRACT_SUBMISSION_BATCH_SIZE:100}
+    max-message-size: ${KM_CONTRACT_MAX_MESSAGE_SIZE:16MB}
+    awaiting-interval: ${KM_CONTRACT_SUBMISSION_AWAITING_INTERVAL:1m}
+    awaiting-threshold: ${KM_CONTRACT_SUBMISSION_AWAITING_THRESHOLD:1h}
+
   reference:
     url: ${REFERENCE_URL:}
     connect-timeout: ${REFERENCE_CONNECT_TIMEOUT:2s}

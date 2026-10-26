@@ -37,7 +37,7 @@ public class AttachmentMetrics {
 
     public void countStorageUnavailable() {
         Counter.builder(STORAGE_UNAVAILABLE)
-                .description("загрузки справок, на которые хранилище S3 не ответило успехом")
+                .description("обращения к хранилищу S3 за справками, не получившие успешного ответа")
                 .register(registry)
                 .increment();
     }

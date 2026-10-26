@@ -33,6 +33,21 @@ public class OneCMessages {
             "documents[0].file_url", "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf",
             "documents[0].file_size", "96256");
 
+    static final Map<String, String> REGISTERED_EXAMPLE = Map.ofEntries(
+            Map.entry("status", "REGISTERED"),
+            Map.entry("contract_usk_id", "a71f3c98-4e20-4a55-93b1-5d0c7e2f8814"),
+            Map.entry("contract_usk_number", "DKM-000004417"),
+            Map.entry("policy.external_id", "9e4d2c1b-7a35-4f68-b2c0-5d1e8f3a6b74"),
+            Map.entry("policy.number", "0987654321"),
+            Map.entry("policy.date_from", "2026-04-10"),
+            Map.entry("policy.date_to", "2026-04-24"),
+            Map.entry("documents[0].doc_type", "CONTRACT"),
+            Map.entry("documents[0].file_url", "https://1c-usk.example/rvl/km/DKM-2026-000001.pdf"),
+            Map.entry("documents[0].file_size", "205312"),
+            Map.entry("documents[1].doc_type", "POLICY"),
+            Map.entry("documents[1].file_url", "https://1c-usk.example/rvl/km/0987654321.pdf"),
+            Map.entry("documents[1].file_size", "118784"));
+
     private static final ZoneId MOSCOW = ZoneId.of("Europe/Moscow");
     private static final Pattern SEGMENT = Pattern.compile("([a-z_]+)(?:\\[(\\d+)])?");
     private static final Set<String> NUMERIC_FIELDS = Set.of("file_size");
@@ -48,17 +63,26 @@ public class OneCMessages {
     }
 
     ObjectNode issued(String messageId, String requestId, UUID policyId, Map<String, String> fields) {
+        return result(messageId, requestId, "sogaz1c.lm-policy.issued", "LmPolicyIssued", policyId, fields);
+    }
+
+    ObjectNode registered(String messageId, String requestId, UUID contractId, Map<String, String> fields) {
+        return result(messageId, requestId, "sogaz1c.km-contract.registered", "KmContractRegistered", contractId, fields);
+    }
+
+    private ObjectNode result(String messageId, String requestId, String topic, String eventType, UUID recordId,
+            Map<String, String> fields) {
         ObjectNode root = json.createObjectNode();
         root.putObject("meta")
                 .put("message_id", messageId)
                 .put("correlation_id", requestId)
-                .put("topic", "sogaz1c.lm-policy.issued")
-                .put("event_type", "LmPolicyIssued")
+                .put("topic", topic)
+                .put("event_type", eventType)
                 .put("schema_version", "1.0")
                 .put("created_at", OffsetDateTime.now(clock.withZone(MOSCOW)).toString())
                 .put("entity_version", 1)
                 .put("source", "1C-USK");
-        ObjectNode data = root.putObject("data").put("id", policyId.toString());
+        ObjectNode data = root.putObject("data").put("id", recordId.toString());
         fields.forEach((path, value) -> put(data, path, value));
         return root;
     }
@@ -73,6 +97,24 @@ public class OneCMessages {
                     .put("error_message", "Стенд: ошибка без кода");
             case "status FAILED" -> data.put("status", "FAILED");
             default -> throw new IllegalArgumentException("неизвестный дефект результата выпуска: " + defect);
+        }
+        return root;
+    }
+
+    ObjectNode defectiveRegistration(String messageId, String requestId, UUID contractId, String defect) {
+        ObjectNode root = registered(messageId, requestId, contractId, REGISTERED_EXAMPLE);
+        ObjectNode data = (ObjectNode) root.get("data");
+        switch (defect) {
+            case "нет поля data.contract_usk_id при status REGISTERED" -> data.remove("contract_usk_id");
+            case "нет поля data.contract_usk_number при status REGISTERED" -> data.remove("contract_usk_number");
+            case "нет поля data.policy при status REGISTERED" -> data.remove("policy");
+            case "нет поля data.documents при status REGISTERED" -> data.remove("documents");
+            case "нет поля data.error_code при status ERROR" -> data.put("status", "ERROR")
+                    .put("error_message", "Стенд: ошибка без кода");
+            case "status FAILED" -> data.put("status", "FAILED");
+            case "doc_type MEDICAL_CERTIFICATE у documents[0]" -> put(data, "documents[0].doc_type", "MEDICAL_CERTIFICATE");
+            case "doc_type INVOICE у documents[0]" -> put(data, "documents[0].doc_type", "INVOICE");
+            default -> throw new IllegalArgumentException("неизвестный дефект результата регистрации: " + defect);
         }
         return root;
     }

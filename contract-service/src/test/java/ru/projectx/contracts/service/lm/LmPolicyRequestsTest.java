@@ -37,6 +37,9 @@ import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
+import ru.projectx.contracts.service.reference.ExternalIdentifiers;
+import ru.projectx.contracts.service.reference.RequestResolution;
+import ru.projectx.contracts.service.reference.IssuanceReferences;
 
 class LmPolicyRequestsTest {
 
@@ -46,10 +49,10 @@ class LmPolicyRequestsTest {
     private static final IssueError ARCHIVED = new IssueError("PROGRAM_ARCHIVED", "программа страхования в архиве");
 
     private final LmPolicyRepository policies = mock();
-    private final LmPolicyReferences references = mock();
+    private final IssuanceReferences references = mock();
     private final LmPolicyRequestRecording recording = mock();
     private final ReferenceMetrics metrics = mock();
-    private final LmPolicyRequests requests = new LmPolicyRequests(policies, references, recording, metrics,
+    private final LmPolicyRequests requests = new LmPolicyRequests(policies, recording, references, metrics,
             new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)));
     private final LmPolicy first = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
     private final LmPolicy second = Issuances.policy("9f3e1c28-6b55-4da1-83f4-82a1d7b56e4a", Tasks.SPOUSE);

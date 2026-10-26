@@ -5,4 +5,6 @@ import ru.projectx.contracts.entity.StoredFile;
 public interface CertificateStore {
 
     void store(StoredFile file, ContentSource content);
+
+    byte[] read(String key);
 }

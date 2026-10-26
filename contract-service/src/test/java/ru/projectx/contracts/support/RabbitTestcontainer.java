@@ -52,7 +52,9 @@ public class RabbitTestcontainer {
     @OneCBroker
     public TestQueues oneCBrokerQueues(@OneCBroker ConnectionFactory connections, OneCBrokerProperties properties) {
         return new TestQueues(connections).declare(properties.queues().lmPolicyRequests())
-                .declare(properties.queues().lmPolicyIssues());
+                .declare(properties.queues().lmPolicyIssues())
+                .declare(properties.queues().kmContractSubmissions())
+                .declare(properties.queues().kmContractRegistrations());
     }
 
     @Bean

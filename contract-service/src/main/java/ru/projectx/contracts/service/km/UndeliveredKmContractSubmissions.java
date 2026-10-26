@@ -1,0 +1,17 @@
+package ru.projectx.contracts.service.km;
+
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.service.usk.UndeliveredUskRequests;
+
+@Component
+public class UndeliveredKmContractSubmissions extends UndeliveredUskRequests<Contract, ContractStatus> {
+
+    public UndeliveredKmContractSubmissions(ContractRepository contracts, RequestStatusPublication statuses) {
+        super(KmContractKind.KIND, contracts, statuses, LoggerFactory.getLogger(UndeliveredKmContractSubmissions.class));
+    }
+}

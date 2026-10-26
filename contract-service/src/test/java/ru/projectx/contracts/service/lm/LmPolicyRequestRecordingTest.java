@@ -43,6 +43,7 @@ import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
+import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 
 class LmPolicyRequestRecordingTest {
 
@@ -83,7 +84,7 @@ class LmPolicyRequestRecordingTest {
         order.verify(messages).meta(policy, NOW);
         order.verify(messages).write(eq(meta), same(policy), eq(PersonSnapshots.of(Tasks.child("0.00"))), eq(IDENTIFIERS));
         ArgumentCaptor<OutboxDraft> draft = ArgumentCaptor.captor();
-        order.verify(journal).record(draft.capture(), eq(NOW));
+        order.verify(journal).record(draft.capture(), eq(List.of()), eq(NOW));
         assertThat(draft.getValue().aggregateType()).isEqualTo("LM_POLICY");
         assertThat(draft.getValue().aggregateId()).isEqualTo(POLICY_ID);
         assertThat(draft.getValue().envelope()).isEqualTo(new MessageEnvelope(MESSAGE_ID, Tasks.REQUEST,
@@ -202,6 +203,6 @@ class LmPolicyRequestRecordingTest {
 
         assertThatThrownBy(() -> recording.submit(unknown, IDENTIFIERS)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(unknown.toString());
-        verify(journal, never()).record(any(), any());
+        verify(journal, never()).record(any(), any(), any());
     }
 }

@@ -19,6 +19,7 @@ import ru.projectx.contracts.support.Tasks;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
+import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 
 class LmPolicyRequestMessagesTest {
 

@@ -13,13 +13,13 @@ import org.springframework.stereotype.Component;
 public class CertificateRecords {
 
     private static final String CERTIFICATES = """
-            select attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
+            select id, attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
               from contract_documents
              where individual_request_id = :request and participant_id = :participant
              order by created_at, id
             """;
     private static final String BY_ATTACHMENT = """
-            select attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
+            select id, attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
               from contract_documents
              where attachment_id = :attachment
             """;
@@ -30,7 +30,7 @@ public class CertificateRecords {
         this.jdbc = jdbc;
     }
 
-    record Certificate(UUID attachment, String docType, String contentType, long size, String hash, String key,
+    record Certificate(UUID id, UUID attachment, String docType, String contentType, long size, String hash, String key,
             Instant createdAt) {
     }
 
@@ -46,7 +46,7 @@ public class CertificateRecords {
     }
 
     private Certificate certificate(ResultSet row, int index) throws SQLException {
-        return new Certificate(row.getObject("attachment_id", UUID.class), row.getString("doc_type"),
+        return new Certificate(row.getObject("id", UUID.class), row.getObject("attachment_id", UUID.class), row.getString("doc_type"),
                 row.getString("content_type"), row.getLong("file_size"), row.getString("file_hash"),
                 row.getString("file_key"), row.getObject("created_at", OffsetDateTime.class).toInstant());
     }

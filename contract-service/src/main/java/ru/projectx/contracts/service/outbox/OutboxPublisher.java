@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.outbox;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Limit;
@@ -19,15 +20,17 @@ public class OutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
 
     private final OutboxMessageRepository messages;
+    private final OutboundBodies bodies;
     private final OutboundPublisher publisher;
     private final OutboxOutcomes outcomes;
     private final Limit batch;
     private final Clock clock;
 
-    public OutboxPublisher(OutboxMessageRepository messages, OutboundPublisher publisher, OutboxOutcomes outcomes,
-            OutboxProperties properties, Clock clock) {
+    public OutboxPublisher(OutboxMessageRepository messages, OutboundBodies bodies, OutboundPublisher publisher,
+            OutboxOutcomes outcomes, OutboxProperties properties, Clock clock) {
         this.batch = Limit.of(properties.publishing().batchSize());
         this.messages = messages;
+        this.bodies = bodies;
         this.publisher = publisher;
         this.outcomes = outcomes;
         this.clock = clock;
@@ -49,11 +52,18 @@ public class OutboxPublisher {
     }
 
     private PublishOutcome attempt(OutboxMessage message) {
-        MessageEnvelope envelope = message.envelope();
-        return message.payload()
-                .map(payload -> publisher.publish(new OutboundMessage(envelope.messageId(), envelope.correlationId(),
-                        envelope.eventType(), payload)))
-                .orElseGet(() -> new PublishOutcome.Refused(PAYLOAD_ERASED));
+        Optional<String> payload = message.payload();
+        if (payload.isEmpty()) {
+            return new PublishOutcome.Refused(PAYLOAD_ERASED);
+        }
+        return switch (bodies.complete(message.id(), payload.get())) {
+            case OutboundBody.Complete complete -> publisher.publish(outbound(message.envelope(), complete.payload()));
+            case OutboundBody.Withheld withheld -> withheld.outcome();
+        };
+    }
+
+    private static OutboundMessage outbound(MessageEnvelope envelope, String payload) {
+        return new OutboundMessage(envelope.messageId(), envelope.correlationId(), envelope.eventType(), payload);
     }
 
     private int record(OutboxMessage message, PublishOutcome outcome) {
