@@ -1,10 +1,16 @@
 package ru.projectx.contracts.service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.Cancellation;
+import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.IssuanceRecord;
+import ru.projectx.contracts.entity.IssuanceStatus;
+import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.message.ContractTaskCancellation;
 import ru.projectx.contracts.repository.ContractRepository;
@@ -31,9 +37,23 @@ public class TaskCancellationService {
         Cancellation outcome = CancelReasons.of(cancellation.cancelReason())
                 .map(reason -> new Cancellation(reason, cancellation.cancelComment(), cancellation.cancelledAt()))
                 .orElseGet(() -> unknownReasons.asOther(cancellation));
-        contracts.findByRequestIndividualRequestIdAndStatusNotIn(cancellation.individualRequestId(), UNTOUCHED_CONTRACTS)
-                .forEach(contract -> contract.cancel(outcome, now));
-        policies.findByRequestIndividualRequestIdAndStatusNotIn(cancellation.individualRequestId(), UNTOUCHED_POLICIES)
-                .forEach(policy -> policy.cancel(outcome, now));
+        UUID individualRequestId = cancellation.individualRequestId();
+        List<Contract> runningContracts =
+                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_CONTRACTS);
+        contracts.lockFresh(runningContracts);
+        cancelUnlessUntouched(runningContracts, UNTOUCHED_CONTRACTS, outcome, now);
+        List<LmPolicy> runningPolicies =
+                policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_POLICIES);
+        policies.lockFresh(runningPolicies);
+        cancelUnlessUntouched(runningPolicies, UNTOUCHED_POLICIES, outcome, now);
+    }
+
+    private static void cancelUnlessUntouched(List<? extends IssuanceRecord> locked,
+            Set<? extends IssuanceStatus> untouched, Cancellation outcome, Instant now) {
+        for (IssuanceRecord record : locked) {
+            if (!untouched.contains(record.status())) {
+                record.cancel(outcome, now);
+            }
+        }
     }
 }
