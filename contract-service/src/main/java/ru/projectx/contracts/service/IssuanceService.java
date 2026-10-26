@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
@@ -27,7 +28,7 @@ public class IssuanceService {
     static final String EXCLUDED_FROM_TRIP = "участник исключён из состава поездки";
     static final String KIND_CHANGED = "вид документа по участнику изменён";
 
-    private static final Set<ContractStatus> CLOSED_CONTRACTS = Set.of(ContractStatus.CANCELLED);
+    private static final Set<ContractStatus> STOPPED_CONTRACTS = Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED);
     private static final Set<LmPolicyStatus> STOPPED_POLICIES = Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED);
 
     private final ContractRepository contracts;
@@ -57,8 +58,7 @@ public class IssuanceService {
     }
 
     private RequestIssuance active(UUID individualRequestId) {
-        List<Contract> activeContracts =
-                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, CLOSED_CONTRACTS);
+        List<Contract> activeContracts = heldContracts(individualRequestId);
         contracts.lockFresh(activeContracts);
         List<LmPolicy> activePolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES);
@@ -66,8 +66,18 @@ public class IssuanceService {
         return new RequestIssuance(stillHeld(activeContracts), stillActive(activePolicies));
     }
 
+    private List<Contract> heldContracts(UUID individualRequestId) {
+        List<Contract> running =
+                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_CONTRACTS);
+        List<Contract> failedAfterPayment = contracts.findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(
+                individualRequestId, ContractStatus.ERROR);
+        return Stream.concat(running.stream(), failedAfterPayment.stream()).distinct().toList();
+    }
+
     private static List<Contract> stillHeld(List<Contract> locked) {
-        return locked.stream().filter(contract -> !contract.status().stopped() || PaidContracts.failedAfterPayment(contract)).toList();
+        return locked.stream()
+                .filter(contract -> !contract.status().stopped() || PaidContracts.failedAfterPayment(contract))
+                .toList();
     }
 
     private static <R extends IssuanceRecord> List<R> stillActive(List<R> locked) {

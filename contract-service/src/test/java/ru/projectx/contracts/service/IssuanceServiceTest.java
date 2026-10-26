@@ -70,7 +70,7 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void activeRecords_areLoadedAmongNotCancelledContractsAndNotStoppedPoliciesAndHandedToTheirIssuance() {
+    void activeRecords_areLoadedAmongNotStoppedAndPaidFailedContractsAndNotStoppedPoliciesAndHandedToTheirIssuance() {
         Contract contract = contract();
         LmPolicy policy = policy();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00"));
@@ -79,7 +79,8 @@ class IssuanceServiceTest {
         service.apply(task, NOW);
 
         verify(contracts).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
-                Set.of(ContractStatus.CANCELLED));
+                Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED));
+        verify(contracts).findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(Tasks.REQUEST, ContractStatus.ERROR);
         verify(policies).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
                 Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED));
         verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
@@ -155,7 +156,7 @@ class IssuanceServiceTest {
     void paidContractInError_staysTheParticipantsRecordAndIsHandedToItsIssuance() {
         Contract failed = paidAndFailed();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("36000.00"));
-        active(List.of(failed), List.of());
+        failedAfterPayment(List.of(failed));
 
         assertThat(service.apply(task, NOW)).contains(new RequestParticipant(Tasks.SPOUSE, DocumentKind.KM_CONTRACT));
 
@@ -178,7 +179,7 @@ class IssuanceServiceTest {
     @Test
     void paidContractInError_ofParticipantMissingFromTask_isCancelledAsExcludedFromTrip() {
         Contract failed = paidAndFailed();
-        active(List.of(failed), List.of());
+        failedAfterPayment(List.of(failed));
 
         service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
 
@@ -191,7 +192,7 @@ class IssuanceServiceTest {
     void paidContractInError_ofRelativeWhoStopsPaying_isCancelledAsKindChangedAndPolicyOpened() {
         Contract failed = paidAndFailed();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("0.00"));
-        active(List.of(failed), List.of());
+        failedAfterPayment(List.of(failed));
 
         service.apply(task, NOW);
 
@@ -199,6 +200,49 @@ class IssuanceServiceTest {
         assertThat(failed.state().cancellation()).map(Cancellation::comment).contains("вид документа по участнику изменён");
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
         verifyNoInteractions(kmContracts);
+    }
+
+    @Test
+    void paidContractFailingWhileTheTaskWaitsForTheLock_staysTheParticipantsRecord() {
+        Contract contract = paid();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(contract), List.of());
+        willAnswer(lock -> {
+            contract.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "договор КМ не передан в 1С:УСК"), NOW);
+            return null;
+        }).given(contracts).lockFresh(List.of(contract));
+
+        service.apply(task, NOW);
+
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
+    }
+
+    @Test
+    void unpaidContractFailingWhileTheTaskWaitsForTheLock_givesWayToANewRecord() {
+        Contract contract = contract();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(contract), List.of());
+        willAnswer(lock -> {
+            contract.markError(new IssueError("PROGRAM_ARCHIVED", "программа в архиве"), NOW);
+            return null;
+        }).given(contracts).lockFresh(List.of(contract));
+
+        service.apply(task, NOW);
+
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
+    }
+
+    @Test
+    void contractFoundByBothQueries_isLockedAndReconciledOnce() {
+        Contract failed = paidAndFailed();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(failed), List.of());
+        failedAfterPayment(List.of(failed));
+
+        service.apply(task, NOW);
+
+        verify(contracts).lockFresh(List.of(failed));
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(failed), NOW);
     }
 
     @Test
@@ -266,11 +310,21 @@ class IssuanceServiceTest {
                 new BigDecimal("34000.00")), NOW);
     }
 
-    private static Contract paidAndFailed() {
+    private void failedAfterPayment(List<Contract> failed) {
+        given(contracts.findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(Tasks.REQUEST, ContractStatus.ERROR))
+                .willReturn(failed);
+    }
+
+    private static Contract paid() {
         Contract contract = contract();
         contract.offerDraft();
         contract.accept();
         contract.markPaid(Issuances.OPENED, NOW);
+        return contract;
+    }
+
+    private static Contract paidAndFailed() {
+        Contract contract = paid();
         contract.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "договор КМ не передан в 1С:УСК"), NOW);
         return contract;
     }

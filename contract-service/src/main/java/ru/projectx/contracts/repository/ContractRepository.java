@@ -13,5 +13,8 @@ public interface ContractRepository extends JpaRepository<Contract, UUID>, Issua
     List<Contract> findByRequestIndividualRequestIdAndStatusNotIn(UUID individualRequestId,
             Collection<ContractStatus> statuses);
 
+    List<Contract> findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(UUID individualRequestId,
+            ContractStatus status);
+
     List<Contract> findByRequestIndividualRequestId(UUID individualRequestId);
 }
