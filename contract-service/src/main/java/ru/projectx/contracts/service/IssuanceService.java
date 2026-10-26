@@ -27,7 +27,6 @@ public class IssuanceService {
     static final String EXCLUDED_FROM_TRIP = "участник исключён из состава поездки";
     static final String KIND_CHANGED = "вид документа по участнику изменён";
 
-    private static final Set<ContractStatus> STOPPED_CONTRACTS = Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED);
     private static final Set<LmPolicyStatus> STOPPED_POLICIES = Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED);
 
     private final ContractRepository contracts;
@@ -57,13 +56,19 @@ public class IssuanceService {
     }
 
     private RequestIssuance active(UUID individualRequestId) {
-        List<Contract> activeContracts =
-                contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_CONTRACTS);
+        List<Contract> activeContracts = contracts.findRunningOrFailedAfterPayment(individualRequestId,
+                ContractStatus.ERROR, ContractStatus.CANCELLED);
         contracts.lockFresh(activeContracts);
         List<LmPolicy> activePolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES);
         policies.lockFresh(activePolicies);
-        return new RequestIssuance(stillActive(activeContracts), stillActive(activePolicies));
+        return new RequestIssuance(stillHeld(activeContracts), stillActive(activePolicies));
+    }
+
+    private static List<Contract> stillHeld(List<Contract> locked) {
+        return locked.stream()
+                .filter(contract -> !contract.status().stopped() || PaidContracts.failedAfterPayment(contract))
+                .toList();
     }
 
     private static <R extends IssuanceRecord> List<R> stillActive(List<R> locked) {

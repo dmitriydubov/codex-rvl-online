@@ -134,6 +134,25 @@ class ContractRepositoryTest {
     }
 
     @Test
+    void runningOrFailedAfterPayment_areRunningAndPaidFailedContractsOfTheRequest() {
+        Contract running = contract(SPOUSE, "DKM-2026-000001");
+        Contract paidFailed = contract(CHILD, "DKM-2026-000002");
+        paidFailed.offerDraft();
+        paidFailed.accept();
+        paidFailed.markPaid(NOW, NOW);
+        paidFailed.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "договор КМ не передан в 1С:УСК"), NOW);
+        Contract unpaidFailed = contract(SPOUSE, "DKM-2026-000003");
+        unpaidFailed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        Contract cancelled = contract(CHILD, "DKM-2026-000004");
+        cancelled.cancel(new Cancellation(CancelReason.OTHER, null, NOW), NOW);
+        transaction.executeWithoutResult(status ->
+                contracts.saveAll(java.util.List.of(running, paidFailed, unpaidFailed, cancelled)));
+
+        assertThat(contracts.findRunningOrFailedAfterPayment(REQUEST, ContractStatus.ERROR, ContractStatus.CANCELLED))
+                .extracting(Contract::number).containsExactlyInAnyOrder("DKM-2026-000001", "DKM-2026-000002");
+    }
+
+    @Test
     void secondUnfinishedContractOfTheSameParticipant_isRejectedByThePartialUniqueIndex() {
         transaction.executeWithoutResult(status -> contracts.save(contract(SPOUSE, "DKM-2026-000001")));
 

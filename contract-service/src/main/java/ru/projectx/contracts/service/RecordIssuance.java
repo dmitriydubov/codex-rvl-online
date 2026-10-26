@@ -17,11 +17,9 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
     private static final Logger log = LoggerFactory.getLogger(RecordIssuance.class);
 
     private final PartySnapshotStore parties;
-    private final String frozenBecause;
 
-    protected RecordIssuance(PartySnapshotStore parties, String frozenBecause) {
+    protected RecordIssuance(PartySnapshotStore parties) {
         this.parties = parties;
-        this.frozenBecause = frozenBecause;
     }
 
     public void reconcile(Issue issue, Optional<R> existing, Instant now) {
@@ -52,7 +50,7 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
 
     protected abstract PersonOwner owner(R record);
 
-    protected abstract boolean frozen(R record);
+    protected abstract Optional<String> frozenBecause(R record);
 
     protected abstract boolean reviseTerms(R record, Issue issue, UUID program);
 
@@ -60,7 +58,7 @@ public abstract class RecordIssuance<R extends IssuanceRecord> {
         if (record.status().issued()) {
             return Optional.of(IssuedRecords.ISSUED);
         }
-        return Optional.of(frozenBecause).filter(reason -> frozen(record));
+        return frozenBecause(record);
     }
 
     private void revise(R record, Issue issue, IssueData data, Instant now) {

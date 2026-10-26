@@ -126,7 +126,7 @@ class KmContractAcceptedIssuanceTest {
         Contract ready = existing("34000.00");
         ready.offerDraft();
 
-        assertThat(issuance.frozen(ready)).isFalse();
+        assertThat(issuance.frozenBecause(ready)).isEmpty();
     }
 
     private static Contract existing(String premium) {
