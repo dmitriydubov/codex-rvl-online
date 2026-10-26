@@ -17,8 +17,10 @@ import tools.jackson.databind.JsonNode;
 public class StatusMessageSteps {
 
     private static final Set<String> PARTICIPANT = Set.of("участник", "document_kind", "km_contract_state",
-            "km_contract_id", "km_contract_number", "policy_id", "policy_number", "payment_status", "documents",
-            "error_code", "error_message");
+            "km_contract_id", "km_contract_number", "km_policy_id", "km_policy_number", "policy_id", "policy_number",
+            "payment_status", "documents", "error_code", "error_message");
+    private static final String LM_POLICY_KIND = "LM_POLICY";
+    private static final String DOCUMENT_SEPARATOR = "; ";
     private static final String KM_CONTRACT = "договор КМ";
     private static final String NO_DOCUMENTS = "нет";
 
@@ -99,7 +101,7 @@ public class StatusMessageSteps {
             softly.assertThat(actual.has(name)).as("поле %s отсутствует", name).isFalse();
         }
         else if ("documents".equals(name)) {
-            documents(softly, expected, actual.path(name), participantId, requestId);
+            documents(softly, expected, actual, new ParticipantRef(participantId, requestId));
         }
         else if ("km_contract_id".equals(name)) {
             assertThat(expected).as("ожидание о km_contract_id").isEqualTo("есть");
@@ -111,26 +113,42 @@ public class StatusMessageSteps {
         }
     }
 
-    private void documents(SoftAssertions softly, String expected, JsonNode actual, String participantId,
-            String requestId) {
+    private record ParticipantRef(String participantId, String requestId) {
+    }
+
+    private void documents(SoftAssertions softly, String expected, JsonNode participant, ParticipantRef ref) {
+        JsonNode actual = participant.path("documents");
         if (NO_DOCUMENTS.equals(expected)) {
             softly.assertThat(actual.isArray() && actual.isEmpty()).as("documents пуст").isTrue();
             return;
         }
-        String[] form = expected.split(" ", 3);
-        assertThat(form).as("ожидание о documents: «doc_type kind url»").hasSize(3);
+        UUID owner = owner(participant, ref.participantId(), ref.requestId());
+        String[] expectedDocuments = expected.split(DOCUMENT_SEPARATOR);
         assertThat(actual.isArray()).as("documents — массив").isTrue();
-        softly.assertThat(actual).as("число документов").hasSize(1);
-        JsonNode document = actual.path(0);
+        softly.assertThat(actual).as("число документов").hasSize(expectedDocuments.length);
+        for (int index = 0; index < expectedDocuments.length; index++) {
+            document(softly, expectedDocuments[index], actual.path(index), owner);
+        }
+    }
+
+    private void document(SoftAssertions softly, String expected, JsonNode document, UUID owner) {
+        String[] form = expected.split(" ", 3);
+        assertThat(form).as("ожидание о документе: «doc_type kind url»").hasSize(3);
         softly.assertThat(document.path("doc_type").asString()).as("doc_type").isEqualTo(form[0]);
         softly.assertThat(document.path("kind").asString()).as("kind").isEqualTo(form[1]);
         softly.assertThat(document.path("url").asString()).as("url").isEqualTo(form[2]);
-        Optional<PrintedFormRecords.Form> record = forms.ofPolicy(records.latestLmPolicyId(participantId, requestId))
-                .stream().filter(candidate -> candidate.docType().equals(form[0]) && candidate.kind().equals(form[1]))
+        Optional<PrintedFormRecords.Form> record = forms.of(owner).stream()
+                .filter(candidate -> candidate.docType().equals(form[0]) && candidate.kind().equals(form[1]))
                 .findFirst();
         assertThat(record).as("запись печатной формы %s %s", form[0], form[1]).isPresent();
         softly.assertThat(document.path("document_id").asString()).as("document_id")
                 .isEqualTo(record.get().id().toString());
+    }
+
+    private UUID owner(JsonNode participant, String participantId, String requestId) {
+        return LM_POLICY_KIND.equals(participant.path("document_kind").asString())
+                ? records.latestLmPolicyId(participantId, requestId)
+                : latestContractId(participantId, requestId);
     }
 
     private UUID latestContractId(String participantId, String requestId) {

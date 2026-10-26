@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.IdentityDocument;
 import ru.projectx.contracts.entity.IssuanceState;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.PersonSnapshot;
@@ -14,8 +13,10 @@ import ru.projectx.contracts.message.LmPolicyEvents;
 import ru.projectx.contracts.message.LmPolicyRequest;
 import ru.projectx.contracts.message.LmPolicyRequested;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.message.ParticipantDocument;
 import ru.projectx.contracts.message.StatusEvents;
+import ru.projectx.contracts.service.reference.ExternalIdentifiers;
+import ru.projectx.contracts.service.usk.ParticipantDocuments;
+import ru.projectx.contracts.service.usk.RequestTerms;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
@@ -37,19 +38,14 @@ public class LmPolicyRequestMessages {
 
     public String write(MessageMeta meta, LmPolicy policy, PersonSnapshot insured, ExternalIdentifiers identifiers) {
         IssuanceState state = policy.state();
-        LmPolicyRequest data = new LmPolicyRequest(policy.id(), state.request().individualRequestId(),
-                identifiers.insuranceContractExternalId(), identifiers.insurerPolicyExternalId(),
-                identifiers.programExternalId(), state.period().dateFrom(), state.period().dateTo(),
+        LmPolicyRequest data = new LmPolicyRequest(policy.id(), RequestTerms.of(state, identifiers),
                 state.policyholderParticipantId(), insured(insured));
         return json.writeValueAsString(new LmPolicyRequested(meta, data));
     }
 
     private static InsuredPerson insured(PersonSnapshot person) {
-        IdentityDocument document = person.document();
         return new InsuredPerson(person.participantId(), person.relationType(), person.lastName(), person.firstName(),
                 person.middleName(), person.birthDate(), person.gender().name(),
-                new ParticipantDocument(document.type().name(), document.series(), document.number(),
-                        document.issuedBy(), document.issuedAt(), document.divisionCode()),
-                person.address());
+                ParticipantDocuments.of(person.document()), person.address());
     }
 }

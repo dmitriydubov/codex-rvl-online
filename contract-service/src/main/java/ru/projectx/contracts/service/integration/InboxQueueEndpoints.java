@@ -31,6 +31,7 @@ public class InboxQueueEndpoints implements RabbitListenerConfigurer {
     public void configureRabbitListeners(RabbitListenerEndpointRegistrar registrar) {
         registrar.registerEndpoint(endpoint(internal.queues().taskChanges()), internalFactory);
         registrar.registerEndpoint(endpoint(onec.queues().lmPolicyIssues()), onecFactory);
+        registrar.registerEndpoint(endpoint(onec.queues().kmContractRegistrations()), onecFactory);
     }
 
     SimpleRabbitListenerEndpoint endpoint(String queue) {

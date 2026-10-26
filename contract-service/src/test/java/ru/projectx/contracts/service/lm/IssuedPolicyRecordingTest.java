@@ -42,6 +42,7 @@ import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
+import ru.projectx.contracts.service.usk.ResultExpectation;
 
 class IssuedPolicyRecordingTest {
 
@@ -79,14 +80,14 @@ class IssuedPolicyRecordingTest {
 
     @Test
     void submittedPolicy_awaitsTheResult() {
-        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.AWAITING_RESULT);
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(ResultExpectation.AWAITING_RESULT);
     }
 
     @Test
     void finishedPolicy_isAlreadyFinished() {
         policy.cancel(new Cancellation(CancelReason.EXPIRED, null, NOW), NOW);
 
-        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.ALREADY_FINISHED);
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(ResultExpectation.ALREADY_FINISHED);
     }
 
     @Test
@@ -185,7 +186,7 @@ class IssuedPolicyRecordingTest {
         undelivered.markError(new IssueError("LM_POLICY_REQUEST_UNDELIVERED", "не доставлен"), NOW);
         given(policies.findLockedById(POLICY_ID)).willReturn(Optional.of(undelivered));
 
-        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.AWAITING_RESULT);
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(ResultExpectation.AWAITING_RESULT);
         recording.recordIssued(POLICY_ID, ISSUED, List.of(FORM), NOW);
 
         assertThat(undelivered.status()).isEqualTo(LmPolicyStatus.ERROR);
@@ -201,7 +202,7 @@ class IssuedPolicyRecordingTest {
     void expectationAndLateResult_readWithoutTheRowLock() {
         given(policies.findLockedById(POLICY_ID)).willThrow(new CannotAcquireLockException("строка полиса занята"));
 
-        assertThat(recording.expect(POLICY_ID)).isEqualTo(PolicyExpectation.AWAITING_RESULT);
+        assertThat(recording.expect(POLICY_ID)).isEqualTo(ResultExpectation.AWAITING_RESULT);
         recording.recordLate(POLICY_ID);
 
         assertThat(journal.list).singleElement().satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));

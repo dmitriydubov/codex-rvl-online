@@ -59,6 +59,12 @@ public class OutboxSteps {
         rememberedMessageIds.remember(ordinal, requestId, messageId);
     }
 
+    @Тогда("message_id исходящего сообщения №{int} по заявке {string} отличается от message_id исходящего сообщения №{int} по заявке {string}")
+    public void messageIdsDiffer(int ordinal, String requestId, int otherOrdinal, String otherRequestId) {
+        assertThat(journal.number(ordinal, requestId).messageId())
+                .isNotEqualTo(journal.number(otherOrdinal, otherRequestId).messageId());
+    }
+
     @Тогда("тип события исходящего сообщения №{int} по заявке {string} — {string}")
     public void eventType(int ordinal, String requestId, String eventType) {
         assertThat(journal.number(ordinal, requestId).eventType()).isEqualTo(eventType);

@@ -59,7 +59,7 @@ public class ContractOfferAcceptance implements OfferAcceptances {
     }
 
     private static void ensureAcceptable(Contract contract) {
-        if (contract.status() != ContractStatus.DRAFT_READY && !contract.offerAccepted()) {
+        if (contract.status() != ContractStatus.DRAFT_READY && !contract.status().offerAccepted()) {
             throw new ContractStateException(contract.id(), contract.status().name());
         }
     }

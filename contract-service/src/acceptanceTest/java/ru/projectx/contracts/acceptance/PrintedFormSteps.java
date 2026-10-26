@@ -29,6 +29,23 @@ public class PrintedFormSteps {
         softly.assertAll();
     }
 
+    @Тогда("печатные формы договора КМ участника {string} заявки {string}:")
+    public void contractPrintedForms(String participantId, String requestId, List<Map<String, String>> expected) {
+        List<PrintedFormRecords.Form> actual = forms.of(records.latestContractId(participantId, requestId));
+        assertThat(actual).as("печатные формы договора КМ участника %s", participantId).hasSameSizeAs(expected);
+        SoftAssertions softly = new SoftAssertions();
+        for (int index = 0; index < expected.size(); index++) {
+            form(softly, expected.get(index), actual.get(index));
+        }
+        softly.assertAll();
+    }
+
+    @Тогда("у договора КМ участника {string} заявки {string} нет печатных форм")
+    public void noContractPrintedForms(String participantId, String requestId) {
+        assertThat(forms.of(records.latestContractId(participantId, requestId)))
+                .as("печатные формы договора КМ участника %s", participantId).isEmpty();
+    }
+
     @Тогда("у полиса ЛМ участника {string} заявки {string} нет печатных форм")
     public void noPrintedForms(String participantId, String requestId) {
         assertThat(forms.ofPolicy(records.latestLmPolicyId(participantId, requestId)))

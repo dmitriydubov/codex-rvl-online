@@ -15,6 +15,7 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.IssuedPolicy;
 import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
@@ -132,7 +133,7 @@ class StatusMessagesTest {
         policy.submit(NOW);
         policy.markIssued(new IssuedPolicy(UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
                 UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456"), NOW);
-        PrintedForm form = PrintedForm.issuedForLmPolicy(policy.id(), new UskDocument(PrintedFormType.POLICY,
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(policy.id()), new UskDocument(PrintedFormType.POLICY,
                 "https://s3.sogaz.ru/rvl/lm/2026/02/0555123456.pdf", 96256L), NOW);
         ReflectionTestUtils.setField(form, "id", UUID.fromString("01960000-0000-7000-8000-000000000003"));
 
@@ -156,9 +157,57 @@ class StatusMessagesTest {
     }
 
     @Test
+    void paidKmContractRegisteredByUsk_carriesPaidPaymentAndThePolicyIssuedUnderIt() {
+        Contract contract = Issuances.paidContract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001",
+                Instant.parse("2026-02-10T07:20:15Z"));
+        contract.submit(NOW);
+        contract.markIssued(new IssuedPolicy(UUID.fromString("a71f3c98-4e20-4a55-93b1-5d0c7e2f8814"), "DKM-000004417",
+                UUID.fromString("2c7e9b40-1f5a-4d83-9e6b-0a4c8d2f7e15"), "0987654321"), NOW);
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.contract(contract.id()), new UskDocument(PrintedFormType.CONTRACT,
+                "https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf", 205312L), NOW);
+        ReflectionTestUtils.setField(form, "id", UUID.fromString("01960000-0000-7000-8000-000000000004"));
+
+        JsonNode body = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM),
+                List.of(contract), List.of(), List.of(form)), META));
+
+        assertThat(body.path("data").path("status").stringValue()).isEqualTo("COMPLETED");
+        JsonNode participant = body.path("data").path("participants").path(0);
+        assertThat(participant.path("document_kind").stringValue()).isEqualTo("KM_CONTRACT");
+        assertThat(participant.path("km_contract_id").stringValue()).isEqualTo(CONTRACT_ID);
+        assertThat(participant.path("km_contract_state").stringValue()).isEqualTo("ISSUED");
+        assertThat(participant.path("km_contract_number").stringValue()).isEqualTo("DKM-2026-000001");
+        assertThat(participant.path("payment_status").stringValue()).isEqualTo("PAID");
+        assertThat(participant.path("km_policy_id").stringValue()).isEqualTo("2c7e9b40-1f5a-4d83-9e6b-0a4c8d2f7e15");
+        assertThat(participant.path("km_policy_number").stringValue()).isEqualTo("0987654321");
+        assertThat(participant.has("policy_id")).isFalse();
+        assertThat(participant.has("policy_number")).isFalse();
+        JsonNode document = participant.path("documents").path(0);
+        assertThat(participant.path("documents")).hasSize(1);
+        assertThat(document.path("document_id").stringValue()).isEqualTo("01960000-0000-7000-8000-000000000004");
+        assertThat(document.path("doc_type").stringValue()).isEqualTo("CONTRACT");
+        assertThat(document.path("url").stringValue()).isEqualTo("https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf");
+        assertThat(participant.has("error_code")).isFalse();
+    }
+
+    @Test
+    void paidKmContractStillWaitingForUsk_isPaidButDrafted_withoutAPolicy() {
+        Contract contract = Issuances.paidContract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001",
+                Instant.parse("2026-02-10T07:20:15Z"));
+        contract.submit(NOW);
+
+        JsonNode participant = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false,
+                List.of(SPOUSE_KM), List.of(contract), List.of(), List.of()), META)).path("data").path("participants").path(0);
+
+        assertThat(participant.path("km_contract_state").stringValue()).isEqualTo("DRAFTED");
+        assertThat(participant.path("payment_status").stringValue()).isEqualTo("PAID");
+        assertThat(participant.has("km_policy_id")).isFalse();
+        assertThat(participant.has("km_policy_number")).isFalse();
+    }
+
+    @Test
     void formsOfAnotherPolicy_doNotLeakIntoTheParticipant() {
         LmPolicy policy = Issuances.policy(POLICY_ID, Tasks.CHILD);
-        PrintedForm foreign = PrintedForm.issuedForLmPolicy(UUID.fromString("01960000-0000-7000-8000-000000000009"),
+        PrintedForm foreign = PrintedForm.issuedFor(PersonOwner.lmPolicy(UUID.fromString("01960000-0000-7000-8000-000000000009")),
                 new UskDocument(PrintedFormType.POLICY, "https://s3.sogaz.ru/rvl/lm/other.pdf", null), NOW);
 
         JsonNode participant = json.readTree(messages.write(new IssuanceSnapshot(Tasks.REQUEST, false,

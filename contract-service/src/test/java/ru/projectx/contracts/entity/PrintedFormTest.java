@@ -40,7 +40,7 @@ class PrintedFormTest {
 
     @Test
     void lmPolicyForm_hasNoAttachmentAndNoStoredFile() {
-        PrintedForm form = PrintedForm.issuedForLmPolicy(ATTACHMENT.participantId(),
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(ATTACHMENT.participantId()),
                 new UskDocument(PrintedFormType.POLICY, "https://s3.example.test/lm/0555123456.pdf", 96256L), NOW);
 
         assertThat(form.attachment()).isEmpty();
@@ -50,10 +50,32 @@ class PrintedFormTest {
 
     @Test
     void lmPolicyForm_isTheFirstVersion() {
-        PrintedForm form = PrintedForm.issuedForLmPolicy(ATTACHMENT.participantId(),
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(ATTACHMENT.participantId()),
                 new UskDocument(PrintedFormType.POLICY, "https://s3.example.test/lm/0555123456.pdf", 96256L), NOW);
 
         assertThat(form.version()).isEqualTo(1);
+    }
+
+    @Test
+    void contractForm_belongsToTheContractOnlyAndCarriesTheUskLinkAndSize() {
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.contract(ATTACHMENT.individualRequestId()),
+                new UskDocument(PrintedFormType.CONTRACT, "https://s3.example.test/km/DKM-2026-000001.pdf", 205312L), NOW);
+
+        assertThat(form.contractId()).contains(ATTACHMENT.individualRequestId());
+        assertThat(form.lmPolicyId()).isEmpty();
+        assertThat(form.attachment()).isEmpty();
+        assertThat(form.docType()).isEqualTo(PrintedFormType.CONTRACT);
+        assertThat(form.kind()).isEqualTo(PrintedFormKind.FINAL);
+        assertThat(form.uskFileUrl()).contains("https://s3.example.test/km/DKM-2026-000001.pdf");
+        assertThat(form).hasFieldOrPropertyWithValue("fileSize", 205312L);
+    }
+
+    @Test
+    void lmPolicyForm_belongsToNoContract() {
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(ATTACHMENT.participantId()),
+                new UskDocument(PrintedFormType.POLICY, "https://s3.example.test/lm/0555123456.pdf", 96256L), NOW);
+
+        assertThat(form.contractId()).isEmpty();
     }
 
     @Test

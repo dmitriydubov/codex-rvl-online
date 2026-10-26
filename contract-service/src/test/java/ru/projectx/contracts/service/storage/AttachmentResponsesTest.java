@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.AttachmentResponse;
 import ru.projectx.contracts.entity.ParticipantAttachment;
+import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.StoredFile;
@@ -31,7 +32,7 @@ class AttachmentResponsesTest {
 
     @Test
     void policyForm_isNoCertificate() {
-        PrintedForm form = PrintedForm.issuedForLmPolicy(Uploads.PARTICIPANT,
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(Uploads.PARTICIPANT),
                 new UskDocument(PrintedFormType.POLICY, "https://s3.example.test/lm.pdf", 1L), NOW);
 
         assertThatThrownBy(() -> AttachmentResponses.of(form)).isInstanceOf(IllegalStateException.class)

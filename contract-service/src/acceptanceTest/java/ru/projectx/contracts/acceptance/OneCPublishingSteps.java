@@ -8,6 +8,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class OneCPublishingSteps {
 
     private static final String RESULTS = "результаты выпуска полисов ЛМ";
+    private static final String REGISTRATIONS = "результаты регистрации договоров КМ";
 
     private final OneCMessages messages;
     private final StandQueues queues;
@@ -40,9 +41,32 @@ public class OneCPublishingSteps {
                 records.latestLmPolicyId(participantId, requestId), defect));
     }
 
+    @Когда("1С:УСК публикует в свою очередь результат регистрации {string} по договору КМ участника {string} заявки {string}:")
+    public void registrationPublished(String messageId, String participantId, String requestId,
+            Map<String, String> fields) {
+        publish(REGISTRATIONS, messageId, messages.registered(messageId, requestId,
+                records.latestContractId(participantId, requestId), fields));
+    }
+
+    @Когда("1С:УСК публикует в свою очередь результат регистрации {string} по заявке {string} для договора КМ с идентификатором {string}:")
+    public void registrationPublishedForContract(String messageId, String requestId, String contractId,
+            Map<String, String> fields) {
+        publish(REGISTRATIONS, messageId, messages.registered(messageId, requestId, UUID.fromString(contractId), fields));
+    }
+
+    @Когда("1С:УСК публикует в свою очередь результат регистрации {string} по договору КМ участника {string} заявки {string} с дефектом {string}")
+    public void defectiveRegistrationPublished(String messageId, String participantId, String requestId, String defect) {
+        publish(REGISTRATIONS, messageId, messages.defectiveRegistration(messageId, requestId,
+                records.latestContractId(participantId, requestId), defect));
+    }
+
     private void publish(String messageId, ObjectNode body) {
+        publish(RESULTS, messageId, body);
+    }
+
+    private void publish(String queue, String messageId, ObjectNode body) {
         byte[] bytes = messages.bytes(body);
         published.remember(messageId, bytes);
-        ((OneCQueue) queues.called(RESULTS)).publish(bytes);
+        ((OneCQueue) queues.called(queue)).publish(bytes);
     }
 }

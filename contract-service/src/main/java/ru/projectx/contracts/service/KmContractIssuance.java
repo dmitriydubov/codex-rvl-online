@@ -53,7 +53,7 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
 
     @Override
     protected boolean frozen(Contract contract) {
-        return contract.offerAccepted();
+        return contract.status().offerAccepted();
     }
 
     @Override

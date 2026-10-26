@@ -14,6 +14,7 @@ import ru.projectx.contracts.dto.PackageItem.PackagePayment;
 import ru.projectx.contracts.dto.PackageItem.PaymentState;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractAcceptance;
+import ru.projectx.contracts.entity.ContractRegistration;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.IssuedPolicy;
@@ -32,19 +33,22 @@ final class PackageItems {
         return switch (participant.kind()) {
             case NONE -> new PackageItem(participant.participantId(), DocumentKind.NONE, null, null, null,
                     DocumentState.NOT_REQUIRED, null, null, null, null, List.of(), null, null);
-            case KM_CONTRACT -> contract(participant, snapshot.contractOf(participant.participantId()), acceptances);
+            case KM_CONTRACT -> contract(participant, snapshot, acceptances);
             case LM_POLICY -> policy(participant, snapshot.policyOf(participant.participantId()), snapshot);
         };
     }
 
-    private static PackageItem contract(RequestParticipant participant, Contract contract,
+    private static PackageItem contract(RequestParticipant participant, IssuanceSnapshot snapshot,
             Map<UUID, ContractAcceptance> acceptances) {
+        Contract contract = snapshot.contractOf(participant.participantId());
         DocumentState state = PackageStates.of(contract.status());
         Optional<IssueError> error = shownError(contract, state);
+        List<PackageDocument> documents = PackageDocuments.of(snapshot.formsOf(contract));
         return new PackageItem(participant.participantId(), DocumentKind.KM_CONTRACT, contract.id(), contract.number(),
-                contract.state().entityVersion(), state, contract.premiumAmount(), null,
+                contract.state().entityVersion(), state, contract.premiumAmount(),
+                contract.progress().registration().map(ContractRegistration::issuedPolicyNumber).orElse(null),
                 Optional.ofNullable(acceptances.get(contract.id())).map(PackageItems::acceptance).orElse(null),
-                payment(state, contract.premiumAmount()), List.of(), error.map(IssueError::code).orElse(null),
+                payment(state, contract.premiumAmount()), documents, error.map(IssueError::code).orElse(null),
                 error.map(IssueError::message).orElse(null));
     }
 

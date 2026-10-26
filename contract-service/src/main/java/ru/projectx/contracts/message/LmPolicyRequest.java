@@ -1,16 +1,11 @@
 package ru.projectx.contracts.message;
 
-import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import java.util.UUID;
 
 public record LmPolicyRequest(
         UUID id,
-        UUID individualRequestId,
-        UUID insuranceContractExternalId,
-        UUID insurerPolicyExternalId,
-        UUID programExternalId,
-        LocalDate dateFrom,
-        LocalDate dateTo,
+        @JsonUnwrapped UskRequestTerms terms,
         UUID policyholderParticipantId,
         InsuredPerson insured) {
 }

@@ -12,6 +12,8 @@ public record ParticipantStatus(
         @Nullable UUID kmContractId,
         KmContractState kmContractState,
         @Nullable String kmContractNumber,
+        @Nullable UUID kmPolicyId,
+        @Nullable String kmPolicyNumber,
         @Nullable UUID policyId,
         @Nullable String policyNumber,
         PaymentStatus paymentStatus,
@@ -21,6 +23,6 @@ public record ParticipantStatus(
 
     public static ParticipantStatus nothingIssued(UUID id) {
         return new ParticipantStatus(id, IssuedDocumentKind.NONE, null, KmContractState.NOT_REQUIRED, null, null, null,
-                PaymentStatus.NOT_REQUIRED, List.of(), null, null);
+                null, null, PaymentStatus.NOT_REQUIRED, List.of(), null, null);
     }
 }

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,12 +24,17 @@ class ContractTest {
     private static final UUID POLICYHOLDER = UUID.fromString("ae8312c3-350b-4d0b-806c-5e2460e74dbc");
     private static final UUID PROGRAM = UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a");
     private static final UUID OTHER_PROGRAM = UUID.fromString("7b3d9e1f-5a2c-4d8e-b0f6-1c2a3b4d5e6f");
+    private static final Instant PAID_AT = Instant.parse("2026-02-10T07:20:15Z");
+    private static final IssuedPolicy ISSUED = new IssuedPolicy(
+            UUID.fromString("a71f3c98-4e20-4a55-93b1-5d0c7e2f8814"), "DKM-000004417",
+            UUID.fromString("2c7e9b40-1f5a-4d83-9e6b-0a4c8d2f7e15"), "0987654321");
 
     private final Contract contract = Contract.open(draft("34000.00"), OPENED);
 
     @Test
     void open_startsInNewWithFirstVersionAndDraftRequisites() {
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
+        assertThat(contract.progress()).isEqualTo(new ContractProgress(Optional.empty(), Optional.empty()));
         assertThat(contract.state().entityVersion()).isEqualTo(1);
         assertThat(contract.number()).isEqualTo("DKM-2026-000001");
         assertThat(contract.participantId()).isEqualTo(INSURED);
@@ -164,7 +170,7 @@ class ContractTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
         assertThat(contract.state().entityVersion()).isEqualTo(1);
-        assertThat(contract.offerAccepted()).isTrue();
+        assertThat(contract.status().offerAccepted()).isTrue();
         assertThat(contract.finished()).isFalse();
     }
 
@@ -181,7 +187,7 @@ class ContractTest {
     void offerAccepted_holdsFromAcceptanceUntilIssue(ContractStatus status) {
         ReflectionTestUtils.setField(contract, "status", status);
 
-        assertThat(contract.offerAccepted()).isTrue();
+        assertThat(contract.status().offerAccepted()).isTrue();
     }
 
     @ParameterizedTest
@@ -189,7 +195,126 @@ class ContractTest {
     void offerAccepted_doesNotHoldBeforeAcceptanceOrAfterTheEnd(ContractStatus status) {
         ReflectionTestUtils.setField(contract, "status", status);
 
-        assertThat(contract.offerAccepted()).isFalse();
+        assertThat(contract.status().offerAccepted()).isFalse();
+    }
+
+    @Test
+    void markPaid_turnsAcceptedContractIntoPaidWithTheMomentOfPaymentAndNextVersion() {
+        contract.offerDraft();
+        contract.accept();
+
+        contract.markPaid(PAID_AT, LATER);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.PAID);
+        assertThat(contract.progress().paidAt()).contains(PAID_AT);
+        assertThat(contract.progress().registration()).isEmpty();
+        assertThat(contract.state().entityVersion()).isEqualTo(2);
+        assertThat(contract).hasFieldOrPropertyWithValue("updatedAt", LATER);
+    }
+
+    @Test
+    void markPaid_acceptsAContractWithAnInvoice() {
+        ReflectionTestUtils.setField(contract, "status", ContractStatus.INVOICE_ISSUED);
+
+        contract.markPaid(PAID_AT, LATER);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.PAID);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"NEW", "DRAFT_READY", "PAID", "SUBMITTED", "ISSUED", "ERROR",
+            "CANCELLED"})
+    void markPaid_isRefusedWhenTheContractDoesNotAwaitPayment(ContractStatus status) {
+        ReflectionTestUtils.setField(contract, "status", status);
+
+        assertThatThrownBy(() -> contract.markPaid(PAID_AT, LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(status.name()).hasMessageContaining("не ждёт оплаты");
+        assertThat(contract.status()).isEqualTo(status);
+        assertThat(contract.progress().paidAt()).isEmpty();
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void submit_turnsPaidContractIntoSubmittedWithNextVersion() {
+        paid();
+
+        contract.submit(LATER);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.SUBMITTED);
+        assertThat(contract.state().entityVersion()).isEqualTo(3);
+        assertThat(contract.progress().paidAt()).contains(PAID_AT);
+        assertThat(contract.finished()).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"NEW", "DRAFT_READY", "ACCEPTED", "INVOICE_ISSUED", "SUBMITTED",
+            "ISSUED", "ERROR", "CANCELLED"})
+    void submit_isRefusedUnlessTheContractIsPaid(ContractStatus status) {
+        ReflectionTestUtils.setField(contract, "status", status);
+
+        assertThatThrownBy(() -> contract.submit(LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(status.name()).hasMessageContaining("PAID");
+        assertThat(contract.status()).isEqualTo(status);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void markIssued_storesTheRegistrationAndFinishesTheSubmittedContract() {
+        paid();
+        contract.submit(LATER);
+
+        contract.markIssued(ISSUED, LATER);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.ISSUED);
+        assertThat(contract.progress().registration()).contains(new ContractRegistration(
+                UUID.fromString("a71f3c98-4e20-4a55-93b1-5d0c7e2f8814"), "DKM-000004417",
+                UUID.fromString("2c7e9b40-1f5a-4d83-9e6b-0a4c8d2f7e15"), "0987654321"));
+        assertThat(contract.progress().paidAt()).contains(PAID_AT);
+        assertThat(contract.state().entityVersion()).isEqualTo(4);
+        assertThat(contract.finished()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"NEW", "DRAFT_READY", "ACCEPTED", "INVOICE_ISSUED", "PAID",
+            "ISSUED", "ERROR", "CANCELLED"})
+    void markIssued_isRefusedUnlessTheContractIsSubmitted(ContractStatus status) {
+        ReflectionTestUtils.setField(contract, "status", status);
+
+        assertThatThrownBy(() -> contract.markIssued(ISSUED, LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(status.name()).hasMessageContaining("SUBMITTED");
+        assertThat(contract.progress().registration()).isEmpty();
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void errorAndCancellation_keepThePaymentAndEnterFromAnyStatus() {
+        paid();
+        contract.submit(LATER);
+
+        contract.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "не передан"), LATER);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.ERROR);
+        assertThat(contract.progress().paidAt()).contains(PAID_AT);
+        assertThat(contract.state().entityVersion()).isEqualTo(4);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"ACCEPTED", "INVOICE_ISSUED"})
+    void awaitsPayment_holdsAfterAcceptanceUntilPayment(ContractStatus status) {
+        assertThat(status.awaitsPayment()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"NEW", "DRAFT_READY", "PAID", "SUBMITTED", "ISSUED", "ERROR",
+            "CANCELLED"})
+    void awaitsPayment_doesNotHoldElsewhere(ContractStatus status) {
+        assertThat(status.awaitsPayment()).isFalse();
+    }
+
+    private void paid() {
+        contract.offerDraft();
+        contract.accept();
+        contract.markPaid(PAID_AT, LATER);
     }
 
     private static ContractDraft draft(String premium) {

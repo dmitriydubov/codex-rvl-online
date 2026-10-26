@@ -1,24 +1,22 @@
 package ru.projectx.contracts.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(name = "contracts")
 public class Contract extends IssuanceRecord {
-
-    private static final Set<ContractStatus> OFFER_ACCEPTED = EnumSet.of(ContractStatus.ACCEPTED,
-            ContractStatus.INVOICE_ISSUED, ContractStatus.PAID, ContractStatus.SUBMITTED);
 
     @Column(nullable = false, updatable = false)
     private String number;
@@ -33,6 +31,14 @@ public class Contract extends IssuanceRecord {
 
     @Column(name = "premium_amount", nullable = false)
     private BigDecimal premiumAmount;
+
+    @Nullable
+    @Column(name = "paid_at")
+    private Instant paidAt;
+
+    @Nullable
+    @Embedded
+    private ContractRegistration registration;
 
     protected Contract() {
     }
@@ -65,24 +71,28 @@ public class Contract extends IssuanceRecord {
     }
 
     public void accept() {
-        if (status != ContractStatus.DRAFT_READY) {
-            throw new IllegalStateException("договор КМ " + id() + " в статусе " + status + " не принимает акцепт");
+        this.status = status.next(ContractStatus.DRAFT_READY, ContractStatus.ACCEPTED, id());
+    }
+
+    public void markPaid(Instant paidAt, Instant now) {
+        if (!status.awaitsPayment()) {
+            throw new IllegalStateException("договор КМ " + id() + " в статусе " + status + " не ждёт оплаты");
         }
-        this.status = ContractStatus.ACCEPTED;
+        this.status = ContractStatus.PAID;
+        this.paidAt = paidAt;
+        advanceVersion(now);
     }
 
-    public boolean offerAccepted() {
-        return OFFER_ACCEPTED.contains(status);
+    public void markIssued(IssuedPolicy issued, Instant now) {
+        this.status = status.next(ContractStatus.SUBMITTED, ContractStatus.ISSUED, id());
+        this.registration = new ContractRegistration(issued.uskId(), issued.uskNumber(), issued.issuedPolicyId(),
+                issued.issuedPolicyNumber());
+        advanceVersion(now);
     }
 
     @Override
-    protected void enterError() {
-        this.status = ContractStatus.ERROR;
-    }
-
-    @Override
-    protected void enterCancelled() {
-        this.status = ContractStatus.CANCELLED;
+    protected void enter(IssuanceTransition transition) {
+        this.status = status.after(transition, id());
     }
 
     public String number() {
@@ -101,5 +111,9 @@ public class Contract extends IssuanceRecord {
 
     public BigDecimal premiumAmount() {
         return premiumAmount;
+    }
+
+    public ContractProgress progress() {
+        return new ContractProgress(Optional.ofNullable(paidAt), Optional.ofNullable(registration));
     }
 }

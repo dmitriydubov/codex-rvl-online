@@ -14,7 +14,7 @@ public class PrintedFormRecords {
     private static final String FORMS = """
             select id, kind::text as kind, doc_type::text as doc_type, usk_file_url, file_size
               from contract_documents
-             where lm_policy_id = :policy
+             where lm_policy_id = :owner or contract_id = :owner
              order by created_at, id
             """;
 
@@ -28,7 +28,11 @@ public class PrintedFormRecords {
     }
 
     List<Form> ofPolicy(UUID policyId) {
-        return jdbc.sql(FORMS).param("policy", policyId).query(this::form).list();
+        return of(policyId);
+    }
+
+    List<Form> of(UUID owner) {
+        return jdbc.sql(FORMS).param("owner", owner).query(this::form).list();
     }
 
     private Form form(ResultSet row, int index) throws SQLException {

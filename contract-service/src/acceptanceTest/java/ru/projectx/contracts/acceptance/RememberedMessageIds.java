@@ -18,6 +18,10 @@ public class RememberedMessageIds {
         byRecord.put(ordinal + "/" + requestId, messageId);
     }
 
+    Optional<UUID> find(int ordinal, String requestId) {
+        return Optional.ofNullable(byRecord.get(ordinal + "/" + requestId));
+    }
+
     UUID of(int ordinal, String requestId) {
         return Optional.ofNullable(byRecord.get(ordinal + "/" + requestId))
                 .orElseThrow(() -> new AssertionError("message_id записи №" + ordinal + " по заявке " + requestId

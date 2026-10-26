@@ -100,6 +100,10 @@ final class StandStorage {
         }
     }
 
+    void removeObject(String bucket, String key) throws Exception {
+        client().removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key).build());
+    }
+
     void stop() {
         docker().stopContainerCmd(container.getContainerId()).exec();
         state = State.STOPPED;
