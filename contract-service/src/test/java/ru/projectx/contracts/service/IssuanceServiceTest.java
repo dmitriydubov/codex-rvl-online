@@ -70,7 +70,7 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void activeRecords_areLoadedAmongNotStoppedOnlyAndHandedToTheirIssuance() {
+    void activeRecords_areLoadedAmongNotCancelledContractsAndNotStoppedPoliciesAndHandedToTheirIssuance() {
         Contract contract = contract();
         LmPolicy policy = policy();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00"));
@@ -79,7 +79,7 @@ class IssuanceServiceTest {
         service.apply(task, NOW);
 
         verify(contracts).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
-                Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED));
+                Set.of(ContractStatus.CANCELLED));
         verify(policies).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
                 Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED));
         verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
@@ -152,6 +152,56 @@ class IssuanceServiceTest {
     }
 
     @Test
+    void paidContractInError_staysTheParticipantsRecordAndIsHandedToItsIssuance() {
+        Contract failed = paidAndFailed();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("36000.00"));
+        active(List.of(failed), List.of());
+
+        assertThat(service.apply(task, NOW)).contains(new RequestParticipant(Tasks.SPOUSE, DocumentKind.KM_CONTRACT));
+
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(failed), NOW);
+        assertThat(failed.status()).isEqualTo(ContractStatus.ERROR);
+    }
+
+    @Test
+    void unpaidContractInError_isNotTheParticipantsRecordAndANewOneIsReconciled() {
+        Contract failed = contract();
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(failed), List.of());
+
+        service.apply(task, NOW);
+
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
+    }
+
+    @Test
+    void paidContractInError_ofParticipantMissingFromTask_isCancelledAsExcludedFromTrip() {
+        Contract failed = paidAndFailed();
+        active(List.of(failed), List.of());
+
+        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        assertThat(failed.status()).isEqualTo(ContractStatus.CANCELLED);
+        assertThat(failed.state().cancellation()).contains(
+                new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW));
+    }
+
+    @Test
+    void paidContractInError_ofRelativeWhoStopsPaying_isCancelledAsKindChangedAndPolicyOpened() {
+        Contract failed = paidAndFailed();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("0.00"));
+        active(List.of(failed), List.of());
+
+        service.apply(task, NOW);
+
+        assertThat(failed.status()).isEqualTo(ContractStatus.CANCELLED);
+        assertThat(failed.state().cancellation()).map(Cancellation::comment).contains("вид документа по участнику изменён");
+        verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
+        verifyNoInteractions(kmContracts);
+    }
+
+    @Test
     void participantMissingFromTask_isCancelledAsExcludedFromTrip() {
         LmPolicy policy = policy();
         active(List.of(), List.of(policy));
@@ -214,6 +264,15 @@ class IssuanceServiceTest {
     private static Contract contract() {
         return Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
                 new BigDecimal("34000.00")), NOW);
+    }
+
+    private static Contract paidAndFailed() {
+        Contract contract = contract();
+        contract.offerDraft();
+        contract.accept();
+        contract.markPaid(Issuances.OPENED, NOW);
+        contract.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "договор КМ не передан в 1С:УСК"), NOW);
+        return contract;
     }
 
     private static LmPolicy policy() {
