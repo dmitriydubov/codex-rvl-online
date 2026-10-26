@@ -78,9 +78,8 @@ class IssuanceServiceTest {
 
         service.apply(task, NOW);
 
-        verify(contracts).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
-                Set.of(ContractStatus.ERROR, ContractStatus.CANCELLED));
-        verify(contracts).findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(Tasks.REQUEST, ContractStatus.ERROR);
+        verify(contracts).findRunningOrFailedAfterPayment(Tasks.REQUEST, ContractStatus.ERROR,
+                ContractStatus.CANCELLED);
         verify(policies).findByRequestIndividualRequestIdAndStatusNotIn(Tasks.REQUEST,
                 Set.of(LmPolicyStatus.ERROR, LmPolicyStatus.CANCELLED));
         verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
@@ -156,7 +155,7 @@ class IssuanceServiceTest {
     void paidContractInError_staysTheParticipantsRecordAndIsHandedToItsIssuance() {
         Contract failed = paidAndFailed();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("36000.00"));
-        failedAfterPayment(List.of(failed));
+        active(List.of(failed), List.of());
 
         assertThat(service.apply(task, NOW)).contains(new RequestParticipant(Tasks.SPOUSE, DocumentKind.KM_CONTRACT));
 
@@ -179,7 +178,7 @@ class IssuanceServiceTest {
     @Test
     void paidContractInError_ofParticipantMissingFromTask_isCancelledAsExcludedFromTrip() {
         Contract failed = paidAndFailed();
-        failedAfterPayment(List.of(failed));
+        active(List.of(failed), List.of());
 
         service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
 
@@ -192,7 +191,7 @@ class IssuanceServiceTest {
     void paidContractInError_ofRelativeWhoStopsPaying_isCancelledAsKindChangedAndPolicyOpened() {
         Contract failed = paidAndFailed();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("0.00"));
-        failedAfterPayment(List.of(failed));
+        active(List.of(failed), List.of());
 
         service.apply(task, NOW);
 
@@ -230,19 +229,6 @@ class IssuanceServiceTest {
         service.apply(task, NOW);
 
         verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
-    }
-
-    @Test
-    void contractFoundByBothQueries_isLockedAndReconciledOnce() {
-        Contract failed = paidAndFailed();
-        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
-        active(List.of(failed), List.of());
-        failedAfterPayment(List.of(failed));
-
-        service.apply(task, NOW);
-
-        verify(contracts).lockFresh(List.of(failed));
-        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(failed), NOW);
     }
 
     @Test
@@ -299,8 +285,8 @@ class IssuanceServiceTest {
     }
 
     private void active(List<Contract> activeContracts, List<LmPolicy> activePolicies) {
-        given(contracts.findByRequestIndividualRequestIdAndStatusNotIn(eq(Tasks.REQUEST), any()))
-                .willReturn(activeContracts);
+        given(contracts.findRunningOrFailedAfterPayment(Tasks.REQUEST, ContractStatus.ERROR,
+                ContractStatus.CANCELLED)).willReturn(activeContracts);
         given(policies.findByRequestIndividualRequestIdAndStatusNotIn(eq(Tasks.REQUEST), any()))
                 .willReturn(activePolicies);
     }
@@ -308,11 +294,6 @@ class IssuanceServiceTest {
     private static Contract contract() {
         return Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
                 new BigDecimal("34000.00")), NOW);
-    }
-
-    private void failedAfterPayment(List<Contract> failed) {
-        given(contracts.findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(Tasks.REQUEST, ContractStatus.ERROR))
-                .willReturn(failed);
     }
 
     private static Contract paid() {

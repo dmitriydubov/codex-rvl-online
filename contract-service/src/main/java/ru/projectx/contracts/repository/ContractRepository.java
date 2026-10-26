@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 
@@ -13,8 +15,14 @@ public interface ContractRepository extends JpaRepository<Contract, UUID>, Issua
     List<Contract> findByRequestIndividualRequestIdAndStatusNotIn(UUID individualRequestId,
             Collection<ContractStatus> statuses);
 
-    List<Contract> findByRequestIndividualRequestIdAndStatusAndPaidAtIsNotNull(UUID individualRequestId,
-            ContractStatus status);
+    @Query("""
+            select c from Contract c
+             where c.request.individualRequestId = :individualRequestId
+               and c.status <> :cancelled
+               and (c.status <> :error or c.paidAt is not null)
+            """)
+    List<Contract> findRunningOrFailedAfterPayment(@Param("individualRequestId") UUID individualRequestId,
+            @Param("error") ContractStatus error, @Param("cancelled") ContractStatus cancelled);
 
     List<Contract> findByRequestIndividualRequestId(UUID individualRequestId);
 }
