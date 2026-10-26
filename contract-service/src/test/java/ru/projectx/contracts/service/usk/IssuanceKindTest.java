@@ -12,6 +12,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.service.IssuanceErrors;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -21,9 +22,10 @@ class IssuanceKindTest {
 
     private final IssuanceKind<Contract, ContractStatus> kind = new IssuanceKind<>(
             new UskWording("договор КМ", "договора КМ", "договору КМ", "результат", "не отправлялась", "отложена",
-                    "{} {}", "{}"),
-            "CONTRACT", "KmContractRegistered", ContractStatus.PAID, ContractStatus.SUBMITTED,
-            new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "не передан"), PersonOwner::contract,
+                    "не подготовлена", "{} {}", "{}"),
+            "CONTRACT", "KmContractSubmitted", "KmContractRegistered", ContractStatus.PAID, ContractStatus.SUBMITTED,
+            new IssuanceErrors(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "не передан"),
+                    new IssueError("KM_CONTRACT_SUBMISSION_PREPARATION_FAILED", "не подготовлена")), PersonOwner::contract,
             Contract::markIssued);
     private final Contract contract = Issuances.contract(CONTRACT_ID.toString(), Tasks.SPOUSE, "DKM-2026-000001");
 
@@ -63,7 +65,7 @@ class IssuanceKindTest {
     void owner_andCompletion_areTheOnesOfTheKind() {
         assertThat(kind.owner().apply(CONTRACT_ID)).isEqualTo(PersonOwner.contract(CONTRACT_ID));
         assertThat(kind.completion()).isNotNull();
-        assertThat(kind.undelivered().code()).isEqualTo("KM_CONTRACT_SUBMISSION_UNDELIVERED");
+        assertThat(kind.errors().undelivered().code()).isEqualTo("KM_CONTRACT_SUBMISSION_UNDELIVERED");
         assertThat(kind.aggregateType()).isEqualTo("CONTRACT");
         assertThat(kind.resultEventType()).isEqualTo("KmContractRegistered");
         assertThat(Instant.EPOCH).isBefore(Instant.now());

@@ -45,12 +45,13 @@ public abstract class UskRequestRecording<R extends IssuanceRecord, S extends Is
     }
 
     @Transactional
-    public void refuse(UUID id, IssueError error) {
+    public boolean refuse(UUID id, IssueError error) {
         R record = load(id);
         if (!kind.ready(record)) {
-            return;
+            return false;
         }
         RecordErrors.enter(statuses, record, error, clock.instant());
+        return true;
     }
 
     protected abstract UskSubmission compose(R record, ExternalIdentifiers identifiers, Instant now);

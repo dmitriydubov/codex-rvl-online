@@ -16,13 +16,22 @@ public class LmPolicyLogSteps {
         this.records = records;
     }
 
+    @Тогда("в журнале Договоров есть запись уровня ERROR по полису ЛМ участника {string} заявки {string} с причиной {string}, SQLSTATE {string}")
+    public void policyPreparationFailureLogged(String participant, String request, String reason, String sqlState) {
+        journal.assertPreparationFailure(prefix(participant, request), reason, sqlState);
+    }
+
     @Тогда("в журнале Договоров нет записей уровня WARN по полису ЛМ участника {string} заявки {string}")
     public void noPolicyWarnings(String participant, String request) {
-        String prefix = "полис ЛМ " + records.latestLmPolicyId(participant, request) + " участника " + participant
-                + " заявки " + request + ":";
+        String prefix = prefix(participant, request);
         assertThat(journal.events()).filteredOn(event -> event.getLevel() == Level.WARN)
                 .extracting(ILoggingEvent::getFormattedMessage)
                 .as("записи WARN по полису ЛМ участника %s", participant)
                 .noneMatch(message -> message.startsWith(prefix));
+    }
+
+    private String prefix(String participant, String request) {
+        return "полис ЛМ " + records.latestLmPolicyId(participant, request) + " участника " + participant
+                + " заявки " + request + ":";
     }
 }
