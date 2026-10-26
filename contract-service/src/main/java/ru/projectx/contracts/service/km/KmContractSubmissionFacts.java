@@ -52,7 +52,7 @@ public class KmContractSubmissionFacts {
     }
 
     private static OutboundAttachment certificate(PrintedForm form) {
-        return new OutboundAttachment(form.id(), form.storedFile()
+        return new OutboundAttachment(form.id(), form.docType(), form.storedFile()
                 .orElseThrow(() -> new IllegalStateException("у записи справки " + form.id() + " нет объекта в хранилище")));
     }
 

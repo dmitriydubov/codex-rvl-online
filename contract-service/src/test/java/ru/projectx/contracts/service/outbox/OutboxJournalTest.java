@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.MessageAttachment;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
@@ -58,7 +59,7 @@ class OutboxJournalTest {
         });
 
         journal.record(new OutboxDraft("CONTRACT", REQUEST, ENVELOPE, "{}"),
-                List.of(new OutboundAttachment(document, file)), NOW);
+                List.of(new OutboundAttachment(document, PrintedFormType.MEDICAL_CERTIFICATE, file)), NOW);
 
         ArgumentCaptor<List<MessageAttachment>> saved = ArgumentCaptor.captor();
         verify(attachments).saveAll(saved.capture());

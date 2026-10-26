@@ -242,6 +242,29 @@
 
 ### Перенос
 
+- **Миграции:** `011` добавляет в `contracts` колонку `paid_at` — момент оплаты договора КМ.
+- **Переменные:** новые необязательные `KM_CONTRACT_SUBMISSION_INTERVAL` (`10s`), `KM_CONTRACT_SUBMISSION_BATCH_SIZE`
+  (`100`), `KM_CONTRACT_MAX_MESSAGE_SIZE` (`16MB`, не больше `max_message_size` брокера 1С:УСК),
+  `KM_CONTRACT_SUBMISSION_AWAITING_INTERVAL` (`1m`), `KM_CONTRACT_SUBMISSION_AWAITING_THRESHOLD` (`1h`).
+- **Брокер 1С:УСК:** учётной записи сервиса нужны права чтения (consume) на очередь результатов регистрации договоров КМ
+  (`ONEC_QUEUE_KM_CONTRACT_REGISTRATIONS`) — без очереди сервис не стартует — и права публикации (write) в обменник по
+  умолчанию с ключом очереди передач (`ONEC_QUEUE_KM_CONTRACT_SUBMISSIONS`); обе очереди заводит 1С:УСК. Передача
+  договора несёт справки 070/у в base64: предел `KM_CONTRACT_MAX_MESSAGE_SIZE` согласуется с пределом брокера.
+- **Хранилище S3:** учётной записи сервиса нужны права чтения объектов под `S3_BASE_PATH` — содержимое справок
+  читается при каждой публикации передачи договора КМ.
+- **Сервис Заявок:** в ответе о состоянии выпуска по участнику с договором КМ появились `km_policy_id`,
+  `km_policy_number` и непустой `documents` после регистрации в 1С:УСК; `payment_status` PAID у оплаченного договора;
+  новые коды ошибок по участнику — `KM_CONTRACT_SUBMISSION_UNDELIVERED` (передача не доставлена, возврат в оплаченные —
+  процедура дежурного в `docs/operations.md`), `KM_CONTRACT_MESSAGE_TOO_LARGE` (сообщение больше предела) и коды
+  регистрации 1С:УСК как пришли.
+- **Оповещение:** правило `contracts_km_contracts_awaiting_overdue > 0` — договор КМ ждёт ответа 1С:УСК дольше порога;
+  правила на отклонённые `KmContractSubmitted` и на `contracts_storage_unavailable_total` при публикации — действия в
+  `docs/operations.md`.
+- **Файлы:** удалены `message/LmPolicyResult.java` и `service/inbox/LmPolicyIssuedParser.java` (с тестом
+  `LmPolicyIssuedParserTest.java`); перемещены `service/lm/ExternalIdentifiers.java`, `IssuedPolicyLookup.java`,
+  `RequestResolution.java` → `service/reference/`, `service/lm/LmPolicyReferences.java` →
+  `service/reference/IssuanceReferences.java`, `service/lm/PolicyExpectation.java` → `service/usk/ResultExpectation.java`
+  — при ручном переносе старые файлы удаляются, иначе останутся дубли классов и бинов.
 - **Переменные:** новые необязательные `LM_POLICY_REQUEST_AWAITING_INTERVAL` (`1m`) и
   `LM_POLICY_REQUEST_AWAITING_THRESHOLD` (`1h`).
 - **Оповещение:** правило `contracts_lm_policies_awaiting_overdue > 0` — полис ЛМ ждёт ответа 1С:УСК дольше порога;

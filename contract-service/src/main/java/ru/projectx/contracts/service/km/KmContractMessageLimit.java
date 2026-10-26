@@ -4,8 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
+import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.exception.MessageTooLargeException;
 import ru.projectx.contracts.message.CertificateDocument;
+import ru.projectx.contracts.service.IssueErrors;
 import ru.projectx.contracts.service.outbox.OutboundAttachment;
 
 @Component
@@ -25,7 +27,8 @@ public class KmContractMessageLimit {
     public void verify(String payload, List<OutboundAttachment> certificates) {
         long size = size(payload, certificates);
         if (size > limit) {
-            throw new MessageTooLargeException(size, limit, certificates.size());
+            IssueError error = IssueErrors.kmContractMessageTooLarge(limit, certificates.size());
+            throw new MessageTooLargeException(size, limit, certificates.size(), error.code(), error.message());
         }
     }
 

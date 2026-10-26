@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.PersonSnapshot;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.message.MessageMeta;
@@ -36,10 +37,10 @@ class KmContractSubmissionMessagesTest {
             UUID.fromString("1d9a6e77-4c02-4b88-a15e-30f7b2c9de41"));
     static final PersonSnapshot POLICYHOLDER = PersonSnapshots.of(Tasks.insured("0.00"));
     static final PersonSnapshot SPOUSE = PersonSnapshots.of(Tasks.spouse("34000.00"));
-    static final OutboundAttachment JPEG = new OutboundAttachment(FIRST_DOCUMENT, new StoredFile(
+    static final OutboundAttachment JPEG = new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
             "certificates/0b6c/3c2f.jpg", "7851d78af0fb98bbbda8933f49860a009ac7761c21a1136613c8a6704b156251", 76L,
             "image/jpeg"));
-    static final OutboundAttachment PDF = new OutboundAttachment(SECOND_DOCUMENT, new StoredFile(
+    static final OutboundAttachment PDF = new OutboundAttachment(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
             "certificates/0b6c/1a4c.pdf", "5f06c6aad0549ff7d77933b65f7f1069aba5dde34da22c71517b0f8ff2b45732", 20000L,
             "application/pdf"));
 
@@ -149,7 +150,8 @@ class KmContractSubmissionMessagesTest {
 
     @Test
     void certificateOfAContentTypeOutsideTheAllowedOnes_isIllegalState() {
-        OutboundAttachment gif = new OutboundAttachment(FIRST_DOCUMENT, new StoredFile("certificates/0b6c/3c2f.gif",
+        OutboundAttachment gif = new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE,
+                new StoredFile("certificates/0b6c/3c2f.gif",
                 "0".repeat(64), 10L, "image/gif"));
 
         assertThatThrownBy(() -> messages.write(messages.meta(contract, NOW), contract, facts(List.of(gif))))

@@ -5,9 +5,9 @@ import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.IssuanceStatus;
-import ru.projectx.contracts.exception.MessageTooLargeException;
+import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.exception.SubmissionRefusedException;
 import ru.projectx.contracts.repository.UskRecordRepository;
-import ru.projectx.contracts.service.IssueErrors;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
@@ -72,9 +72,9 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
     private void submit(R record, ExternalIdentifiers identifiers) {
         try {
             recording.submit(record.id(), identifiers);
-        } catch (MessageTooLargeException tooLarge) {
-            warn(record, tooLarge.getMessage());
-            recording.refuse(record.id(), IssueErrors.kmContractMessageTooLarge(tooLarge.limit(), tooLarge.documents()));
+        } catch (SubmissionRefusedException refused) {
+            warn(record, refused.getMessage());
+            recording.refuse(record.id(), new IssueError(refused.errorCode(), refused.errorMessage()));
         }
     }
 

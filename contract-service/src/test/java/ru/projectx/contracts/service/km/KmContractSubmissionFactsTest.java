@@ -74,8 +74,8 @@ class KmContractSubmissionFactsTest {
         assertThat(gathered.acceptedAt()).isEqualTo(ACCEPTED_AT);
         assertThat(gathered.policyholder()).isEqualTo(PersonSnapshots.of(Tasks.insured("0.00")));
         assertThat(gathered.insured()).isEqualTo(PersonSnapshots.of(Tasks.spouse("34000.00")));
-        assertThat(gathered.certificates()).containsExactly(new OutboundAttachment(FIRST_DOCUMENT, JPEG),
-                new OutboundAttachment(SECOND_DOCUMENT, PDF));
+        assertThat(gathered.certificates()).containsExactly(new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, JPEG),
+                new OutboundAttachment(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, PDF));
     }
 
     @Test

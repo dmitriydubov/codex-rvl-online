@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.PersonSnapshot;
-import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.message.CertificateDocument;
 import ru.projectx.contracts.message.KmContractEvents;
@@ -77,7 +76,7 @@ public class KmContractSubmissionMessages {
 
     private CertificateDocument document(OutboundAttachment certificate) {
         StoredFile file = certificate.file();
-        return new CertificateDocument(certificate.documentId(), PrintedFormType.MEDICAL_CERTIFICATE.name(),
+        return new CertificateDocument(certificate.documentId(), certificate.docType().name(),
                 fileName(certificate.documentId(), file.contentType()), file.contentType(), null, file.hash());
     }
 

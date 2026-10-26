@@ -107,7 +107,8 @@ class KmContractSubmissionsTest {
     @Test
     void messageOverTheLimit_refusesTheContractWithTheLimitCodeAndAWarningAndThePassGoesOn() {
         given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
-        willThrow(new MessageTooLargeException(70004, 65536, 2)).given(recording).submit(first.id(), IDENTIFIERS);
+        willThrow(new MessageTooLargeException(70004, 65536, 2, "KM_CONTRACT_MESSAGE_TOO_LARGE",
+                "сообщение о договоре КМ больше предела 65536 байт, справок — 2")).given(recording).submit(first.id(), IDENTIFIERS);
 
         assertThat(submissions.prepareDue()).isEqualTo(2);
 

@@ -126,7 +126,7 @@ class KmContractSubmissionRecordingTest {
 
     @Test
     void messageOverTheLimit_failsTheSubmissionBeforeAnythingIsRecorded() {
-        MessageTooLargeException tooLarge = new MessageTooLargeException(70000, 65536, 2);
+        MessageTooLargeException tooLarge = new MessageTooLargeException(70000, 65536, 2, "KM_CONTRACT_MESSAGE_TOO_LARGE", "сообщение");
         willThrow(tooLarge).given(limit).verify("{\"data\": {}}", gathered.certificates());
 
         assertThatThrownBy(() -> recording.submit(CONTRACT_ID, KmContractSubmissionMessagesTest.IDENTIFIERS))

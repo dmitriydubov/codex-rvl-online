@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.MessageAttachment;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.exception.MessageTooLargeException;
@@ -74,9 +75,12 @@ class KmContractMessageLimitTest {
                 .isInstanceOf(MessageTooLargeException.class)
                 .satisfies(failure -> {
                     MessageTooLargeException tooLarge = (MessageTooLargeException) failure;
-                    assertThat(tooLarge.limit()).isEqualTo(65536);
-                    assertThat(tooLarge.documents()).isEqualTo(2);
-                    assertThat(tooLarge.getMessage()).doesNotContain("certificates/");
+                    assertThat(tooLarge.errorCode()).isEqualTo("KM_CONTRACT_MESSAGE_TOO_LARGE");
+                    assertThat(tooLarge.errorMessage())
+                            .isEqualTo("сообщение о договоре КМ больше предела 65536 байт, справок — 2");
+                    assertThat(tooLarge.getMessage())
+                            .isEqualTo("сообщение в 80070 байт больше предела 65536 байт, вложений — 2")
+                            .doesNotContain("certificates/");
                 });
     }
 
@@ -109,7 +113,7 @@ class KmContractMessageLimitTest {
     }
 
     private static OutboundAttachment certificate(long size) {
-        return new OutboundAttachment(UUID.randomUUID(), new StoredFile("certificates/0b6c/" + size + ".jpg",
+        return new OutboundAttachment(UUID.randomUUID(), PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile("certificates/0b6c/" + size + ".jpg",
                 "0".repeat(64), size, "image/jpeg"));
     }
 

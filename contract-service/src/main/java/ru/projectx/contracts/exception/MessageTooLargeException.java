@@ -1,23 +1,11 @@
 package ru.projectx.contracts.exception;
 
-public class MessageTooLargeException extends RuntimeException {
+public class MessageTooLargeException extends SubmissionRefusedException {
 
     private static final long serialVersionUID = 1L;
 
-    private final long limit;
-    private final int documents;
-
-    public MessageTooLargeException(long size, long limit, int documents) {
-        super("сообщение в " + size + " байт больше предела " + limit + " байт, вложений — " + documents);
-        this.limit = limit;
-        this.documents = documents;
-    }
-
-    public long limit() {
-        return limit;
-    }
-
-    public int documents() {
-        return documents;
+    public MessageTooLargeException(long size, long limit, int documents, String errorCode, String errorMessage) {
+        super("сообщение в " + size + " байт больше предела " + limit + " байт, вложений — " + documents,
+                errorCode, errorMessage);
     }
 }
