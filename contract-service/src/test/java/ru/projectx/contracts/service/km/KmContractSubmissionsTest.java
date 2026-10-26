@@ -136,7 +136,7 @@ class KmContractSubmissionsTest {
     }
 
     @Test
-    void brokenInternalCondition_ofAContractNoLongerPaid_isNeitherCountedNorLoggedAndThePassGoesOn() {
+    void brokenInternalCondition_ofAContractNoLongerPaid_isOnlyWarnedWithoutCountingAndThePassGoesOn() {
         given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
         willThrow(new IllegalStateException("у договора КМ нет момента оплаты"))
                 .given(recording).submit(first.id(), IDENTIFIERS);
@@ -145,6 +145,27 @@ class KmContractSubmissionsTest {
 
         verify(recording).refuse(first.id(), PREPARATION_FAILED);
         verify(recording).submit(second.id(), IDENTIFIERS);
+        verifyNoInteractions(preparationMetrics);
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).isEqualTo("договор КМ " + first.id() + " участника " + Tasks.SPOUSE
+                    + " заявки " + Tasks.REQUEST + ": запись уже не готова к передаче, ошибка подготовки не записана,"
+                    + " тип отказа java.lang.IllegalStateException, SQLSTATE нет");
+        });
+    }
+
+    @Test
+    void failureToWriteThePreparationError_endsThePassKeepingTheBrokenConditionAsSuppressed() {
+        IllegalStateException broken = new IllegalStateException("у договора КМ нет записи акцепта");
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка занята");
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        willThrow(broken).given(recording).submit(first.id(), IDENTIFIERS);
+        willThrow(busy).given(recording).refuse(first.id(), PREPARATION_FAILED);
+
+        assertThatThrownBy(submissions::prepareDue).isSameAs(busy);
+
+        assertThat(busy.getSuppressed()).containsExactly(broken);
+        verify(recording, never()).submit(second.id(), IDENTIFIERS);
         verifyNoInteractions(preparationMetrics);
         assertThat(journal.list).isEmpty();
     }

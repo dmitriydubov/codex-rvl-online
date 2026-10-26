@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.usk;
 
 import org.slf4j.Logger;
 import org.slf4j.MDC;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.IssuanceStatus;
@@ -16,6 +17,9 @@ import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.service.reference.RequestResolution;
 
 public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
+
+    private static final String FAILURE_FORMAT = "{} {} участника {} заявки {}: {}, тип отказа {}, SQLSTATE {}";
+    private static final String NO_LONGER_READY = "запись уже не готова к передаче, ошибка подготовки не записана";
 
     private final IssuanceKind<R, S> kind;
     private final UskRecordRepository<R, S> records;
@@ -87,12 +91,27 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
         if (UskPreparationFailures.temporary(failure)) {
             throw failure;
         }
-        if (recording.refuse(record.id(), kind.errors().preparationFailed())) {
+        if (refuseAsNotPrepared(record, failure)) {
             preparationMetrics.countFailed(kind.requestEventType());
-            log.error("{} {} участника {} заявки {}: {}, тип отказа {}, SQLSTATE {}", kind.wording().kind(), record.id(),
-                    record.participantId(), record.state().request().individualRequestId(),
-                    kind.wording().preparationFailed(), failure.getClass().getName(), SqlStates.deepestOrNone(failure));
+            logFailure(log.atError(), record, kind.wording().preparationFailed(), failure);
+            return;
         }
+        logFailure(log.atWarn(), record, NO_LONGER_READY, failure);
+    }
+
+    private boolean refuseAsNotPrepared(R record, RuntimeException failure) {
+        try {
+            return recording.refuse(record.id(), kind.errors().preparationFailed());
+        } catch (RuntimeException refusal) {
+            refusal.addSuppressed(failure);
+            throw refusal;
+        }
+    }
+
+    private void logFailure(LoggingEventBuilder event, R record, String reason, RuntimeException failure) {
+        event.log(FAILURE_FORMAT, kind.wording().kind(), record.id(), record.participantId(),
+                record.state().request().individualRequestId(), reason, failure.getClass().getName(),
+                SqlStates.deepestOrNone(failure));
     }
 
     private void postpone(R record, RequestResolution.Unavailable unavailable) {

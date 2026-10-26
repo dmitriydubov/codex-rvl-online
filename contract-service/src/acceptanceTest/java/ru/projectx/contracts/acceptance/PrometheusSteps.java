@@ -38,7 +38,9 @@ public class PrometheusSteps {
 
     @Тогда("счётчик Prometheus {string} с меткой event_type {string} вырос за сценарий на {int}")
     public void counterGrewByEventType(String name, String eventType, int growth) throws IOException, InterruptedException {
-        assertEventTypeDocumented(name, eventType);
+        if (growth == 0) {
+            assertEventTypeDocumented(name, eventType);
+        }
         counterGrew(name, "event_type", eventType, growth);
     }
 

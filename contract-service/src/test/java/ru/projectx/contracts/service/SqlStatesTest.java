@@ -38,7 +38,7 @@ class SqlStatesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"23505", "22001", "42P01", "55000", "57P01", "XX000"})
+    @ValueSource(strings = {"23505", "22001", "42P01", "55000", "57P01", "XX000", "", "0"})
     void transientState_doesNotHoldForFailuresThatRepeatOnRetry(String state) {
         assertThat(SqlStates.transientState(state)).isFalse();
     }

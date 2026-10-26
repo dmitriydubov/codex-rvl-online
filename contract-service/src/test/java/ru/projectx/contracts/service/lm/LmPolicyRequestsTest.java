@@ -174,6 +174,21 @@ class LmPolicyRequestsTest {
     }
 
     @Test
+    void failureToWriteThePreparationError_endsThePassKeepingTheBrokenConditionAsSuppressed() {
+        IllegalStateException broken = new IllegalStateException("у полиса ЛМ нет снимка застрахованного");
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка занята");
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        doThrow(broken).when(recording).submit(first.id(), IDENTIFIERS);
+        doThrow(busy).when(recording).refuse(first.id(), PREPARATION_FAILED);
+
+        assertThatThrownBy(requests::prepareDue).isSameAs(busy);
+
+        assertThat(busy.getSuppressed()).containsExactly(broken);
+        verify(recording, never()).submit(second.id(), IDENTIFIERS);
+        verifyNoInteractions(preparationMetrics);
+    }
+
+    @Test
     void nothingDue_preparesNothing() {
         given(policies.findByStatusOrderByCreatedAtAscIdAsc(LmPolicyStatus.NEW, Limit.of(7))).willReturn(List.of());
 

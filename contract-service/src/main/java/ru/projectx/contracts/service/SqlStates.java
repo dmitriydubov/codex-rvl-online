@@ -31,6 +31,7 @@ public final class SqlStates {
     }
 
     public static boolean transientState(String state) {
-        return TRANSIENT_STATES.contains(state) || TRANSIENT_CLASSES.contains(state.substring(0, CLASS_LENGTH));
+        return TRANSIENT_STATES.contains(state)
+                || state.length() >= CLASS_LENGTH && TRANSIENT_CLASSES.contains(state.substring(0, CLASS_LENGTH));
     }
 }
