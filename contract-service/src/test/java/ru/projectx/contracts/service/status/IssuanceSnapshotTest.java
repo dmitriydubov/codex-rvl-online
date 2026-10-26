@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.CancelReason;
 import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
@@ -16,6 +15,7 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
@@ -138,6 +138,7 @@ class IssuanceSnapshotTest {
 
         assertThat(snapshot.formsOf(policy)).containsExactly(own);
         assertThat(snapshot.formsOf(another)).containsExactly(foreign);
+        assertThat(snapshot.formsOf(contract)).containsExactly(contractForm);
     }
 
     @Test
@@ -149,13 +150,11 @@ class IssuanceSnapshotTest {
     }
 
     private static PrintedForm issuedForm(UUID policyId, String url) {
-        return PrintedForm.issuedForLmPolicy(policyId, new UskDocument(PrintedFormType.POLICY, url, 96256L), NOW);
+        return PrintedForm.issuedFor(PersonOwner.lmPolicy(policyId), new UskDocument(PrintedFormType.POLICY, url, 96256L), NOW);
     }
 
     private static PrintedForm formOfContract(UUID contractId, String url) {
-        PrintedForm form = issuedForm(contractId, url);
-        ReflectionTestUtils.setField(form, "lmPolicyId", null);
-        ReflectionTestUtils.setField(form, "contractId", contractId);
-        return form;
+        return PrintedForm.issuedFor(PersonOwner.contract(contractId),
+                new UskDocument(PrintedFormType.CONTRACT, url, 205312L), NOW);
     }
 }

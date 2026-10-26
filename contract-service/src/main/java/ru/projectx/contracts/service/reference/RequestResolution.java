@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.reference;
 
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.exception.ReferenceKind;

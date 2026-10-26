@@ -89,7 +89,7 @@ class LmPolicyRaceIT {
         policyId = policies.saveAndFlush(policy).id();
         MessageEnvelope envelope = new MessageEnvelope(UUID.randomUUID(), request,
                 LmPolicyEvents.LM_POLICY_REQUEST_TOPIC, LmPolicyEvents.LM_POLICY_REQUESTED, 2);
-        requestMessageId = journal.record(new OutboxDraft(LmPolicyRequestRecording.AGGREGATE_TYPE, policyId, envelope,
+        requestMessageId = journal.record(new OutboxDraft("LM_POLICY", policyId, envelope,
                 "{}"), Issuances.OPENED).id();
     }
 

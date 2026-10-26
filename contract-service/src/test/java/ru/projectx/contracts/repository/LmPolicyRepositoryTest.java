@@ -6,9 +6,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.entity.IssuanceTerms;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
@@ -37,27 +39,44 @@ class LmPolicyRepositoryTest {
     private ContractPersonRepository persons;
 
     @BeforeEach
+    @AfterEach
     void emptyTables() {
         persons.deleteAll();
         policies.deleteAll();
     }
 
     @Test
-    void earliestUpdate_isTheOldestSubmissionAmongSubmittedPoliciesOnly() {
+    void firstSubmitted_isTheOldestSubmissionAmongSubmittedPoliciesOnly() {
         policies.save(submitted("6778e8c2-985a-4d54-9bd3-0f6403b104d6", SECOND_SUBMITTED));
         policies.save(submitted("2b9d4e6f-8a1c-4d3e-9f50-61728394a5b6", FIRST_SUBMITTED));
         policies.save(LmPolicy.open(new LmPolicyDraft(TERMS, UUID.fromString("4d8e1f2a-3b4c-4d5e-9f60-718293a4b5c6")),
                 OPENED));
 
-        assertThat(policies.findEarliestUpdateByStatus(LmPolicyStatus.SUBMITTED)).contains(FIRST_SUBMITTED);
+        assertThat(policies.findFirstByStatusOrderByUpdatedAtAscIdAsc(LmPolicyStatus.SUBMITTED))
+                .map(policy -> policy.state().updatedAt()).contains(FIRST_SUBMITTED);
     }
 
     @Test
-    void earliestUpdate_withoutSubmittedPolicies_isEmpty() {
+    void firstSubmitted_withoutSubmittedPolicies_isEmpty() {
         policies.save(LmPolicy.open(new LmPolicyDraft(TERMS, UUID.fromString("4d8e1f2a-3b4c-4d5e-9f60-718293a4b5c6")),
                 OPENED));
 
-        assertThat(policies.findEarliestUpdateByStatus(LmPolicyStatus.SUBMITTED)).isEmpty();
+        assertThat(policies.findFirstByStatusOrderByUpdatedAtAscIdAsc(LmPolicyStatus.SUBMITTED)).isEmpty();
+    }
+
+    @Test
+    void dueByStatus_listsPoliciesOfThatStatusInCreationOrderUpToTheLimit() {
+        LmPolicy later = LmPolicy.open(new LmPolicyDraft(TERMS, UUID.fromString("4d8e1f2a-3b4c-4d5e-9f60-718293a4b5c6")),
+                OPENED.plus(Duration.ofMinutes(1)));
+        LmPolicy earlier = LmPolicy.open(new LmPolicyDraft(TERMS, UUID.fromString("2b9d4e6f-8a1c-4d3e-9f50-61728394a5b6")),
+                OPENED);
+        policies.save(later);
+        policies.save(earlier);
+        policies.save(submitted("6778e8c2-985a-4d54-9bd3-0f6403b104d6", FIRST_SUBMITTED));
+
+        assertThat(policies.findByStatusOrderByCreatedAtAscIdAsc(LmPolicyStatus.NEW, Limit.of(10)))
+                .extracting(LmPolicy::participantId).containsExactly(earlier.participantId(), later.participantId());
+        assertThat(policies.findByStatusOrderByCreatedAtAscIdAsc(LmPolicyStatus.NEW, Limit.of(1))).hasSize(1);
     }
 
     @Test

@@ -30,6 +30,7 @@ import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.IssuedPolicy;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.OfferAcceptance;
+import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
@@ -135,7 +136,7 @@ class RequestPackagesTest {
         policy.submit(NOW);
         policy.markIssued(new IssuedPolicy(UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
                 UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456"), NOW);
-        PrintedForm form = PrintedForm.issuedForLmPolicy(policy.id(),
+        PrintedForm form = PrintedForm.issuedFor(PersonOwner.lmPolicy(policy.id()),
                 new UskDocument(PrintedFormType.POLICY, FORM_URL, 96256L), NOW);
         ReflectionTestUtils.setField(form, "id", FORM_ID);
         snapshot(List.of(CHILD), List.of(form));

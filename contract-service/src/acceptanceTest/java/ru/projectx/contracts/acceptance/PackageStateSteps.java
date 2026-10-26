@@ -27,6 +27,8 @@ public class PackageStateSteps {
     private static final String NESTED = ".";
     private static final Set<String> AMOUNTS = Set.of("premium_amount", "payment.amount");
     private static final Set<String> MOMENTS = Set.of("acceptance.accepted_at");
+    private static final String LM_POLICY_KIND = "LM_POLICY";
+    private static final String DOCUMENT_SEPARATOR = "; ";
 
     private final AttachmentCalls calls;
     private final IssuanceRecords records;
@@ -105,7 +107,7 @@ public class PackageStateSteps {
             return;
         }
         if (DOCUMENTS.equals(column)) {
-            documents(softly, request, participant, item.path(DOCUMENTS), expected);
+            documents(softly, item, new ParticipantRef(request, participant), expected);
             return;
         }
         JsonNode actual = node(item, column);
@@ -137,31 +139,43 @@ public class PackageStateSteps {
         softly.assertThat(actual.asString()).as(described).isEqualTo(expected);
     }
 
-    private void documents(SoftAssertions softly, String request, String participant, JsonNode actual,
-            String expected) {
-        softly.assertThat(actual.isArray()).as("documents участника %s — массив", participant).isTrue();
-        if (NONE.equals(expected)) {
-            softly.assertThat(actual.size()).as("documents участника %s", participant).isZero();
-            return;
-        }
-        String[] parts = expected.split(" ");
-        softly.assertThat(actual.size()).as("documents участника %s", participant).isEqualTo(1);
-        JsonNode document = actual.path(0);
-        softly.assertThat(document.path("doc_type").asString()).isEqualTo(parts[0]);
-        softly.assertThat(document.path("kind").asString()).isEqualTo(parts[1]);
-        softly.assertThat(document.path("version").asString()).isEqualTo(parts[2]);
-        softly.assertThat(document.path("url").asString()).isEqualTo(parts[3]);
-        softly.assertThat(document.path("document_id").asString()).as("document_id")
-                .isEqualTo(formId(request, participant, parts[0], parts[1]));
+    private record ParticipantRef(String request, String participant) {
     }
 
-    private String formId(String request, String participant, String docType, String kind) {
-        UUID policy = records.latestLmPolicyId(participant, request);
-        return forms.ofPolicy(policy).stream()
+    private void documents(SoftAssertions softly, JsonNode item, ParticipantRef ref, String expected) {
+        JsonNode actual = item.path(DOCUMENTS);
+        softly.assertThat(actual.isArray()).as("documents участника %s — массив", ref.participant()).isTrue();
+        if (NONE.equals(expected)) {
+            softly.assertThat(actual.size()).as("documents участника %s", ref.participant()).isZero();
+            return;
+        }
+        UUID owner = owner(item, ref.request(), ref.participant());
+        String[] expectedDocuments = expected.split(DOCUMENT_SEPARATOR);
+        softly.assertThat(actual.size()).as("documents записи %s", owner).isEqualTo(expectedDocuments.length);
+        for (int index = 0; index < expectedDocuments.length; index++) {
+            String[] parts = expectedDocuments[index].split(" ");
+            JsonNode document = actual.path(index);
+            softly.assertThat(document.path("doc_type").asString()).isEqualTo(parts[0]);
+            softly.assertThat(document.path("kind").asString()).isEqualTo(parts[1]);
+            softly.assertThat(document.path("version").asString()).isEqualTo(parts[2]);
+            softly.assertThat(document.path("url").asString()).isEqualTo(parts[3]);
+            softly.assertThat(document.path("document_id").asString()).as("document_id")
+                    .isEqualTo(formId(owner, parts[0], parts[1]));
+        }
+    }
+
+    private UUID owner(JsonNode item, String request, String participant) {
+        return LM_POLICY_KIND.equals(item.path("document_kind").asString())
+                ? records.latestLmPolicyId(participant, request)
+                : records.latestContractId(participant, request);
+    }
+
+    private String formId(UUID owner, String docType, String kind) {
+        return forms.of(owner).stream()
                 .filter(form -> docType.equals(form.docType()) && kind.equals(form.kind()))
                 .map(form -> form.id().toString())
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("у полиса ЛМ " + policy + " нет формы " + docType + " " + kind));
+                .orElseThrow(() -> new AssertionError("у записи " + owner + " нет формы " + docType + " " + kind));
     }
 
     private static void nestedObjects(SoftAssertions softly, Map<String, String> row, JsonNode item) {

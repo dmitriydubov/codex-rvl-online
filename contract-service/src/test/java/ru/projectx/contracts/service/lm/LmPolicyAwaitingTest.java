@@ -11,8 +11,11 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.config.LmPolicyRequestProperties;
+import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.support.Issuances;
+import ru.projectx.contracts.support.Tasks;
 
 class LmPolicyAwaitingTest {
 
@@ -27,8 +30,9 @@ class LmPolicyAwaitingTest {
 
     @Test
     void submittedPolicies_showTheWaitOfTheOldestAndTheCountSubmittedBeforeTheThreshold() {
-        given(policies.findEarliestUpdateByStatus(LmPolicyStatus.SUBMITTED))
-                .willReturn(Optional.of(NOW.minus(Duration.ofMinutes(90))));
+        LmPolicy oldest = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
+        oldest.submit(NOW.minus(Duration.ofMinutes(90)));
+        given(policies.findFirstByStatusOrderByUpdatedAtAscIdAsc(LmPolicyStatus.SUBMITTED)).willReturn(Optional.of(oldest));
         given(policies.countByStatusAndUpdatedAtBefore(LmPolicyStatus.SUBMITTED, NOW.minus(THRESHOLD))).willReturn(2L);
 
         awaiting.refresh();
@@ -38,7 +42,7 @@ class LmPolicyAwaitingTest {
 
     @Test
     void noSubmittedPolicies_showZeroWaitAndNothingOverdue() {
-        given(policies.findEarliestUpdateByStatus(LmPolicyStatus.SUBMITTED)).willReturn(Optional.empty());
+        given(policies.findFirstByStatusOrderByUpdatedAtAscIdAsc(LmPolicyStatus.SUBMITTED)).willReturn(Optional.empty());
         given(policies.countByStatusAndUpdatedAtBefore(LmPolicyStatus.SUBMITTED, NOW.minus(THRESHOLD))).willReturn(0L);
 
         awaiting.refresh();

@@ -29,6 +29,7 @@ import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.RowRaces;
 import ru.projectx.contracts.support.Tasks;
+import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 
 @IntegrationTest
 class LmPolicyRequestRaceIT {

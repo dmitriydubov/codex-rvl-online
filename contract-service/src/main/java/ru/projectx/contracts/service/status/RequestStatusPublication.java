@@ -7,12 +7,11 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.IssuanceRequest;
-import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.StatusEvents;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
+import ru.projectx.contracts.service.outbox.OutboxDrafts;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 
 @Service
@@ -73,9 +72,6 @@ public class RequestStatusPublication {
         MessageMeta meta = new MessageMeta(UUID.randomUUID(), individualRequestId, StatusEvents.CONTRACT_STATUS_TOPIC,
                 StatusEvents.CONTRACT_STATUS_CHANGED, StatusEvents.SCHEMA_VERSION,
                 OffsetDateTime.ofInstant(now, clock.getZone()), request.nextSnapshotVersion(now), StatusEvents.SOURCE);
-        MessageEnvelope envelope = new MessageEnvelope(meta.messageId(), individualRequestId, meta.topic(),
-                meta.eventType(), meta.entityVersion());
-        journal.record(new OutboxDraft(AGGREGATE_TYPE, individualRequestId, envelope, messages.write(snapshot, meta)),
-                now);
+        journal.record(OutboxDrafts.of(AGGREGATE_TYPE, individualRequestId, meta, messages.write(snapshot, meta)), now);
     }
 }

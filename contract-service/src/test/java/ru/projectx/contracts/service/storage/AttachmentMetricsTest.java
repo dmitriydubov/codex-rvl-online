@@ -44,6 +44,6 @@ class AttachmentMetricsTest {
         assertThat(registry.get("contracts.storage.unavailable").counter().count()).isEqualTo(1);
         assertThat(registry.get("contracts.storage.unavailable").counter().getId().getTags()).isEmpty();
         assertThat(registry.get("contracts.storage.unavailable").counter().getId().getDescription())
-                .isEqualTo("загрузки справок, на которые хранилище S3 не ответило успехом");
+                .isEqualTo("обращения к хранилищу S3 за справками, не получившие успешного ответа");
     }
 }

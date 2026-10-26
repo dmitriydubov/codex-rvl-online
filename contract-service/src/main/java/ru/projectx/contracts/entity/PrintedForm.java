@@ -78,8 +78,9 @@ public class PrintedForm {
     protected PrintedForm() {
     }
 
-    private PrintedForm(UUID lmPolicyId, UskDocument document, Instant now) {
-        this.lmPolicyId = lmPolicyId;
+    private PrintedForm(PersonOwner owner, UskDocument document, Instant now) {
+        this.contractId = owner.contractId();
+        this.lmPolicyId = owner.lmPolicyId();
         this.kind = PrintedFormKind.FINAL;
         this.docType = document.type();
         this.version = FIRST_VERSION;
@@ -100,8 +101,8 @@ public class PrintedForm {
         this.createdAt = now;
     }
 
-    public static PrintedForm issuedForLmPolicy(UUID lmPolicyId, UskDocument document, Instant now) {
-        return new PrintedForm(lmPolicyId, document, now);
+    public static PrintedForm issuedFor(PersonOwner owner, UskDocument document, Instant now) {
+        return new PrintedForm(owner, document, now);
     }
 
     public static PrintedForm receivedCertificate(ParticipantAttachment attachment, StoredFile file, Instant now) {
@@ -110,6 +111,10 @@ public class PrintedForm {
 
     public UUID id() {
         return id;
+    }
+
+    public Optional<UUID> contractId() {
+        return Optional.ofNullable(contractId);
     }
 
     public Optional<UUID> lmPolicyId() {

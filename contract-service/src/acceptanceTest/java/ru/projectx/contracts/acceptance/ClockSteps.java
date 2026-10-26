@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.config.LmPolicyRequestProperties;
 import ru.projectx.contracts.config.OutboxProperties;
 
@@ -22,13 +23,15 @@ public class ClockSteps {
     private final InboxProperties inbox;
     private final OutboxProperties outbox;
     private final LmPolicyRequestProperties lmPolicyRequests;
+    private final KmContractSubmissionProperties kmContractSubmissions;
 
     public ClockSteps(StandClock clock, InboxProperties inbox, OutboxProperties outbox,
-            LmPolicyRequestProperties lmPolicyRequests) {
+            LmPolicyRequestProperties lmPolicyRequests, KmContractSubmissionProperties kmContractSubmissions) {
         this.clock = clock;
         this.inbox = inbox;
         this.outbox = outbox;
         this.lmPolicyRequests = lmPolicyRequests;
+        this.kmContractSubmissions = kmContractSubmissions;
     }
 
     @Before
@@ -79,5 +82,10 @@ public class ClockSteps {
     @Когда("на часах Договоров прошёл порог ожидания ответа 1С:УСК")
     public void awaitingThresholdPassed() {
         clock.advance(lmPolicyRequests.awaitingThreshold());
+    }
+
+    @Когда("на часах Договоров прошёл порог ожидания ответа 1С:УСК по договору КМ")
+    public void kmContractAwaitingThresholdPassed() {
+        clock.advance(kmContractSubmissions.awaitingThreshold());
     }
 }

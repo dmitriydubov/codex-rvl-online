@@ -53,17 +53,11 @@ public class LmPolicy extends IssuanceRecord {
         return new LmPolicy(draft, now);
     }
 
-    public void submit(Instant now) {
-        require(LmPolicyStatus.NEW);
-        this.status = LmPolicyStatus.SUBMITTED;
-        advanceVersion(now);
-    }
-
     public void markIssued(IssuedPolicy issued, Instant now) {
         require(LmPolicyStatus.SUBMITTED);
         this.status = LmPolicyStatus.ISSUED;
-        this.policyUskId = issued.policyUskId();
-        this.policyUskNumber = issued.policyUskNumber();
+        this.policyUskId = issued.uskId();
+        this.policyUskNumber = issued.uskNumber();
         this.issuedPolicyId = issued.issuedPolicyId();
         this.issuedPolicyNumber = issued.issuedPolicyNumber();
         advanceVersion(now);
@@ -76,13 +70,17 @@ public class LmPolicy extends IssuanceRecord {
     }
 
     @Override
-    protected void enterError() {
-        this.status = LmPolicyStatus.ERROR;
+    protected void enter(IssuanceTransition transition) {
+        this.status = switch (transition) {
+            case SUBMITTED -> submittedFromNew();
+            case ERROR -> LmPolicyStatus.ERROR;
+            case CANCELLED -> LmPolicyStatus.CANCELLED;
+        };
     }
 
-    @Override
-    protected void enterCancelled() {
-        this.status = LmPolicyStatus.CANCELLED;
+    private LmPolicyStatus submittedFromNew() {
+        require(LmPolicyStatus.NEW);
+        return LmPolicyStatus.SUBMITTED;
     }
 
     public boolean submitted() {

@@ -20,8 +20,8 @@ public class IssuanceRecords {
             select 'договор КМ' as document, id, status::text as status, number, date_from, date_to, premium_amount,
                    policyholder_participant_id, insurance_contract_id, insurer_policy_id, program_id, entity_version,
                    cancel_reason::text as cancel_reason, cancel_comment, cancelled_at, error_code, error_message,
-                   null::uuid as policy_usk_id, null::text as policy_usk_number, null::text as issued_policy_number,
-                   null::uuid as issued_policy_id, created_at
+                   contract_usk_id as policy_usk_id, contract_usk_number as policy_usk_number, issued_policy_number,
+                   issued_policy_id, created_at
               from contracts where individual_request_id = :request and insured_participant_id = :participant
             union all
             select 'полис ЛМ', id, status::text, null, date_from, date_to, null,

@@ -75,6 +75,10 @@ public class AttachmentCalls {
                 .orElseThrow(() -> new AssertionError("вложение " + attachment + " не принималось в этом сценарии"));
     }
 
+    List<byte[]> allSentContents() {
+        return List.copyOf(sent.values());
+    }
+
     byte[] sentContent(String attachment) {
         return Optional.ofNullable(sent.get(attachment))
                 .orElseThrow(() -> new AssertionError("вложение " + attachment + " не отправлялось в этом сценарии"));

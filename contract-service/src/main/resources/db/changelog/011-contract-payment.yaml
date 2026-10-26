@@ -1,0 +1,17 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 011-contract-payment
+      author: contract-service
+      comment: >
+        Момент поступления оплаты по договору КМ. Пишется переходом договора в «оплачен» и уходит в
+        1С:УСК вместе с оплаченным договором; заказ на оплату и его реквизиты появятся отдельно, на
+        этапе оплаты. Договоры в «оплачен» берёт проход передачи в 1С:УСК, поэтому индекс по статусу
+        уже есть.
+      changes:
+        - addColumn:
+            tableName: contracts
+            columns:
+              - column: { name: paid_at, type: timestamptz }
+      rollback:
+        - dropColumn: { tableName: contracts, columnName: paid_at }

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.reference;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,20 +9,15 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.IssuanceState;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.service.IssueErrors;
-import ru.projectx.contracts.service.reference.InsuranceContractReads;
-import ru.projectx.contracts.service.reference.PolicyReads;
-import ru.projectx.contracts.service.reference.ProgramReads;
-import ru.projectx.contracts.service.reference.ReferenceOutcome;
-import ru.projectx.contracts.service.reference.ReferenceRead;
 
 @Component
-public class LmPolicyReferences {
+public class IssuanceReferences {
 
     private final ProgramReads programs;
     private final InsuranceContractReads insuranceContracts;
     private final PolicyReads policies;
 
-    public LmPolicyReferences(ProgramReads programs, InsuranceContractReads insuranceContracts, PolicyReads policies) {
+    public IssuanceReferences(ProgramReads programs, InsuranceContractReads insuranceContracts, PolicyReads policies) {
         this.programs = programs;
         this.insuranceContracts = insuranceContracts;
         this.policies = policies;

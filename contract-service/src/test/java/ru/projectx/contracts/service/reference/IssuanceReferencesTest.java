@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.reference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -25,7 +25,7 @@ import ru.projectx.contracts.service.reference.ProgramReads;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
-class LmPolicyReferencesTest {
+class IssuanceReferencesTest {
 
     private static final UUID PROGRAM_EXTERNAL = UUID.fromString("6b02f1cc-9d47-4e35-8a20-7f1c3e5b09a2");
     private static final UUID CONTRACT_EXTERNAL = UUID.fromString("8c41e2ab-55d0-4a17-9b63-2f0e7c1d4a88");
@@ -34,7 +34,7 @@ class LmPolicyReferencesTest {
     private final ProgramReads programs = mock();
     private final InsuranceContractReads insuranceContracts = mock();
     private final PolicyReads policies = mock();
-    private final LmPolicyReferences references = new LmPolicyReferences(programs, insuranceContracts, policies);
+    private final IssuanceReferences references = new IssuanceReferences(programs, insuranceContracts, policies);
     private final IssuanceState state = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD).state();
 
     @BeforeEach
@@ -86,7 +86,7 @@ class LmPolicyReferencesTest {
     @Test
     void policyWithoutProgram_isRefusedWithoutReadingAnything() {
         IssuanceState withoutProgram = new IssuanceState(state.request(), state.policyholderParticipantId(),
-                Optional.empty(), state.period(), Optional.empty(), Optional.empty(), 1);
+                Optional.empty(), state.period(), Optional.empty(), Optional.empty(), 1, state.updatedAt());
 
         assertThat(references.resolve(withoutProgram)).isEqualTo(new RequestResolution.Refused(
                 new IssueError("PROGRAM_REQUIRED", "у записи о выпуске нет программы страхования")));

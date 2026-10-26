@@ -33,7 +33,8 @@ import ru.projectx.contracts.service.integration.OneCBroker;
         "projectx.storage.timeouts.connect=1s",
         "projectx.storage.timeouts.read=2s",
         "projectx.storage.timeouts.write=2s",
-        "projectx.storage.timeouts.call=3s"})
+        "projectx.storage.timeouts.call=3s",
+        "projectx.km-contract-submissions.max-message-size=65536"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 
@@ -44,6 +45,8 @@ public class CucumberSpringConfiguration {
         private static final String RABBITMQ_IMAGE = "rabbitmq:4.1.2-alpine";
         private static final String LM_POLICY_REQUESTS = "запросы на выпуск полисов ЛМ";
         private static final String LM_POLICY_RESULTS = "результаты выпуска полисов ЛМ";
+        private static final String KM_CONTRACT_SUBMISSIONS = "передачи договоров КМ";
+        private static final String KM_CONTRACT_REGISTRATIONS = "результаты регистрации договоров КМ";
 
         @Bean
         @ServiceConnection
@@ -126,6 +129,16 @@ public class CucumberSpringConfiguration {
         @Bean
         OneCQueue lmPolicyResultQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
             return new OneCQueue(connections, LM_POLICY_RESULTS, broker.queues().lmPolicyIssues());
+        }
+
+        @Bean
+        OneCQueue kmContractSubmissionQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
+            return new OneCQueue(connections, KM_CONTRACT_SUBMISSIONS, broker.queues().kmContractSubmissions());
+        }
+
+        @Bean
+        OneCQueue kmContractRegistrationQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
+            return new OneCQueue(connections, KM_CONTRACT_REGISTRATIONS, broker.queues().kmContractRegistrations());
         }
     }
 }

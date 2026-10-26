@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
@@ -37,16 +38,19 @@ class InboxQueueEndpointsTest {
     }
 
     @Test
-    void lmPolicyResultQueue_isRegisteredOnTheOneCBrokerFactoryWithTheSameListener() {
+    void oneCResultQueues_areRegisteredOnTheOneCBrokerFactoryWithTheSameListener() {
         RabbitListenerEndpointRegistrar registrar = mock();
 
         endpoints.configureRabbitListeners(registrar);
 
         ArgumentCaptor<SimpleRabbitListenerEndpoint> endpoint = ArgumentCaptor.captor();
-        verify(registrar).registerEndpoint(endpoint.capture(), same(onecFactory));
-        assertThat(endpoint.getValue().getId()).isEqualTo("lm-policy-issues");
-        assertThat(endpoint.getValue().getQueueNames()).containsExactly("lm-policy-issues");
-        assertThat(endpoint.getValue().getMessageListener()).isSameAs(listener);
+        verify(registrar, times(2)).registerEndpoint(endpoint.capture(), same(onecFactory));
+        assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getId)
+                .containsExactly("lm-policy-issues", "km-contract-registrations");
+        assertThat(endpoint.getAllValues()).flatExtracting(SimpleRabbitListenerEndpoint::getQueueNames)
+                .containsExactly("lm-policy-issues", "km-contract-registrations");
+        assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getMessageListener)
+                .containsOnly(listener);
     }
 
     private static InternalBrokerProperties internal() {

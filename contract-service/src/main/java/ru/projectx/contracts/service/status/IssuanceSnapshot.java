@@ -30,7 +30,7 @@ public final class IssuanceSnapshot {
     private final Map<UUID, RecordOutcome> latestByParticipant;
     private final Map<UUID, Contract> latestContracts;
     private final Map<UUID, LmPolicy> latestPolicies;
-    private final Map<UUID, List<PrintedForm>> formsByPolicy;
+    private final Map<UUID, List<PrintedForm>> formsByOwner;
 
     public IssuanceSnapshot(UUID individualRequestId, boolean cancelled, List<RequestParticipant> composition,
             List<Contract> contracts, List<LmPolicy> policies, List<PrintedForm> forms) {
@@ -43,8 +43,9 @@ public final class IssuanceSnapshot {
         this.latestByParticipant = latestBy(records, RecordOutcome::participantId, RecordOutcome::recordId);
         this.latestContracts = latestBy(contracts, IssuanceRecord::participantId, IssuanceRecord::id);
         this.latestPolicies = latestBy(policies, IssuanceRecord::participantId, IssuanceRecord::id);
-        this.formsByPolicy = forms.stream().filter(form -> form.lmPolicyId().isPresent())
-                .collect(Collectors.groupingBy(form -> form.lmPolicyId().get()));
+        this.formsByOwner = forms.stream()
+                .filter(form -> form.contractId().or(form::lmPolicyId).isPresent())
+                .collect(Collectors.groupingBy(form -> form.contractId().or(form::lmPolicyId).orElseThrow()));
     }
 
     private static <T> Map<UUID, T> latestBy(List<T> items, Function<T, UUID> participant, Function<T, UUID> order) {
@@ -81,8 +82,8 @@ public final class IssuanceSnapshot {
         return latest(latestPolicies, participantId, LM_POLICY);
     }
 
-    public List<PrintedForm> formsOf(LmPolicy policy) {
-        return formsByPolicy.getOrDefault(policy.id(), List.of());
+    public List<PrintedForm> formsOf(IssuanceRecord record) {
+        return formsByOwner.getOrDefault(record.id(), List.of());
     }
 
     public Optional<IssuanceStatus> statusOf(RequestParticipant participant) {

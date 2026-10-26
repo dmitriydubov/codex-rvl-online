@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.contracts.entity.CancelReason;
@@ -68,6 +72,7 @@ class ContractRepositoryTest {
     private JdbcClient jdbc;
 
     @BeforeEach
+    @AfterEach
     void emptyTables() {
         persons.deleteAll();
         contracts.deleteAll();
@@ -105,6 +110,27 @@ class ContractRepositoryTest {
         assertThat(contracts.findByRequestIndividualRequestIdAndStatusNotIn(REQUEST,
                 Set.of(ContractStatus.ISSUED, ContractStatus.ERROR, ContractStatus.CANCELLED)))
                 .extracting(Contract::number).containsExactly("DKM-2026-000001");
+    }
+
+    @Test
+    void submittedContracts_areCountedAndOrderedByTheMomentOfSubmissionAndListedByStatusInCreationOrder() {
+        Contract later = paid(SPOUSE, "DKM-2026-000001", NOW.plus(Duration.ofMinutes(1)));
+        Contract earlier = paid(CHILD, "DKM-2026-000002", NOW);
+        Contract submitted = paid(UUID.fromString("2b9d4e6f-8a1c-4d3e-9f50-61728394a5b6"), "DKM-2026-000003", NOW);
+        submitted.submit(NOW.plus(Duration.ofMinutes(5)));
+        transaction.executeWithoutResult(status -> contracts.saveAll(java.util.List.of(later, earlier, submitted)));
+
+        assertThat(contracts.findByStatusOrderByCreatedAtAscIdAsc(ContractStatus.PAID, Limit.of(10)))
+                .extracting(Contract::number).containsExactly("DKM-2026-000002", "DKM-2026-000001");
+        assertThat(contracts.findFirstByStatusOrderByUpdatedAtAscIdAsc(ContractStatus.SUBMITTED))
+                .map(Contract::number).contains("DKM-2026-000003");
+        assertThat(contracts.countByStatusAndUpdatedAtBefore(ContractStatus.SUBMITTED, NOW.plus(Duration.ofMinutes(5))))
+                .isZero();
+        assertThat(contracts.countByStatusAndUpdatedAtBefore(ContractStatus.SUBMITTED, NOW.plus(Duration.ofMinutes(6))))
+                .isEqualTo(1);
+        Optional<String> locked = transaction.execute(status -> contracts.findLockedById(submitted.id())
+                .map(Contract::number));
+        assertThat(locked).contains("DKM-2026-000003");
     }
 
     @Test
@@ -194,5 +220,14 @@ class ContractRepositoryTest {
 
     private static Contract contract(UUID participant, String number) {
         return Contract.open(new ContractDraft(number, TERMS, participant, new BigDecimal("34000.00")), NOW);
+    }
+
+    private static Contract paid(UUID participant, String number, Instant opened) {
+        Contract contract = Contract.open(new ContractDraft(number, TERMS, participant, new BigDecimal("34000.00")),
+                opened);
+        contract.offerDraft();
+        contract.accept();
+        contract.markPaid(opened, opened);
+        return contract;
     }
 }

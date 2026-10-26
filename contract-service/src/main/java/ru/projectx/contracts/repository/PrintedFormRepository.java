@@ -9,7 +9,11 @@ import ru.projectx.contracts.entity.PrintedForm;
 
 public interface PrintedFormRepository extends JpaRepository<PrintedForm, UUID> {
 
-    List<PrintedForm> findByLmPolicyIdInOrderByCreatedAtAscIdAsc(Collection<UUID> lmPolicyIds);
+    List<PrintedForm> findByLmPolicyIdInOrContractIdInOrderByCreatedAtAscIdAsc(Collection<UUID> lmPolicyIds,
+            Collection<UUID> contractIds);
 
     Optional<PrintedForm> findByAttachmentAttachmentId(UUID attachmentId);
+
+    List<PrintedForm> findByAttachmentIndividualRequestIdAndAttachmentParticipantIdOrderByCreatedAtAscIdAsc(
+            UUID individualRequestId, UUID participantId);
 }
