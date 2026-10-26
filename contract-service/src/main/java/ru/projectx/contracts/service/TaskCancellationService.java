@@ -9,6 +9,7 @@ import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.IssuanceRecord;
+import ru.projectx.contracts.entity.IssuanceStatus;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.message.ContractTaskCancellation;
@@ -47,8 +48,8 @@ public class TaskCancellationService {
         cancelUnlessUntouched(runningPolicies, UNTOUCHED_POLICIES, outcome, now);
     }
 
-    private static void cancelUnlessUntouched(List<? extends IssuanceRecord> locked, Set<?> untouched,
-            Cancellation outcome, Instant now) {
+    private static void cancelUnlessUntouched(List<? extends IssuanceRecord> locked,
+            Set<? extends IssuanceStatus> untouched, Cancellation outcome, Instant now) {
         for (IssuanceRecord record : locked) {
             if (!untouched.contains(record.status())) {
                 record.cancel(outcome, now);

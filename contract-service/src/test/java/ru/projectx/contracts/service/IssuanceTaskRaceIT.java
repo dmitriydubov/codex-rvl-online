@@ -59,6 +59,7 @@ class IssuanceTaskRaceIT {
     private JdbcClient jdbc;
 
     private final UUID request = UUID.randomUUID();
+    private final UUID child = UUID.randomUUID();
     private RowRaces races;
     private UUID policyId;
 
@@ -67,7 +68,7 @@ class IssuanceTaskRaceIT {
         races = new RowRaces(dataSource, jdbc);
         IssuanceTerms terms = new IssuanceTerms(new RequestReference(request, Tasks.INSURANCE_CONTRACT,
                 Tasks.INSURER_POLICY), Tasks.INSURED, Tasks.PROGRAM, Issuances.PERIOD);
-        policyId = policies.saveAndFlush(LmPolicy.open(new LmPolicyDraft(terms, Tasks.CHILD), Issuances.OPENED)).id();
+        policyId = policies.saveAndFlush(LmPolicy.open(new LmPolicyDraft(terms, child), Issuances.OPENED)).id();
     }
 
     @AfterEach
@@ -81,7 +82,7 @@ class IssuanceTaskRaceIT {
     void submissionCommittedWhileTheTaskWaitsForTheRow_keepsThePolicySubmittedWithItsTermsAndOpensNothing()
             throws SQLException {
         ContractTask movedTrip = new ContractTask(2, request, Tasks.INSURANCE_CONTRACT, Tasks.INSURER_POLICY,
-                Tasks.FROM.plusDays(7), Tasks.TO.plusDays(7), List.of(Tasks.insured("0.00"), Tasks.child("0.00")));
+                Tasks.FROM.plusDays(7), Tasks.TO.plusDays(7), List.of(Tasks.insured("0.00"), Tasks.relative(1, child, "0.00", "CHILD")));
 
         races.commitOnceTheOtherPathWaitsForTheRow(SUBMIT, policyId, () -> applyAfterWatching(movedTrip));
 

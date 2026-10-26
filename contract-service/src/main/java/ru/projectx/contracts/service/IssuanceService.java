@@ -63,12 +63,11 @@ public class IssuanceService {
         List<LmPolicy> activePolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES);
         policies.lockFresh(activePolicies);
-        return new RequestIssuance(stillActive(activeContracts, STOPPED_CONTRACTS),
-                stillActive(activePolicies, STOPPED_POLICIES));
+        return new RequestIssuance(stillActive(activeContracts), stillActive(activePolicies));
     }
 
-    private static <R extends IssuanceRecord> List<R> stillActive(List<R> locked, Set<?> stopped) {
-        return locked.stream().filter(record -> !stopped.contains(record.status())).toList();
+    private static <R extends IssuanceRecord> List<R> stillActive(List<R> locked) {
+        return locked.stream().filter(record -> !record.status().stopped()).toList();
     }
 
     private DocumentKind reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current,

@@ -58,6 +58,7 @@ class LmPolicyRequestRaceIT {
     private JdbcClient jdbc;
 
     private final UUID request = UUID.randomUUID();
+    private final UUID child = UUID.randomUUID();
     private RowRaces races;
     private UUID policyId;
 
@@ -66,7 +67,7 @@ class LmPolicyRequestRaceIT {
         races = new RowRaces(dataSource, jdbc);
         IssuanceTerms terms = new IssuanceTerms(new RequestReference(request, Tasks.INSURANCE_CONTRACT,
                 Tasks.INSURER_POLICY), Tasks.INSURED, Tasks.PROGRAM, Issuances.PERIOD);
-        policyId = policies.saveAndFlush(LmPolicy.open(new LmPolicyDraft(terms, Tasks.CHILD), Issuances.OPENED)).id();
+        policyId = policies.saveAndFlush(LmPolicy.open(new LmPolicyDraft(terms, child), Issuances.OPENED)).id();
         persons.saveAndFlush(ContractPerson.snapshot(PersonOwner.lmPolicy(policyId), PersonRole.INSURED,
                 PersonSnapshots.of(Tasks.child("0.00")), Issuances.OPENED));
     }

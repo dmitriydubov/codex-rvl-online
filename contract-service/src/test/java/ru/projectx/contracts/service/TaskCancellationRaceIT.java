@@ -62,6 +62,8 @@ class TaskCancellationRaceIT {
     private JdbcClient jdbc;
 
     private final UUID request = UUID.randomUUID();
+    private final UUID spouse = UUID.randomUUID();
+    private final UUID child = UUID.randomUUID();
     private RowRaces races;
     private UUID contractId;
     private UUID policyId;
@@ -72,10 +74,10 @@ class TaskCancellationRaceIT {
         IssuanceTerms terms = new IssuanceTerms(new RequestReference(request, Tasks.INSURANCE_CONTRACT,
                 Tasks.INSURER_POLICY), Tasks.INSURED, Tasks.PROGRAM, Issuances.PERIOD);
         Contract contract = Contract.open(new ContractDraft("DKM-RACE-" + request.toString().substring(0, 8), terms,
-                Tasks.SPOUSE, new BigDecimal("34000.00")), Issuances.OPENED);
+                spouse, new BigDecimal("34000.00")), Issuances.OPENED);
         contract.offerDraft();
         contractId = contracts.saveAndFlush(contract).id();
-        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(terms, Tasks.CHILD), Issuances.OPENED);
+        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(terms, child), Issuances.OPENED);
         policy.submit(Issuances.OPENED);
         policyId = policies.saveAndFlush(policy).id();
     }
