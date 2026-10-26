@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class SqlStatesTest {
 
@@ -27,5 +29,17 @@ class SqlStatesTest {
     void deepest_isEmptyWithoutSqlException() {
         assertThat(SqlStates.deepest(new IllegalStateException("нет базы"))).isEmpty();
         assertThat(SqlStates.deepestOrNone(new IllegalStateException("нет базы"))).isEqualTo("нет");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"08006", "08001", "40001", "40P01", "53300", "55P03", "57014"})
+    void transientState_holdsForConnectionTransactionResourceLockAndCancelFailures(String state) {
+        assertThat(SqlStates.transientState(state)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"23505", "22001", "42P01", "55000", "57P01", "XX000"})
+    void transientState_doesNotHoldForFailuresThatRepeatOnRetry(String state) {
+        assertThat(SqlStates.transientState(state)).isFalse();
     }
 }

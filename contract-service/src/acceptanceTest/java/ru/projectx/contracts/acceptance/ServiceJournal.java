@@ -1,5 +1,8 @@
 package ru.projectx.contracts.acceptance;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
@@ -31,6 +34,17 @@ public class ServiceJournal {
 
     List<ILoggingEvent> events() {
         return List.copyOf(events.list);
+    }
+
+    void assertPreparationFailure(String recordPrefix, String reason, String sqlState) {
+        List<ILoggingEvent> matching = events().stream()
+                .filter(event -> event.getLevel() == Level.ERROR)
+                .filter(event -> event.getFormattedMessage().startsWith(recordPrefix + " " + reason + ", тип отказа "))
+                .toList();
+        assertThat(matching).as("записи ERROR «%s %s»", recordPrefix, reason).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage()).endsWith(", SQLSTATE " + sqlState);
+            assertThat(event.getThrowableProxy()).as("приложенное исключение").isNull();
+        });
     }
 
     List<ILoggingEvent> mentioning(String text) {

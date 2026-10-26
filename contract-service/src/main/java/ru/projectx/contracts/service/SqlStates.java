@@ -2,11 +2,16 @@ package ru.projectx.contracts.service;
 
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 public final class SqlStates {
 
     public static final String NONE = "нет";
+
+    private static final Set<String> TRANSIENT_CLASSES = Set.of("08", "40", "53");
+    private static final Set<String> TRANSIENT_STATES = Set.of("55P03", "57014");
+    private static final int CLASS_LENGTH = 2;
 
     private SqlStates() {
     }
@@ -23,5 +28,9 @@ public final class SqlStates {
             }
         }
         return Optional.ofNullable(found);
+    }
+
+    public static boolean transientState(String state) {
+        return TRANSIENT_STATES.contains(state) || TRANSIENT_CLASSES.contains(state.substring(0, CLASS_LENGTH));
     }
 }

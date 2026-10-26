@@ -27,6 +27,11 @@ public class KmContractLogSteps {
         assertThat(matching).extracting(ILoggingEvent::getThrowableProxy).as("приложенное исключение").containsOnlyNulls();
     }
 
+    @Тогда("в журнале Договоров есть запись уровня ERROR по договору КМ участника {string} заявки {string} с причиной {string}, SQLSTATE {string}")
+    public void contractPreparationFailureLogged(String participant, String request, String reason, String sqlState) {
+        journal.assertPreparationFailure(prefix(participant, request), reason, sqlState);
+    }
+
     @Тогда("в журнале Договоров нет записей уровня WARN по договору КМ участника {string} заявки {string}")
     public void noContractWarnings(String participant, String request) {
         String prefix = prefix(participant, request);

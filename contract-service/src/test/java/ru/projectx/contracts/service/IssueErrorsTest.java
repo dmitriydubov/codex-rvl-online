@@ -30,4 +30,30 @@ class IssueErrorsTest {
         assertThat(IssueErrors.kmContractMessageTooLarge(1048576L, 3)).isEqualTo(new IssueError(
                 "KM_CONTRACT_MESSAGE_TOO_LARGE", "сообщение о договоре КМ больше предела 1048576 байт, справок — 3"));
     }
+
+    @Test
+    void kmContractSubmissionNotPrepared_isNamedByItsOwnCodeWithoutTheFailureDetail() {
+        assertThat(IssueErrors.kmContractSubmissionPreparationFailed()).isEqualTo(new IssueError(
+                "KM_CONTRACT_SUBMISSION_PREPARATION_FAILED",
+                "передача договора КМ в 1С:УСК не подготовлена: внутренняя ошибка сервиса Договоров"));
+    }
+
+    @Test
+    void lmPolicyRequestNotPrepared_isNamedByItsOwnCodeWithoutTheFailureDetail() {
+        assertThat(IssueErrors.lmPolicyRequestPreparationFailed()).isEqualTo(new IssueError(
+                "LM_POLICY_REQUEST_PREPARATION_FAILED",
+                "запрос на выпуск полиса ЛМ в 1С:УСК не подготовлен: внутренняя ошибка сервиса Договоров"));
+    }
+
+    @Test
+    void kmContractSubmissionErrors_areTheUndeliveredAndTheNotPreparedSubmission() {
+        assertThat(IssueErrors.kmContractSubmission()).isEqualTo(new IssuanceErrors(
+                IssueErrors.kmContractSubmissionUndelivered(), IssueErrors.kmContractSubmissionPreparationFailed()));
+    }
+
+    @Test
+    void lmPolicyRequestErrors_areTheUndeliveredAndTheNotPreparedRequest() {
+        assertThat(IssueErrors.lmPolicyRequest()).isEqualTo(new IssuanceErrors(
+                IssueErrors.lmPolicyRequestUndelivered(), IssueErrors.lmPolicyRequestPreparationFailed()));
+    }
 }

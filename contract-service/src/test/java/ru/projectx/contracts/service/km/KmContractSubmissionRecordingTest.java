@@ -140,7 +140,7 @@ class KmContractSubmissionRecordingTest {
         IssuanceSnapshot before = mock();
         given(statuses.watch(Tasks.REQUEST)).willReturn(before);
 
-        recording.refuse(CONTRACT_ID, ARCHIVED);
+        assertThat(recording.refuse(CONTRACT_ID, ARCHIVED)).isTrue();
 
         assertThat(contract.status()).isEqualTo(ContractStatus.ERROR);
         assertThat(contract.state().error()).contains(ARCHIVED);
@@ -156,7 +156,7 @@ class KmContractSubmissionRecordingTest {
     void refuse_leavesAContractThatIsNoLongerPaidAlone() {
         contract.submit(NOW);
 
-        recording.refuse(CONTRACT_ID, ARCHIVED);
+        assertThat(recording.refuse(CONTRACT_ID, ARCHIVED)).isFalse();
 
         assertThat(contract.status()).isEqualTo(ContractStatus.SUBMITTED);
         assertThat(contract.state().error()).isEmpty();
