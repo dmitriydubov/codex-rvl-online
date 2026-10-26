@@ -39,7 +39,7 @@ public class UndeliveredUskRequests<R extends IssuanceRecord, S extends Issuance
             log.warn(wording.undeliveredUnchanged(), id, record.status());
             return;
         }
-        RecordErrors.enter(statuses, record, kind.undelivered(), now);
+        RecordErrors.enter(statuses, record, kind.errors().undelivered(), now);
         log.warn(wording.undeliveredErrored(), id);
     }
 }

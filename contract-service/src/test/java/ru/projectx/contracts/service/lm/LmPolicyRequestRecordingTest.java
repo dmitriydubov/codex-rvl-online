@@ -130,7 +130,7 @@ class LmPolicyRequestRecordingTest {
         IssuanceSnapshot before = mock();
         given(statuses.watch(Tasks.REQUEST)).willReturn(before);
 
-        recording.refuse(POLICY_ID, ARCHIVED);
+        assertThat(recording.refuse(POLICY_ID, ARCHIVED)).isTrue();
 
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.ERROR);
         assertThat(policy.state().error()).contains(ARCHIVED);
@@ -144,7 +144,7 @@ class LmPolicyRequestRecordingTest {
     void refuse_leavesAPolicyThatIsNoLongerNewAlone() {
         policy.submit(NOW);
 
-        recording.refuse(POLICY_ID, ARCHIVED);
+        assertThat(recording.refuse(POLICY_ID, ARCHIVED)).isFalse();
 
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.SUBMITTED);
         verifyNoInteractions(statuses);

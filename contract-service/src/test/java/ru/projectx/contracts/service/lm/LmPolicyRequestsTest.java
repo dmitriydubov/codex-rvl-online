@@ -40,20 +40,24 @@ import ru.projectx.contracts.support.Tasks;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.RequestResolution;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
+import ru.projectx.contracts.service.usk.UskPreparationMetrics;
 
 class LmPolicyRequestsTest {
 
     private static final ExternalIdentifiers IDENTIFIERS = new ExternalIdentifiers(
             UUID.fromString("6b02f1cc-9d47-4e35-8a20-7f1c3e5b09a2"), UUID.fromString("8c41e2ab-55d0-4a17-9b63-2f0e7c1d4a88"),
             UUID.fromString("1d9a6e77-4c02-4b88-a15e-30f7b2c9de41"));
+    private static final IssueError PREPARATION_FAILED = new IssueError("LM_POLICY_REQUEST_PREPARATION_FAILED",
+            "запрос на выпуск полиса ЛМ в 1С:УСК не подготовлен: внутренняя ошибка сервиса Договоров");
     private static final IssueError ARCHIVED = new IssueError("PROGRAM_ARCHIVED", "программа страхования в архиве");
 
     private final LmPolicyRepository policies = mock();
     private final IssuanceReferences references = mock();
     private final LmPolicyRequestRecording recording = mock();
     private final ReferenceMetrics metrics = mock();
+    private final UskPreparationMetrics preparationMetrics = mock();
     private final LmPolicyRequests requests = new LmPolicyRequests(policies, recording, references, metrics,
-            new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)));
+            preparationMetrics, new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)));
     private final LmPolicy first = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
     private final LmPolicy second = Issuances.policy("9f3e1c28-6b55-4da1-83f4-82a1d7b56e4a", Tasks.SPOUSE);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
@@ -145,6 +149,48 @@ class LmPolicyRequestsTest {
         assertThatThrownBy(requests::prepareDue).isSameAs(busy);
 
         verify(recording, never()).submit(second.id(), IDENTIFIERS);
+        verify(recording, never()).refuse(any(), any());
+        verifyNoInteractions(preparationMetrics);
+    }
+
+    @Test
+    void brokenInternalCondition_entersErrorWithThePreparationCodeAndThePassGoesOn() {
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        doThrow(new IllegalStateException("у полиса ЛМ нет снимка застрахованного"))
+                .when(recording).submit(first.id(), IDENTIFIERS);
+        given(recording.refuse(first.id(), PREPARATION_FAILED)).willReturn(true);
+
+        assertThat(requests.prepareDue()).isEqualTo(2);
+
+        InOrder order = inOrder(recording);
+        order.verify(recording).refuse(first.id(), PREPARATION_FAILED);
+        order.verify(recording).submit(second.id(), IDENTIFIERS);
+        verify(preparationMetrics).countFailed("LmPolicyRequested");
+        assertThat(journal.list).filteredOn(event -> event.getLevel() == Level.ERROR)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("полис ЛМ " + first.id() + " участника " + Tasks.CHILD + " заявки " + Tasks.REQUEST
+                        + ": запрос на выпуск полиса ЛМ не подготовлен из-за внутренней ошибки, полис переведён в ERROR,"
+                        + " тип отказа java.lang.IllegalStateException, SQLSTATE нет");
+    }
+
+    @Test
+    void failureToWriteThePreparationError_endsThePassKeepingTheBrokenConditionAsSuppressed() {
+        IllegalStateException broken = new IllegalStateException("у полиса ЛМ нет снимка застрахованного");
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка занята");
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        doThrow(broken).when(recording).submit(first.id(), IDENTIFIERS);
+        doThrow(busy).when(recording).refuse(first.id(), PREPARATION_FAILED);
+
+        assertThatThrownBy(requests::prepareDue).isSameAs(busy);
+
+        assertThat(busy.getSuppressed()).containsExactly(broken);
+        verify(recording, never()).submit(second.id(), IDENTIFIERS);
+        verifyNoInteractions(preparationMetrics);
+        assertThat(journal.list).filteredOn(event -> event.getLevel() == Level.WARN)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("полис ЛМ " + first.id() + " участника " + Tasks.CHILD + " заявки " + Tasks.REQUEST
+                        + ": передача не подготовлена, записать ошибку подготовки не удалось,"
+                        + " тип отказа java.lang.IllegalStateException, SQLSTATE нет");
     }
 
     @Test
