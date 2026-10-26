@@ -19,6 +19,7 @@ import ru.projectx.contracts.service.reference.RequestResolution;
 public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
 
     private static final String FAILURE_FORMAT = "{} {} участника {} заявки {}: {}, тип отказа {}, SQLSTATE {}";
+    private static final String ERROR_NOT_WRITTEN = "передача не подготовлена, записать ошибку подготовки не удалось";
     private static final String NO_LONGER_READY = "запись уже не готова к передаче, ошибка подготовки не записана";
 
     private final IssuanceKind<R, S> kind;
@@ -103,6 +104,7 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
         try {
             return recording.refuse(record.id(), kind.errors().preparationFailed());
         } catch (RuntimeException refusal) {
+            logFailure(log.atWarn(), record, ERROR_NOT_WRITTEN, failure);
             refusal.addSuppressed(failure);
             throw refusal;
         }

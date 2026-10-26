@@ -186,6 +186,11 @@ class LmPolicyRequestsTest {
         assertThat(busy.getSuppressed()).containsExactly(broken);
         verify(recording, never()).submit(second.id(), IDENTIFIERS);
         verifyNoInteractions(preparationMetrics);
+        assertThat(journal.list).filteredOn(event -> event.getLevel() == Level.WARN)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("полис ЛМ " + first.id() + " участника " + Tasks.CHILD + " заявки " + Tasks.REQUEST
+                        + ": передача не подготовлена, записать ошибку подготовки не удалось,"
+                        + " тип отказа java.lang.IllegalStateException, SQLSTATE нет");
     }
 
     @Test

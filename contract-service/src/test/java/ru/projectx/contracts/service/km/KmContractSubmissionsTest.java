@@ -167,7 +167,11 @@ class KmContractSubmissionsTest {
         assertThat(busy.getSuppressed()).containsExactly(broken);
         verify(recording, never()).submit(second.id(), IDENTIFIERS);
         verifyNoInteractions(preparationMetrics);
-        assertThat(journal.list).isEmpty();
+        assertThat(journal.list).filteredOn(event -> event.getLevel() == Level.WARN)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .containsExactly("договор КМ " + first.id() + " участника " + Tasks.SPOUSE + " заявки " + Tasks.REQUEST
+                        + ": передача не подготовлена, записать ошибку подготовки не удалось,"
+                        + " тип отказа java.lang.IllegalStateException, SQLSTATE нет");
     }
 
     @Test

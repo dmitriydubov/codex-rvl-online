@@ -11,7 +11,6 @@ public final class SqlStates {
 
     private static final Set<String> TRANSIENT_CLASSES = Set.of("08", "40", "53");
     private static final Set<String> TRANSIENT_STATES = Set.of("55P03", "57014");
-    private static final int CLASS_LENGTH = 2;
 
     private SqlStates() {
     }
@@ -31,7 +30,6 @@ public final class SqlStates {
     }
 
     public static boolean transientState(String state) {
-        return TRANSIENT_STATES.contains(state)
-                || state.length() >= CLASS_LENGTH && TRANSIENT_CLASSES.contains(state.substring(0, CLASS_LENGTH));
+        return TRANSIENT_STATES.contains(state) || TRANSIENT_CLASSES.stream().anyMatch(state::startsWith);
     }
 }
