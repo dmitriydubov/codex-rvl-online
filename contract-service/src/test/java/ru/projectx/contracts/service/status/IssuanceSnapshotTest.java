@@ -15,10 +15,12 @@ import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.ParticipantAttachment;
 import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.message.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
@@ -138,6 +140,20 @@ class IssuanceSnapshotTest {
 
         assertThat(snapshot.formsOf(policy)).containsExactly(own);
         assertThat(snapshot.formsOf(another)).containsExactly(foreign);
+        assertThat(snapshot.formsOf(contract)).containsExactly(contractForm);
+    }
+
+    @Test
+    void receivedCertificateOfAParticipant_belongsToNoRecord_andDoesNotBreakTheSnapshot() {
+        Contract contract = Issuances.contract(EARLIER, Tasks.SPOUSE, "DKM-2026-000001");
+        PrintedForm certificate = PrintedForm.receivedCertificate(
+                new ParticipantAttachment(Tasks.REQUEST, Tasks.SPOUSE, UUID.fromString("5d0e9a3c-2b7f-4c18-8e6a-1f3b9c7d2e40")),
+                new StoredFile("certificates/61a7/5d0e.pdf", "f".repeat(64), 76L, "application/pdf"), NOW);
+        PrintedForm contractForm = formOfContract(contract.id(), "https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf");
+
+        IssuanceSnapshot snapshot = new IssuanceSnapshot(Tasks.REQUEST, false, List.of(SPOUSE_KM),
+                List.of(contract), List.of(), List.of(certificate, contractForm));
+
         assertThat(snapshot.formsOf(contract)).containsExactly(contractForm);
     }
 

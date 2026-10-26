@@ -74,6 +74,14 @@ class OutboundBodiesTest {
     }
 
     @Test
+    void messageWithoutAttachments_keepsItsBodyByteForByte_evenTheFormattingAReserialisationWouldDrop() {
+        String formatted = "{\n  \"meta\": {\"entity_version\": 3},\n  \"data\": {\"premium_amount\": 34000.00}\n}";
+        given(attachments.findByOutboxMessageIdOrderByCreatedAtAscIdAsc(MESSAGE_ID)).willReturn(List.of());
+
+        assertThat(bodies.complete(MESSAGE_ID, formatted)).isEqualTo(new OutboundBody.Complete(formatted));
+    }
+
+    @Test
     void attachments_areReadFromTheStorageAndPutInBase64IntoTheirDocumentsByDocumentId() {
         given(store.read(FIRST_KEY)).willReturn(FIRST_CONTENT);
         given(store.read(SECOND_KEY)).willReturn(new byte[] {1, 2, 3, 4});
