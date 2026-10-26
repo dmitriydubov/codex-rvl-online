@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -22,6 +23,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.dao.CannotAcquireLockException;
+import ru.projectx.contracts.entity.CancelReason;
+import ru.projectx.contracts.entity.Cancellation;
 import ru.projectx.contracts.entity.ContractPerson;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
@@ -63,7 +67,7 @@ class LmPolicyRequestRecordingTest {
 
     @BeforeEach
     void policyIsStoredWithItsInsuredParty() {
-        given(policies.findById(POLICY_ID)).willReturn(Optional.of(policy));
+        given(policies.findLockedById(POLICY_ID)).willReturn(Optional.of(policy));
         given(persons.findByLmPolicyIdOrderByRole(POLICY_ID)).willReturn(List.of(ContractPerson.snapshot(
                 PersonOwner.lmPolicy(POLICY_ID), PersonRole.INSURED, PersonSnapshots.of(Tasks.child("0.00")), NOW)));
         given(messages.meta(policy, NOW)).willReturn(meta);
@@ -146,12 +150,58 @@ class LmPolicyRequestRecordingTest {
     }
 
     @Test
+    void submit_leavesACancelledPolicyAloneWithoutAnyRequestOrAnswer() {
+        policy.cancel(new Cancellation(CancelReason.REQUEST_CANCELLED, null, NOW), NOW);
+
+        recording.submit(POLICY_ID, IDENTIFIERS);
+
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+        assertThat(policy.state().entityVersion()).isEqualTo(2);
+        verifyNoInteractions(journal, messages, statuses, persons);
+    }
+
+    @Test
+    void refuse_leavesACancelledPolicyAloneWithoutErrorOrAnswer() {
+        policy.cancel(new Cancellation(CancelReason.REQUEST_CANCELLED, null, NOW), NOW);
+
+        recording.refuse(POLICY_ID, ARCHIVED);
+
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+        assertThat(policy.state().error()).isEmpty();
+        verifyNoInteractions(journal, statuses);
+    }
+
+    @Test
+    void policyRowThatCannotBeLocked_failsTheSubmissionBeforeAnythingIsWritten() {
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка занята");
+        given(policies.findLockedById(POLICY_ID)).willThrow(busy);
+
+        assertThatThrownBy(() -> recording.submit(POLICY_ID, IDENTIFIERS)).isSameAs(busy);
+
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.NEW);
+        verifyNoInteractions(journal, messages, statuses, persons);
+        verify(policies, never()).findById(any());
+    }
+
+    @Test
+    void policyRowThatCannotBeLocked_failsTheRefusalBeforeAnythingIsWritten() {
+        CannotAcquireLockException busy = new CannotAcquireLockException("строка занята");
+        given(policies.findLockedById(POLICY_ID)).willThrow(busy);
+
+        assertThatThrownBy(() -> recording.refuse(POLICY_ID, ARCHIVED)).isSameAs(busy);
+
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.NEW);
+        verifyNoInteractions(journal, statuses);
+        verify(policies, never()).findById(any());
+    }
+
+    @Test
     void unknownPolicy_isIllegalState() {
         UUID unknown = UUID.fromString("00000000-0000-4000-8000-000000000001");
-        given(policies.findById(unknown)).willReturn(Optional.empty());
+        given(policies.findLockedById(unknown)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> recording.submit(unknown, IDENTIFIERS)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(unknown.toString());
-        verify(journal, org.mockito.Mockito.never()).record(any(), any());
+        verify(journal, never()).record(any(), any());
     }
 }

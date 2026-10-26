@@ -77,7 +77,7 @@ public class LmPolicyRequestRecording {
     }
 
     private LmPolicy load(UUID policyId) {
-        return policies.findById(policyId)
+        return policies.findLockedById(policyId)
                 .orElseThrow(() -> new IllegalStateException("полиса ЛМ " + policyId + " нет"));
     }
 }

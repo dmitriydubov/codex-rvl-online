@@ -13,6 +13,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.DocumentKind;
 import ru.projectx.contracts.entity.IssuanceRecord;
+import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.entity.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
@@ -58,11 +59,15 @@ public class IssuanceService {
     private RequestIssuance active(UUID individualRequestId) {
         List<Contract> activeContracts =
                 contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_CONTRACTS);
-        for (Contract contract : activeContracts) {
-            contracts.lockFresh(contract);
-        }
-        return new RequestIssuance(activeContracts,
-                policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES));
+        contracts.lockFresh(activeContracts);
+        List<LmPolicy> activePolicies =
+                policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES);
+        policies.lockFresh(activePolicies);
+        return new RequestIssuance(stillActive(activeContracts), stillActive(activePolicies));
+    }
+
+    private static <R extends IssuanceRecord> List<R> stillActive(List<R> locked) {
+        return locked.stream().filter(record -> !record.status().stopped()).toList();
     }
 
     private DocumentKind reconcile(ContractTask task, TaskParticipant participant, RequestIssuance current,

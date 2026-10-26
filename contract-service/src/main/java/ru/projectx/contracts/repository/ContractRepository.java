@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 
-public interface ContractRepository extends JpaRepository<Contract, UUID>, ContractRepositoryLocking {
+public interface ContractRepository extends JpaRepository<Contract, UUID>, IssuanceRepositoryLocking<Contract> {
 
     List<Contract> findByRequestIndividualRequestIdAndStatusNotIn(UUID individualRequestId,
             Collection<ContractStatus> statuses);
