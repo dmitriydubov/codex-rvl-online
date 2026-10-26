@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 
-public interface LmPolicyRepository extends JpaRepository<LmPolicy, UUID> {
+public interface LmPolicyRepository extends JpaRepository<LmPolicy, UUID>, IssuanceRepositoryLocking<LmPolicy> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<LmPolicy> findLockedById(UUID id);

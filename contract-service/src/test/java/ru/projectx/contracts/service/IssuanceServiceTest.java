@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -23,6 +24,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.LmPolicyStatus;
@@ -87,16 +89,66 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void activeContract_isLockedAndReadAfreshBeforeItsIssuanceSeesIt() {
+    void activeRecords_areLockedAndReadAfreshContractsFirstBeforeTheirIssuanceSeesThem() {
         Contract contract = contract();
-        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
-        active(List.of(contract), List.of());
+        LmPolicy policy = policy();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"), Tasks.child("0.00"));
+        active(List.of(contract), List.of(policy));
 
         service.apply(task, NOW);
 
-        InOrder order = inOrder(contracts, kmContracts);
-        order.verify(contracts).lockFresh(contract);
+        InOrder order = inOrder(contracts, policies, kmContracts, lmPolicies);
+        order.verify(contracts).lockFresh(List.of(contract));
+        order.verify(policies).lockFresh(List.of(policy));
         order.verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.of(contract), NOW);
+        order.verify(lmPolicies).reconcile(new Issue(task, task.participants().get(2)), Optional.of(policy), NOW);
+    }
+
+    @Test
+    void policyStoppedByTheTimeItIsLocked_isNotTheParticipantsActiveRecordAnyMore() {
+        LmPolicy policy = policy();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.child("0.00"));
+        active(List.of(), List.of(policy));
+        willAnswer(lock -> {
+            policy.markError(new IssueError("LM_POLICY_REQUEST_UNDELIVERED", "запрос не доставлен"), NOW);
+            return null;
+        }).given(policies).lockFresh(List.of(policy));
+
+        service.apply(task, NOW);
+
+        verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.ERROR);
+    }
+
+    @Test
+    void leftoverStoppedByTheTimeItIsLocked_isNotCancelledAgain() {
+        LmPolicy policy = policy();
+        Cancellation elsewhere = new Cancellation(CancelReason.REQUEST_CANCELLED, null, Issuances.OPENED);
+        active(List.of(), List.of(policy));
+        willAnswer(lock -> {
+            policy.cancel(elsewhere, Issuances.OPENED);
+            return null;
+        }).given(policies).lockFresh(List.of(policy));
+
+        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        assertThat(policy.state().cancellation()).contains(elsewhere);
+        assertThat(policy.state().entityVersion()).isEqualTo(2);
+    }
+
+    @Test
+    void contractStoppedByTheTimeItIsLocked_isNotTheParticipantsActiveRecordAnyMore() {
+        Contract contract = contract();
+        ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("34000.00"));
+        active(List.of(contract), List.of());
+        willAnswer(lock -> {
+            contract.cancel(new Cancellation(CancelReason.EXPIRED, null, Issuances.OPENED), Issuances.OPENED);
+            return null;
+        }).given(contracts).lockFresh(List.of(contract));
+
+        service.apply(task, NOW);
+
+        verify(kmContracts).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
     }
 
     @Test
