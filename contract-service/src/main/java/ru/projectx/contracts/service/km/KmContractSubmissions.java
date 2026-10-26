@@ -8,14 +8,16 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
+import ru.projectx.contracts.service.usk.UskPreparationMetrics;
 import ru.projectx.contracts.service.usk.UskRequests;
 
 @Service
 public class KmContractSubmissions extends UskRequests<Contract, ContractStatus> {
 
     public KmContractSubmissions(ContractRepository contracts, KmContractSubmissionRecording recording,
-            IssuanceReferences references, ReferenceMetrics metrics, KmContractSubmissionProperties properties) {
-        super(KmContractKind.KIND, contracts, recording, references, metrics, properties.batchSize(),
+            IssuanceReferences references, ReferenceMetrics metrics, UskPreparationMetrics preparationMetrics,
+            KmContractSubmissionProperties properties) {
+        super(KmContractKind.KIND, contracts, recording, references, metrics, preparationMetrics, properties.batchSize(),
                 LoggerFactory.getLogger(KmContractSubmissions.class));
     }
 }

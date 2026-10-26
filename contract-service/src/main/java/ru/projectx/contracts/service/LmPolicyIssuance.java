@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.LmPolicy;
@@ -19,7 +20,7 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
     private final LmPolicyRepository policies;
 
     public LmPolicyIssuance(LmPolicyRepository policies, PartySnapshotStore parties) {
-        super(parties, SUBMITTED);
+        super(parties);
         this.policies = policies;
     }
 
@@ -44,8 +45,8 @@ public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
     }
 
     @Override
-    protected boolean frozen(LmPolicy policy) {
-        return policy.submitted();
+    protected Optional<String> frozenBecause(LmPolicy policy) {
+        return Optional.of(SUBMITTED).filter(reason -> policy.submitted());
     }
 
     @Override

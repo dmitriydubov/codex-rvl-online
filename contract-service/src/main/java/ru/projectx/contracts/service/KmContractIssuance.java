@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
@@ -16,12 +17,13 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
 
     static final String KIND = "договор КМ";
     static final String ACCEPTED = "акцептован";
+    static final String PAID = "оплачен";
 
     private final ContractRepository contracts;
     private final ContractNumbers numbers;
 
     public KmContractIssuance(ContractRepository contracts, ContractNumbers numbers, PartySnapshotStore parties) {
-        super(parties, ACCEPTED);
+        super(parties);
         this.contracts = contracts;
         this.numbers = numbers;
     }
@@ -52,8 +54,11 @@ public class KmContractIssuance extends RecordIssuance<Contract> {
     }
 
     @Override
-    protected boolean frozen(Contract contract) {
-        return contract.status().offerAccepted();
+    protected Optional<String> frozenBecause(Contract contract) {
+        if (PaidContracts.failedAfterPayment(contract)) {
+            return Optional.of(PAID);
+        }
+        return Optional.of(ACCEPTED).filter(reason -> contract.status().offerAccepted());
     }
 
     @Override

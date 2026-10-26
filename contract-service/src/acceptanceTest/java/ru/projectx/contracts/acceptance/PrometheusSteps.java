@@ -21,6 +21,7 @@ public class PrometheusSteps {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final Path OPERATIONS = Path.of("docs", "operations.md");
+    private static final Pattern DOCUMENTED_EVENT_TYPE = Pattern.compile("`([A-Z][a-z][A-Za-z]*)`");
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final URI scrape;
@@ -37,6 +38,9 @@ public class PrometheusSteps {
 
     @Тогда("счётчик Prometheus {string} с меткой event_type {string} вырос за сценарий на {int}")
     public void counterGrewByEventType(String name, String eventType, int growth) throws IOException, InterruptedException {
+        if (growth == 0) {
+            assertEventTypeDocumented(name, eventType);
+        }
         counterGrew(name, "event_type", eventType, growth);
     }
 
@@ -81,6 +85,17 @@ public class PrometheusSteps {
         assertThat(row.matcher(Files.readString(OPERATIONS, StandardCharsets.UTF_8)).find())
                 .as("счётчик %s с меткой %s в таблице метрик %s", name, label, OPERATIONS)
                 .isTrue();
+    }
+
+    private static void assertEventTypeDocumented(String name, String eventType) throws IOException {
+        Pattern row = Pattern.compile("^\\| `" + Pattern.quote(name) + "\\{[^}]*}` \\|.*$", Pattern.MULTILINE);
+        List<String> documented = row.matcher(Files.readString(OPERATIONS, StandardCharsets.UTF_8)).results()
+                .flatMap(match -> DOCUMENTED_EVENT_TYPE.matcher(match.group()).results().map(type -> type.group(1)))
+                .toList();
+        if (!documented.isEmpty()) {
+            assertThat(documented).as("типы событий счётчика %s в таблице метрик %s", name, OPERATIONS)
+                    .contains(eventType);
+        }
     }
 
     private String scrape() throws IOException, InterruptedException {

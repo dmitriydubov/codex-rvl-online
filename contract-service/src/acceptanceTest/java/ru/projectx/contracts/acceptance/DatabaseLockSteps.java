@@ -6,6 +6,7 @@ import io.cucumber.java.After;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Map;
@@ -20,12 +21,18 @@ public class DatabaseLockSteps {
             "журнал исходящих сообщений", "outbox_messages",
             "договоры КМ", "contracts",
             "полисы ЛМ", "lm_policies");
+    private static final Map<String, String> RECORD_TABLES = Map.of(
+            "договор КМ", "contracts",
+            "полис ЛМ", "lm_policies");
+
+    private final IssuanceRecords records;
 
     private final DataSource dataSource;
     private @Nullable Connection lockingSession;
 
-    public DatabaseLockSteps(DataSource dataSource) {
+    public DatabaseLockSteps(DataSource dataSource, IssuanceRecords records) {
         this.dataSource = dataSource;
+        this.records = records;
     }
 
     @Дано("данные {string} в базе Договоров заблокированы долгой операцией")
@@ -36,6 +43,19 @@ public class DatabaseLockSteps {
         session.setAutoCommit(false);
         try (Statement statement = session.createStatement()) {
             statement.execute("lock table " + TABLES.get(data) + " in exclusive mode");
+        }
+    }
+
+    @Дано("запись о выпуске участника {string} заявки {string} в базе Договоров заблокирована долгой операцией")
+    public void recordLocked(String participantId, String requestId) throws SQLException {
+        IssuanceRecords.Record record = records.of(participantId, requestId).getLast();
+        Connection session = dataSource.getConnection();
+        lockingSession = session;
+        session.setAutoCommit(false);
+        String table = RECORD_TABLES.get(record.document());
+        try (PreparedStatement statement = session.prepareStatement("select id from " + table + " where id = ? for update")) {
+            statement.setObject(1, record.id());
+            assertThat(statement.executeQuery().next()).as("строка записи %s заблокирована", record.id()).isTrue();
         }
     }
 

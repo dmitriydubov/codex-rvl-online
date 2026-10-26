@@ -173,7 +173,7 @@ class IssuanceServiceIssuedRecordsTest {
     }
 
     private void active(List<Contract> activeContracts, List<LmPolicy> activePolicies) {
-        given(contracts.findByRequestIndividualRequestIdAndStatusNotIn(eq(Tasks.REQUEST), any()))
+        given(contracts.findRunningOrFailedAfterPayment(Tasks.REQUEST, ContractStatus.ERROR, ContractStatus.CANCELLED))
                 .willReturn(activeContracts);
         given(policies.findByRequestIndividualRequestIdAndStatusNotIn(eq(Tasks.REQUEST), any()))
                 .willReturn(activePolicies);

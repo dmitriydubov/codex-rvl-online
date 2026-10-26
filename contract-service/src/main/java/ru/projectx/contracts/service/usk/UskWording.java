@@ -7,6 +7,7 @@ public record UskWording(
         String result,
         String notRequested,
         String postponed,
+        String preparationFailed,
         String undeliveredUnchanged,
         String undeliveredErrored) {
 }
