@@ -223,6 +223,17 @@ class KmContractSubmissionsTest {
     }
 
     @Test
+    void unexpectedFailureOfTheReferenceRead_endsThePassWithThatFailureAndLeavesTheContractPaid() {
+        IllegalStateException failure = new IllegalStateException("непредвиденный ответ справочника");
+        given(references.resolve(first.state())).willThrow(failure);
+
+        assertThatThrownBy(submissions::prepareDue).isSameAs(failure);
+
+        verifyNoInteractions(recording, preparationMetrics);
+        assertThat(journal.list).isEmpty();
+    }
+
+    @Test
     void nothingDue_preparesNothing() {
         given(contracts.findByStatusOrderByCreatedAtAscIdAsc(ContractStatus.PAID, Limit.of(7))).willReturn(List.of());
 
