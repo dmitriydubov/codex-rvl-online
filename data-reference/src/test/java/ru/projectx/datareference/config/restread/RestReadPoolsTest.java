@@ -26,6 +26,7 @@ class RestReadPoolsTest {
     void restReadPool_withoutDriverOfApplicationPool_leavesDriverUnset() {
         HikariDataSource application = new HikariDataSource();
         application.setJdbcUrl("jdbc:postgresql://db:5432/data_reference");
+        application.addDataSourceProperty("options", "-c lock_timeout=5s");
 
         HikariDataSource restRead = RestReadPools.restReadPool(application, new MockEnvironment(), SETTINGS);
 

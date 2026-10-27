@@ -747,7 +747,7 @@ Central через прокси иногда отвечает 429 на пачк�
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`), таймауты сеанса базы и их строка `options` для пулов (`DatabaseSessionTimeouts`, `SessionStartupOptions`, `SessionTimeoutsPostProcessor`), копия настроек пула приложения для других пулов (`ApplicationPoolCopy`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`), таймауты сеанса базы и их строка `options` для пулов (`DatabaseSessionTimeouts`, `SessionStartupOptions`, `SessionTimeoutsPostProcessor`), правило «это пул Spring Boot» (`BootPool`), копия настроек пула приложения для других пулов (`ApplicationPoolCopy`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
 │   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел; соединение слушателя оповещений о сбросе вне пулов (`ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`, `ListenerConnectionSettings`) и его настройки (`ReferenceCacheNotificationProperties`)
 │   ├── leadership/    — пул соединений блокировки ведущего `leader-lock` без `lock_timeout` (`LeaderLockPoolConfig`, `LeaderLockPools`, `LeaderLockPoolProperties`)
 │   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него; пул приложения для конфигураций — бин `ApplicationPool`

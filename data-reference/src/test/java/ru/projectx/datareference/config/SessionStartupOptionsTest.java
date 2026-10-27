@@ -1,6 +1,7 @@
 package ru.projectx.datareference.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,16 @@ class SessionStartupOptionsTest {
     }
 
     @Test
+    void isSet_tellsWhetherThePoolHasStartupOptions() {
+        HikariDataSource pool = new HikariDataSource();
+        assertThat(SessionStartupOptions.isSet(pool)).isFalse();
+
+        pool.addDataSourceProperty("options", "-c lock_timeout=9s");
+
+        assertThat(SessionStartupOptions.isSet(pool)).isTrue();
+    }
+
+    @Test
     void copy_givesTargetTheStartupOptionsOfSource() {
         HikariDataSource source = new HikariDataSource();
         source.addDataSourceProperty("options", "-c lock_timeout=5s");
@@ -43,12 +54,14 @@ class SessionStartupOptionsTest {
     }
 
     @Test
-    void copy_fromSourceWithoutStartupOptions_leavesTargetAsIs() {
+    void copy_fromSourceWithoutStartupOptions_failsNamingTheSource() {
+        HikariDataSource source = new HikariDataSource();
+        source.setPoolName("application");
         HikariDataSource target = new HikariDataSource();
-        target.addDataSourceProperty("options", "-c lock_timeout=9s");
 
-        SessionStartupOptions.copy(new HikariDataSource(), target);
-
-        assertThat(target.getDataSourceProperties()).containsEntry("options", "-c lock_timeout=9s");
+        assertThatIllegalStateException()
+                .isThrownBy(() -> SessionStartupOptions.copy(source, target))
+                .withMessage("у пула application нет таймаутов сеанса (options)");
+        assertThat(target.getDataSourceProperties()).doesNotContainKey("options");
     }
 }
