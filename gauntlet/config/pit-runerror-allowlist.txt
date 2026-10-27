@@ -76,3 +76,12 @@ ru.projectx.datareference.service.onec.PriceListTransferMarkup#of               
 ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator         # lockTtlNotLongerThanHeartbeat_failsStartup: 2s/2s starts
 ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE # defaults_holdTheLock...: defaults 30s/1s fail startup
 ru.projectx.datareference.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  BooleanTrueReturnValsMutator        # lockTtlNotLongerThanHeartbeat_failsStartup: 2s/2s starts
+
+# DatabaseSessionTimeoutsStartupOptionsTest and LeaderLockPoolsTest (Ш86, PR #259). Record DatabaseSessionTimeouts: which
+# mutant crashes the JVM on redefineClasses changes from run to run, so besides the two the session saw (startupOptions,
+# withoutLockWait) the two other return mutants of the record's methods are listed. Each mutation was applied by hand on
+# 3f44aa5 and the named tests failed. Verified by the coordinator 2026-10-27.
+ru.projectx.datareference.config.DatabaseSessionTimeouts#startupOptions           EmptyObjectReturnValsMutator  # startupOptions_listEveryParameterInOrder: isEqualTo("-c lock_timeout=5s ...") gets ""
+ru.projectx.datareference.config.DatabaseSessionTimeouts#lambda$startupOptions$*  EmptyObjectReturnValsMutator  # startupOptions_listEveryParameterInOrder: isEqualTo("-c lock_timeout=5s ...") gets "  "
+ru.projectx.datareference.config.DatabaseSessionTimeouts#withoutLockWait          NullReturnValsMutator         # withoutLockWait_disablesOnlyTheLockTimeout: lockTimeout() on null throws NPE; LeaderLockPoolsTest: NPE in every test
+ru.projectx.datareference.config.DatabaseSessionTimeouts#byParameter              EmptyObjectReturnValsMutator  # withoutLockWait_disablesOnlyTheLockTimeout: containsEntry("lock_timeout", "0") on {}
