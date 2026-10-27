@@ -105,6 +105,9 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 
 Обязательны только пароли. Остальные умолчания ведут на локальный контур из `docker-compose.yml` или заданы под рабочий
 режим. Таймауты PostgreSQL пишутся с единицей (`ms`, `s`, `min`): число без неё PostgreSQL читает как миллисекунды.
+Таймауты сеанса задаются только переменными `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT` и `DB_IDLE_IN_TRANSACTION_TIMEOUT`:
+стартовый параметр драйвера `options` собирает сервис, и свойство `spring.datasource.hikari.data-source-properties.options`,
+заданное в окружении, заменяется — при старте об этом пишется WARN.
 
 **База**
 
@@ -416,6 +419,9 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
   пулер соединений выбросил стартовый параметр `options`, или таймаут задан на роли или базе. Ещё предупреждение — когда
   лимит REST-чтения не меньше `DB_LOCK_TIMEOUT` или сетевой тайм-аут пула REST-чтений меньше лимита чтения вместе с
   ожиданием отмены. Сервис работает, но таймауты не те, что в этом документе.
+- **WARN при старте «стартовый параметр options пула … заменён таймаутами сеанса»** (`SessionTimeoutsPostProcessor`).
+  В окружении задано `spring.datasource.hikari.data-source-properties.options`; оно не действует, таймауты сеанса —
+  `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`. Уберите свойство из окружения.
 
 Почему процедуры такие — в [design.md](design.md), разделы «Разбор сырья, повторы и ручная переобработка» и «Прайсы».
 

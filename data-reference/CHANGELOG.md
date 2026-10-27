@@ -13,6 +13,14 @@
 
 ## [Не выпущено]
 
+### Изменено
+
+- Строку таймаутов сеанса базы (`lock_timeout`, `statement_timeout`, `idle_in_transaction_session_timeout`) для всех
+  пулов собирает сервис из `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT` и `DB_IDLE_IN_TRANSACTION_TIMEOUT`; блок `options`
+  ушёл из `application.yml`. Значения по умолчанию прежние. Свойство
+  `spring.datasource.hikari.data-source-properties.options`, заданное в окружении, больше не действует: при старте
+  пишется WARN.
+
 ### Добавлено
 
 - Ведущий экземпляр не теряет роль, пока его же транзакция приёма или разбора держит блокировку ведущего, и пока
