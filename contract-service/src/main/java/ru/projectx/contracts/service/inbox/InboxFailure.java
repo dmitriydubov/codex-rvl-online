@@ -1,9 +1,8 @@
 package ru.projectx.contracts.service.inbox;
 
-import java.util.Optional;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.exception.TemporaryFailureException;
 import ru.projectx.contracts.service.SqlStates;
+import ru.projectx.contracts.service.TemporaryFailures;
 
 public sealed interface InboxFailure {
 
@@ -12,36 +11,41 @@ public sealed interface InboxFailure {
     String sqlState();
 
     static InboxFailure of(RuntimeException failure) {
-        return declared(failure).orElseGet(() -> bySqlState(failure));
-    }
-
-    private static Optional<InboxFailure> declared(RuntimeException failure) {
         if (failure instanceof ContractViolationException violation) {
-            return Optional.of(new Permanent(violation.getMessage(), SqlStates.NONE));
+            return new Permanent(violation.getMessage(), SqlStates.NONE);
         }
-        if (failure instanceof TemporaryFailureException temporary) {
-            return Optional.of(new Transient(temporary.getMessage(), SqlStates.NONE));
+        if (TemporaryFailures.temporary(failure)) {
+            return Transient.of(failure);
         }
-        return Optional.empty();
-    }
-
-    private static InboxFailure bySqlState(RuntimeException failure) {
-        Optional<String> sqlState = SqlStates.deepest(failure);
-        if (sqlState.filter(SqlStates::transientState).isPresent()) {
-            return Transient.database(sqlState.get());
-        }
-        return sqlState.map(state -> new Permanent("отказ базы данных, SQLSTATE " + state, state))
-                .orElseGet(() -> new Permanent("внутренняя ошибка обработки: " + failure.getClass().getName(),
-                        SqlStates.NONE));
+        return Permanent.of(failure);
     }
 
     record Permanent(String reason, String sqlState) implements InboxFailure {
+
+        static Permanent of(RuntimeException failure) {
+            return SqlStates.deepest(failure)
+                    .map(state -> new Permanent("отказ базы данных, SQLSTATE " + state, state))
+                    .orElseGet(() -> new Permanent("внутренняя ошибка обработки: " + failure.getClass().getName(),
+                            SqlStates.NONE));
+        }
     }
 
     record Transient(String reason, String sqlState) implements InboxFailure {
 
         static Transient database(String sqlState) {
             return new Transient("временный отказ базы данных, SQLSTATE " + sqlState, sqlState);
+        }
+
+        static Transient of(RuntimeException failure) {
+            return TemporaryFailures.serviceReason(failure).map(reason -> new Transient(reason, SqlStates.NONE))
+                    .or(() -> TemporaryFailures.transientSqlState(failure).map(Transient::database))
+                    .orElseGet(() -> dataAccess(failure));
+        }
+
+        private static Transient dataAccess(RuntimeException failure) {
+            Throwable cause = TemporaryFailures.temporaryCause(failure).orElse(failure);
+            return new Transient("временный отказ доступа к данным: " + cause.getClass().getName(),
+                    SqlStates.deepestOrNone(failure));
         }
     }
 }
