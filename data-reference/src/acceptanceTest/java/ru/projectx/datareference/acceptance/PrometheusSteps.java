@@ -61,6 +61,13 @@ public class PrometheusSteps {
                 .containsExactly((double) expected);
     }
 
+    @Тогда("показатель Prometheus {string} с меткой pool {string} равен {int}")
+    public void gaugeWithPoolEquals(String name, String pool, int expected) throws IOException, InterruptedException {
+        assertThat(seriesValues(scrape(), Pattern.quote(name) + "\\{[^}]*pool=\"" + Pattern.quote(pool) + "\"[^}]*} "))
+                .as("ряд %s{pool=\"%s\"}", name, pool)
+                .containsExactly((double) expected);
+    }
+
     @Тогда("показатель Prometheus {string} с меткой stream {string} — {int} ч с точностью до минуты")
     public void gaugeWithStreamInHours(String name, String stream, int hours) throws IOException, InterruptedException {
         assertThat(valueOf(scrape(), name, stream))

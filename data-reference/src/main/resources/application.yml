@@ -21,10 +21,6 @@ spring:
       connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:2000}
       validation-timeout: 1000
       data-source-properties:
-        options: >-
-          -c lock_timeout=${projectx.database.session-timeouts.lock-timeout}
-          -c statement_timeout=${projectx.database.session-timeouts.statement-timeout}
-          -c idle_in_transaction_session_timeout=${projectx.database.session-timeouts.idle-in-transaction-session-timeout}
         socketTimeout: ${DB_SOCKET_TIMEOUT_SECONDS:60}
         logServerErrorDetail: false
 
@@ -108,6 +104,8 @@ projectx:
       connection-timeout: ${DB_REST_CONNECTION_TIMEOUT_MS:2000}
       socket-timeout-seconds: ${DB_REST_SOCKET_TIMEOUT_SECONDS:5}
       cancel-signal-timeout-seconds: ${DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS:2}
+    leader-lock-pool:
+      maximum-pool-size: ${DB_LEADER_POOL_SIZE:1}
 
   scheduling:
     enabled: true

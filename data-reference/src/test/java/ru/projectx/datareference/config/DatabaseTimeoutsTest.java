@@ -15,9 +15,15 @@ import javax.sql.DataSource;
 import liquibase.integration.spring.SpringLiquibase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.NestedExceptionUtils;
+import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
+import ru.projectx.datareference.config.restread.ApplicationPool;
+import ru.projectx.datareference.config.restread.RestReadDataSource;
+import ru.projectx.datareference.config.restread.RestReadPoolConfig;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.database.SessionSettingsRepository;
+import ru.projectx.datareference.service.database.DatabaseTimeoutsCheck;
 import ru.projectx.datareference.support.IntegrationTest;
 
 @IntegrationTest
@@ -32,6 +38,17 @@ class DatabaseTimeoutsTest {
     private DataSource dataSource;
 
     @Autowired
+    @Qualifier(LeaderLockPoolConfig.LEADER_LOCK_POOL)
+    private DataSource leaderLockPool;
+
+    @Autowired
+    @Qualifier(RestReadPoolConfig.REST_READ_POOL)
+    private DataSource restReadPool;
+
+    @Autowired
+    private ApplicationPool applicationPool;
+
+    @Autowired
     private SpringLiquibase liquibase;
 
     @Autowired
@@ -43,6 +60,9 @@ class DatabaseTimeoutsTest {
     @Autowired
     private DatabaseSessionTimeouts configured;
 
+    @Autowired
+    private DatabaseTimeoutsCheck.Connections timeoutsCheckConnections;
+
     @Test
     void applicationConnection_carriesSessionAndSocketTimeouts() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -51,6 +71,37 @@ class DatabaseTimeoutsTest {
             assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
             assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
         }
+    }
+
+    @Test
+    void restReadConnection_carriesSessionTimeoutsOfApplicationPool() throws SQLException {
+        try (Connection connection = restReadPool.getConnection()) {
+            assertThat(setting(connection, "lock_timeout")).isEqualTo("5s");
+            assertThat(setting(connection, "statement_timeout")).isEqualTo("30s");
+            assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
+        }
+    }
+
+    @Test
+    void leaderLockConnection_waitsForLocksWithoutLimit_underItsOwnName() throws SQLException {
+        try (Connection connection = leaderLockPool.getConnection()) {
+            assertThat(setting(connection, "lock_timeout")).isEqualTo(DISABLED);
+            assertThat(setting(connection, "statement_timeout")).isEqualTo("30s");
+            assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
+            assertThat(setting(connection, "application_name")).isEqualTo("data-reference-leader-lock");
+            assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
+        }
+    }
+
+    @Test
+    void applicationPoolBean_isTheBootPoolBehindTheDataSource() throws SQLException {
+        assertThat(applicationPool.pool()).isSameAs(dataSource.unwrap(RestReadDataSource.class).applicationPool());
+    }
+
+    @Test
+    void timeoutsCheck_readsTheLeaderLockPoolItself_notTheApplicationPool() {
+        assertThat(timeoutsCheckConnections.leaderLockPool()).isSameAs(leaderLockPool);
+        assertThat(timeoutsCheckConnections.pool()).isSameAs(dataSource);
     }
 
     @Test
