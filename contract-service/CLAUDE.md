@@ -208,8 +208,10 @@ README.
 Договор КМ: NEW → DRAFT_READY → ACCEPTED → INVOICE_ISSUED → PAID → SUBMITTED → ISSUED; из любого незавершённого —
 CANCELLED (причина REQUEST_CANCELLED / INSURED_REFUSED / EXPIRED / OTHER); ERROR — ошибка в данных участника, отказ
 справочника, недоставка или ошибка регистрации в 1С. Полис ЛМ:
-NEW → SUBMITTED → ISSUED, ERROR, CANCELLED. ДГ-03 публикуется на DRAFT_READY, INVOICE_ISSUED, ERROR, CANCELLED и когда
-по всем участникам заявки работа завершена; ACCEPTED, PAID и SUBMITTED наружу не публикуются. Перечисления — нативные
+NEW → SUBMITTED → ISSUED, ERROR, CANCELLED. ДГ-03 публикуется на DRAFT_READY, INVOICE_ISSUED, ERROR, CANCELLED, на
+выход участника из ошибки (новая запись не в ERROR, смена вида документа, исключение из состава — по участнику,
+`StatusTransitions`, Д-06) и когда по всем участникам заявки работа завершена; ACCEPTED, PAID и SUBMITTED наружу не
+публикуются. Перечисления — нативные
 типы PostgreSQL (`CREATE TYPE … AS ENUM`), как требует «Структура данных».
 
 Оплаченный договор (PAID, момент оплаты — `contracts.paid_at`) новой записью не перевыпускается: деньги уже заплачены.
