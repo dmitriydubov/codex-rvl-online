@@ -137,7 +137,7 @@ README.
 
 | Точка | Направление | Событие | Очередь |
 |---|---|---|---|
-| ДГ-04 | Договоры → 1С | `KmContractSubmitted` — оплаченный договор КМ со справками 070/у застрахованного в base64 | `rvl_contracts_to_1c-usk_km-contract-changes` |
+| ДГ-04 | Договоры → 1С | `KmContractSubmitted` — оплаченный договор КМ со ссылками на справки 070/у застрахованного в общем хранилище S3 | `rvl_contracts_to_1c-usk_km-contract-changes` |
 | ДГ-05 | 1С → Договоры | `KmContractRegistered` — идентификаторы, полис, постоянные ссылки либо ошибка | `1c-usk_to_rvl_contracts_km-contract-changes` |
 | ДГ-06 | Договоры → 1С | `LmPolicyRequested` — выпуск полиса ЛМ родственнику без доплаты | `rvl_contracts_to_1c-usk_lm-policy-changes` |
 | ДГ-07 | 1С → Договоры | `LmPolicyIssued` — полис ЛМ и ссылки либо ошибка | `1c-usk_to_rvl_contracts_lm-policy-changes` |
@@ -160,9 +160,13 @@ README.
   55P03, 57014; `TemporaryFailureException`, `TransientDataAccessException`, `SQLTransientException` в цепочке причин) —
   запись ждёт следующего прохода, входящее — лестницы; любой другой — запись в ERROR `*_PREPARATION_FAILED` отдельной транзакцией,
   счётчик `contracts_usk_preparation_failed_total{event_type}`, проход идёт к следующим. Сломанная запись проход не держит.
-- Тело ДГ-04 в Outbox — без `content_base64`: справки — строки `message_attachments`, содержимое публикатор читает из S3
-  при отправке (`OutboundBodies`). Предел размера сообщения `KM_CONTRACT_MAX_MESSAGE_SIZE` проверяется до записи в Outbox
-  (`KmContractMessageLimit`). Правила ДГ-04 и ДГ-05 — журнал решений, Д-13.
+- Хранилище S3 общее для сервисов РВЛ и 1С:УСК: справка уходит в ДГ-04 ссылкой `documents[].link` = `/<бакет>/<ключ>`
+  без адреса хранилища (`CertificateLinks`, из `file_key` реестра), как в других интеграциях с 1С:УСК; содержимое файлов в
+  сообщениях и в Outbox не передаётся, публикация хранилище не читает. Ключ новых справок —
+  `<S3_INN>_<S3_KPP>/<S3_BASE_PATH>/<uuid>/<attachment_id>.<расширение>` (`ObjectKeys`). Перед записью в Outbox проход
+  проверяет, что объект есть (`SubmissionPrerequisites`, `KmContractCertificates`): нет — ERROR
+  `KM_CONTRACT_SUBMISSION_PREPARATION_FAILED`, хранилище недоступно — запись ждёт. Правила ДГ-04 и ДГ-05 — журнал
+  решений, Д-13.
 
 ## Чтение справочников data-reference
 
@@ -246,10 +250,10 @@ Semantic Versioning 2.0.0 (история — `CHANGELOG.md` по Keep a Changel
 MVC подключён стартером `spring-boot-starter-web`, а не `spring-boot-starter-webmvc`: Nexus контура отдаёт только
 `starter-web`. По той же причине без `spring-boot-starter-webmvc-test` и без `spring-boot-starter-restclient`.
 Каждая новая зависимость — только после проверки координат в Nexus владельцем и строки в «Источниках документации»
-`gauntlet/CLAUDE.md`. В S3 контура хранятся справки 070/у (печатные формы формирует 1С:УСК, у сервиса — только их
-ссылки); клиент — MinIO Java SDK `io.minio:minio`: его нет в BOM Spring Boot, поэтому версия — свойство `minioVersion`
-в `gradle.properties`, а не литерал в `build.gradle`. Адрес, бакет, учётные данные, таймауты и доверие сертификату —
-переменные `S3_*`.
+`gauntlet/CLAUDE.md`. В общем хранилище S3 сервисов РВЛ и 1С:УСК хранятся справки 070/у (печатные формы формирует
+1С:УСК, у сервиса — только их ссылки); клиент — MinIO Java SDK `io.minio:minio`: его нет в BOM Spring Boot, поэтому версия — свойство `minioVersion`
+в `gradle.properties`, а не литерал в `build.gradle`. Адрес, бакет, ИНН и КПП организации в ключе объекта, учётные
+данные, таймауты и доверие сертификату — переменные `S3_*`.
 
 Репозитории выбирает свойство `publicRepositories` в `settings.gradle`: по умолчанию — только Nexus контура, со
 значением `true` — только публичные. Задаётся `-PpublicRepositories=true|false` или переменной
@@ -457,7 +461,7 @@ ru.projectx.contracts
 ### Персональные данные
 
 ПДн в сервисе: снимок сторон договора (`contract_persons`: ФИО, дата рождения, пол, документ, адрес), тела ДГ-01 в Inbox,
-тела ДГ-04 и ДГ-06 в Outbox (в `message_attachments` — только ссылки на файлы), печатные формы в хранилище, свободный
+тела ДГ-04 и ДГ-06 в Outbox (справки в ДГ-04 — только ссылками на файлы), печатные формы в хранилище, свободный
 комментарий прекращения (`cancel_comment` в `contracts` и `lm_policies`) и медицинские данные — справки 070/у в S3.
 Справка и имя её файла не попадают ни в журнал, ни в метрики, ни в ответы; имя файла не хранится.
 
