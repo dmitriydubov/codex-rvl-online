@@ -4708,7 +4708,8 @@ REST.
   смержил в порядке #259 → #260 («случайно»): вреда нет — финальный `mutationGate` #259 был зелёным и без строк
   allowlist, а на `main` они есть с `eb325e7`. Проверка после мержа: каталог `data-reference` на `main` совпадает с головой
   #259 `3f44aa5`, allowlist и план — с головой #260 `fc4f81d`; обе команды следов разработки пусты; комментариев Grok и
-  ревью в #259 нет. Ш86 дал: пул `leader-lock` (`config.leadership`: `LeaderLockPoolConfig`, `LeaderLockPools`,
+  ревью в #259 нет; контрольный `gauntletFast` на `main` eb325e7 (область — от 315bcce) зелёный: 2033 unit- и
+  интеграционных тестов, 705 сценариев приёмки, 7 архитектурных, 0 skipped. Ш86 дал: пул `leader-lock` (`config.leadership`: `LeaderLockPoolConfig`, `LeaderLockPools`,
   `LeaderLockPoolProperties`; `config.ApplicationPoolCopy` — общая копия настроек пула приложения), `DB_LEADER_POOL_SIZE`
   (1), `lock_timeout` 0 у продления, свой `DataSourceTransactionManager` у `DefaultLockRepository`, проверку таймаутов
   этого пула на старте, фичу `onec_leader_lock_held_by_own_transaction.feature` (4 сценария), тесты
