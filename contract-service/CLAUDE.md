@@ -155,9 +155,10 @@ README.
   строки пишет запрос в Outbox и переводит запись в SUBMITTED; окончательный отказ публикации — ERROR `*_UNDELIVERED`;
   ответ 1С разбирает `UskResultParser` по раскладке вида (`UskResultLayout`). Новый вид выпуска — новое значение
   `IssuanceKind` и свои классы вида, а не копия потока.
-- Отказ при подготовке запроса разбирает общий проход (`UskRequests`, `UskPreparationFailures`): временный (SQLSTATE 08,
-  40, 53, 55P03, 57014; `TemporaryFailureException`, `TransientDataAccessException`, `SQLTransientException` в цепочке
-  причин) — запись ждёт следующего прохода; любой другой — запись в ERROR `*_PREPARATION_FAILED` отдельной транзакцией,
+- Отказ при подготовке запроса разбирает общий проход (`UskRequests`) по единому правилу временного отказа
+  `service.TemporaryFailures` — оно же действует в журнале входящих (`InboxFailure`): временный (SQLSTATE 08, 40, 53,
+  55P03, 57014; `TemporaryFailureException`, `TransientDataAccessException`, `SQLTransientException` в цепочке причин) —
+  запись ждёт следующего прохода, входящее — лестницы; любой другой — запись в ERROR `*_PREPARATION_FAILED` отдельной транзакцией,
   счётчик `contracts_usk_preparation_failed_total{event_type}`, проход идёт к следующим. Сломанная запись проход не держит.
 - Тело ДГ-04 в Outbox — без `content_base64`: справки — строки `message_attachments`, содержимое публикатор читает из S3
   при отправке (`OutboundBodies`). Предел размера сообщения `KM_CONTRACT_MAX_MESSAGE_SIZE` проверяется до записи в Outbox
