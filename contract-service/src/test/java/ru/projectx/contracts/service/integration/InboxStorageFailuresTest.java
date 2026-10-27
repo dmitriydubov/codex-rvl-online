@@ -134,6 +134,19 @@ class InboxStorageFailuresTest {
     }
 
     @Test
+    void quarantineWriteRejectedAsPoisonToo_pausesTheConsumersWithThatSqlState() throws IOException {
+        given(quarantine.quarantine(any(), any()))
+                .willThrow(new DataIntegrityViolationException("карантин", sql("22021")));
+
+        failures.quarantine(delivery, RECEIPT, REASON);
+
+        verify(consumers).pause(new StorageOutage("22021", DataIntegrityViolationException.class.getName()));
+        verify(channel, never()).basicAck(7L, false);
+        verify(channel, never()).basicNack(7L, false, true);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
     void quarantineWriteRefusedByTheDatabase_pausesTheConsumersWithoutAnswer() throws IOException {
         given(quarantine.quarantine(any(), any()))
                 .willThrow(new DataAccessResourceFailureException("обрыв", sql("08006")));
