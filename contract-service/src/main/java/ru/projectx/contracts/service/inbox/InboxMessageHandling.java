@@ -11,6 +11,7 @@ import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service
 public class InboxMessageHandling {
@@ -20,13 +21,15 @@ public class InboxMessageHandling {
     private final InboxMessageRepository messages;
     private final InboxEventHandlers handlers;
     private final TransactionTemplate transaction;
+    private final LeadershipFence fence;
     private final Clock clock;
 
     public InboxMessageHandling(InboxMessageRepository messages, InboxEventHandlers handlers,
-            TransactionTemplate transaction, Clock clock) {
+            TransactionTemplate transaction, LeadershipFence fence, Clock clock) {
         this.messages = messages;
         this.handlers = handlers;
         this.transaction = transaction;
+        this.fence = fence;
         this.clock = clock;
     }
 
@@ -52,6 +55,7 @@ public class InboxMessageHandling {
         }
         InboxReceipt receipt = message.receipt();
         Optional<Integer> processed = processedVersionNotBelow(receipt);
+        fence.holdUntilCommit();
         if (processed.isPresent()) {
             message.markSkipped("версия объекта " + receipt.entityVersion() + " не выше обработанной "
                     + processed.get(), clock.instant());
@@ -75,6 +79,7 @@ public class InboxMessageHandling {
             return;
         }
         work.apply(clock.instant());
+        fence.holdUntilCommit();
         message.markProcessed(clock.instant());
     }
 

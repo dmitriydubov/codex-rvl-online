@@ -9,10 +9,12 @@ import java.util.List;
 public class OneCQueueSteps {
 
     private final StandQueues queues;
+    private final ConsumedQueues consumers;
     private final List<OneCQueue> deleted = new ArrayList<>();
 
-    public OneCQueueSteps(StandQueues queues) {
+    public OneCQueueSteps(StandQueues queues, ConsumedQueues consumers) {
         this.queues = queues;
+        this.consumers = consumers;
     }
 
     @Дано("у брокера 1С:УСК удалена очередь {string}")
@@ -30,6 +32,7 @@ public class OneCQueueSteps {
     @After
     public void restoreDeletedQueues() {
         deleted.forEach(OneCQueue::declare);
+        deleted.forEach(queue -> consumers.restoreConsumerOf(queue.name()));
         deleted.clear();
     }
 

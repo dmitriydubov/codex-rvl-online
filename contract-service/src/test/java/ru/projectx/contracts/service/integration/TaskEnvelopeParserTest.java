@@ -19,9 +19,10 @@ class TaskEnvelopeParserTest {
 
     @Test
     void completeEnvelope_yieldsReceiptWithIdentifiersTopicTypeAndVersion() {
-        InboxReceipt receipt = parser.parse(TaskBodies.upserted().toBytes());
+        TaskEnvelope envelope = parser.parse(TaskBodies.upserted().toBytes());
 
-        assertThat(receipt).isEqualTo(new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
+        assertThat(envelope).isInstanceOf(TaskEnvelope.Storable.class);
+        assertThat(envelope.receipt()).isEqualTo(new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
                 UUID.fromString(TaskBodies.REQUEST_ID), "rvl.contract-task.upserted", "ContractTaskUpserted", 1));
     }
 
@@ -54,23 +55,32 @@ class TaskEnvelopeParserTest {
         assertThatThrownBy(() -> parser.parse(longTopic)).hasMessage("в конверте нет пригодного topic");
         assertThatThrownBy(() -> parser.parse(longType)).hasMessage("в конверте нет пригодного event_type");
         assertThatThrownBy(() -> parser.parse(blankType)).hasMessage("в конверте нет пригодного event_type");
-        assertThat(parser.parse(TaskBodies.upserted().withMetaField("topic", "t".repeat(100)).toBytes()).topic())
+        assertThat(parser.parse(TaskBodies.upserted().withMetaField("topic", "t".repeat(100)).toBytes()).receipt().topic())
                 .hasSize(100);
     }
 
     @Test
-    void nullCharacterOrUnpairedSurrogateAnywhereInTheBody_isUnusableEnvelope() {
+    void nullCharacterOrUnpairedSurrogateAnywhereInTheBody_isUnstorableWithItsReceipt() {
         String[] escapes = {"Тест\\u0000ова", "Тестова\\ud83d", "Тест\\ud83dова", "\\ude00Тестова", "Тест\\ude00ова"};
+        InboxReceipt expected = new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
+                UUID.fromString(TaskBodies.REQUEST_ID), "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
 
         for (String escaped : escapes) {
             byte[] inValue = TaskBodies.upserted().toJson().replace("Тестова", escaped).getBytes(StandardCharsets.UTF_8);
-            assertThatThrownBy(() -> parser.parse(inValue)).as(escaped).isInstanceOf(InboxEnvelopeException.class)
-                    .hasMessage("в теле символ, который база не хранит: нулевой или непарный суррогат");
+            assertThat(parser.parse(inValue)).as(escaped).isEqualTo(new TaskEnvelope.Unstorable(expected));
         }
         byte[] inKey = TaskBodies.upserted().toJson().replace("\"address\"", "\"add\\u0000ress\"")
                 .getBytes(StandardCharsets.UTF_8);
-        assertThatThrownBy(() -> parser.parse(inKey)).isInstanceOf(InboxEnvelopeException.class)
-                .hasMessage("в теле символ, который база не хранит: нулевой или непарный суррогат");
+        assertThat(parser.parse(inKey)).isEqualTo(new TaskEnvelope.Unstorable(expected));
+    }
+
+    @Test
+    void unstorableTextInAnUnusableEnvelope_isStillAnUnusableEnvelope() {
+        byte[] body = TaskBodies.upserted().withoutMetaField("message_id").toJson().replace("Тестова", "Тест\\u0000ова")
+                .getBytes(StandardCharsets.UTF_8);
+
+        assertThatThrownBy(() -> parser.parse(body)).isInstanceOf(InboxEnvelopeException.class)
+                .hasMessage("в конверте нет пригодного message_id");
     }
 
     @Test
@@ -78,7 +88,8 @@ class TaskEnvelopeParserTest {
         byte[] body = TaskBodies.upserted().toJson().replace("\"topic\":\"rvl.contract-task.upserted\"",
                 "\"topic\":\"задача \\ud83d\\ude00\"").getBytes(StandardCharsets.UTF_8);
 
-        assertThat(parser.parse(body).topic()).isEqualTo("задача \ud83d\ude00");
+        assertThat(parser.parse(body)).isInstanceOf(TaskEnvelope.Storable.class);
+        assertThat(parser.parse(body).receipt().topic()).isEqualTo("задача \ud83d\ude00");
     }
 
     @Test

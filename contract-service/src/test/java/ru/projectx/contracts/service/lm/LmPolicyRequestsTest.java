@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -35,7 +36,10 @@ import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.repository.LmPolicyRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.support.Issuances;
+import ru.projectx.contracts.support.TestLeadership;
 import ru.projectx.contracts.support.Tasks;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.RequestResolution;
@@ -56,8 +60,7 @@ class LmPolicyRequestsTest {
     private final LmPolicyRequestRecording recording = mock();
     private final ReferenceMetrics metrics = mock();
     private final UskPreparationMetrics preparationMetrics = mock();
-    private final LmPolicyRequests requests = new LmPolicyRequests(policies, recording, references, metrics,
-            preparationMetrics, new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)));
+    private final LmPolicyRequests requests = requests(TestLeadership.leader());
     private final LmPolicy first = Issuances.policy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
     private final LmPolicy second = Issuances.policy("9f3e1c28-6b55-4da1-83f4-82a1d7b56e4a", Tasks.SPOUSE);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
@@ -203,5 +206,31 @@ class LmPolicyRequestsTest {
 
     private static Logger logger() {
         return (Logger) LoggerFactory.getLogger(LmPolicyRequests.class);
+    }
+
+    @Test
+    void standby_preparesNothingAndDoesNotReadTheJournal() {
+        assertThat(requests(TestLeadership.standby()).prepareDue()).isZero();
+
+        verifyNoInteractions(references, recording);
+        verify(policies, never()).findByStatusOrderByCreatedAtAscIdAsc(LmPolicyStatus.NEW, Limit.of(7));
+    }
+
+    @Test
+    void lostLeaderLockWhileRecordingARequest_endsThePassWithoutRefusingTheRecord() {
+        given(references.resolve(first.state())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        doThrow(new LeadershipLostException("0b5f3c1e")).when(recording).submit(first.id(), IDENTIFIERS);
+
+        assertThat(requests.prepareDue()).isZero();
+
+        verify(recording, never()).refuse(any(), any());
+        verify(recording, never()).submit(second.id(), IDENTIFIERS);
+        verify(references, times(1)).resolve(any());
+        verifyNoInteractions(preparationMetrics);
+    }
+
+    private LmPolicyRequests requests(BackgroundLeadership role) {
+        return new LmPolicyRequests(policies, recording, references, metrics, preparationMetrics,
+                new LmPolicyRequestProperties(Duration.ofSeconds(10), 7, Duration.ofMinutes(1), Duration.ofHours(1)), role);
     }
 }

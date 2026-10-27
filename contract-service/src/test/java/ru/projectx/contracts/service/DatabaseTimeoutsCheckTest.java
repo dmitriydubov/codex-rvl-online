@@ -36,7 +36,7 @@ class DatabaseTimeoutsCheckTest {
 
     private final SessionSettingsRepository sessionSettings = mock();
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
-    private final Logger log = (Logger) LoggerFactory.getLogger(DatabaseTimeoutsCheck.class);
+    private final Logger log = (Logger) LoggerFactory.getLogger(SessionTimeoutsCheck.class);
 
     @BeforeEach
     void startJournal() {
@@ -66,11 +66,11 @@ class DatabaseTimeoutsCheckTest {
 
         assertThat(journal.list).allMatch(event -> event.getLevel() == Level.WARN)
                 .extracting(ILoggingEvent::getFormattedMessage).containsExactly(
-                        "таймаут сеанса PostgreSQL расходится с настройкой: параметр=lock_timeout, ожидается=PT5S, "
-                                + "фактически=PT0S",
-                        "таймаут сеанса PostgreSQL расходится с настройкой: параметр=statement_timeout, "
+                        "таймаут сеанса PostgreSQL расходится с настройкой: пул=application, параметр=lock_timeout, "
+                                + "ожидается=PT5S, фактически=PT0S",
+                        "таймаут сеанса PostgreSQL расходится с настройкой: пул=application, параметр=statement_timeout, "
                                 + "ожидается=PT30S, фактически=PT0S",
-                        "таймаут сеанса PostgreSQL расходится с настройкой: "
+                        "таймаут сеанса PostgreSQL расходится с настройкой: пул=application, "
                                 + "параметр=idle_in_transaction_session_timeout, ожидается=PT1M, фактически=PT0S");
     }
 
@@ -82,8 +82,8 @@ class DatabaseTimeoutsCheckTest {
         check("5s", "30s", "1min").run(null);
 
         assertThat(journal.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
-                "таймаут сеанса PostgreSQL расходится с настройкой: параметр=idle_in_transaction_session_timeout, "
-                        + "ожидается=PT1M, фактически=неизвестно");
+                "таймаут сеанса PostgreSQL расходится с настройкой: пул=application, "
+                        + "параметр=idle_in_transaction_session_timeout, ожидается=PT1M, фактически=неизвестно");
     }
 
     @Test
@@ -95,7 +95,8 @@ class DatabaseTimeoutsCheckTest {
         assertThat(journal.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("проверка таймаутов PostgreSQL: настройка lock_timeout не разобрана, параметр не проверен");
+                    .isEqualTo("проверка таймаутов PostgreSQL: настройка lock_timeout пула application не разобрана, "
+                            + "параметр не проверен");
         });
     }
 
@@ -108,7 +109,7 @@ class DatabaseTimeoutsCheckTest {
 
         assertThat(journal.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getFormattedMessage()).isEqualTo("проверка таймаутов PostgreSQL: сеанс пула не прочитан: "
+            assertThat(event.getFormattedMessage()).isEqualTo("проверка таймаутов PostgreSQL: сеанс пула application не прочитан: "
                     + "DataAccessResourceFailureException, SQLSTATE 08006");
             assertThat(event.getThrowableProxy()).isNull();
         });

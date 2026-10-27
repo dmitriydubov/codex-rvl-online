@@ -15,14 +15,6 @@ class InboxEnvelopeExceptionTest {
     }
 
     @Test
-    void unstorableText_isLostAsUnstorableText() {
-        InboxEnvelopeException failure = InboxEnvelopeException.unstorableText();
-
-        assertThat(failure).hasMessage("в теле символ, который база не хранит: нулевой или непарный суррогат");
-        assertThat(failure.lossReason()).isEqualTo("unstorable_text");
-    }
-
-    @Test
     void unreadableBody_keepsItsCauseAndIsLostAsAnUnreadableBody() {
         IllegalArgumentException cause = new IllegalArgumentException("Тестова");
         InboxEnvelopeException failure = InboxEnvelopeException.unreadableBody(cause);

@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -20,6 +21,8 @@ import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.config.OutboxProperties;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.support.TestLeadership;
 
 class PayloadRetentionTest {
 
@@ -36,7 +39,8 @@ class PayloadRetentionTest {
         InboxMessageRepository messages = mock();
         given(transactions.getTransaction(any())).willReturn(status);
         given(messages.erasePayloadsReceivedBefore(CUTOFF, 2)).willReturn(2, 2, 1);
-        InboxPayloadRetention retention = new InboxPayloadRetention(messages, inboxProperties(2), transaction, clock);
+        InboxPayloadRetention retention = new InboxPayloadRetention(messages, inboxProperties(2), transaction, clock,
+                TestLeadership.leader());
 
         assertThat(retention.eraseExpired()).isEqualTo(5);
 
@@ -49,7 +53,8 @@ class PayloadRetentionTest {
         OutboxMessageRepository messages = mock();
         given(transactions.getTransaction(any())).willReturn(status);
         given(messages.eraseFinishedPayloadsCreatedBefore(CUTOFF, 500)).willReturn(3);
-        OutboxPayloadRetention retention = new OutboxPayloadRetention(messages, outboxProperties(500), transaction, clock);
+        OutboxPayloadRetention retention = new OutboxPayloadRetention(messages, outboxProperties(500), transaction, clock,
+                TestLeadership.leader());
 
         assertThat(retention.eraseExpired()).isEqualTo(3);
 
@@ -63,15 +68,40 @@ class PayloadRetentionTest {
         given(transactions.getTransaction(any())).willReturn(status);
         given(messages.erasePayloadsReceivedBefore(CUTOFF, 2)).willReturn(0);
 
-        assertThat(new InboxPayloadRetention(messages, inboxProperties(2), transaction, clock).eraseExpired()).isZero();
+        assertThat(new InboxPayloadRetention(messages, inboxProperties(2), transaction, clock, TestLeadership.leader())
+                .eraseExpired()).isZero();
 
         verify(messages).erasePayloadsReceivedBefore(CUTOFF, 2);
+    }
+
+    @Test
+    void quarantineRetention_erasesQuarantineBodiesReceivedBeforeTheCutoff() {
+        QuarantineRepository quarantine = mock();
+        given(transactions.getTransaction(any())).willReturn(status);
+        given(quarantine.eraseBodiesReceivedBefore(CUTOFF, 2)).willReturn(2, 0);
+        QuarantinePayloadRetention retention = new QuarantinePayloadRetention(quarantine, inboxProperties(2),
+                transaction, clock, TestLeadership.leader());
+
+        assertThat(retention.eraseExpired()).isEqualTo(2);
+
+        verify(quarantine, times(2)).eraseBodiesReceivedBefore(CUTOFF, 2);
+    }
+
+    @Test
+    void standby_erasesNothingAndOpensNoTransaction() {
+        InboxMessageRepository messages = mock();
+
+        assertThat(new InboxPayloadRetention(messages, inboxProperties(2), transaction, clock, TestLeadership.standby())
+                .eraseExpired()).isZero();
+
+        verifyNoInteractions(messages, transactions);
     }
 
     private static InboxProperties inboxProperties(int batch) {
         return new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
                 new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
-                new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), batch), Duration.ofSeconds(5));
+                new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), batch),
+                new InboxProperties.Pause(Duration.ofSeconds(10), Duration.ofSeconds(30)), Duration.ofSeconds(5));
     }
 
     private static OutboxProperties outboxProperties(int batch) {

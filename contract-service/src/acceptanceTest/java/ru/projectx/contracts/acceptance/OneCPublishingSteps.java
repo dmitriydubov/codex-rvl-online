@@ -67,6 +67,7 @@ public class OneCPublishingSteps {
     private void publish(String queue, String messageId, ObjectNode body) {
         byte[] bytes = messages.bytes(body);
         published.remember(messageId, bytes);
+        published.rememberQueued(queue, messageId);
         ((OneCQueue) queues.called(queue)).publish(bytes);
     }
 }

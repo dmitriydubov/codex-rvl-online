@@ -42,6 +42,23 @@ public final class RowRaces {
         }
     }
 
+    public void whileTheOtherPathWaitsForTheRow(String holdingStatement, UUID rowId, Runnable otherPath,
+            Runnable meanwhile) throws SQLException {
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            execute(holder, holdingStatement, rowId);
+            Future<?> other = inAnotherThread(otherPath);
+            try {
+                Awaitility.await().atMost(LOCK_WAIT).until(() -> other.isDone() || somebodyWaitsForALock());
+                meanwhile.run();
+            }
+            finally {
+                holder.rollback();
+            }
+            awaitOutcome(other);
+        }
+    }
+
     public void whileTheRowIsHeld(String holdingStatement, UUID rowId, Runnable path) throws SQLException {
         try (Connection holder = dataSource.getConnection()) {
             holder.setAutoCommit(false);

@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.km;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -9,13 +10,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
+import ru.projectx.contracts.support.TestLeadership;
 
 class KmContractAwaitingTest {
 
@@ -24,10 +29,16 @@ class KmContractAwaitingTest {
 
     private final ContractRepository contracts = mock();
     private final KmContractAwaitingMetrics metrics = mock();
+    private final PlatformTransactionManager transactions = mock();
     private final KmContractAwaiting awaiting = new KmContractAwaiting(contracts, metrics,
             new KmContractSubmissionProperties(Duration.ofSeconds(10), 100,
                     Duration.ofMinutes(1), THRESHOLD),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC), TestLeadership.leader(), transactions);
+
+    @BeforeEach
+    void transactionsOpen() {
+        given(transactions.getTransaction(any())).willReturn(new SimpleTransactionStatus());
+    }
 
     @Test
     void submittedContracts_showTheWaitOfTheOldestAndTheCountSubmittedBeforeTheThreshold() {

@@ -30,6 +30,7 @@ import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.entity.OutboxStatus;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 class OutboxOutcomesTest {
 
@@ -42,8 +43,9 @@ class OutboxOutcomesTest {
 
     private final OutboxMessageRepository messages = mock();
     private final OutboxMetrics metrics = mock();
+    private final LeadershipFence fence = mock();
     private final OutboxOutcomes outcomes = new OutboxOutcomes(messages, properties(),
-            new OutboxRejection(metrics, List.of()), Clock.fixed(NOW, ZoneOffset.UTC));
+            new OutboxRejection(metrics, List.of()), fence, Clock.fixed(NOW, ZoneOffset.UTC));
     private final OutboxMessage message = OutboxMessage.compose(
             new OutboxDraft("INDIVIDUAL_REQUEST", REQUEST, ENVELOPE, "{}"), NOW.minusSeconds(5));
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
@@ -160,5 +162,26 @@ class OutboxOutcomesTest {
                 Duration.ofSeconds(10),
                 new OutboxProperties.Retry(List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15))),
                 new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500));
+    }
+
+    @Test
+    void lostLeaderLock_failsTheRecordingAfterTheMessageIsReadAndBeforeItsOutcomeIsWritten() {
+        org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
+                .given(fence).holdUntilCommit();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> outcomes.record(message.id(), new PublishOutcome.Delivered()))
+                .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
+
+        verify(messages).findById(message.id());
+        assertThat(message.status()).isEqualTo(OutboxStatus.NEW);
+    }
+
+    @Test
+    void outcomeAlreadyRecorded_isLeftWithoutTheLeaderLockRowBeingHeld() {
+        message.markPublished(NOW.minusSeconds(1));
+
+        outcomes.record(message.id(), new PublishOutcome.Delivered());
+
+        org.mockito.Mockito.verifyNoInteractions(fence);
     }
 }

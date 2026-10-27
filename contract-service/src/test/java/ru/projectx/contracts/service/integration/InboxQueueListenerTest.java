@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
@@ -19,16 +20,14 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.ShutdownSignalException;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.time.Duration;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.InboxReceiver;
@@ -41,18 +40,12 @@ class InboxQueueListenerTest {
     private static final InboxReceipt RECEIPT = new InboxReceipt(UUID.fromString(TaskBodies.MESSAGE_ID),
             UUID.fromString(TaskBodies.REQUEST_ID), "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
 
-    private static final Duration REQUEUE_DELAY = Duration.ofSeconds(5);
-
     private final InboxReceiver receiver = mock();
     private final Channel channel = mock();
-    private final Pauses pauses = mock();
+    private final InboxStorageFailures failures = mock();
     private final InboxMetrics metrics = mock();
     private final InboxQueueListener listener = new InboxQueueListener(
-            new TaskEnvelopeParser(JsonMapper.builder().build()), receiver,
-            new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
-                    new InboxProperties.Retry(List.of(Duration.ofMinutes(1))),
-                    new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
-                    REQUEUE_DELAY), pauses, metrics);
+            new TaskEnvelopeParser(JsonMapper.builder().build()), receiver, failures, metrics);
     private final ListAppender<ILoggingEvent> journal = new ListAppender<>();
     private final Logger log = (Logger) LoggerFactory.getLogger(InboxQueueListener.class);
 
@@ -76,6 +69,7 @@ class InboxQueueListenerTest {
 
         verify(channel).basicAck(7L, false);
         verify(channel, never()).basicNack(7L, false, true);
+        verifyNoInteractions(failures, metrics);
     }
 
     @Test
@@ -108,56 +102,34 @@ class InboxQueueListenerTest {
     }
 
     @Test
-    void storageFailure_returnsMessageToQueueAfterThePauseAndLogsTypeAndSqlStateOnly() throws IOException {
+    void storageFailure_isHandedToTheFailureRulesWithoutAnswerToTheBroker() throws IOException {
         String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body))
-                .willThrow(new IllegalStateException("Тестова", new SQLException("locked", "55P03")));
-        given(pauses.hold(REQUEUE_DELAY)).willReturn(true);
+        IllegalStateException failure = new IllegalStateException("Тестова", new SQLException("locked", "55P03"));
+        given(receiver.receive(RECEIPT, body)).willThrow(failure);
 
         listener.onMessage(message(body), channel);
 
-        verify(pauses).hold(REQUEUE_DELAY);
-        verify(channel).basicNack(7L, false, true);
+        ArgumentCaptor<TaskDelivery> delivery = ArgumentCaptor.captor();
+        verify(failures).handle(delivery.capture(), eq(RECEIPT), eq(failure));
+        assertThat(delivery.getValue().queue()).isEqualTo("task-changes");
         verify(channel, never()).basicAck(7L, false);
-        assertThat(journal.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.WARN);
-            assertThat(event.getFormattedMessage())
-                    .contains(TaskBodies.MESSAGE_ID)
-                    .contains("java.lang.IllegalStateException, SQLSTATE 55P03")
-                    .doesNotContain("Тестова");
-            assertThat(event.getThrowableProxy()).isNull();
-        });
-    }
-
-    @Test
-    void interruptedPause_leavesMessageUnacknowledgedForTheBrokerToRequeue() throws IOException {
-        String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("база"));
-        given(pauses.hold(REQUEUE_DELAY)).willReturn(false);
-
-        listener.onMessage(message(body), channel);
-
         verify(channel, never()).basicNack(7L, false, true);
-        verify(channel, never()).basicAck(7L, false);
+        assertThat(journal.list).isEmpty();
     }
 
     @Test
-    void bodyWithUnstorableText_isAcknowledgedLostAndLoggedWithoutTheBody() throws IOException {
+    void bodyWithUnstorableText_goesToQuarantineInsteadOfTheJournal() throws IOException {
         String body = TaskBodies.upserted().toJson().replace("Тестова", "Тест\\u0000ова");
 
         listener.onMessage(message(body), channel);
 
-        verify(channel).basicAck(7L, false);
+        ArgumentCaptor<TaskDelivery> delivery = ArgumentCaptor.captor();
+        verify(failures).quarantine(delivery.capture(), eq(RECEIPT),
+                eq("в теле символ, который база не хранит: нулевой или непарный суррогат"));
+        assertThat(delivery.getValue().payload()).isEqualTo(body);
         verify(receiver, never()).receive(any(), anyString());
-        verify(metrics).countLost("unstorable_text");
-        verifyNoInteractions(pauses);
-        assertThat(journal.list).singleElement().satisfies(event -> {
-            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
-            assertThat(event.getFormattedMessage())
-                    .contains("потеряно: в теле символ, который база не хранит: нулевой или непарный суррогат")
-                    .doesNotContain("Тест");
-            assertThat(event.getThrowableProxy()).isNull();
-        });
+        verifyNoInteractions(metrics);
+        verify(channel, never()).basicAck(7L, false);
     }
 
     @Test
@@ -166,19 +138,9 @@ class InboxQueueListenerTest {
 
         verify(channel).basicAck(7L, false);
         verify(metrics).countLost("unreadable_body");
-        verifyNoInteractions(receiver);
+        verifyNoInteractions(receiver, failures);
         assertThat(journal.list).singleElement().satisfies(event ->
                 assertThat(event.getFormattedMessage()).contains("потеряно: тело не читается как JSON").doesNotContain("Тестова"));
-    }
-
-    @Test
-    void storedMessage_countsNoLoss() throws IOException {
-        String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body)).willReturn(ReceiptOutcome.STORED);
-
-        listener.onMessage(message(body), channel);
-
-        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -195,21 +157,6 @@ class InboxQueueListenerTest {
             assertThat(event.getFormattedMessage()).contains("не отправлен: com.rabbitmq.client.AlreadyClosedException");
             assertThat(event.getThrowableProxy()).isNull();
         });
-    }
-
-    @Test
-    void closedChannelOnReturn_isLoggedByTypeOnlyAndNothingIsThrown() throws IOException {
-        String body = TaskBodies.upserted().toJson();
-        given(receiver.receive(RECEIPT, body)).willThrow(new IllegalStateException("Тестова"));
-        given(pauses.hold(REQUEUE_DELAY)).willReturn(true);
-        willThrow(new AlreadyClosedException(new ShutdownSignalException(false, false, null, channel)))
-                .given(channel).basicNack(7L, false, true);
-
-        listener.onMessage(message(body), channel);
-
-        assertThat(journal.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN, Level.WARN);
-        assertThat(journal.list.get(1).getFormattedMessage())
-                .contains("не отправлен: com.rabbitmq.client.AlreadyClosedException").doesNotContain("Тестова");
     }
 
     @Test

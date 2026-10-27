@@ -11,6 +11,7 @@ import ru.projectx.contracts.config.OutboxProperties;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Service
 public class OutboxPublisher {
@@ -23,19 +24,24 @@ public class OutboxPublisher {
     private final OutboundPublisher publisher;
     private final OutboxOutcomes outcomes;
     private final Limit batch;
+    private final BackgroundLeadership leadership;
     private final Clock clock;
 
     public OutboxPublisher(OutboxMessageRepository messages, OutboundPublisher publisher,
-            OutboxOutcomes outcomes, OutboxProperties properties, Clock clock) {
+            OutboxOutcomes outcomes, OutboxProperties properties, BackgroundLeadership leadership, Clock clock) {
         this.batch = Limit.of(properties.publishing().batchSize());
         this.messages = messages;
         this.publisher = publisher;
         this.outcomes = outcomes;
+        this.leadership = leadership;
         this.clock = clock;
     }
 
     public int publishDue() {
-        List<OutboxMessage> due = messages.findDue(clock.instant(), batch);
+        return leadership.countAsLeader(() -> publish(messages.findDue(clock.instant(), batch)));
+    }
+
+    private int publish(List<OutboxMessage> due) {
         int handled = 0;
         for (OutboxMessage message : due) {
             PublishOutcome outcome = attempt(message);

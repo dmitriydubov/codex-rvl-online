@@ -27,6 +27,9 @@ import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
+import ru.projectx.contracts.support.TestLeadership;
 
 class OutboxPublisherTest {
 
@@ -38,11 +41,7 @@ class OutboxPublisherTest {
     private final OutboxMessageRepository messages = mock();
     private final OutboundPublisher broker = mock();
     private final OutboxOutcomes outcomes = mock();
-    private final OutboxPublisher publisher = new OutboxPublisher(messages, broker, outcomes,
-            new OutboxProperties(new OutboxProperties.Publishing(Duration.ofSeconds(5), 7), Duration.ofSeconds(10),
-                    new OutboxProperties.Retry(List.of(Duration.ofMinutes(1))),
-                    new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500)),
-            Clock.fixed(NOW, ZoneOffset.UTC));
+    private final OutboxPublisher publisher = publisher(TestLeadership.leader());
     private final OutboxMessage first = message(FIRST, "{\"n\": 1}");
     private final OutboxMessage second = message(SECOND, "{\"n\": 2}");
 
@@ -134,11 +133,38 @@ class OutboxPublisherTest {
     }
 
     @Test
+    void standby_sendsNothingAndDoesNotReadTheJournal() {
+        assertThat(publisher(TestLeadership.standby()).publishDue()).isZero();
+
+        verifyNoInteractions(messages, broker, outcomes);
+    }
+
+    @Test
+    void lostLeaderLockWhileRecordingAnOutcome_endsThePassQuietlyBeforeTheNextMessage() {
+        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(broker.publish(any())).willReturn(new PublishOutcome.Delivered());
+        willThrow(new LeadershipLostException("0b5f3c1e")).given(outcomes).record(first.id(), new PublishOutcome.Delivered());
+
+        assertThat(publisher.publishDue()).isZero();
+
+        verify(broker).publish(any());
+        verify(outcomes, never()).record(second.id(), new PublishOutcome.Delivered());
+    }
+
+    @Test
     void nothingDue_sendsNothing() {
         given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of());
 
         assertThat(publisher.publishDue()).isZero();
         verifyNoInteractions(broker, outcomes);
+    }
+
+    private OutboxPublisher publisher(BackgroundLeadership role) {
+        return new OutboxPublisher(messages, broker, outcomes,
+                new OutboxProperties(new OutboxProperties.Publishing(Duration.ofSeconds(5), 7), Duration.ofSeconds(10),
+                        new OutboxProperties.Retry(List.of(Duration.ofMinutes(1))),
+                        new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500)),
+                role, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static OutboxMessage message(String messageId, String payload) {
