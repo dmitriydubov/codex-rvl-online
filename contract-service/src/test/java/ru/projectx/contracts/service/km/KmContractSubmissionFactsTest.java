@@ -50,7 +50,8 @@ class KmContractSubmissionFactsTest {
     private final ContractPersonRepository persons = mock();
     private final ContractAcceptanceRepository acceptances = mock();
     private final PrintedFormRepository forms = mock();
-    private final KmContractSubmissionFacts facts = new KmContractSubmissionFacts(persons, acceptances, forms);
+    private final KmContractSubmissionFacts facts = new KmContractSubmissionFacts(persons, acceptances,
+            new InsuredCertificates(forms));
     private final Contract contract = Issuances.contract(CONTRACT_ID.toString(), Tasks.SPOUSE, "DKM-2026-000001");
 
     @BeforeEach

@@ -80,6 +80,13 @@ class MinioCertificateStoreIT {
     }
 
     @Test
+    void objectInAMissingBucket_isStorageUnavailable() {
+        assertThatThrownBy(() -> new MinioCertificateStore(client, "contracts-missing")
+                .verifyPresent("certificates/none/1.jpg"))
+                .isInstanceOf(StorageUnavailableException.class);
+    }
+
+    @Test
     void missingBucket_isStorageUnavailableAndTheBucketIsNotCreated() throws Exception {
         StoredFile file = new StoredFile("certificates/1/2.png", "0".repeat(64), CONTENT.length, "image/png");
 

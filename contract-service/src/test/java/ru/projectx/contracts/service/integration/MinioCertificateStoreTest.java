@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
@@ -140,9 +142,38 @@ class MinioCertificateStoreTest {
                 new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
                 null, null);
         when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenReturn(true);
 
         assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(CertificateMissingException.class)
                 .hasCause(missing).hasMessage("объекта справки нет в хранилище");
+        ArgumentCaptor<BucketExistsArgs> bucket = ArgumentCaptor.forClass(BucketExistsArgs.class);
+        verify(client).bucketExists(bucket.capture());
+        assertThat(bucket.getValue().bucket()).isEqualTo("rvl-contracts");
+    }
+
+    @Test
+    void verifyPresent_answeredNoSuchKeyInAMissingBucket_isStorageUnavailable() throws Exception {
+        ErrorResponseException missing = new ErrorResponseException(
+                new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenReturn(false);
+
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+                .hasCause(missing);
+    }
+
+    @Test
+    void verifyPresent_whoseBucketCannotBeChecked_isStorageUnavailable() throws Exception {
+        ErrorResponseException missing = new ErrorResponseException(
+                new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        IOException refused = new IOException("Connection refused");
+        when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenThrow(refused);
+
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+                .hasCause(refused);
     }
 
     @Test
@@ -154,6 +185,7 @@ class MinioCertificateStoreTest {
 
         assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
                 .hasCause(refused);
+        verify(client, never()).bucketExists(any());
     }
 
     @Test

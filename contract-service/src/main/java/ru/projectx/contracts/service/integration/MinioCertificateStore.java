@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.integration;
 
+import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
@@ -48,18 +49,34 @@ public class MinioCertificateStore implements CertificateStore {
         } catch (ErrorResponseException refused) {
             throw refusal(refused);
         } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
-            log.warn("хранилище справок не ответило о наличии объекта: {}", failure.getClass().getName());
-            throw new StorageUnavailableException(failure);
+            throw unanswered(failure);
         }
     }
 
-    private static RuntimeException refusal(ErrorResponseException refused) {
+    private RuntimeException refusal(ErrorResponseException refused) {
         String code = refused.errorResponse().code();
-        if (NO_SUCH_KEY.equals(code)) {
+        if (!NO_SUCH_KEY.equals(code)) {
+            log.warn("хранилище справок отказало в проверке объекта: код {}", code);
+            return new StorageUnavailableException(refused);
+        }
+        if (bucketPresent()) {
             return new CertificateMissingException(refused);
         }
-        log.warn("хранилище справок отказало в проверке объекта: код {}", code);
+        log.warn("в хранилище справок нет бакета справок");
         return new StorageUnavailableException(refused);
+    }
+
+    private boolean bucketPresent() {
+        try {
+            return client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+        } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
+            throw unanswered(failure);
+        }
+    }
+
+    private static StorageUnavailableException unanswered(Exception failure) {
+        log.warn("хранилище справок не ответило о наличии объекта: {}", failure.getClass().getName());
+        return new StorageUnavailableException(failure);
     }
 
     private void put(StoredFile file, InputStream stream) {

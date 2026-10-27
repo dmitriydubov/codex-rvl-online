@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,8 @@ class KmContractCertificatesTest {
     private final PrintedFormRepository forms = mock();
     private final CertificateStore store = mock();
     private final AttachmentMetrics metrics = mock();
-    private final KmContractCertificates certificates = new KmContractCertificates(forms, store, metrics);
+    private final KmContractCertificates certificates = new KmContractCertificates(
+            new InsuredCertificates(forms), store, metrics);
     private final Contract contract = Issuances.contract("0f4b8e2a-6c13-4d7e-b9a1-2e5c7d3f8a64", Tasks.SPOUSE,
             "DKM-2026-000001");
 
@@ -92,6 +94,22 @@ class KmContractCertificatesTest {
                 missing));
 
         verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void certificateRecordWithoutAnObject_breaksThePrerequisitesAsAnInternalFailureWithoutAskingTheStorage() {
+        PrintedForm withoutObject = mock();
+        given(withoutObject.storedFile()).willReturn(Optional.empty());
+        given(forms.findByAttachmentIndividualRequestIdAndAttachmentParticipantIdOrderByCreatedAtAscIdAsc(Tasks.REQUEST,
+                Tasks.SPOUSE)).willReturn(List.of(withoutObject));
+
+        assertThat(certificates.check(contract)).isInstanceOfSatisfying(Prerequisites.Broken.class, broken -> {
+            assertThat(broken.reason())
+                    .isEqualTo("передача договора КМ не подготовлена из-за внутренней ошибки, договор переведён в ERROR");
+            assertThat(broken.failure()).isInstanceOf(IllegalStateException.class);
+        });
+
+        verifyNoInteractions(store, metrics);
     }
 
     private static PrintedForm certificate(StoredFile file) {

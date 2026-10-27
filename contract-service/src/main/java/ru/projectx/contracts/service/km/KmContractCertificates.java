@@ -1,14 +1,11 @@
 package ru.projectx.contracts.service.km;
 
 import java.util.List;
-import java.util.Optional;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
-import ru.projectx.contracts.repository.PrintedFormRepository;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.CertificateStore;
 import ru.projectx.contracts.service.usk.Prerequisites;
@@ -21,12 +18,12 @@ public class KmContractCertificates implements SubmissionPrerequisites<Contract>
     static final String CERTIFICATE_MISSING =
             "передача договора КМ не подготовлена: файла справки нет в хранилище, договор переведён в ERROR";
 
-    private final PrintedFormRepository forms;
+    private final InsuredCertificates certificates;
     private final CertificateStore store;
     private final AttachmentMetrics metrics;
 
-    public KmContractCertificates(PrintedFormRepository forms, CertificateStore store, AttachmentMetrics metrics) {
-        this.forms = forms;
+    public KmContractCertificates(InsuredCertificates certificates, CertificateStore store, AttachmentMetrics metrics) {
+        this.certificates = certificates;
         this.store = store;
         this.metrics = metrics;
     }
@@ -34,7 +31,15 @@ public class KmContractCertificates implements SubmissionPrerequisites<Contract>
     @Override
     public Prerequisites check(Contract contract) {
         try {
-            keys(contract).forEach(store::verifyPresent);
+            return verified(keys(contract));
+        } catch (IllegalStateException broken) {
+            return new Prerequisites.Broken(KmContractTexts.WORDING.preparationFailed(), broken);
+        }
+    }
+
+    private Prerequisites verified(List<String> keys) {
+        try {
+            keys.forEach(store::verifyPresent);
             return new Prerequisites.Met();
         } catch (StorageUnavailableException unavailable) {
             metrics.countStorageUnavailable();
@@ -45,10 +50,8 @@ public class KmContractCertificates implements SubmissionPrerequisites<Contract>
     }
 
     private List<String> keys(Contract contract) {
-        return forms.findByAttachmentIndividualRequestIdAndAttachmentParticipantIdOrderByCreatedAtAscIdAsc(
-                        contract.state().request().individualRequestId(), contract.participantId()).stream()
-                .map(PrintedForm::storedFile)
-                .flatMap(Optional::stream)
+        return certificates.of(contract).stream()
+                .map(SubmittedCertificate::file)
                 .map(StoredFile::key)
                 .toList();
     }
