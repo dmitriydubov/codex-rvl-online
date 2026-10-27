@@ -139,6 +139,7 @@ projectx:
     group: contract-service
     lock-ttl: ${LEADER_LOCK_TTL:30s}
     heartbeat: 1s
+    connections: ${LEADER_LOCK_CONNECTIONS:2}
 
   inbox:
     processing:

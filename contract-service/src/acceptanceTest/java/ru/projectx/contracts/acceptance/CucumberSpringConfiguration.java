@@ -19,6 +19,7 @@ import ru.projectx.contracts.config.InternalBrokerProperties;
 import ru.projectx.contracts.config.OneCBrokerProperties;
 import ru.projectx.contracts.service.integration.InternalBroker;
 import ru.projectx.contracts.service.integration.OneCBroker;
+import ru.projectx.contracts.service.leadership.LeaderLockConnections;
 
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -151,6 +152,9 @@ public class CucumberSpringConfiguration {
                 public Object postProcessAfterInitialization(Object bean, String beanName) {
                     if (bean instanceof DataSource pool && DATA_SOURCE_BEAN.equals(beanName)) {
                         return new SwitchableDataSource(pool);
+                    }
+                    if (bean instanceof LeaderLockConnections pool) {
+                        return new SwitchableLeaderLockConnections(pool);
                     }
                     return bean;
                 }
