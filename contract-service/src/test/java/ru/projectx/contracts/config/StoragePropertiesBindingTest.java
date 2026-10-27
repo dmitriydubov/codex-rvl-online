@@ -21,6 +21,8 @@ class StoragePropertiesBindingTest {
                     PREFIX + ".region=ru-central-1",
                     PREFIX + ".bucket=rvl-contracts",
                     PREFIX + ".base-path=certificates",
+                    PREFIX + ".inn=1111111111",
+                    PREFIX + ".kpp=222222222",
                     PREFIX + ".access-key=contracts-access",
                     PREFIX + ".secret-key=contracts-secret",
                     PREFIX + ".timeouts.connect=2s",
@@ -37,6 +39,8 @@ class StoragePropertiesBindingTest {
             assertThat(storage.region()).isEqualTo("ru-central-1");
             assertThat(storage.bucket()).isEqualTo("rvl-contracts");
             assertThat(storage.basePath()).isEqualTo("certificates");
+            assertThat(storage.inn()).isEqualTo("1111111111");
+            assertThat(storage.kpp()).isEqualTo("222222222");
             assertThat(storage.accessKey()).isEqualTo("contracts-access");
             assertThat(storage.secretKey()).isEqualTo("contracts-secret");
             assertThat(storage.timeouts()).isEqualTo(new StorageProperties.Timeouts(Duration.ofSeconds(2),
@@ -63,6 +67,14 @@ class StoragePropertiesBindingTest {
         "base-path, '', basePath",
         "base-path, /certificates, basePath",
         "base-path, certificates/, basePath",
+        "inn, '', inn",
+        "inn, 111111111, inn",
+        "inn, 11111111111, inn",
+        "inn, 111111111a, inn",
+        "kpp, '', kpp",
+        "kpp, 22222222, kpp",
+        "kpp, 2222222222, kpp",
+        "kpp, 22222222a, kpp",
         "access-key, '', accessKey",
         "secret-key, '', secretKey",
         "timeouts.connect, 0s, connect",

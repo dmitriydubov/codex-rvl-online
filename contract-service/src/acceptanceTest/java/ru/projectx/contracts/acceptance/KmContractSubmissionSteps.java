@@ -3,10 +3,10 @@ package ru.projectx.contracts.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.rabbitmq.client.GetResponse;
-import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.assertj.core.api.SoftAssertions;
 import org.awaitility.Awaitility;
-import ru.projectx.contracts.config.KmContractSubmissionProperties;
+import ru.projectx.contracts.config.StorageProperties;
 import ru.projectx.contracts.service.km.KmContractAwaiting;
 import ru.projectx.contracts.service.km.KmContractSubmissionScheduler;
 import tools.jackson.databind.JsonNode;
@@ -24,11 +24,12 @@ public class KmContractSubmissionSteps {
     private static final Duration PATIENCE = Duration.ofSeconds(10);
     private static final String ABSENT = "нет";
     private static final String EMPTY_ARRAY = "[]";
+    private static final String LINK_SEPARATOR = "/";
     private static final Pattern SEGMENT = Pattern.compile("([a-z_0-9]+)(?:\\[(\\d+)])?");
 
     private final KmContractSubmissionScheduler scheduler;
     private final KmContractAwaiting awaiting;
-    private final KmContractSubmissionProperties settings;
+    private final StorageProperties storage;
     private final StandQueues queues;
     private final ReceivedKmContractSubmissions received;
     private final RememberedMessageIds rememberedMessageIds;
@@ -38,12 +39,12 @@ public class KmContractSubmissionSteps {
     private final TaskMessages messages;
 
     public KmContractSubmissionSteps(KmContractSubmissionScheduler scheduler, KmContractAwaiting awaiting,
-            KmContractSubmissionProperties settings, StandQueues queues, ReceivedKmContractSubmissions received,
+            StorageProperties storage, StandQueues queues, ReceivedKmContractSubmissions received,
             RememberedMessageIds rememberedMessageIds, OutboxRecords journal, IssuanceRecords records,
             CertificateRecords certificates, TaskMessages messages) {
         this.scheduler = scheduler;
         this.awaiting = awaiting;
-        this.settings = settings;
+        this.storage = storage;
         this.queues = queues;
         this.received = received;
         this.rememberedMessageIds = rememberedMessageIds;
@@ -61,11 +62,6 @@ public class KmContractSubmissionSteps {
     @Когда("Договоры обновляют сводку договоров КМ, ждущих ответа 1С:УСК")
     public void summaryRefreshed() {
         awaiting.refresh();
-    }
-
-    @Дано("предел размера сообщения о договоре КМ на стенде — {long} байт")
-    public void messageLimit(long limit) {
-        assertThat(settings.maxMessageSize().toBytes()).as("предел размера сообщения о договоре КМ").isEqualTo(limit);
     }
 
     @Тогда("1С:УСК получает из своей очереди {string} передачи договоров КМ, всего за сценарий — {int}")
@@ -116,6 +112,22 @@ public class KmContractSubmissionSteps {
         assertThat(document.path("document_id").stringValue()).as("document_id").isEqualTo(documentId.toString());
         assertThat(document.path("file_name").stringValue()).as("file_name")
                 .isEqualTo("certificate-" + documentId + "." + extension);
+    }
+
+    @Тогда("документ №{int} передачи договора КМ №{int} ссылается на объект справки по вложению {string} — {string}")
+    public void link(int documentOrdinal, int ordinal, String attachment, String expected) {
+        String link = body(ordinal).path("data").path("documents").path(documentOrdinal - 1).path("link").stringValue();
+        assertThat(link).as("link документа №%s", documentOrdinal).isEqualTo(
+                LINK_SEPARATOR + storage.bucket() + LINK_SEPARATOR + certificates.byAttachment(attachment).key());
+        assertThat(link).as("link документа №%s", documentOrdinal).matches(CertificateRegistrySteps.keyPattern(expected));
+    }
+
+    @Тогда("data передачи договора КМ №{int} совпадает с data тела исходящего сообщения №{int} по заявке {string}")
+    public void dataAsJournaled(int ordinal, int journalOrdinal, String requestId) {
+        String payload = journal.number(journalOrdinal, requestId).payload();
+        assertThat(payload).as("тело исходящего сообщения №%s", journalOrdinal).isNotNull();
+        assertThat(body(ordinal).path("data")).as("data передачи №%s", ordinal)
+                .isEqualTo(messages.read(payload.getBytes(StandardCharsets.UTF_8)).path("data"));
     }
 
     private static void field(SoftAssertions softly, JsonNode data, String path, String expected) {

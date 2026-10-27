@@ -1,9 +1,9 @@
 package ru.projectx.contracts.service.integration;
 
-import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
+import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
 import java.io.IOException;
@@ -42,25 +42,41 @@ public class MinioCertificateStore implements CertificateStore {
     }
 
     @Override
-    public byte[] read(String key) {
-        GetObjectArgs object = GetObjectArgs.builder().bucket(bucket).object(key).build();
-        try (GetObjectResponse stream = client.getObject(object)) {
-            return stream.readAllBytes();
+    public void verifyPresent(String key) {
+        StatObjectArgs object = StatObjectArgs.builder().bucket(bucket).object(key).build();
+        try {
+            client.statObject(object);
         } catch (ErrorResponseException refused) {
             throw refusal(refused);
         } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
-            log.warn("хранилище справок не отдало объект: {}", failure.getClass().getName());
-            throw new StorageUnavailableException(failure);
+            throw unanswered(failure);
         }
     }
 
-    private static RuntimeException refusal(ErrorResponseException refused) {
+    private RuntimeException refusal(ErrorResponseException refused) {
         String code = refused.errorResponse().code();
-        if (NO_SUCH_KEY.equals(code)) {
+        if (!NO_SUCH_KEY.equals(code)) {
+            log.warn("хранилище справок отказало в проверке объекта: код {}", code);
+            return new StorageUnavailableException(refused);
+        }
+        if (bucketPresent()) {
             return new CertificateMissingException(refused);
         }
-        log.warn("хранилище справок отказало в чтении объекта: код {}", code);
+        log.warn("в хранилище справок нет бакета справок");
         return new StorageUnavailableException(refused);
+    }
+
+    private boolean bucketPresent() {
+        try {
+            return client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+        } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
+            throw unanswered(failure);
+        }
+    }
+
+    private static StorageUnavailableException unanswered(Exception failure) {
+        log.warn("хранилище справок не ответило о наличии объекта: {}", failure.getClass().getName());
+        return new StorageUnavailableException(failure);
     }
 
     private void put(StoredFile file, InputStream stream) {

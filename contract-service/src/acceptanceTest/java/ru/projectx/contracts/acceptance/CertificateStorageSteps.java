@@ -1,11 +1,15 @@
 package ru.projectx.contracts.acceptance;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import io.cucumber.java.After;
 import io.cucumber.java.ru.Дано;
 import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
+import io.minio.BucketExistsArgs;
+import io.minio.MinioClient;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import ru.projectx.contracts.config.AttachmentProperties;
@@ -14,28 +18,34 @@ import ru.projectx.contracts.config.StorageProperties;
 public class CertificateStorageSteps {
 
     private static final String SEPARATOR = "/";
+    private static final String ORGANIZATION_SEPARATOR = "_";
+    private static final Duration SERVICE_RECONNECT = Duration.ofSeconds(30);
 
     private final StandStorage storage;
     private final StorageProperties settings;
     private final AttachmentProperties attachments;
     private final CertificateRecords records;
     private final AttachmentCalls calls;
+    private final MinioClient serviceClient;
 
     private final Map<String, Runnable> outages;
 
     public CertificateStorageSteps(StandStorage storage, StorageProperties settings, AttachmentProperties attachments,
-            CertificateRecords records, AttachmentCalls calls) {
+            CertificateRecords records, AttachmentCalls calls, MinioClient serviceClient) {
         this.storage = storage;
         this.settings = settings;
         this.attachments = attachments;
         this.records = records;
         this.calls = calls;
+        this.serviceClient = serviceClient;
         this.outages = Map.of("остановлено", storage::stop, "не отвечает", storage::pause);
     }
 
     @After
     public void recoverStorage() {
         storage.recover();
+        await("клиент хранилища сервиса снова отвечает").atMost(SERVICE_RECONNECT).ignoreExceptions()
+                .until(this::serviceClientAnswers);
     }
 
     @Дано("хранилище справок Договоров — бакет {string}, base-path {string}, предельный размер файла {long} байт")
@@ -44,6 +54,12 @@ public class CertificateStorageSteps {
         assertThat(settings.basePath()).as("base-path в настройках стенда").isEqualTo(basePath);
         assertThat(attachments.maxFileSize().toBytes()).as("предельный размер файла").isEqualTo(maxFileSize);
         storage.recreateBucket(bucket);
+    }
+
+    @Дано("организация в ключах хранилища справок Договоров — ИНН {string}, КПП {string}")
+    public void organization(String inn, String kpp) {
+        assertThat(settings.inn()).as("ИНН в настройках стенда").isEqualTo(inn);
+        assertThat(settings.kpp()).as("КПП в настройках стенда").isEqualTo(kpp);
     }
 
     @Дано("хранилище справок недоступно: {string}")
@@ -55,7 +71,7 @@ public class CertificateStorageSteps {
 
     @Когда("хранилище справок снова доступно")
     public void storageBack() throws Exception {
-        storage.recover();
+        recoverStorage();
         assertThat(storage.bucketExists(settings.bucket())).as("бакет после восстановления").isTrue();
     }
 
@@ -71,7 +87,7 @@ public class CertificateStorageSteps {
 
     @Тогда("в хранилище справок за сценарий появилось объектов — {int}")
     public void objectCount(int count) throws Exception {
-        assertThat(storage.keys(settings.bucket(), settings.basePath() + SEPARATOR)).as("объекты бакета").hasSize(count);
+        assertThat(storage.keys(settings.bucket(), basePath() + SEPARATOR)).as("объекты бакета").hasSize(count);
     }
 
     @Тогда("содержимое объекта справки по вложению {string} в хранилище совпадает с отправленным")
@@ -87,8 +103,18 @@ public class CertificateStorageSteps {
     }
 
     private String folder(String key) {
-        String[] segments = key.substring(settings.basePath().length() + 1).split(SEPARATOR);
+        assertThat(key).as("ключ объекта").startsWith(basePath() + SEPARATOR);
+        String[] segments = key.substring(basePath().length() + 1).split(SEPARATOR);
         assertThat(segments).as("сегменты ключа %s", key).hasSize(2);
         return segments[0];
+    }
+
+    private boolean serviceClientAnswers() throws Exception {
+        serviceClient.bucketExists(BucketExistsArgs.builder().bucket(settings.bucket()).build());
+        return true;
+    }
+
+    private String basePath() {
+        return settings.inn() + ORGANIZATION_SEPARATOR + settings.kpp() + SEPARATOR + settings.basePath();
     }
 }

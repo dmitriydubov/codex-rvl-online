@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,7 +31,6 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.IssueError;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxDraft;
-import ru.projectx.contracts.exception.MessageTooLargeException;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
@@ -52,11 +50,10 @@ class KmContractSubmissionRecordingTest {
     private final ContractRepository contracts = mock();
     private final KmContractSubmissionFacts facts = mock();
     private final KmContractSubmissionMessages messages = mock();
-    private final KmContractMessageLimit limit = mock();
     private final OutboxJournal journal = mock();
     private final RequestStatusPublication statuses = mock();
     private final KmContractSubmissionRecording recording = new KmContractSubmissionRecording(contracts, facts,
-            messages, limit, journal, statuses, Clock.fixed(NOW, ZoneOffset.UTC));
+            messages, journal, statuses, Clock.fixed(NOW, ZoneOffset.UTC));
     private final Contract contract = Issuances.paidContract(CONTRACT_ID.toString(), Tasks.SPOUSE, "DKM-2026-000001",
             PAID_AT);
     private final SubmissionFacts gathered = KmContractSubmissionMessagesTest.facts(List.of(
@@ -73,18 +70,17 @@ class KmContractSubmissionRecordingTest {
     }
 
     @Test
-    void submit_turnsThePaidContractIntoSubmittedAndRecordsTheSubmissionWithItsCertificatesAsAttachments() {
+    void submit_turnsThePaidContractIntoSubmittedAndRecordsTheWholeSubmissionInTheJournal() {
         recording.submit(CONTRACT_ID, KmContractSubmissionMessagesTest.IDENTIFIERS);
 
         assertThat(contract.status()).isEqualTo(ContractStatus.SUBMITTED);
         assertThat(contract.state().entityVersion()).isEqualTo(3);
-        InOrder order = inOrder(facts, messages, limit, journal);
-        order.verify(facts).gather(contract, KmContractSubmissionMessagesTest.IDENTIFIERS);
+        InOrder order = inOrder(facts, messages, journal);
         order.verify(messages).meta(contract, NOW);
+        order.verify(facts).gather(contract, KmContractSubmissionMessagesTest.IDENTIFIERS);
         order.verify(messages).write(meta, contract, gathered);
-        order.verify(limit).verify("{\"data\": {}}", gathered.certificates());
         ArgumentCaptor<OutboxDraft> draft = ArgumentCaptor.captor();
-        order.verify(journal).record(draft.capture(), eq(gathered.certificates()), eq(NOW));
+        order.verify(journal).record(draft.capture(), eq(NOW));
         assertThat(draft.getValue().aggregateType()).isEqualTo("CONTRACT");
         assertThat(draft.getValue().aggregateId()).isEqualTo(CONTRACT_ID);
         assertThat(draft.getValue().envelope()).isEqualTo(new MessageEnvelope(MESSAGE_ID, Tasks.REQUEST,
@@ -94,24 +90,13 @@ class KmContractSubmissionRecordingTest {
     }
 
     @Test
-    void submit_withoutCertificates_recordsNoAttachments() {
-        SubmissionFacts bare = KmContractSubmissionMessagesTest.facts(List.of());
-        given(facts.gather(contract, KmContractSubmissionMessagesTest.IDENTIFIERS)).willReturn(bare);
-        given(messages.write(meta, contract, bare)).willReturn("{\"data\": {}}");
-
-        recording.submit(CONTRACT_ID, KmContractSubmissionMessagesTest.IDENTIFIERS);
-
-        verify(journal).record(any(), eq(List.of()), eq(NOW));
-    }
-
-    @Test
     void submit_leavesAContractThatIsNoLongerPaidAlone() {
         contract.submit(NOW);
 
         recording.submit(CONTRACT_ID, KmContractSubmissionMessagesTest.IDENTIFIERS);
 
         assertThat(contract.state().entityVersion()).isEqualTo(3);
-        verifyNoInteractions(facts, messages, limit, journal, statuses);
+        verifyNoInteractions(facts, messages, journal, statuses);
     }
 
     @Test
@@ -122,17 +107,6 @@ class KmContractSubmissionRecordingTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         verifyNoInteractions(facts, journal, statuses);
-    }
-
-    @Test
-    void messageOverTheLimit_failsTheSubmissionBeforeAnythingIsRecorded() {
-        MessageTooLargeException tooLarge = new MessageTooLargeException(70000, 65536, 2, "KM_CONTRACT_MESSAGE_TOO_LARGE", "сообщение");
-        willThrow(tooLarge).given(limit).verify("{\"data\": {}}", gathered.certificates());
-
-        assertThatThrownBy(() -> recording.submit(CONTRACT_ID, KmContractSubmissionMessagesTest.IDENTIFIERS))
-                .isSameAs(tooLarge);
-
-        verifyNoInteractions(journal, statuses);
     }
 
     @Test
@@ -184,7 +158,7 @@ class KmContractSubmissionRecordingTest {
 
         assertThatThrownBy(() -> recording.submit(unknown, KmContractSubmissionMessagesTest.IDENTIFIERS))
                 .isInstanceOf(IllegalStateException.class).hasMessage("договора КМ " + unknown + " нет");
-        verify(journal, never()).record(any(), any(), any());
+        verify(journal, never()).record(any(), any());
         verify(messages, never()).write(any(), same(contract), any());
     }
 }

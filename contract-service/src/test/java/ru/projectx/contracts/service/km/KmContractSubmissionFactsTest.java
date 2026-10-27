@@ -29,7 +29,6 @@ import ru.projectx.contracts.repository.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 import ru.projectx.contracts.repository.PrintedFormRepository;
 import ru.projectx.contracts.service.PersonSnapshots;
-import ru.projectx.contracts.service.outbox.OutboundAttachment;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -51,7 +50,8 @@ class KmContractSubmissionFactsTest {
     private final ContractPersonRepository persons = mock();
     private final ContractAcceptanceRepository acceptances = mock();
     private final PrintedFormRepository forms = mock();
-    private final KmContractSubmissionFacts facts = new KmContractSubmissionFacts(persons, acceptances, forms);
+    private final KmContractSubmissionFacts facts = new KmContractSubmissionFacts(persons, acceptances,
+            new InsuredCertificates(forms));
     private final Contract contract = Issuances.contract(CONTRACT_ID.toString(), Tasks.SPOUSE, "DKM-2026-000001");
 
     @BeforeEach
@@ -74,8 +74,8 @@ class KmContractSubmissionFactsTest {
         assertThat(gathered.acceptedAt()).isEqualTo(ACCEPTED_AT);
         assertThat(gathered.policyholder()).isEqualTo(PersonSnapshots.of(Tasks.insured("0.00")));
         assertThat(gathered.insured()).isEqualTo(PersonSnapshots.of(Tasks.spouse("34000.00")));
-        assertThat(gathered.certificates()).containsExactly(new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, JPEG),
-                new OutboundAttachment(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, PDF));
+        assertThat(gathered.certificates()).containsExactly(new SubmittedCertificate(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, JPEG),
+                new SubmittedCertificate(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, PDF));
     }
 
     @Test

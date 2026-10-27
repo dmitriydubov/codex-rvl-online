@@ -6,8 +6,6 @@ import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.entity.IssuanceRecord;
 import ru.projectx.contracts.entity.IssuanceStatus;
-import ru.projectx.contracts.entity.IssueError;
-import ru.projectx.contracts.exception.SubmissionRefusedException;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.SqlStates;
@@ -25,7 +23,8 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
 
     private final IssuanceKind<R, S> kind;
     private final UskRecordRepository<R, S> records;
-    private final UskRequestRecording<R, S> recording;
+    private final UskRequestRecording<R, S, ?> recording;
+    private final SubmissionPrerequisites<R> prerequisites;
     private final IssuanceReferences references;
     private final ReferenceMetrics metrics;
     private final UskPreparationMetrics preparationMetrics;
@@ -33,11 +32,13 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
     private final Logger log;
 
     protected UskRequests(IssuanceKind<R, S> kind, UskRecordRepository<R, S> records,
-            UskRequestRecording<R, S> recording, IssuanceReferences references, ReferenceMetrics metrics,
-            UskPreparationMetrics preparationMetrics, int batchSize, Logger log) {
+            UskRequestRecording<R, S, ?> recording, SubmissionPrerequisites<R> prerequisites,
+            IssuanceReferences references, ReferenceMetrics metrics, UskPreparationMetrics preparationMetrics,
+            int batchSize, Logger log) {
         this.kind = kind;
         this.records = records;
         this.recording = recording;
+        this.prerequisites = prerequisites;
         this.references = references;
         this.metrics = metrics;
         this.preparationMetrics = preparationMetrics;
@@ -68,7 +69,9 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
 
     private boolean prepareWithItsRequestId(R record) {
         switch (references.resolve(record.state())) {
-            case RequestResolution.Resolved resolved -> submit(record, resolved.identifiers());
+            case RequestResolution.Resolved resolved -> {
+                return submitWhenReady(record, resolved.identifiers());
+            }
             case RequestResolution.Refused refused -> recording.refuse(record.id(), refused.error());
             case RequestResolution.Unavailable unavailable -> {
                 postpone(record, unavailable);
@@ -78,12 +81,21 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
         return true;
     }
 
+    private boolean submitWhenReady(R record, ExternalIdentifiers identifiers) {
+        switch (prerequisites.check(record)) {
+            case Prerequisites.Met met -> submit(record, identifiers);
+            case Prerequisites.Broken broken -> refuseNotPrepared(record, broken.reason(), broken.failure());
+            case Prerequisites.Postponed postponed -> {
+                warn(record, postponed.reason());
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void submit(R record, ExternalIdentifiers identifiers) {
         try {
             recording.submit(record.id(), identifiers);
-        } catch (SubmissionRefusedException refused) {
-            warn(record, refused.getMessage());
-            recording.refuse(record.id(), new IssueError(refused.errorCode(), refused.errorMessage()));
         } catch (RuntimeException failure) {
             failPreparation(record, failure);
         }
@@ -93,9 +105,13 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
         if (TemporaryFailures.temporary(failure)) {
             throw failure;
         }
+        refuseNotPrepared(record, kind.wording().preparationFailed(), failure);
+    }
+
+    private void refuseNotPrepared(R record, String reason, RuntimeException failure) {
         if (refuseAsNotPrepared(record, failure)) {
             preparationMetrics.countFailed(kind.requestEventType());
-            logFailure(log.atError(), record, kind.wording().preparationFailed(), failure);
+            logFailure(log.atError(), record, reason, failure);
             return;
         }
         logFailure(log.atWarn(), record, NO_LONGER_READY, failure);

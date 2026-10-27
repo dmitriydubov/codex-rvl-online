@@ -19,30 +19,35 @@ import ru.projectx.contracts.message.KmContractSubmission;
 import ru.projectx.contracts.message.KmContractSubmitted;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.StatusEvents;
-import ru.projectx.contracts.service.outbox.OutboundAttachment;
+import ru.projectx.contracts.service.storage.CertificateLinks;
 import ru.projectx.contracts.service.usk.ParticipantDocuments;
 import ru.projectx.contracts.service.usk.RequestTerms;
+import ru.projectx.contracts.service.usk.UskRequestMessages;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
-public class KmContractSubmissionMessages {
+public class KmContractSubmissionMessages implements UskRequestMessages<Contract, SubmissionFacts> {
 
     private static final String FILE_NAME_PREFIX = "certificate-";
 
     private final JsonMapper json;
     private final Map<String, String> extensions;
+    private final CertificateLinks links;
 
-    public KmContractSubmissionMessages(JsonMapper json, AttachmentProperties attachments) {
+    public KmContractSubmissionMessages(JsonMapper json, AttachmentProperties attachments, CertificateLinks links) {
         this.json = json;
         this.extensions = attachments.contentTypes();
+        this.links = links;
     }
 
+    @Override
     public MessageMeta meta(Contract contract, Instant now) {
         return new MessageMeta(UUID.randomUUID(), contract.state().request().individualRequestId(),
                 KmContractEvents.KM_CONTRACT_SUBMISSION_TOPIC, KmContractEvents.KM_CONTRACT_SUBMITTED,
                 StatusEvents.SCHEMA_VERSION, utc(now), contract.state().entityVersion(), StatusEvents.SOURCE);
     }
 
+    @Override
     public String write(MessageMeta meta, Contract contract, SubmissionFacts facts) {
         KmContractSubmission data = new KmContractSubmission(contract.id(), contract.number(),
                 RequestTerms.of(contract.state(), facts.identifiers()), contract.premiumAmount(), utc(paidAt(contract)),
@@ -74,10 +79,10 @@ public class KmContractSubmissionMessages {
                 ParticipantDocuments.of(person.document()), person.address());
     }
 
-    private CertificateDocument document(OutboundAttachment certificate) {
+    private CertificateDocument document(SubmittedCertificate certificate) {
         StoredFile file = certificate.file();
         return new CertificateDocument(certificate.documentId(), certificate.docType().name(),
-                fileName(certificate.documentId(), file.contentType()), file.contentType(), null, file.hash());
+                fileName(certificate.documentId(), file.contentType()), file.contentType(), links.link(file), file.hash());
     }
 
     private String fileName(UUID documentId, String contentType) {

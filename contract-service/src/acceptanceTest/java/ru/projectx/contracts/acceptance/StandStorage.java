@@ -9,10 +9,12 @@ import io.minio.GetObjectResponse;
 import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
 import io.minio.RemoveBucketArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.Result;
 import io.minio.messages.Item;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
@@ -30,6 +32,7 @@ final class StandStorage {
     private static final String MINIO = "minio/minio";
     private static final int S3_PORT = 9000;
     private static final Duration RECOVERY = Duration.ofSeconds(60);
+    private static final long UNKNOWN_PART_SIZE = -1;
 
     private final MinIOContainer container;
     private State state = State.RUNNING;
@@ -98,6 +101,11 @@ final class StandStorage {
         try (GetObjectResponse object = client().getObject(GetObjectArgs.builder().bucket(bucket).object(key).build())) {
             return object.readAllBytes();
         }
+    }
+
+    void putObject(String bucket, String key, byte[] content) throws Exception {
+        client().putObject(PutObjectArgs.builder().bucket(bucket).object(key)
+                .stream(new ByteArrayInputStream(content), content.length, UNKNOWN_PART_SIZE).build());
     }
 
     void removeObject(String bucket, String key) throws Exception {

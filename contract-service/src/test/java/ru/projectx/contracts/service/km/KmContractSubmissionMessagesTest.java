@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.km;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -10,14 +11,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.AttachmentProperties;
+import ru.projectx.contracts.config.StorageProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.PersonSnapshot;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.service.PersonSnapshots;
-import ru.projectx.contracts.service.outbox.OutboundAttachment;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
+import ru.projectx.contracts.service.storage.CertificateLinks;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 import tools.jackson.databind.JsonNode;
@@ -37,16 +39,17 @@ class KmContractSubmissionMessagesTest {
             UUID.fromString("1d9a6e77-4c02-4b88-a15e-30f7b2c9de41"));
     static final PersonSnapshot POLICYHOLDER = PersonSnapshots.of(Tasks.insured("0.00"));
     static final PersonSnapshot SPOUSE = PersonSnapshots.of(Tasks.spouse("34000.00"));
-    static final OutboundAttachment JPEG = new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
+    static final SubmittedCertificate JPEG = new SubmittedCertificate(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
             "certificates/0b6c/3c2f.jpg", "7851d78af0fb98bbbda8933f49860a009ac7761c21a1136613c8a6704b156251", 76L,
             "image/jpeg"));
-    static final OutboundAttachment PDF = new OutboundAttachment(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
+    static final SubmittedCertificate PDF = new SubmittedCertificate(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, new StoredFile(
             "certificates/0b6c/1a4c.pdf", "5f06c6aad0549ff7d77933b65f7f1069aba5dde34da22c71517b0f8ff2b45732", 20000L,
             "application/pdf"));
 
     private final JsonMapper json = JsonMapper.builder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build();
-    private final KmContractSubmissionMessages messages = new KmContractSubmissionMessages(json, properties());
+    private final KmContractSubmissionMessages messages = new KmContractSubmissionMessages(json, properties(),
+            new CertificateLinks(storage()));
     private final Contract contract = Issuances.paidContract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001", PAID_AT);
 
     @Test
@@ -97,10 +100,12 @@ class KmContractSubmissionMessagesTest {
         assertThat(documents.path(0).path("file_name").stringValue()).isEqualTo("certificate-" + FIRST_DOCUMENT + ".jpg");
         assertThat(documents.path(0).path("content_type").stringValue()).isEqualTo("image/jpeg");
         assertThat(documents.path(0).path("file_hash").stringValue()).isEqualTo(JPEG.file().hash());
+        assertThat(documents.path(0).path("link").stringValue()).isEqualTo("/rvl-files/certificates/0b6c/3c2f.jpg");
         assertThat(documents.path(0).has("content_base64")).isFalse();
         assertThat(documents.path(1).path("file_name").stringValue()).isEqualTo("certificate-" + SECOND_DOCUMENT + ".pdf");
         assertThat(documents.path(1).path("content_type").stringValue()).isEqualTo("application/pdf");
         assertThat(documents.path(1).path("file_hash").stringValue()).isEqualTo(PDF.file().hash());
+        assertThat(documents.path(1).path("link").stringValue()).isEqualTo("/rvl-files/certificates/0b6c/1a4c.pdf");
     }
 
     @Test
@@ -150,7 +155,7 @@ class KmContractSubmissionMessagesTest {
 
     @Test
     void certificateOfAContentTypeOutsideTheAllowedOnes_isIllegalState() {
-        OutboundAttachment gif = new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE,
+        SubmittedCertificate gif = new SubmittedCertificate(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE,
                 new StoredFile("certificates/0b6c/3c2f.gif",
                 "0".repeat(64), 10L, "image/gif"));
 
@@ -167,8 +172,14 @@ class KmContractSubmissionMessagesTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining(CONTRACT_ID);
     }
 
-    static SubmissionFacts facts(List<OutboundAttachment> certificates) {
+    static SubmissionFacts facts(List<SubmittedCertificate> certificates) {
         return new SubmissionFacts(IDENTIFIERS, ACCEPTED_AT, POLICYHOLDER, SPOUSE, certificates);
+    }
+
+    private static StorageProperties storage() {
+        Duration timeout = Duration.ofSeconds(1);
+        return new StorageProperties("http://storage.test:9000", "us-east-1", "rvl-files", "certificates", "1111111111",
+                "222222222", "access", "secret", null, new StorageProperties.Timeouts(timeout, timeout, timeout, timeout));
     }
 
     static AttachmentProperties properties() {

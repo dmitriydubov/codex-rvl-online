@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.util.unit.DataSize;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
@@ -13,7 +12,6 @@ import org.springframework.validation.annotation.Validated;
 public record KmContractSubmissionProperties(
         @NotNull @DurationMin(millis = 1) Duration interval,
         @Min(1) int batchSize,
-        @NotNull @PositiveSize DataSize maxMessageSize,
         @NotNull @DurationMin(millis = 1) Duration awaitingInterval,
         @NotNull @DurationMin(seconds = 1) Duration awaitingThreshold) {
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import io.cucumber.java.ru.Дано;
+import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
 import java.io.IOException;
 import java.net.URI;
@@ -13,20 +14,15 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import org.assertj.core.api.SoftAssertions;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import ru.projectx.contracts.config.StorageProperties;
 
-public class MessageAttachmentSteps {
+public class CertificateContentSteps {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     private static final String CONTENT_FIELD = "\"content_base64\"";
-    private static final String SAME_AS_REGISTRY = "совпадает с реестром";
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
-    private final MessageAttachmentRecords attachments;
     private final CertificateRecords certificates;
     private final OutboxRecords journal;
     private final AttachmentCalls calls;
@@ -35,10 +31,9 @@ public class MessageAttachmentSteps {
     private final ServiceJournal serviceJournal;
     private final URI metrics;
 
-    public MessageAttachmentSteps(MessageAttachmentRecords attachments, CertificateRecords certificates,
-            OutboxRecords journal, AttachmentCalls calls, StandStorage storage, StorageProperties settings,
-            ServiceJournal serviceJournal, @LocalManagementPort int managementPort) {
-        this.attachments = attachments;
+    public CertificateContentSteps(CertificateRecords certificates, OutboxRecords journal, AttachmentCalls calls,
+            StandStorage storage, StorageProperties settings, ServiceJournal serviceJournal,
+            @LocalManagementPort int managementPort) {
         this.certificates = certificates;
         this.journal = journal;
         this.calls = calls;
@@ -46,23 +41,6 @@ public class MessageAttachmentSteps {
         this.settings = settings;
         this.serviceJournal = serviceJournal;
         this.metrics = URI.create("http://localhost:" + managementPort + "/actuator/prometheus");
-    }
-
-    @Тогда("вложений у исходящего сообщения №{int} по заявке {string} — {int}")
-    public void attachmentCount(int ordinal, String requestId, int count) {
-        assertThat(attachments.of(journal.number(ordinal, requestId).messageId()))
-                .as("вложения исходящего сообщения №%s", ordinal).hasSize(count);
-    }
-
-    @Тогда("вложения исходящего сообщения №{int} по заявке {string}:")
-    public void attachmentRows(int ordinal, String requestId, List<Map<String, String>> expected) {
-        List<MessageAttachmentRecords.Attachment> actual = attachments.of(journal.number(ordinal, requestId).messageId());
-        assertThat(actual).as("вложения исходящего сообщения №%s", ordinal).hasSameSizeAs(expected);
-        SoftAssertions softly = new SoftAssertions();
-        for (int index = 0; index < expected.size(); index++) {
-            attachment(softly, expected.get(index), actual.get(index));
-        }
-        softly.assertAll();
     }
 
     @Тогда("тело исходящего сообщения №{int} по заявке {string} не содержит содержимого справок")
@@ -80,6 +58,19 @@ public class MessageAttachmentSteps {
         storage.removeObject(settings.bucket(), certificates.byAttachment(attachment).key());
     }
 
+    @Когда("стенд возвращает в хранилище объект справки по вложению {string}")
+    public void objectRestored(String attachment) throws Exception {
+        storage.putObject(settings.bucket(), certificates.byAttachment(attachment).key(), calls.sentContent(attachment));
+    }
+
+    @Дано("справка по вложению {string} загружена до перехода на ключи с ИНН и КПП: стенд перенёс её объект и ключ в реестре на {string}")
+    public void storedUnderTheEarlierKey(String attachment, String earlierKey) throws Exception {
+        String key = certificates.byAttachment(attachment).key();
+        storage.putObject(settings.bucket(), earlierKey, storage.object(settings.bucket(), key));
+        storage.removeObject(settings.bucket(), key);
+        certificates.rekey(attachment, earlierKey);
+    }
+
     @Тогда("имя файла {string} и содержимое справки по вложению {string} не попали ни в журнал Договоров, ни в метрики, ни в причины исходов журнала исходящих")
     public void medicalDataStaysOutOfOutcomes(String fileName, String attachment) throws IOException, InterruptedException {
         String content = new String(calls.sentContent(attachment), StandardCharsets.UTF_8);
@@ -92,16 +83,6 @@ public class MessageAttachmentSteps {
                     .as("причины исходов журнала исходящих")
                     .allSatisfy(reason -> assertThat(reason == null || !reason.contains(value)).isTrue());
         }
-    }
-
-    private void attachment(SoftAssertions softly, Map<String, String> expected,
-            MessageAttachmentRecords.Attachment actual) {
-        CertificateRecords.Certificate certificate = certificates.byAttachment(StepTables.required(expected, "вложение"));
-        softly.assertThat(actual.documentId()).as("document_id").isEqualTo(certificate.id());
-        softly.assertThat(actual.contentType()).as("content_type").isEqualTo(StepTables.required(expected, "content_type"));
-        softly.assertThat(Long.toString(actual.fileSize())).as("размер").isEqualTo(StepTables.required(expected, "размер"));
-        assertThat(StepTables.required(expected, "ключ объекта")).as("ожидание о ключе объекта").isEqualTo(SAME_AS_REGISTRY);
-        softly.assertThat(actual.fileKey()).as("ключ объекта").isEqualTo(certificate.key());
     }
 
     private String exposition() throws IOException, InterruptedException {

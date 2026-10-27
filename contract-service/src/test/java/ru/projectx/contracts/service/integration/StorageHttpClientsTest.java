@@ -102,6 +102,6 @@ class StorageHttpClientsTest {
 
     private static StorageProperties settings(String bundle) {
         return new StorageProperties("https://s3.contour.example:9000", "us-east-1", "rvl-contracts", "certificates",
-                "access", "secret", bundle, TIMEOUTS);
+                "1111111111", "222222222", "access", "secret", bundle, TIMEOUTS);
     }
 }

@@ -4,14 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
+import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.ServerException;
 import io.minio.messages.ErrorResponse;
@@ -22,7 +23,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import okhttp3.Headers;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.contracts.entity.StoredFile;
@@ -127,85 +127,79 @@ class MinioCertificateStoreTest {
     }
 
     @Test
-    void read_returnsTheBytesOfTheObjectUnderTheKeyInTheBucket() throws Exception {
-        when(client.getObject(any())).thenReturn(response(new ByteArrayInputStream(CONTENT)));
+    void verifyPresent_asksTheStorageForTheObjectUnderTheKeyInTheBucket() throws Exception {
+        store.verifyPresent(FILE.key());
 
-        assertThat(store.read(FILE.key())).isEqualTo(CONTENT);
-
-        ArgumentCaptor<GetObjectArgs> get = ArgumentCaptor.forClass(GetObjectArgs.class);
-        verify(client).getObject(get.capture());
-        assertThat(get.getValue().bucket()).isEqualTo("rvl-contracts");
-        assertThat(get.getValue().object()).isEqualTo(FILE.key());
+        ArgumentCaptor<StatObjectArgs> stat = ArgumentCaptor.forClass(StatObjectArgs.class);
+        verify(client).statObject(stat.capture());
+        assertThat(stat.getValue().bucket()).isEqualTo("rvl-contracts");
+        assertThat(stat.getValue().object()).isEqualTo(FILE.key());
     }
 
     @Test
-    void read_closesTheObjectStreamAfterReading() throws Exception {
-        AtomicBoolean closed = new AtomicBoolean();
-        InputStream content = new ByteArrayInputStream(CONTENT) {
-            @Override
-            public void close() {
-                closed.set(true);
-            }
-        };
-        when(client.getObject(any())).thenReturn(response(content));
-
-        store.read(FILE.key());
-
-        assertThat(closed).isTrue();
-    }
-
-    @Test
-    void read_ofAMissingObject_isACertificateMissing() throws Exception {
+    void verifyPresent_ofAMissingObject_isACertificateMissing() throws Exception {
         ErrorResponseException missing = new ErrorResponseException(
-                new ErrorResponse("NoSuchKey", "The specified key does not exist.", "rvl-contracts", FILE.key(), null,
-                        null, null), null, null);
-        when(client.getObject(any())).thenThrow(missing);
+                new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenReturn(true);
 
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(CertificateMissingException.class)
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(CertificateMissingException.class)
                 .hasCause(missing).hasMessage("объекта справки нет в хранилище");
+        ArgumentCaptor<BucketExistsArgs> bucket = ArgumentCaptor.forClass(BucketExistsArgs.class);
+        verify(client).bucketExists(bucket.capture());
+        assertThat(bucket.getValue().bucket()).isEqualTo("rvl-contracts");
     }
 
     @Test
-    void read_refusedForAnotherReason_isStorageUnavailable() throws Exception {
-        ErrorResponseException refused = new ErrorResponseException(
-                new ErrorResponse("NoSuchBucket", "The specified bucket does not exist", "rvl-contracts", null, null,
-                        null, null), null, null);
-        when(client.getObject(any())).thenThrow(refused);
+    void verifyPresent_answeredNoSuchKeyInAMissingBucket_isStorageUnavailable() throws Exception {
+        ErrorResponseException missing = new ErrorResponseException(
+                new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenReturn(false);
 
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+                .hasCause(missing);
+    }
+
+    @Test
+    void verifyPresent_whoseBucketCannotBeChecked_isStorageUnavailable() throws Exception {
+        ErrorResponseException missing = new ErrorResponseException(
+                new ErrorResponse("NoSuchKey", "Object does not exist", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        IOException refused = new IOException("Connection refused");
+        when(client.statObject(any())).thenThrow(missing);
+        when(client.bucketExists(any())).thenThrow(refused);
+
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
                 .hasCause(refused);
     }
 
     @Test
-    void read_thatFailsOnTheNetworkOrInTheClient_isStorageUnavailable() throws Exception {
+    void verifyPresent_refusedForAnotherReason_isStorageUnavailable() throws Exception {
+        ErrorResponseException refused = new ErrorResponseException(
+                new ErrorResponse("AccessDenied", "Access Denied.", "rvl-contracts", FILE.key(), null, null, null),
+                null, null);
+        when(client.statObject(any())).thenThrow(refused);
+
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+                .hasCause(refused);
+        verify(client, never()).bucketExists(any());
+    }
+
+    @Test
+    void verifyPresent_thatFailsOnTheNetworkOrInTheClient_isStorageUnavailable() throws Exception {
         IOException refused = new IOException("Connection refused");
-        when(client.getObject(any())).thenThrow(refused).thenThrow(new ServerException("503", 503, "trace"))
+        when(client.statObject(any())).thenThrow(refused).thenThrow(new ServerException("503", 503, "trace"))
                 .thenThrow(new RuntimeException(new InterruptedException()));
 
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
                 .hasCause(refused);
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
                 .hasCauseInstanceOf(ServerException.class);
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(StorageUnavailableException.class)
+        assertThatThrownBy(() -> store.verifyPresent(FILE.key())).isInstanceOf(StorageUnavailableException.class)
                 .hasCauseInstanceOf(RuntimeException.class);
-    }
-
-    @Test
-    void read_thatBreaksMidStream_isStorageUnavailable() throws Exception {
-        InputStream broken = new InputStream() {
-            @Override
-            public int read() throws IOException {
-                throw new IOException("Connection reset");
-            }
-        };
-        when(client.getObject(any())).thenReturn(response(broken));
-
-        assertThatThrownBy(() -> store.read(FILE.key())).isInstanceOf(StorageUnavailableException.class)
-                .hasCauseInstanceOf(IOException.class);
-    }
-
-    private static GetObjectResponse response(InputStream content) {
-        return new GetObjectResponse(Headers.of(), "rvl-contracts", null, FILE.key(), content);
     }
 
     @Test

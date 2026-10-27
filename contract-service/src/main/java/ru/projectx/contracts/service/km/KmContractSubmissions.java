@@ -16,8 +16,8 @@ public class KmContractSubmissions extends UskRequests<Contract, ContractStatus>
 
     public KmContractSubmissions(ContractRepository contracts, KmContractSubmissionRecording recording,
             IssuanceReferences references, ReferenceMetrics metrics, UskPreparationMetrics preparationMetrics,
-            KmContractSubmissionProperties properties) {
-        super(KmContractKind.KIND, contracts, recording, references, metrics, preparationMetrics, properties.batchSize(),
-                LoggerFactory.getLogger(KmContractSubmissions.class));
+            KmContractCertificates certificates, KmContractSubmissionProperties properties) {
+        super(KmContractKind.KIND, contracts, recording, certificates, references, metrics, preparationMetrics,
+                properties.batchSize(), LoggerFactory.getLogger(KmContractSubmissions.class));
     }
 }

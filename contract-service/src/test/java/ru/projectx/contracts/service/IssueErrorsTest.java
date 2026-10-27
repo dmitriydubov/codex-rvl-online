@@ -26,12 +26,6 @@ class IssueErrorsTest {
     }
 
     @Test
-    void tooLargeKmContractMessage_namesTheLimitAndTheNumberOfCertificates() {
-        assertThat(IssueErrors.kmContractMessageTooLarge(1048576L, 3)).isEqualTo(new IssueError(
-                "KM_CONTRACT_MESSAGE_TOO_LARGE", "сообщение о договоре КМ больше предела 1048576 байт, справок — 3"));
-    }
-
-    @Test
     void kmContractSubmissionNotPrepared_isNamedByItsOwnCodeWithoutTheFailureDetail() {
         assertThat(IssueErrors.kmContractSubmissionPreparationFailed()).isEqualTo(new IssueError(
                 "KM_CONTRACT_SUBMISSION_PREPARATION_FAILED",
