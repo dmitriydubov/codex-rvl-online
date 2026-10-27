@@ -23,8 +23,9 @@ public class QuarantineService {
 
     @Transactional
     public boolean quarantine(RejectedMessage rejected, String reason) {
+        boolean quarantined = quarantine.existsById(rejected.messageId());
         fence.holdUntilCommit();
-        if (quarantine.existsById(rejected.messageId())) {
+        if (quarantined) {
             return false;
         }
         quarantine.save(QuarantinedMessage.of(rejected, reason, clock.instant()));

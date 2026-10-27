@@ -213,7 +213,7 @@ class LmPolicyRequestRecordingTest {
     }
 
     @Test
-    void lostLeaderLock_failsTheSubmissionBeforeThePolicyIsLocked() {
+    void lostLeaderLock_failsTheSubmissionAfterThePolicyRowIsLockedAndBeforeAnythingIsWritten() {
         org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> recording.submit(POLICY_ID, IDENTIFIERS))
@@ -221,7 +221,27 @@ class LmPolicyRequestRecordingTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> recording.refuse(POLICY_ID, ARCHIVED))
                 .isInstanceOf(LeadershipLostException.class);
 
-        org.mockito.Mockito.verify(policies, org.mockito.Mockito.never()).findLockedById(POLICY_ID);
+        org.mockito.Mockito.verify(policies, org.mockito.Mockito.times(2)).findLockedById(POLICY_ID);
+        assertThat(policy.status()).isEqualTo(LmPolicyStatus.NEW);
         org.mockito.Mockito.verifyNoInteractions(journal, statuses);
+    }
+
+    @Test
+    void leaderLockRow_isHeldAfterThePolicyRowIsLockedAndBeforeTheRequestIsRecorded() {
+        recording.submit(POLICY_ID, IDENTIFIERS);
+
+        InOrder order = inOrder(policies, fence, journal);
+        order.verify(policies).findLockedById(POLICY_ID);
+        order.verify(fence).holdUntilCommit();
+        order.verify(journal).record(any(), any());
+    }
+
+    @Test
+    void policyNotReadyForTheRequest_isLeftWithoutTheLeaderLockRowBeingHeld() {
+        policy.submit(NOW.minusSeconds(60));
+
+        recording.submit(POLICY_ID, IDENTIFIERS);
+
+        verifyNoInteractions(fence, journal);
     }
 }

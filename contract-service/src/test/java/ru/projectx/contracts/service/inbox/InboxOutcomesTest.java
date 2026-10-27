@@ -119,14 +119,15 @@ class InboxOutcomesTest {
     }
 
     @Test
-    void lostLeaderLock_failsTheRecordingBeforeTheMessageIsRead() {
+    void lostLeaderLock_failsTheRecordingAfterTheMessageIsReadAndBeforeItsOutcomeIsWritten() {
         org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
                 .given(fence).holdUntilCommit();
 
         assertThatThrownBy(() -> outcomes.recordFailure(message.id(), new InboxFailure.Permanent("отказ", "нет")))
                 .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
 
-        verify(messages, never()).findById(message.id());
+        verify(messages).findById(message.id());
         assertThat(message.status()).isEqualTo(InboxStatus.NEW);
+        assertThat(message.attempts()).isZero();
     }
 }

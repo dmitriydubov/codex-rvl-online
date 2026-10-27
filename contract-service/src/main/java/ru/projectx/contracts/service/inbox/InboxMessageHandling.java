@@ -49,13 +49,13 @@ public class InboxMessageHandling {
     }
 
     private Optional<PendingMessage> begin(UUID id) {
-        fence.holdUntilCommit();
         InboxMessage message = load(id);
         if (message.status() != InboxStatus.NEW) {
             return Optional.empty();
         }
         InboxReceipt receipt = message.receipt();
         Optional<Integer> processed = processedVersionNotBelow(receipt);
+        fence.holdUntilCommit();
         if (processed.isPresent()) {
             message.markSkipped("версия объекта " + receipt.entityVersion() + " не выше обработанной "
                     + processed.get(), clock.instant());
@@ -74,12 +74,12 @@ public class InboxMessageHandling {
     }
 
     private void complete(UUID id, InboxWork work) {
-        fence.holdUntilCommit();
         InboxMessage message = load(id);
         if (message.status() != InboxStatus.NEW) {
             return;
         }
         work.apply(clock.instant());
+        fence.holdUntilCommit();
         message.markProcessed(clock.instant());
     }
 

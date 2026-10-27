@@ -38,9 +38,9 @@ public class InboxOutcomes {
 
     @Transactional
     public void recordFailure(UUID id, InboxFailure failure) {
-        fence.holdUntilCommit();
         InboxMessage message = messages.findById(id)
                 .orElseThrow(() -> new IllegalStateException("в журнале входящих нет записи " + id));
+        fence.holdUntilCommit();
         InboxLogContext.run(message.receipt(), () -> record(message, failure));
     }
 

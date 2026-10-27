@@ -36,7 +36,6 @@ public class OutboxOutcomes {
 
     @Transactional
     public void record(UUID id, PublishOutcome.Attempted outcome) {
-        fence.holdUntilCommit();
         OutboxMessage message = messages.findById(id)
                 .orElseThrow(() -> new IllegalStateException("в журнале исходящих нет записи " + id));
         if (message.status() != OutboxStatus.NEW) {
@@ -44,6 +43,7 @@ public class OutboxOutcomes {
                     message.status());
             return;
         }
+        fence.holdUntilCommit();
         switch (outcome) {
             case PublishOutcome.Delivered delivered -> message.markPublished(clock.instant());
             case PublishOutcome.Refused refused -> rejection.reject(message, refused.reason(), clock.instant());

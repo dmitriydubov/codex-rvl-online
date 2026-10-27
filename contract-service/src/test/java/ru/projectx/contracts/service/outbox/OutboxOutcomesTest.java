@@ -165,13 +165,23 @@ class OutboxOutcomesTest {
     }
 
     @Test
-    void lostLeaderLock_failsTheRecordingBeforeTheMessageIsRead() {
+    void lostLeaderLock_failsTheRecordingAfterTheMessageIsReadAndBeforeItsOutcomeIsWritten() {
         org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
                 .given(fence).holdUntilCommit();
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> outcomes.record(message.id(), new PublishOutcome.Delivered()))
                 .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
 
-        org.mockito.Mockito.verify(messages, org.mockito.Mockito.never()).findById(message.id());
+        verify(messages).findById(message.id());
+        assertThat(message.status()).isEqualTo(OutboxStatus.NEW);
+    }
+
+    @Test
+    void outcomeAlreadyRecorded_isLeftWithoutTheLeaderLockRowBeingHeld() {
+        message.markPublished(NOW.minusSeconds(1));
+
+        outcomes.record(message.id(), new PublishOutcome.Delivered());
+
+        org.mockito.Mockito.verifyNoInteractions(fence);
     }
 }

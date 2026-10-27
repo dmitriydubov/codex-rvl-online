@@ -23,8 +23,9 @@ public class InboxReceiver {
 
     @Transactional
     public ReceiptOutcome receive(InboxReceipt receipt, String payload) {
+        boolean duplicate = messages.existsByMessageId(receipt.messageId());
         fence.holdUntilCommit();
-        if (messages.existsByMessageId(receipt.messageId())) {
+        if (duplicate) {
             return ReceiptOutcome.DUPLICATE;
         }
         messages.save(InboxMessage.receive(receipt, payload, clock.instant()));

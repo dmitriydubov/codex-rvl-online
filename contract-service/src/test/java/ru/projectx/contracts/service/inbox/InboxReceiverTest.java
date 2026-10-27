@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
@@ -50,13 +51,15 @@ class InboxReceiverTest {
     }
 
     @Test
-    void leaderLockRow_isHeldBeforeTheJournalIsRead() {
+    void leaderLockRow_isHeldAfterTheDuplicateCheckAndBeforeTheMessageIsStored() {
         given(messages.existsByMessageId(RECEIPT.messageId())).willReturn(false);
 
         receiver.receive(RECEIPT, "{}");
 
-        inOrder(fence, messages).verify(fence).holdUntilCommit();
-        inOrder(fence, messages).verify(messages).existsByMessageId(RECEIPT.messageId());
+        InOrder order = inOrder(fence, messages);
+        order.verify(messages).existsByMessageId(RECEIPT.messageId());
+        order.verify(fence).holdUntilCommit();
+        order.verify(messages).save(any());
     }
 
     @Test
@@ -64,8 +67,15 @@ class InboxReceiverTest {
         willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
 
         assertThatThrownBy(() -> receiver.receive(RECEIPT, "{}")).isInstanceOf(LeadershipLostException.class);
-        verify(messages, never()).existsByMessageId(any());
         verify(messages, never()).save(any());
+    }
+
+    @Test
+    void lostLeaderLock_failsEvenTheReceiptOfADuplicate() {
+        given(messages.existsByMessageId(RECEIPT.messageId())).willReturn(true);
+        willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> receiver.receive(RECEIPT, "{}")).isInstanceOf(LeadershipLostException.class);
     }
 
     @Test

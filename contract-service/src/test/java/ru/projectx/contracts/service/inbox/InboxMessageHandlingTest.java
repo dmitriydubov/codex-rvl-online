@@ -209,27 +209,42 @@ class InboxMessageHandlingTest {
     }
 
     @Test
-    void lostLeaderLock_failsTheHandlingBeforeTheMessageIsRead() {
-        org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
-                .given(fence).holdUntilCommit();
+    void lostLeaderLock_failsTheFirstTransactionBeforeAnyWorkIsPrepared() {
+        given(messages.maxProcessedVersion(REQUEST, TASKS)).willReturn(Optional.empty());
+        org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
 
-        assertThatThrownBy(() -> handling.process(message.id()))
-                .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
+        assertThatThrownBy(() -> handling.process(message.id())).isInstanceOf(LeadershipLostException.class);
 
-        verify(handlers, never()).forEventType(anyString());
-        verify(messages, never()).findById(any());
+        verify(handler, never()).prepare(anyString());
+        assertThat(message.status()).isEqualTo(InboxStatus.NEW);
+        verify(transactions).rollback(any());
     }
 
     @Test
-    void leaderLockLostWhileTheWorkWasPrepared_appliesNothingAndLeavesMessageNew() {
+    void leaderLockLostWhileTheWorkWasPrepared_rollsBackTheAppliedWorkAndLeavesMessageNew() {
         given(messages.maxProcessedVersion(REQUEST, TASKS)).willReturn(Optional.empty());
         willDoNothing().willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
 
         assertThatThrownBy(() -> handling.process(message.id())).isInstanceOf(LeadershipLostException.class);
 
         verify(handler).prepare("{\"data\":{}}");
-        verify(work, never()).apply(any());
+        verify(work).apply(NOW);
         assertThat(message.status()).isEqualTo(InboxStatus.NEW);
         verify(transactions).rollback(any());
+    }
+
+    @Test
+    void leaderLockRow_isHeldAfterTheWorkLockedItsRowsAndBeforeTheMessageIsMarkedProcessed() {
+        given(messages.maxProcessedVersion(REQUEST, TASKS)).willReturn(Optional.empty());
+
+        handling.process(message.id());
+
+        InOrder order = inOrder(messages, fence, work, transactions);
+        order.verify(messages).maxProcessedVersion(REQUEST, TASKS);
+        order.verify(fence).holdUntilCommit();
+        order.verify(work).apply(NOW);
+        order.verify(fence).holdUntilCommit();
+        order.verify(transactions).commit(any());
+        assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
     }
 }

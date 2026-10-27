@@ -47,14 +47,23 @@ class QuarantineServiceTest {
     }
 
     @Test
-    void lostLeaderLock_failsBeforeTheQuarantineIsRead() {
+    void lostLeaderLock_failsAfterTheQuarantineIsReadAndBeforeTheMessageIsStored() {
         org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.quarantine(rejected, "SQLSTATE 22P05"))
                 .isInstanceOf(LeadershipLostException.class);
 
-        verify(quarantine, never()).existsById(any());
+        verify(quarantine).existsById(MESSAGE_ID);
         verify(quarantine, never()).save(any());
+    }
+
+    @Test
+    void lostLeaderLock_failsEvenTheRepeatOfAQuarantinedMessage() {
+        given(quarantine.existsById(MESSAGE_ID)).willReturn(true);
+        org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.quarantine(rejected, "SQLSTATE 22P05"))
+                .isInstanceOf(LeadershipLostException.class);
     }
 
     @Test

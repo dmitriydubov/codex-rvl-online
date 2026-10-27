@@ -42,11 +42,11 @@ public class UskRequestRecording<R extends IssuanceRecord, S extends IssuanceSta
 
     @Transactional
     public void submit(UUID id, ExternalIdentifiers identifiers) {
-        fence.holdUntilCommit();
         R record = load(id);
         if (!kind.ready(record)) {
             return;
         }
+        fence.holdUntilCommit();
         Instant now = clock.instant();
         record.submit(now);
         journal.record(compose(record, identifiers, now), now);
@@ -54,11 +54,11 @@ public class UskRequestRecording<R extends IssuanceRecord, S extends IssuanceSta
 
     @Transactional
     public boolean refuse(UUID id, IssueError error) {
-        fence.holdUntilCommit();
         R record = load(id);
         if (!kind.ready(record)) {
             return false;
         }
+        fence.holdUntilCommit();
         RecordErrors.enter(statuses, record, error, clock.instant());
         return true;
     }
