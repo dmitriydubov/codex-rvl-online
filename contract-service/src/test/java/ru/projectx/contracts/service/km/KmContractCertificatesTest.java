@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.km;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -21,6 +22,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ParticipantAttachment;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.repository.PrintedFormRepository;
@@ -106,10 +108,18 @@ class KmContractCertificatesTest {
         assertThat(certificates.check(contract)).isInstanceOfSatisfying(Prerequisites.Broken.class, broken -> {
             assertThat(broken.reason())
                     .isEqualTo("передача договора КМ не подготовлена из-за внутренней ошибки, договор переведён в ERROR");
-            assertThat(broken.failure()).isInstanceOf(IllegalStateException.class);
+            assertThat(broken.failure()).isInstanceOf(CertificateKeyMissingException.class);
         });
 
         verifyNoInteractions(store, metrics);
+    }
+
+    @Test
+    void unexpectedFailureOfTheStorageCheck_isNotTakenForABrokenPrerequisite() {
+        IllegalStateException unexpected = new IllegalStateException("непредвиденный отказ");
+        willThrow(unexpected).given(store).verifyPresent(JPEG.key());
+
+        assertThatThrownBy(() -> certificates.check(contract)).isSameAs(unexpected);
     }
 
     private static PrintedForm certificate(StoredFile file) {

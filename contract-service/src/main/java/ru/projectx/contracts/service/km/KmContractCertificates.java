@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
@@ -32,7 +33,7 @@ public class KmContractCertificates implements SubmissionPrerequisites<Contract>
     public Prerequisites check(Contract contract) {
         try {
             return verified(keys(contract));
-        } catch (IllegalStateException broken) {
+        } catch (CertificateKeyMissingException broken) {
             return new Prerequisites.Broken(KmContractTexts.WORDING.preparationFailed(), broken);
         }
     }

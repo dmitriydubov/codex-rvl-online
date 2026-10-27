@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.repository.PrintedFormRepository;
 
 @Component
@@ -24,6 +25,6 @@ public class InsuredCertificates {
 
     private static SubmittedCertificate certificate(PrintedForm form) {
         return new SubmittedCertificate(form.id(), form.docType(), form.storedFile()
-                .orElseThrow(() -> new IllegalStateException("у записи справки " + form.id() + " нет объекта в хранилище")));
+                .orElseThrow(() -> new CertificateKeyMissingException(form.id())));
     }
 }
