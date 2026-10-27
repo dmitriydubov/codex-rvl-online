@@ -108,6 +108,8 @@ projectx:
       connection-timeout: ${DB_REST_CONNECTION_TIMEOUT_MS:2000}
       socket-timeout-seconds: ${DB_REST_SOCKET_TIMEOUT_SECONDS:5}
       cancel-signal-timeout-seconds: ${DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS:2}
+    leader-lock-pool:
+      maximum-pool-size: ${DB_LEADER_POOL_SIZE:1}
 
   scheduling:
     enabled: true

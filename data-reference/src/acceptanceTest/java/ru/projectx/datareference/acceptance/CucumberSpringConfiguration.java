@@ -19,6 +19,7 @@ import org.springframework.core.env.Environment;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.datareference.config.OneCQueueProperties;
+import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 
 @CucumberContextConfiguration
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -83,11 +84,15 @@ public class CucumberSpringConfiguration {
 
         @Bean
         static BeanPostProcessor switchableDataSource() {
+            DatabaseSwitch availability = new DatabaseSwitch();
             return new BeanPostProcessor() {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String beanName) {
                     if (bean instanceof DataSource pool && DATA_SOURCE_BEAN.equals(beanName)) {
-                        return new SwitchableDataSource(new LateFirstReadDataSource(pool));
+                        return new SwitchableDataSource(new LateFirstReadDataSource(pool), availability);
+                    }
+                    if (bean instanceof DataSource pool && LeaderLockPoolConfig.LEADER_LOCK_POOL.equals(beanName)) {
+                        return new SwitchableDataSource(pool, availability);
                     }
                     return bean;
                 }
