@@ -152,6 +152,18 @@ class StatusTransitionsTest {
     }
 
     @Test
+    void participantLeavingTheErrorNextToAnUndraftedKmContract_defersThePublication() {
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        Contract fresh = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        List<RequestParticipant> composition = List.of(INSURED, SPOUSE_KM, CHILD_LM);
+        IssuanceSnapshot before = snapshot(false, composition, List.of(fresh), List.of(failed));
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, composition, List.of(fresh),
+                List.of(failed, Issuances.policy(LATER_POLICY_ID, Tasks.CHILD))))).isFalse();
+    }
+
+    @Test
     void kmContractThatBecameReadyForAcceptance_isPublished() {
         Contract drafted = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
         drafted.offerDraft();
