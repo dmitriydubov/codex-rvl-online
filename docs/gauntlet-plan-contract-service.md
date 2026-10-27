@@ -1134,6 +1134,13 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   `main` (PR #259–#261, `cfa9d1f`): настройка `projectx.database.leader-lock-pool.maximum-pool-size`, переменная
   `DB_LEADER_POOL_SIZE` (умолчание 1), классы `config/leadership/LeaderLockPool*`; имена и порядок (сверить, слить `main`,
   полный `gauntlet`, push) переданы сессии К10 20:52 UTC.
+  Контрольный `gauntletFast` на `117ef11` (пул, без `main`) — зелёный: unit 1425/0, archTest 7/0, приёмка 342/0, CRAP 1222
+  метода, CPD 0; 15 мин 11 с. **Владелец 2026-10-27:** «1) да» — пул блокировки ведущего называется как в data-reference
+  (`projectx.database.leader-lock-pool.maximum-pool-size`, `DB_LEADER_POOL_SIZE`, умолчание 1) вместо
+  `projectx.leadership.connections` / `LEADER_LOCK_CONNECTIONS` / 2; «2) лимит GitHub Actions, сбросится в следующем
+  месяце» — задание `gauntlet` без раннера не блокирует PR, зелёный подтверждают прогон сессии и контрольный прогон
+  координатора. Передано сессии К10 21:11 UTC: переименование, слияние `main` `0e6c4aa`, полный `gauntlet`, push.
+  Контрольный прогон — на итоговом коммите.
 - 2026-10-27, **владелец: новое правило `docs/troubleshooting.md`** (переслал текст координатора data-reference: в
   `gauntlet/CLAUDE.md`, «README модуля», `<module>/docs/troubleshooting.md` — известные проблемы эксплуатации: признак, как
   проверить, что делать; операции, меняющие данные, — в `operations.md`; README ссылается; файл переносится в контур;
