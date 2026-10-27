@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import org.awaitility.Awaitility;
+import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.service.integration.InboxConsumerPause;
 import ru.projectx.contracts.service.integration.InboxConsumerSubscriptions;
 import ru.projectx.contracts.service.integration.InboxQueueConsumers;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Component
 public class ConsumedQueues {
@@ -17,12 +20,16 @@ public class ConsumedQueues {
     private final InboxQueueConsumers consumers;
     private final RabbitListenerEndpointRegistry containers;
     private final InboxConsumerSubscriptions subscriptions;
+    private final InboxConsumerPause pause;
+    private final BackgroundLeadership leadership;
 
     public ConsumedQueues(InboxQueueConsumers consumers, RabbitListenerEndpointRegistry containers,
-            InboxConsumerSubscriptions subscriptions) {
+            InboxConsumerSubscriptions subscriptions, InboxConsumerPause pause, BackgroundLeadership leadership) {
         this.consumers = consumers;
         this.containers = containers;
         this.subscriptions = subscriptions;
+        this.pause = pause;
+        this.leadership = leadership;
     }
 
     void awaitEveryConsumer() {
@@ -34,11 +41,20 @@ public class ConsumedQueues {
         Awaitility.await().atMost(PATIENCE).until(this::everyRunningContainerSubscribedOrStopped);
     }
 
-    void startStopped() {
-        containers.getListenerContainerIds().stream()
-                .map(containers::getListenerContainer)
-                .filter(container -> !container.isRunning())
-                .forEach(container -> container.start());
+    void restoreConsumerOf(String queue) {
+        if (!leadership.leader() || pause.paused().isPresent()) {
+            return;
+        }
+        MessageListenerContainer container = containers.getListenerContainer(queue);
+        if (container == null) {
+            return;
+        }
+        Awaitility.await().atMost(PATIENCE).ignoreExceptions().untilAsserted(() -> {
+            if (!container.isRunning()) {
+                container.start();
+            }
+            assertThat(subscriptions.subscribed(queue)).as("потребитель очереди %s снова подписан", queue).isTrue();
+        });
     }
 
     private boolean everyRunningContainerSubscribedOrStopped() {
