@@ -55,7 +55,8 @@ class LeaderLockPoolTest {
                     .containsEntry("options",
                             "-c lock_timeout=0 -c statement_timeout=30s -c idle_in_transaction_session_timeout=1min")
                     .containsEntry("socketTimeout", "60")
-                    .containsEntry("logServerErrorDetail", "false");
+                    .containsEntry("logServerErrorDetail", "false")
+                    .containsEntry("ApplicationName", "contract-service-leader-lock");
             assertThat(connections.getMetricsTrackerFactory()).isInstanceOf(MicrometerMetricsTrackerFactory.class);
         }
     }
@@ -73,6 +74,7 @@ class LeaderLockPoolTest {
         assertThat(application.getPoolName()).isEqualTo("application");
         assertThat(application.getDataSourceProperties().getProperty("options")).isEqualTo(APPLICATION_OPTIONS);
         assertThat(application.getMaximumPoolSize()).isEqualTo(10);
+        assertThat(application.getDataSourceProperties()).doesNotContainKey("ApplicationName");
         assertThat(application.getMetricsTrackerFactory()).isNull();
     }
 
@@ -92,7 +94,8 @@ class LeaderLockPoolTest {
             assertThat(((HikariDataSource) pool.dataSource()).getDataSourceProperties()).containsOnly(
                     Map.entry("options", "-c lock_timeout=0"),
                     Map.entry("socketTimeout", "60"),
-                    Map.entry("logServerErrorDetail", "false"));
+                    Map.entry("logServerErrorDetail", "false"),
+                    Map.entry("ApplicationName", "contract-service-leader-lock"));
         }
     }
 

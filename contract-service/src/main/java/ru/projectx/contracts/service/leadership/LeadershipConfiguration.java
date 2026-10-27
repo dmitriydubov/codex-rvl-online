@@ -8,6 +8,7 @@ import org.springframework.integration.jdbc.lock.DefaultLockRepository;
 import org.springframework.integration.jdbc.lock.JdbcLockRegistry;
 import org.springframework.integration.support.leader.LockRegistryLeaderInitiator;
 import org.springframework.jdbc.support.JdbcTransactionManager;
+import ru.projectx.contracts.config.LeaderLockPoolProperties;
 import ru.projectx.contracts.config.LeadershipProperties;
 
 @Configuration(proxyBeanMethods = false)
@@ -28,8 +29,8 @@ public class LeadershipConfiguration {
     }
 
     @Bean
-    LeaderLockConnections leaderLockPool(DataSource dataSource, LeadershipProperties properties, MeterRegistry registry) {
-        return LeaderLockPool.besideApplicationPool(dataSource, properties.connections(), registry);
+    LeaderLockConnections leaderLockPool(DataSource dataSource, LeaderLockPoolProperties settings, MeterRegistry registry) {
+        return LeaderLockPool.besideApplicationPool(dataSource, settings.maximumPoolSize(), registry);
     }
 
     @Bean

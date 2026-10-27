@@ -14,6 +14,8 @@ import org.springframework.boot.jdbc.DataSourceUnwrapper;
 public final class LeaderLockPool implements LeaderLockConnections, AutoCloseable {
 
     static final String POOL_NAME = "leader-lock";
+    static final String APPLICATION_NAME = "contract-service-leader-lock";
+    static final String APPLICATION_NAME_PROPERTY = "ApplicationName";
     static final String SESSION_OPTIONS_PROPERTY = "options";
     static final String LOCK_TIMEOUT_DISABLED = "-c lock_timeout=0";
     private static final Pattern LOCK_TIMEOUT_OPTION = Pattern.compile("-c\\s+lock_timeout=\\S+");
@@ -38,6 +40,7 @@ public final class LeaderLockPool implements LeaderLockConnections, AutoCloseabl
         target.pool.setMinimumIdle(connections);
         target.pool.addDataSourceProperty(SESSION_OPTIONS_PROPERTY,
                 lockTimeoutDisabled(source.getDataSourceProperties().getProperty(SESSION_OPTIONS_PROPERTY, "")));
+        target.pool.addDataSourceProperty(APPLICATION_NAME_PROPERTY, APPLICATION_NAME);
         target.pool.setMetricsTrackerFactory(new MicrometerMetricsTrackerFactory(registry));
         return target;
     }

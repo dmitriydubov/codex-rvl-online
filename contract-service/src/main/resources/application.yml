@@ -134,12 +134,13 @@ projectx:
       lock-timeout: ${DB_LOCK_TIMEOUT:5s}
       statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
       idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+    leader-lock-pool:
+      maximum-pool-size: ${DB_LEADER_POOL_SIZE:1}
 
   leadership:
     group: contract-service
     lock-ttl: ${LEADER_LOCK_TTL:30s}
     heartbeat: 1s
-    connections: ${LEADER_LOCK_CONNECTIONS:2}
 
   inbox:
     processing:

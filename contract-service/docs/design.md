@@ -208,8 +208,8 @@ DOWN; персональных данных нет ни в health, ни в ме�
 ограждённая транзакция держит строку дольше `lock_timeout` плюс время до ближайшего продления; долгая транзакция приёма
 или фенс, взятый до ожидания занятой строки, его выполняют. Вторая дыра той же природы — основной пул не выдал
 соединение за `DB_CONNECTION_TIMEOUT_MS`: `CannotCreateTransactionException` тоже не временный отказ. Поэтому
-`DefaultLockRepository` работает через собственный пул `leader-lock` (`LeaderLockPool`, `LEADER_LOCK_CONNECTIONS`
-соединений) и собственный `JdbcTransactionManager` над ним (`LeadershipConfiguration`): адрес, учётные данные,
+`DefaultLockRepository` работает через собственный пул `leader-lock` (`LeaderLockPool`, `DB_LEADER_POOL_SIZE`
+соединений, сеансы с `application_name` `contract-service-leader-lock`, чтобы продление было видно в `pg_stat_activity`) и собственный `JdbcTransactionManager` над ним (`LeadershipConfiguration`): адрес, учётные данные,
 `statement_timeout`, `idle_in_transaction_session_timeout`, ожидание соединения и параметры драйвера те же, что у
 основного пула — `LeaderLockPool` копирует их как свойства JavaBean (`BeanUtils.copyProperties`: адрес, учётные данные,
 драйвер, схема, стартовый SQL, изоляция, все сроки пула, параметры драйвера), затем правит имя, размер, `options` и метрики;

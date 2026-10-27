@@ -22,7 +22,8 @@
   каждый экземпляр. При плавной остановке ведущего роль переходит за секунду-две, после гибели — через `LEADER_LOCK_TTL`
   (30 с). Транзакции приёма, разбора, записи исходов публикации и подготовки запросов держат строку блокировки ведущего:
   экземпляр, потерявший роль, начатую работу не дописывает. Строку блокировки экземпляр берёт и продлевает через
-  отдельный пул `leader-lock` (`LEADER_LOCK_CONNECTIONS` соединений, без `lock_timeout`): продление не упирается в
+  отдельный пул `leader-lock` (`DB_LEADER_POOL_SIZE` соединений, без `lock_timeout`, сеансы под `application_name`
+  `contract-service-leader-lock`): продление не упирается в
   таймаут блокировки и занятость основного пула, пока транзакция ведущего держит строку. Роль видна деталью `role`
   компонента здоровья `inbox` и метрикой `contracts_leader`; сводки ожидания ответа 1С:УСК отдаёт только ведущий.
 - Компонент здоровья `inbox` у ведущего отвечает UP, только когда у каждой очереди обоих брокеров есть потребитель,
@@ -312,11 +313,11 @@
 - **Зависимости:** новая `org.springframework.integration:spring-integration-jdbc` (версия из BOM Spring Boot, 7.0.5;
   приносит `spring-integration-core`).
 - **Переменные:** удалена `INBOX_REQUEUE_DELAY` — убрать из окружения. Новые необязательные `LEADER_LOCK_TTL` (`30s`),
-  `LEADER_LOCK_CONNECTIONS` (`2`), `INBOX_STORAGE_CHECK_INTERVAL` (`10s`), `INBOX_CONSUMER_STOP_TIMEOUT` (`30s`),
+  `DB_LEADER_POOL_SIZE` (`1`), `INBOX_STORAGE_CHECK_INTERVAL` (`10s`), `INBOX_CONSUMER_STOP_TIMEOUT` (`30s`),
   `INBOX_DUPLICATE_DELIVERY_BACKOFF` (`5s`).
 - **Экземпляры:** сервис можно запускать несколькими экземплярами на одной базе; часы подов синхронизируются (срок
-  блокировки ведущего — по часам экземпляра). Каждый экземпляр держит к базе `LEADER_LOCK_CONNECTIONS` соединений сверх
-  основного пула. Оповещения по `contracts_*_awaiting_*` строятся по `max()` по экземплярам.
+  блокировки ведущего — по часам экземпляра). Каждый экземпляр держит к базе `DB_LEADER_POOL_SIZE` соединений сверх основного
+  пула. Оповещения по `contracts_*_awaiting_*` строятся по `max()` по экземплярам.
 - **Файлы:** удалён метод `InboxEnvelopeException.unstorableText` и причина `UNSTORABLE_TEXT`; новые классы —
   `config/LeadershipProperties`, `entity/QuarantinedMessage`, `entity/RejectedMessage`, `repository/LeaderLockRepository`,
   `repository/InboxProbeRepository`, `repository/QuarantineRepository`, `service/FlagGauges`, пакет `service/leadership`,

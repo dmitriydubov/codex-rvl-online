@@ -18,7 +18,7 @@ class LeaderLockSessionIT {
     private DataSource application;
 
     @Test
-    void leaderLockSession_hasNoLockTimeoutButKeepsTheOtherTimeoutsOfTheApplicationSession() {
+    void leaderLockSession_hasNoLockTimeoutAndItsOwnApplicationNameButKeepsTheOtherTimeouts() {
         JdbcClient leaderLockSession = JdbcClient.create(leaderLock.dataSource());
         JdbcClient applicationSession = JdbcClient.create(application);
 
@@ -28,8 +28,8 @@ class LeaderLockSessionIT {
                 .isEqualTo(setting(applicationSession, "statement_timeout"));
         assertThat(setting(leaderLockSession, "idle_in_transaction_session_timeout"))
                 .isEqualTo(setting(applicationSession, "idle_in_transaction_session_timeout"));
-        assertThat(setting(leaderLockSession, "application_name"))
-                .isEqualTo(setting(applicationSession, "application_name"));
+        assertThat(setting(leaderLockSession, "application_name")).isEqualTo("contract-service-leader-lock");
+        assertThat(setting(applicationSession, "application_name")).isNotEqualTo("contract-service-leader-lock");
     }
 
     private static String setting(JdbcClient session, String parameter) {

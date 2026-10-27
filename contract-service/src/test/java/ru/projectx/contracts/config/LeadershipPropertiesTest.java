@@ -14,55 +14,47 @@ class LeadershipPropertiesTest {
     private static final String GROUP = "projectx.leadership.group=contract-service";
     private static final String TTL = "projectx.leadership.lock-ttl=30s";
     private static final String HEARTBEAT = "projectx.leadership.heartbeat=1s";
-    private static final String CONNECTIONS = "projectx.leadership.connections=2";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(Leadership.class);
 
     @Test
-    void completeConfiguration_bindsGroupTtlHeartbeatAndConnections() {
-        runner.withPropertyValues(GROUP, TTL, HEARTBEAT, CONNECTIONS).run(context -> {
+    void completeConfiguration_bindsGroupTtlAndHeartbeat() {
+        runner.withPropertyValues(GROUP, TTL, HEARTBEAT).run(context -> {
             LeadershipProperties properties = context.getBean(LeadershipProperties.class);
             assertThat(properties.group()).isEqualTo("contract-service");
             assertThat(properties.lockTtl()).isEqualTo(Duration.ofSeconds(30));
             assertThat(properties.heartbeat()).isEqualTo(Duration.ofSeconds(1));
-            assertThat(properties.connections()).isEqualTo(2);
         });
     }
 
     @Test
-    void poolWithoutConnections_failsValidation() {
-        runner.withPropertyValues(GROUP, TTL, HEARTBEAT, "projectx.leadership.connections=0")
-                .run(context -> assertThat(context).hasFailed());
-    }
-
-    @Test
     void blankGroup_failsValidation() {
-        runner.withPropertyValues("projectx.leadership.group= ", TTL, HEARTBEAT, CONNECTIONS)
+        runner.withPropertyValues("projectx.leadership.group= ", TTL, HEARTBEAT)
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
     void groupLongerThanTheLockColumn_failsValidation() {
-        runner.withPropertyValues("projectx.leadership.group=" + "g".repeat(101), TTL, HEARTBEAT, CONNECTIONS)
+        runner.withPropertyValues("projectx.leadership.group=" + "g".repeat(101), TTL, HEARTBEAT)
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
     void ttlBelowASecond_failsValidation() {
-        runner.withPropertyValues(GROUP, "projectx.leadership.lock-ttl=999ms", HEARTBEAT, CONNECTIONS)
+        runner.withPropertyValues(GROUP, "projectx.leadership.lock-ttl=999ms", HEARTBEAT)
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
     void heartbeatNotShorterThanTtl_failsValidation() {
-        runner.withPropertyValues(GROUP, TTL, "projectx.leadership.heartbeat=30s", CONNECTIONS)
+        runner.withPropertyValues(GROUP, TTL, "projectx.leadership.heartbeat=30s")
                 .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
     void missingHeartbeat_failsValidation() {
-        runner.withPropertyValues(GROUP, TTL, CONNECTIONS).run(context -> assertThat(context).hasFailed());
+        runner.withPropertyValues(GROUP, TTL).run(context -> assertThat(context).hasFailed());
     }
 
     @ParameterizedTest
@@ -73,15 +65,15 @@ class LeadershipPropertiesTest {
             "PT1S, PT1.001S, false",
             "PT1S, PT30S, false"})
     void ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat(Duration lockTtl, Duration heartbeat, boolean longer) {
-        assertThat(new LeadershipProperties("contract-service", lockTtl, heartbeat, 2).isLockTtlLongerThanHeartbeat())
+        assertThat(new LeadershipProperties("contract-service", lockTtl, heartbeat).isLockTtlLongerThanHeartbeat())
                 .isEqualTo(longer);
     }
 
     @Test
     void ttlCheck_isFalseWhileAValueIsMissing() {
-        assertThat(new LeadershipProperties("contract-service", null, Duration.ofSeconds(1), 2)
+        assertThat(new LeadershipProperties("contract-service", null, Duration.ofSeconds(1))
                 .isLockTtlLongerThanHeartbeat()).isFalse();
-        assertThat(new LeadershipProperties("contract-service", Duration.ofSeconds(30), null, 2)
+        assertThat(new LeadershipProperties("contract-service", Duration.ofSeconds(30), null)
                 .isLockTtlLongerThanHeartbeat()).isFalse();
     }
 
