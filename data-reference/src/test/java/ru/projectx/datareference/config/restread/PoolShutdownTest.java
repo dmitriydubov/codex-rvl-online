@@ -23,12 +23,18 @@ class PoolShutdownTest {
     void instanceStop_closesAllPools_andStopsTheCacheListener() {
         ConfigurableApplicationContext instance = ServiceInstances.startWithoutBroker(
                 environment, environment.getRequiredProperty("spring.datasource.url"), Map.of());
-        HikariDataSource applicationPool = instance.getBean(ApplicationPool.class).pool();
-        HikariDataSource restReadPool = instance.getBean(RestReadPoolConfig.REST_READ_POOL, HikariDataSource.class);
-        HikariDataSource leaderLockPool = instance.getBean(LeaderLockPoolConfig.LEADER_LOCK_POOL, HikariDataSource.class);
-        PostgresChannelMessageTableSubscriber listener = instance.getBean(PostgresChannelMessageTableSubscriber.class);
-
-        instance.close();
+        HikariDataSource applicationPool;
+        HikariDataSource restReadPool;
+        HikariDataSource leaderLockPool;
+        PostgresChannelMessageTableSubscriber listener;
+        try {
+            applicationPool = instance.getBean(ApplicationPool.class).pool();
+            restReadPool = instance.getBean(RestReadPoolConfig.REST_READ_POOL, HikariDataSource.class);
+            leaderLockPool = instance.getBean(LeaderLockPoolConfig.LEADER_LOCK_POOL, HikariDataSource.class);
+            listener = instance.getBean(PostgresChannelMessageTableSubscriber.class);
+        } finally {
+            instance.close();
+        }
 
         assertThat(applicationPool.isClosed()).as("пул приложения закрыт").isTrue();
         assertThat(restReadPool.isClosed()).as("пул REST-чтений закрыт").isTrue();
