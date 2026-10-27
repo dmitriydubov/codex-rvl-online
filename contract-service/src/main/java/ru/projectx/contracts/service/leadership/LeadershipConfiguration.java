@@ -8,7 +8,6 @@ import org.springframework.integration.jdbc.lock.DefaultLockRepository;
 import org.springframework.integration.jdbc.lock.JdbcLockRegistry;
 import org.springframework.integration.support.leader.LockRegistryLeaderInitiator;
 import org.springframework.jdbc.support.JdbcTransactionManager;
-import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
 import ru.projectx.contracts.config.LeadershipProperties;
 
 @Configuration(proxyBeanMethods = false)
@@ -29,9 +28,8 @@ public class LeadershipConfiguration {
     }
 
     @Bean
-    LeaderLockConnections leaderLockPool(DataSource dataSource, DatabaseTimeoutsProperties timeouts,
-            LeadershipProperties properties, MeterRegistry registry) {
-        return LeaderLockPool.besideApplicationPool(dataSource, timeouts, properties.connections(), registry);
+    LeaderLockConnections leaderLockPool(DataSource dataSource, LeadershipProperties properties, MeterRegistry registry) {
+        return LeaderLockPool.besideApplicationPool(dataSource, properties.connections(), registry);
     }
 
     @Bean
