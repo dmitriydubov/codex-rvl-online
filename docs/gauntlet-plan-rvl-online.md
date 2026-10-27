@@ -3555,7 +3555,12 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   `PoolShutdownTest` поднимает отдельный экземпляр (`support.ServiceInstances`, им же пользуется
   `ReferenceCacheAcrossInstancesTest`) и закрывает его штатно, проверяя три пула и остановку слушателя;
   `DatabaseTimeoutsCheckTest` считает только записи своего логгера. Дополнение владельца в той же задаче —
-  `docs/troubleshooting.md` со ссылкой из README.
+  `docs/troubleshooting.md` со ссылкой из README. PR #263 открыт 2026-10-27 (голова `1047d36`; гейты: `gauntletFast` на
+  `8e92077` зелёный — 2052 / 705 / 7, PIT пропущен — `src/main` не менялся, Gherkin 0 мутантов; ручные мутанты T1, T2 и
+  старый путь `destroySingletons` роняют `PoolShutdownTest`; ревьюер — раунд 1 CHANGES REQUESTED, 3 major и 12 minor,
+  исправлено, раунд 2 APPROVED). Ответы владельца «1) да 2) да»: правка `data-reference/CLAUDE.md` и правило
+  `troubleshooting.md` в `gauntlet/CLAUDE.md` («README модуля», `01fde7f`) утверждены; координатору Договоров правило
+  пересылает владелец. В PR — новый вопрос владельцу (п. 3): задача на код по локали базы, пункт бэклога ниже.
 - **Бэклог без номера, ждёт решения владельца — сравнение без учёта регистра зависит от локали базы** (находка ревьюера
   2026-10-27, воспроизведена координатором на `postgres:16.10-alpine`: в базе с `LOCALE 'C'` `lower('РВЛ и СКЛ')`
   возвращает строку как есть, сравнение с `'рвл и скл'` — false; в `en_US.utf8` — true; PostgreSQL 16 collation.html:
