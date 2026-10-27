@@ -1141,6 +1141,12 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   месяце» — задание `gauntlet` без раннера не блокирует PR, зелёный подтверждают прогон сессии и контрольный прогон
   координатора. Передано сессии К10 21:11 UTC: переименование, слияние `main` `0e6c4aa`, полный `gauntlet`, push.
   Контрольный прогон — на итоговом коммите.
+  21:56 UTC: К10 — `9d75716` (переименование, `application_name` `contract-service-leader-lock` у сеансов пула) и
+  `d76ddcb` (слияние `main` `0e6c4aa`). Контрольный `gauntletFast` на `d76ddcb` вместе с `main` `b6b3672` — зелёный:
+  unit 1426/0, archTest 7/0, приёмка 342/0, CRAP 1223 метода, CPD 0; 14 мин 21 с; следы разработки — пусто. До мержа
+  передано сессии (только документы): в CHANGELOG, «Перенос → Файлы», не хватает `config/LeaderLockPoolProperties`,
+  `service/SessionTimeoutsCheck`, `InboxConsumerSubscriptions`, `InboxQueueConsumers`; в описании PR — ответ владельца
+  по пункту 8.
 - 2026-10-27, **владелец: новое правило `docs/troubleshooting.md`** (переслал текст координатора data-reference: в
   `gauntlet/CLAUDE.md`, «README модуля», `<module>/docs/troubleshooting.md` — известные проблемы эксплуатации: признак, как
   проверить, что делать; операции, меняющие данные, — в `operations.md`; README ссылается; файл переносится в контур;
