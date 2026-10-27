@@ -20,6 +20,7 @@ import org.springframework.core.NestedExceptionUtils;
 import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.database.SessionSettingsRepository;
+import ru.projectx.datareference.service.database.DatabaseTimeoutsCheck;
 import ru.projectx.datareference.support.IntegrationTest;
 
 @IntegrationTest
@@ -49,6 +50,9 @@ class DatabaseTimeoutsTest {
     @Autowired
     private DatabaseSessionTimeouts configured;
 
+    @Autowired
+    private DatabaseTimeoutsCheck.Connections timeoutsCheckConnections;
+
     @Test
     void applicationConnection_carriesSessionAndSocketTimeouts() throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
@@ -68,6 +72,12 @@ class DatabaseTimeoutsTest {
             assertThat(setting(connection, "application_name")).isEqualTo("data-reference-leader-lock");
             assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
         }
+    }
+
+    @Test
+    void timeoutsCheck_readsTheLeaderLockPoolItself_notTheApplicationPool() {
+        assertThat(timeoutsCheckConnections.leaderLockPool()).isSameAs(leaderLockPool);
+        assertThat(timeoutsCheckConnections.pool()).isSameAs(dataSource);
     }
 
     @Test

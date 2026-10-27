@@ -230,7 +230,9 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 - Сервис может работать и несколькими репликами, до трёх, с выкаткой `RollingUpdate` (на её время работают до четырёх
   экземпляров двух версий): ведущий один, REST отвечает на всех.
   Ведущего выбирает строка таблицы `leader_lock`. При плавной остановке ведущий отпускает роль, и другой экземпляр берёт
-  её за секунду-две. Если ведущий погиб, роль переходит через `LEADER_LOCK_TTL` (30 с). Сообщение, которое погибший
+  её за секунду-две; если в момент остановки у ведущего шёл проход по расписанию дольше `DB_STATEMENT_TIMEOUT` (30 с),
+  строка остаётся, и роль переходит через `LEADER_LOCK_TTL`, как после гибели. Если ведущий погиб, роль переходит
+  через `LEADER_LOCK_TTL` (30 с). Сообщение, которое погибший
   ведущий не успел подтвердить, брокер возвращает в очередь, а новый ведущий подтверждает его как дубль.
 - Кэш ответов живёт в памяти каждого экземпляра. Ведущий, разобрав сообщение 1С:УСК, оповещает все экземпляры через
   базу (`LISTEN`/`NOTIFY` PostgreSQL), и они за доли секунды сбрасывают кэши этого справочника. Экземпляр, у которого
@@ -280,7 +282,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `onec_inbound_backlog_staleness_seconds` | давность снимка, по которому считаются `onec_inbound_messages` и возраст ожидания | намного больше 30 с: снимок не обновляется, значения выше устарели |
 | `onec_retention_overdue_payloads`, `onec_retention_overdue_quarantine_bodies` | тела с персональными данными и тела карантина старше срока хранения, ещё не стёртые | больше 0 дольше двух проходов стирания (2 ч при `retention-poll-interval` 1 ч) |
 | `policies_retention_overdue_personal_data` | полисы, чьи ФИО, дата рождения и почта должны быть стёрты, но ещё нет | больше 0 дольше двух проходов стирания (2 ч) |
-| `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор), `rest-read` (REST-чтения) и `leader-lock` (блокировка ведущего; `hikaricp_connections_timeout_total{pool="leader-lock"}` растёт только при недоступной базе) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`; `hikaricp_connections_pending{pool="rest-read"} > 0` дольше минуты — REST-чтений больше, чем успевает пул: следующий шаг нагрузки даёт 503 ([load-testing.md](load-testing.md)) |
+| `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор), `rest-read` (REST-чтения) и `leader-lock` (блокировка ведущего; `hikaricp_connections_timeout_total{pool="leader-lock"}` растёт при недоступной базе, а ещё на остановке экземпляра, если его проход по расписанию длился дольше `DB_STATEMENT_TIMEOUT`) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`; `hikaricp_connections_pending{pool="rest-read"} > 0` дольше минуты — REST-чтений больше, чем успевает пул: следующий шаг нагрузки даёт 503 ([load-testing.md](load-testing.md)) |
 | `http_server_requests_seconds_count{status,uri}` | запросы REST по статусу и шаблону пути | доля `status="503"` среди `uri=~"/internal/v1/.*"` выше 5 % за 10 минут |
 | `cache_gets_total`, `cache_puts_total`, `cache_evictions_total`, `cache_size` с меткой `cache` | кэш ответов | — |
 | `reference_cache_notifications_connected` | 1 — экземпляр слушает оповещения о сбросе кэша; 0 — соединения слушателя нет | хотя бы у одного экземпляра 0 дольше минуты — `min(reference_cache_notifications_connected) == 0` или правило по каждому экземпляру, не `sum()`: такой экземпляр не получает сбросов и отдаёт ответы, которые могут отставать до `REFERENCE_CACHE_TTL` |
