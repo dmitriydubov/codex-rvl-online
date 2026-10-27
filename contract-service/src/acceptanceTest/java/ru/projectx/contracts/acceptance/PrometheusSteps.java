@@ -65,6 +65,7 @@ public class PrometheusSteps {
 
     @Тогда("счётчик Prometheus {string} вырос за сценарий на {int}")
     public void counterGrew(String name, int growth) throws IOException, InterruptedException {
+        assertDocumentedWithoutLabels(name);
         double now = valueOf(scrape(), name);
 
         assertThat(now - valueOf(beforeScenario, name)).as("прирост %s за сценарий", name).isEqualTo(growth);
@@ -82,8 +83,17 @@ public class PrometheusSteps {
     private static void assertDocumented(String name, String label) throws IOException {
         Pattern row = Pattern.compile("^\\| `" + Pattern.quote(name) + "\\{(?:[a-z_]+, ?)*" + Pattern.quote(label)
                 + "(?:, ?[a-z_]+)*}` \\|", Pattern.MULTILINE);
+        assertMetricsTableHas(row, "счётчик " + name + " с меткой " + label);
+    }
+
+    private static void assertDocumentedWithoutLabels(String name) throws IOException {
+        assertMetricsTableHas(Pattern.compile("^\\| `" + Pattern.quote(name) + "` \\|", Pattern.MULTILINE),
+                "счётчик " + name + " без меток");
+    }
+
+    private static void assertMetricsTableHas(Pattern row, String counter) throws IOException {
         assertThat(row.matcher(Files.readString(OPERATIONS, StandardCharsets.UTF_8)).find())
-                .as("счётчик %s с меткой %s в таблице метрик %s", name, label, OPERATIONS)
+                .as("%s в таблице метрик %s", counter, OPERATIONS)
                 .isTrue();
     }
 
