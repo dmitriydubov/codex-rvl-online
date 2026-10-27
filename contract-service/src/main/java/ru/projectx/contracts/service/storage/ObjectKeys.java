@@ -9,11 +9,12 @@ public class ObjectKeys {
 
     private static final String SEPARATOR = "/";
     private static final String EXTENSION = ".";
+    private static final String ORGANIZATION_SEPARATOR = "_";
 
     private final String basePath;
 
     public ObjectKeys(StorageProperties settings) {
-        this.basePath = settings.basePath();
+        this.basePath = settings.inn() + ORGANIZATION_SEPARATOR + settings.kpp() + SEPARATOR + settings.basePath();
     }
 
     public String next(UUID attachmentId, String extension) {

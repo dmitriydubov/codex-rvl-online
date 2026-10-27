@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.dao.CannotAcquireLockException;
@@ -37,21 +36,15 @@ class OutboxPublisherTest {
     private static final String SECOND = "0c7d2e4f-6a8b-4c0d-9e1f-2a3b4c5d6e7f";
 
     private final OutboxMessageRepository messages = mock();
-    private final OutboundBodies bodies = mock();
     private final OutboundPublisher broker = mock();
     private final OutboxOutcomes outcomes = mock();
-    private final OutboxPublisher publisher = new OutboxPublisher(messages, bodies, broker, outcomes,
+    private final OutboxPublisher publisher = new OutboxPublisher(messages, broker, outcomes,
             new OutboxProperties(new OutboxProperties.Publishing(Duration.ofSeconds(5), 7), Duration.ofSeconds(10),
                     new OutboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500)),
             Clock.fixed(NOW, ZoneOffset.UTC));
     private final OutboxMessage first = message(FIRST, "{\"n\": 1}");
     private final OutboxMessage second = message(SECOND, "{\"n\": 2}");
-
-    @BeforeEach
-    void bodiesAreCompleteAsStored() {
-        given(bodies.complete(any(), any())).willAnswer(call -> new OutboundBody.Complete(call.getArgument(1)));
-    }
 
     @Test
     void dueMessages_arePublishedInOrderAndEachOutcomeIsRecordedBeforeTheNextSend() {
@@ -116,52 +109,13 @@ class OutboxPublisherTest {
     }
 
     @Test
-    void bodyWithAttachments_isSentAsCompletedAndNotAsStored() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first));
-        given(bodies.complete(first.id(), "{\"n\": 1}")).willReturn(new OutboundBody.Complete("{\"n\": 1, \"c\": \"x\"}"));
-        given(broker.publish(any())).willReturn(new PublishOutcome.Delivered());
-
-        assertThat(publisher.publishDue()).isEqualTo(1);
-
-        verify(broker).publish(new OutboundMessage(UUID.fromString(FIRST), REQUEST, "ContractStatusChanged",
-                "{\"n\": 1, \"c\": \"x\"}"));
-    }
-
-    @Test
-    void withheldBody_isNotSentAndItsOutcomeIsRecorded() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
-        PublishOutcome.Refused refused = new PublishOutcome.Refused("объекта справки нет в хранилище");
-        given(bodies.complete(first.id(), "{\"n\": 1}")).willReturn(new OutboundBody.Withheld(refused));
-        given(broker.publish(any())).willReturn(new PublishOutcome.Delivered());
-
-        assertThat(publisher.publishDue()).isEqualTo(2);
-
-        verify(outcomes).record(first.id(), refused);
-        verify(broker).publish(new OutboundMessage(UUID.fromString(SECOND), REQUEST, "ContractStatusChanged",
-                "{\"n\": 2}"));
-        verify(outcomes).record(second.id(), new PublishOutcome.Delivered());
-    }
-
-    @Test
-    void bodyWithheldByAnUnavailableStorage_endsThePassWithoutAnAttempt() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
-        given(bodies.complete(first.id(), "{\"n\": 1}"))
-                .willReturn(new OutboundBody.Withheld(new PublishOutcome.NotSent("хранилище справок недоступно")));
-
-        assertThat(publisher.publishDue()).isZero();
-
-        verifyNoInteractions(broker, outcomes);
-        verify(bodies, never()).complete(second.id(), "{\"n\": 2}");
-    }
-
-    @Test
     void messageWithoutBody_isRefusedWithoutSending() {
         OutboxMessage erased = message(FIRST, null);
         given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(erased));
 
         assertThat(publisher.publishDue()).isEqualTo(1);
 
-        verifyNoInteractions(broker, bodies);
+        verifyNoInteractions(broker);
         verify(outcomes).record(erased.id(), new PublishOutcome.Refused("тело сообщения стёрто по сроку хранения"));
     }
 

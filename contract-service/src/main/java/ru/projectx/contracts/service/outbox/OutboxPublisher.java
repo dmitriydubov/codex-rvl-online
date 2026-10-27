@@ -20,17 +20,15 @@ public class OutboxPublisher {
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
 
     private final OutboxMessageRepository messages;
-    private final OutboundBodies bodies;
     private final OutboundPublisher publisher;
     private final OutboxOutcomes outcomes;
     private final Limit batch;
     private final Clock clock;
 
-    public OutboxPublisher(OutboxMessageRepository messages, OutboundBodies bodies, OutboundPublisher publisher,
+    public OutboxPublisher(OutboxMessageRepository messages, OutboundPublisher publisher,
             OutboxOutcomes outcomes, OutboxProperties properties, Clock clock) {
         this.batch = Limit.of(properties.publishing().batchSize());
         this.messages = messages;
-        this.bodies = bodies;
         this.publisher = publisher;
         this.outcomes = outcomes;
         this.clock = clock;
@@ -56,10 +54,7 @@ public class OutboxPublisher {
         if (payload.isEmpty()) {
             return new PublishOutcome.Refused(PAYLOAD_ERASED);
         }
-        return switch (bodies.complete(message.id(), payload.get())) {
-            case OutboundBody.Complete complete -> publisher.publish(outbound(message.envelope(), complete.payload()));
-            case OutboundBody.Withheld withheld -> withheld.outcome();
-        };
+        return publisher.publish(outbound(message.envelope(), payload.get()));
     }
 
     private static OutboundMessage outbound(MessageEnvelope envelope, String payload) {

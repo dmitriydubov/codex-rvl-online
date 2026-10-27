@@ -60,7 +60,8 @@ class LmPolicyRequestRecordingTest {
     private final LmPolicyRequestMessages messages = mock();
     private final OutboxJournal journal = mock();
     private final RequestStatusPublication statuses = mock();
-    private final LmPolicyRequestRecording recording = new LmPolicyRequestRecording(policies, persons, messages,
+    private final LmPolicyRequestRecording recording = new LmPolicyRequestRecording(policies,
+            new LmPolicyRequestFacts(persons), messages,
             journal, statuses, Clock.fixed(NOW, ZoneOffset.UTC));
     private final LmPolicy policy = Issuances.policy(POLICY_ID.toString(), Tasks.CHILD);
     private final MessageMeta meta = new MessageMeta(MESSAGE_ID, Tasks.REQUEST, "rvl.lm-policy.requested",
@@ -72,7 +73,7 @@ class LmPolicyRequestRecordingTest {
         given(persons.findByLmPolicyIdOrderByRole(POLICY_ID)).willReturn(List.of(ContractPerson.snapshot(
                 PersonOwner.lmPolicy(POLICY_ID), PersonRole.INSURED, PersonSnapshots.of(Tasks.child("0.00")), NOW)));
         given(messages.meta(policy, NOW)).willReturn(meta);
-        given(messages.write(eq(meta), same(policy), any(), eq(IDENTIFIERS))).willReturn("{\"data\": {}}");
+        given(messages.write(eq(meta), same(policy), any())).willReturn("{\"data\": {}}");
     }
 
     @Test
@@ -82,9 +83,10 @@ class LmPolicyRequestRecordingTest {
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.SUBMITTED);
         InOrder order = inOrder(messages, journal);
         order.verify(messages).meta(policy, NOW);
-        order.verify(messages).write(eq(meta), same(policy), eq(PersonSnapshots.of(Tasks.child("0.00"))), eq(IDENTIFIERS));
+        order.verify(messages).write(eq(meta), same(policy),
+                eq(new LmRequestFacts(PersonSnapshots.of(Tasks.child("0.00")), IDENTIFIERS)));
         ArgumentCaptor<OutboxDraft> draft = ArgumentCaptor.captor();
-        order.verify(journal).record(draft.capture(), eq(List.of()), eq(NOW));
+        order.verify(journal).record(draft.capture(), eq(NOW));
         assertThat(draft.getValue().aggregateType()).isEqualTo("LM_POLICY");
         assertThat(draft.getValue().aggregateId()).isEqualTo(POLICY_ID);
         assertThat(draft.getValue().envelope()).isEqualTo(new MessageEnvelope(MESSAGE_ID, Tasks.REQUEST,
@@ -103,7 +105,8 @@ class LmPolicyRequestRecordingTest {
 
         recording.submit(POLICY_ID, IDENTIFIERS);
 
-        verify(messages).write(eq(meta), same(policy), eq(PersonSnapshots.of(Tasks.child("0.00"))), eq(IDENTIFIERS));
+        verify(messages).write(eq(meta), same(policy),
+                eq(new LmRequestFacts(PersonSnapshots.of(Tasks.child("0.00")), IDENTIFIERS)));
     }
 
     @Test
@@ -203,6 +206,6 @@ class LmPolicyRequestRecordingTest {
 
         assertThatThrownBy(() -> recording.submit(unknown, IDENTIFIERS)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(unknown.toString());
-        verify(journal, never()).record(any(), any(), any());
+        verify(journal, never()).record(any(), any());
     }
 }

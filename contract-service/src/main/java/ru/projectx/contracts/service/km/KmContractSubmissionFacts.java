@@ -13,11 +13,11 @@ import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.repository.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 import ru.projectx.contracts.repository.PrintedFormRepository;
-import ru.projectx.contracts.service.outbox.OutboundAttachment;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
+import ru.projectx.contracts.service.usk.UskRequestFacts;
 
 @Component
-public class KmContractSubmissionFacts {
+public class KmContractSubmissionFacts implements UskRequestFacts<Contract, SubmissionFacts> {
 
     private final ContractPersonRepository persons;
     private final ContractAcceptanceRepository acceptances;
@@ -30,6 +30,7 @@ public class KmContractSubmissionFacts {
         this.forms = forms;
     }
 
+    @Override
     public SubmissionFacts gather(Contract contract, ExternalIdentifiers identifiers) {
         List<ContractPerson> parties = persons.findByContractIdOrderByRole(contract.id());
         return new SubmissionFacts(identifiers, acceptedAt(contract), party(parties, PersonRole.POLICYHOLDER, contract),
@@ -43,7 +44,7 @@ public class KmContractSubmissionFacts {
                 .acceptedAt();
     }
 
-    private List<OutboundAttachment> certificates(Contract contract) {
+    private List<SubmittedCertificate> certificates(Contract contract) {
         UUID requestId = contract.state().request().individualRequestId();
         return forms.findByAttachmentIndividualRequestIdAndAttachmentParticipantIdOrderByCreatedAtAscIdAsc(requestId,
                         contract.participantId()).stream()
@@ -51,8 +52,8 @@ public class KmContractSubmissionFacts {
                 .toList();
     }
 
-    private static OutboundAttachment certificate(PrintedForm form) {
-        return new OutboundAttachment(form.id(), form.docType(), form.storedFile()
+    private static SubmittedCertificate certificate(PrintedForm form) {
+        return new SubmittedCertificate(form.id(), form.docType(), form.storedFile()
                 .orElseThrow(() -> new IllegalStateException("у записи справки " + form.id() + " нет объекта в хранилище")));
     }
 

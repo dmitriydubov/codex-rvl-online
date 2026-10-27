@@ -29,7 +29,6 @@ import ru.projectx.contracts.repository.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 import ru.projectx.contracts.repository.PrintedFormRepository;
 import ru.projectx.contracts.service.PersonSnapshots;
-import ru.projectx.contracts.service.outbox.OutboundAttachment;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -74,8 +73,8 @@ class KmContractSubmissionFactsTest {
         assertThat(gathered.acceptedAt()).isEqualTo(ACCEPTED_AT);
         assertThat(gathered.policyholder()).isEqualTo(PersonSnapshots.of(Tasks.insured("0.00")));
         assertThat(gathered.insured()).isEqualTo(PersonSnapshots.of(Tasks.spouse("34000.00")));
-        assertThat(gathered.certificates()).containsExactly(new OutboundAttachment(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, JPEG),
-                new OutboundAttachment(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, PDF));
+        assertThat(gathered.certificates()).containsExactly(new SubmittedCertificate(FIRST_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, JPEG),
+                new SubmittedCertificate(SECOND_DOCUMENT, PrintedFormType.MEDICAL_CERTIFICATE, PDF));
     }
 
     @Test

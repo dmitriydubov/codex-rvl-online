@@ -17,6 +17,8 @@ public record StorageProperties(
         @NotBlank String region,
         @NotBlank String bucket,
         @NotBlank @Pattern(regexp = "[^/].*[^/]|[^/]") String basePath,
+        @NotBlank @Pattern(regexp = "\\d{10}") String inn,
+        @NotBlank @Pattern(regexp = "\\d{9}") String kpp,
         @NotBlank String accessKey,
         @NotBlank String secretKey,
         @Nullable String sslBundle,

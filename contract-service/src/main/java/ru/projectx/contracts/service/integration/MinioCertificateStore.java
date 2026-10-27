@@ -1,9 +1,8 @@
 package ru.projectx.contracts.service.integration;
 
-import io.minio.GetObjectArgs;
-import io.minio.GetObjectResponse;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
 import java.io.IOException;
@@ -42,14 +41,14 @@ public class MinioCertificateStore implements CertificateStore {
     }
 
     @Override
-    public byte[] read(String key) {
-        GetObjectArgs object = GetObjectArgs.builder().bucket(bucket).object(key).build();
-        try (GetObjectResponse stream = client.getObject(object)) {
-            return stream.readAllBytes();
+    public void verifyPresent(String key) {
+        StatObjectArgs object = StatObjectArgs.builder().bucket(bucket).object(key).build();
+        try {
+            client.statObject(object);
         } catch (ErrorResponseException refused) {
             throw refusal(refused);
         } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
-            log.warn("хранилище справок не отдало объект: {}", failure.getClass().getName());
+            log.warn("хранилище справок не ответило о наличии объекта: {}", failure.getClass().getName());
             throw new StorageUnavailableException(failure);
         }
     }
@@ -59,7 +58,7 @@ public class MinioCertificateStore implements CertificateStore {
         if (NO_SUCH_KEY.equals(code)) {
             return new CertificateMissingException(refused);
         }
-        log.warn("хранилище справок отказало в чтении объекта: код {}", code);
+        log.warn("хранилище справок отказало в проверке объекта: код {}", code);
         return new StorageUnavailableException(refused);
     }
 

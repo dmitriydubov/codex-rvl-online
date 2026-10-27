@@ -4,22 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.entity.MessageAttachment;
-import ru.projectx.contracts.entity.PrintedFormType;
-import ru.projectx.contracts.entity.StoredFile;
-import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
+import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.entity.OutboxStatus;
-import ru.projectx.contracts.repository.MessageAttachmentRepository;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
 
 class OutboxJournalTest {
@@ -31,8 +23,7 @@ class OutboxJournalTest {
             "ContractStatusChanged", 1);
 
     private final OutboxMessageRepository messages = mock();
-    private final MessageAttachmentRepository attachments = mock();
-    private final OutboxJournal journal = new OutboxJournal(messages, attachments);
+    private final OutboxJournal journal = new OutboxJournal(messages);
 
     @Test
     void record_savesAPendingMessageComposedFromTheDraft() {
@@ -44,30 +35,5 @@ class OutboxJournalTest {
         assertThat(recorded.envelope()).isEqualTo(ENVELOPE);
         assertThat(recorded.payload()).contains("{}");
         assertThat(recorded).hasFieldOrPropertyWithValue("createdAt", NOW);
-        verify(attachments).saveAll(List.of());
-    }
-
-    @Test
-    void record_withAttachments_savesAnAttachmentRowPerFilePointingAtTheSavedMessage() {
-        UUID messageId = UUID.fromString("0196c0f1-7a2b-7c3d-8e4f-5a6b7c8d9e0f");
-        UUID document = UUID.fromString("3c2f8e10-5a7b-4d21-9f6e-1b0a7c4d8e21");
-        StoredFile file = new StoredFile("certificates/0b6c/3c2f.jpg", "0".repeat(64), 76L, "image/jpeg");
-        given(messages.save(any())).willAnswer(invocation -> {
-            OutboxMessage saved = invocation.getArgument(0);
-            ReflectionTestUtils.setField(saved, "id", messageId);
-            return saved;
-        });
-
-        journal.record(new OutboxDraft("CONTRACT", REQUEST, ENVELOPE, "{}"),
-                List.of(new OutboundAttachment(document, PrintedFormType.MEDICAL_CERTIFICATE, file)), NOW);
-
-        ArgumentCaptor<List<MessageAttachment>> saved = ArgumentCaptor.captor();
-        verify(attachments).saveAll(saved.capture());
-        assertThat(saved.getValue()).singleElement()
-                .hasFieldOrPropertyWithValue("outboxMessageId", messageId)
-                .hasFieldOrPropertyWithValue("documentId", document)
-                .hasFieldOrPropertyWithValue("fileKey", file.key())
-                .hasFieldOrPropertyWithValue("fileSize", 76L)
-                .hasFieldOrPropertyWithValue("createdAt", NOW);
     }
 }

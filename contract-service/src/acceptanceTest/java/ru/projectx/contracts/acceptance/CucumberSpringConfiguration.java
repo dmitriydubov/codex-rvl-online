@@ -30,11 +30,12 @@ import ru.projectx.contracts.service.integration.OneCBroker;
         "projectx.brokers.onec.listener-auto-startup=true",
         "projectx.storage.bucket=contracts-stand",
         "projectx.storage.base-path=certificates",
+        "projectx.storage.inn=1111111111",
+        "projectx.storage.kpp=222222222",
         "projectx.storage.timeouts.connect=1s",
         "projectx.storage.timeouts.read=2s",
         "projectx.storage.timeouts.write=2s",
-        "projectx.storage.timeouts.call=3s",
-        "projectx.km-contract-submissions.max-message-size=65536"})
+        "projectx.storage.timeouts.call=3s"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 

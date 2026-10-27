@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.minio.BucketExistsArgs;
@@ -20,6 +21,7 @@ import org.springframework.boot.ssl.DefaultSslBundleRegistry;
 import org.testcontainers.containers.MinIOContainer;
 import ru.projectx.contracts.config.StorageProperties;
 import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.support.TestStorage;
 
@@ -62,6 +64,22 @@ class MinioCertificateStoreIT {
     }
 
     @Test
+    void storedObject_isPresent() {
+        StoredFile file = new StoredFile("certificates/7a1d/0c6a9f31.png", "0".repeat(64), CONTENT.length,
+                "image/png");
+        MinioCertificateStore store = new MinioCertificateStore(client, BUCKET);
+        store.store(file, () -> new ByteArrayInputStream(CONTENT));
+
+        assertThatCode(() -> store.verifyPresent(file.key())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void objectThatWasNeverStored_isACertificateMissing() {
+        assertThatThrownBy(() -> new MinioCertificateStore(client, BUCKET).verifyPresent("certificates/none/1.jpg"))
+                .isInstanceOf(CertificateMissingException.class);
+    }
+
+    @Test
     void missingBucket_isStorageUnavailableAndTheBucketIsNotCreated() throws Exception {
         StoredFile file = new StoredFile("certificates/1/2.png", "0".repeat(64), CONTENT.length, "image/png");
 
@@ -75,8 +93,8 @@ class MinioCertificateStoreIT {
     @Test
     void refusedConnection_isStorageUnavailable() {
         StorageProperties nowhere = new StorageProperties("http://127.0.0.1:1", "us-east-1", BUCKET, "certificates",
-                STORAGE.getUserName(), STORAGE.getPassword(), null, new StorageProperties.Timeouts(TIMEOUT, TIMEOUT,
-                TIMEOUT, TIMEOUT));
+                "1111111111", "222222222", STORAGE.getUserName(), STORAGE.getPassword(), null,
+                new StorageProperties.Timeouts(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT));
         MinioClient refused = new StorageClientConfig().storageClient(nowhere, new DefaultSslBundleRegistry());
         StoredFile file = new StoredFile("certificates/1/3.png", "0".repeat(64), CONTENT.length, "image/png");
 
@@ -86,7 +104,8 @@ class MinioCertificateStoreIT {
     }
 
     private static StorageProperties settings(String bucket) {
-        return new StorageProperties(STORAGE.getS3URL(), "us-east-1", bucket, "certificates", STORAGE.getUserName(),
-                STORAGE.getPassword(), null, new StorageProperties.Timeouts(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT));
+        return new StorageProperties(STORAGE.getS3URL(), "us-east-1", bucket, "certificates", "1111111111", "222222222",
+                STORAGE.getUserName(), STORAGE.getPassword(), null,
+                new StorageProperties.Timeouts(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT));
     }
 }

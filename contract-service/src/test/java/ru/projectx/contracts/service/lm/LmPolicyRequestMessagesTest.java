@@ -58,7 +58,7 @@ class LmPolicyRequestMessagesTest {
     void body_carriesTheEnvelopeExternalIdentifiersPolicyDatesAndTheInsuredSnapshotInSnakeCase() {
         MessageMeta meta = messages.meta(policy, NOW);
 
-        JsonNode body = json.readTree(messages.write(meta, policy, CHILD, IDENTIFIERS));
+        JsonNode body = json.readTree(messages.write(meta, policy, new LmRequestFacts(CHILD, IDENTIFIERS)));
 
         JsonNode metaNode = body.path("meta");
         assertThat(metaNode.path("message_id").stringValue()).isEqualTo(meta.messageId().toString());

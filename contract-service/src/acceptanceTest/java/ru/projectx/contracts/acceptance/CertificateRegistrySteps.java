@@ -47,6 +47,10 @@ public class CertificateRegistrySteps {
                 .as("справки участника %s", participant).isEmpty();
     }
 
+    static String keyPattern(String expected) {
+        return Pattern.quote(expected).replace(ANY_UUID, "\\E" + UUID_PATTERN + "\\Q");
+    }
+
     private static void matches(CertificateRecords.Certificate certificate, Map<String, String> row) {
         for (Map.Entry<String, String> cell : row.entrySet()) {
             matches(certificate, cell.getKey(), cell.getValue());
@@ -55,8 +59,7 @@ public class CertificateRegistrySteps {
 
     private static void matches(CertificateRecords.Certificate certificate, String column, String expected) {
         if (KEY_COLUMN.equals(column)) {
-            assertThat(certificate.key()).as("ключ объекта")
-                    .matches(Pattern.quote(expected).replace(ANY_UUID, "\\E" + UUID_PATTERN + "\\Q"));
+            assertThat(certificate.key()).as("ключ объекта").matches(keyPattern(expected));
             return;
         }
         if (CREATED_COLUMN.equals(column)) {

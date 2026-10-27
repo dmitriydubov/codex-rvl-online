@@ -14,13 +14,13 @@ import ru.projectx.contracts.message.LmPolicyRequest;
 import ru.projectx.contracts.message.LmPolicyRequested;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.StatusEvents;
-import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.usk.ParticipantDocuments;
 import ru.projectx.contracts.service.usk.RequestTerms;
+import ru.projectx.contracts.service.usk.UskRequestMessages;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
-public class LmPolicyRequestMessages {
+public class LmPolicyRequestMessages implements UskRequestMessages<LmPolicy, LmRequestFacts> {
 
     private final JsonMapper json;
     private final Clock clock;
@@ -30,16 +30,18 @@ public class LmPolicyRequestMessages {
         this.clock = clock;
     }
 
+    @Override
     public MessageMeta meta(LmPolicy policy, Instant now) {
         return new MessageMeta(UUID.randomUUID(), policy.state().request().individualRequestId(),
                 LmPolicyEvents.LM_POLICY_REQUEST_TOPIC, LmPolicyEvents.LM_POLICY_REQUESTED, StatusEvents.SCHEMA_VERSION,
                 OffsetDateTime.ofInstant(now, clock.getZone()), policy.state().entityVersion(), StatusEvents.SOURCE);
     }
 
-    public String write(MessageMeta meta, LmPolicy policy, PersonSnapshot insured, ExternalIdentifiers identifiers) {
+    @Override
+    public String write(MessageMeta meta, LmPolicy policy, LmRequestFacts facts) {
         IssuanceState state = policy.state();
-        LmPolicyRequest data = new LmPolicyRequest(policy.id(), RequestTerms.of(state, identifiers),
-                state.policyholderParticipantId(), insured(insured));
+        LmPolicyRequest data = new LmPolicyRequest(policy.id(), RequestTerms.of(state, facts.identifiers()),
+                state.policyholderParticipantId(), insured(facts.insured()));
         return json.writeValueAsString(new LmPolicyRequested(meta, data));
     }
 

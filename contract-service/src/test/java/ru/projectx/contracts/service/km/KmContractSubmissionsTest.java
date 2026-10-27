@@ -30,12 +30,11 @@ import java.sql.SQLException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
-import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.IssueError;
-import ru.projectx.contracts.exception.MessageTooLargeException;
+import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.service.RequestIds;
@@ -43,6 +42,7 @@ import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.service.reference.RequestResolution;
+import ru.projectx.contracts.service.usk.Prerequisites;
 import ru.projectx.contracts.service.usk.UskPreparationMetrics;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -62,8 +62,9 @@ class KmContractSubmissionsTest {
     private final KmContractSubmissionRecording recording = mock();
     private final ReferenceMetrics metrics = mock();
     private final UskPreparationMetrics preparationMetrics = mock();
+    private final KmContractCertificates certificates = mock();
     private final KmContractSubmissions submissions = new KmContractSubmissions(contracts, recording, references,
-            metrics, preparationMetrics, new KmContractSubmissionProperties(Duration.ofSeconds(10), 7, DataSize.ofBytes(65536),
+            metrics, preparationMetrics, certificates, new KmContractSubmissionProperties(Duration.ofSeconds(10), 7,
                     Duration.ofMinutes(1), Duration.ofHours(1)));
     private final Contract first = Issuances.paidContract("0f4b8e2a-6c13-4d7e-b9a1-2e5c7d3f8a64", Tasks.SPOUSE,
             "DKM-2026-000001", PAID_AT);
@@ -73,6 +74,7 @@ class KmContractSubmissionsTest {
 
     @BeforeEach
     void twoPaidContractsAreDue() {
+        given(certificates.check(any())).willReturn(new Prerequisites.Met());
         given(contracts.findByStatusOrderByCreatedAtAscIdAsc(ContractStatus.PAID, Limit.of(7)))
                 .willReturn(List.of(first, second));
         journal.start();
@@ -187,22 +189,81 @@ class KmContractSubmissionsTest {
     }
 
     @Test
-    void messageOverTheLimit_refusesTheContractWithTheLimitCodeAndAWarningAndThePassGoesOn() {
+    void certificates_areCheckedAfterTheReferencesAndBeforeTheSubmission() {
         given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
-        willThrow(new MessageTooLargeException(70004, 65536, 2, "KM_CONTRACT_MESSAGE_TOO_LARGE",
-                "сообщение о договоре КМ больше предела 65536 байт, справок — 2")).given(recording).submit(first.id(), IDENTIFIERS);
+
+        submissions.prepareDue();
+
+        InOrder order = inOrder(references, certificates, recording);
+        order.verify(references).resolve(first.state());
+        order.verify(certificates).check(first);
+        order.verify(recording).submit(first.id(), IDENTIFIERS);
+    }
+
+    @Test
+    void unavailableStorage_endsThePassWithAWarningLeavingTheContractPaidForTheNextPass() {
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        given(certificates.check(first)).willReturn(new Prerequisites.Postponed(
+                "хранилище справок недоступно, передача отложена до следующего прохода"));
+
+        assertThat(submissions.prepareDue()).isZero();
+
+        verifyNoInteractions(recording, preparationMetrics);
+        verify(certificates, never()).check(second);
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).isEqualTo("договор КМ " + first.id() + " участника " + Tasks.SPOUSE
+                    + " заявки " + Tasks.REQUEST + ": хранилище справок недоступно, передача отложена до следующего прохода");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void missingCertificateFile_entersErrorWithThePreparationCodeAndItsOwnReasonAndThePassGoesOn() {
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        given(certificates.check(first)).willReturn(new Prerequisites.Broken(
+                "передача договора КМ не подготовлена: файла справки нет в хранилище, договор переведён в ERROR",
+                new CertificateMissingException(new IllegalStateException("NoSuchKey"))));
+        given(recording.refuse(first.id(), PREPARATION_FAILED)).willReturn(true);
 
         assertThat(submissions.prepareDue()).isEqualTo(2);
 
+        verify(recording, never()).submit(first.id(), IDENTIFIERS);
         InOrder order = inOrder(recording);
-        order.verify(recording).submit(first.id(), IDENTIFIERS);
-        order.verify(recording).refuse(first.id(), new IssueError("KM_CONTRACT_MESSAGE_TOO_LARGE",
-                "сообщение о договоре КМ больше предела 65536 байт, справок — 2"));
+        order.verify(recording).refuse(first.id(), PREPARATION_FAILED);
         order.verify(recording).submit(second.id(), IDENTIFIERS);
-        assertThat(journal.list).filteredOn(event -> event.getLevel() == Level.WARN)
-                .extracting(ILoggingEvent::getFormattedMessage)
-                .containsExactly("договор КМ " + first.id() + " участника " + Tasks.SPOUSE + " заявки " + Tasks.REQUEST
-                        + ": сообщение в 70004 байт больше предела 65536 байт, вложений — 2");
+        verify(preparationMetrics).countFailed("KmContractSubmitted");
+        assertThat(journal.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getFormattedMessage()).isEqualTo("договор КМ " + first.id() + " участника " + Tasks.SPOUSE
+                    + " заявки " + Tasks.REQUEST + ": передача договора КМ не подготовлена: файла справки нет в"
+                    + " хранилище, договор переведён в ERROR, тип отказа"
+                    + " ru.projectx.contracts.exception.CertificateMissingException, SQLSTATE нет");
+            assertThat(event.getThrowableProxy()).isNull();
+        });
+    }
+
+    @Test
+    void missingCertificateFile_ofAContractNoLongerPaid_isOnlyWarnedWithoutCounting() {
+        given(references.resolve(any())).willReturn(new RequestResolution.Resolved(IDENTIFIERS));
+        given(certificates.check(first)).willReturn(new Prerequisites.Broken("файла справки нет",
+                new CertificateMissingException(new IllegalStateException("NoSuchKey"))));
+        given(recording.refuse(first.id(), PREPARATION_FAILED)).willReturn(false);
+
+        assertThat(submissions.prepareDue()).isEqualTo(2);
+
+        verifyNoInteractions(preparationMetrics);
+        assertThat(journal.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
+    }
+
+    @Test
+    void refusedOrUnavailableReference_doesNotCheckTheCertificates() {
+        given(references.resolve(first.state())).willReturn(new RequestResolution.Refused(ARCHIVED));
+        given(references.resolve(second.state())).willReturn(new RequestResolution.Unavailable(ReferenceKind.POLICY));
+
+        submissions.prepareDue();
+
+        verifyNoInteractions(certificates);
     }
 
     @Test

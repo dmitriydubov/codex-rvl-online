@@ -15,18 +15,23 @@ import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 
-public abstract class UskRequestRecording<R extends IssuanceRecord, S extends IssuanceStatus> {
+public class UskRequestRecording<R extends IssuanceRecord, S extends IssuanceStatus, F> {
 
     private final IssuanceKind<R, S> kind;
     private final UskRecordRepository<R, S> records;
+    private final UskRequestFacts<R, F> facts;
+    private final UskRequestMessages<R, F> messages;
     private final OutboxJournal journal;
     private final RequestStatusPublication statuses;
     private final Clock clock;
 
-    protected UskRequestRecording(IssuanceKind<R, S> kind, UskRecordRepository<R, S> records, OutboxJournal journal,
+    protected UskRequestRecording(IssuanceKind<R, S> kind, UskRecordRepository<R, S> records,
+            UskRequestFacts<R, F> facts, UskRequestMessages<R, F> messages, OutboxJournal journal,
             RequestStatusPublication statuses, Clock clock) {
         this.kind = kind;
         this.records = records;
+        this.facts = facts;
+        this.messages = messages;
         this.journal = journal;
         this.statuses = statuses;
         this.clock = clock;
@@ -40,8 +45,7 @@ public abstract class UskRequestRecording<R extends IssuanceRecord, S extends Is
         }
         Instant now = clock.instant();
         record.submit(now);
-        UskSubmission submission = compose(record, identifiers, now);
-        journal.record(submission.draft(), submission.attachments(), now);
+        journal.record(compose(record, identifiers, now), now);
     }
 
     @Transactional
@@ -54,9 +58,9 @@ public abstract class UskRequestRecording<R extends IssuanceRecord, S extends Is
         return true;
     }
 
-    protected abstract UskSubmission compose(R record, ExternalIdentifiers identifiers, Instant now);
-
-    protected OutboxDraft draft(R record, MessageMeta meta, String payload) {
+    private OutboxDraft compose(R record, ExternalIdentifiers identifiers, Instant now) {
+        MessageMeta meta = messages.meta(record, now);
+        String payload = messages.write(meta, record, facts.gather(record, identifiers));
         return OutboxDrafts.of(kind.aggregateType(), record.id(), meta, payload);
     }
 

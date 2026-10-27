@@ -24,6 +24,10 @@ public class CertificateRecords {
              where attachment_id = :attachment
             """;
 
+    private static final String REKEY = """
+            update contract_documents set file_key = :key where attachment_id = :attachment
+            """;
+
     private final JdbcClient jdbc;
 
     public CertificateRecords(JdbcClient jdbc) {
@@ -43,6 +47,13 @@ public class CertificateRecords {
         return jdbc.sql(BY_ATTACHMENT).param("attachment", UUID.fromString(attachment)).query(this::certificate)
                 .optional()
                 .orElseThrow(() -> new AssertionError("в реестре документов нет справки по вложению " + attachment));
+    }
+
+    void rekey(String attachment, String key) {
+        int updated = jdbc.sql(REKEY).param("key", key).param("attachment", UUID.fromString(attachment)).update();
+        if (updated != 1) {
+            throw new AssertionError("в реестре документов нет справки по вложению " + attachment);
+        }
     }
 
     private Certificate certificate(ResultSet row, int index) throws SQLException {

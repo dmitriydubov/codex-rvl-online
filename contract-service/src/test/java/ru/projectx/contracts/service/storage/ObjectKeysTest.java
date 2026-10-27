@@ -11,13 +11,13 @@ class ObjectKeysTest {
     private static final Duration TIMEOUT = Duration.ofSeconds(1);
 
     private final ObjectKeys keys = new ObjectKeys(new StorageProperties("http://storage.test:9000", "us-east-1",
-            "contracts", "rvl/certificates", "access", "secret", null,
+            "contracts", "rvl/certificates", "1111111111", "222222222", "access", "secret", null,
             new StorageProperties.Timeouts(TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT)));
 
     @Test
-    void key_isBasePathThenUniqueFolderThenAttachmentWithExtension() {
+    void key_isOrganizationThenBasePathThenUniqueFolderThenAttachmentWithExtension() {
         assertThat(keys.next(Uploads.ATTACHMENT, "jpg")).matches(
-                "rvl/certificates/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
+                "1111111111_222222222/rvl/certificates/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
                         + Uploads.ATTACHMENT + "\\.jpg");
     }
 

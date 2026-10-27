@@ -8,7 +8,6 @@ public final class IssueErrors {
     static final String PROGRAM_REQUIRED = "PROGRAM_REQUIRED";
     static final String LM_POLICY_REQUEST_UNDELIVERED = "LM_POLICY_REQUEST_UNDELIVERED";
     static final String KM_CONTRACT_SUBMISSION_UNDELIVERED = "KM_CONTRACT_SUBMISSION_UNDELIVERED";
-    static final String KM_CONTRACT_MESSAGE_TOO_LARGE = "KM_CONTRACT_MESSAGE_TOO_LARGE";
     static final String KM_CONTRACT_SUBMISSION_PREPARATION_FAILED = "KM_CONTRACT_SUBMISSION_PREPARATION_FAILED";
     static final String LM_POLICY_REQUEST_PREPARATION_FAILED = "LM_POLICY_REQUEST_PREPARATION_FAILED";
     static final String INTERNAL_FAILURE = ": внутренняя ошибка сервиса Договоров";
@@ -49,10 +48,5 @@ public final class IssueErrors {
     public static IssueError lmPolicyRequestPreparationFailed() {
         return new IssueError(LM_POLICY_REQUEST_PREPARATION_FAILED,
                 "запрос на выпуск полиса ЛМ в 1С:УСК не подготовлен" + INTERNAL_FAILURE);
-    }
-
-    public static IssueError kmContractMessageTooLarge(long limit, int certificates) {
-        return new IssueError(KM_CONTRACT_MESSAGE_TOO_LARGE,
-                "сообщение о договоре КМ больше предела " + limit + " байт, справок — " + certificates);
     }
 }

@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
@@ -26,7 +25,7 @@ class KmContractAwaitingTest {
     private final ContractRepository contracts = mock();
     private final KmContractAwaitingMetrics metrics = mock();
     private final KmContractAwaiting awaiting = new KmContractAwaiting(contracts, metrics,
-            new KmContractSubmissionProperties(Duration.ofSeconds(10), 100, DataSize.ofMegabytes(16),
+            new KmContractSubmissionProperties(Duration.ofSeconds(10), 100,
                     Duration.ofMinutes(1), THRESHOLD),
             Clock.fixed(NOW, ZoneOffset.UTC));
 

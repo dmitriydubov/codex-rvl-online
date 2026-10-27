@@ -6,5 +6,5 @@ public interface CertificateStore {
 
     void store(StoredFile file, ContentSource content);
 
-    byte[] read(String key);
+    void verifyPresent(String key);
 }
