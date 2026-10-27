@@ -1077,6 +1077,18 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   удалённых файлов нет. После мержа (координатор, этот PR): ДГ-03 редакции 2 (триггер «выход из ошибки», ответ может
   прийти с ERROR и меньшим числом ошибок), `.docx`; Д-06; `contract-service/CLAUDE.md` — правило публикации ДГ-03; README
   не меняется. Сессии К10 сообщено (10:47 UTC): слить `main` по 4.4.4 п. 1. Сессия К9 архивирована.
+- 2026-10-27, **К10: фича здоровья и пункты 2–4 (владелец переслал, «k10»).** Владелец утвердил в чате К10
+  `inbox_consumer_health.feature` («1) да»: три сценария, деталь `queuesWithoutConsumer` по алфавиту, пауза — блокировкой
+  таблицы 55P03, удаление очереди межсервисного брокера не покрыто); сессия переслала текст, координатор закоммитил его в
+  ветку К10 (`52ad999`, GAUNTLET_GUARD=off). Ответы владельца координатору «1) да 2) да»: (1) три строки
+  `pit-runerror-allowlist.txt` для RUN_ERROR record `LeadershipProperties#isLockTtlLongerThanHeartbeat`
+  (`ConditionalsBoundaryMutator`, `RemoveConditionalMutator_EQUAL_ELSE`, `_ORDER_ELSE`) — координатор сверил тесты на
+  `26578b3`: строки `PT1S, PT1S, false` и `PT30S, PT1S, true` в `ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat`,
+  `heartbeatNotShorterThanTtl_failsValidation`, `completeConfiguration_bindsGroupTtlAndHeartbeat`; строки — PR координатора
+  в `main`; (2) эквивалентный Gherkin-мутант `instances_leader.feature:496` — `message_id` сценария «роль забрали во время
+  паузы» стал литералом шага, столбец убран (`c559ed8` в ветке К10; allowlist для мутантов сценариев в наборе нет).
+  (3) Метрика-флаг «очередь без потребителя» не делается — как у data-reference, оповещение строится на `/actuator/health`;
+  сессия пишет это в `operations.md`.
 - 2026-10-13, **хвост К5 (координатор):** контрольный `gauntletFast -Pgauntlet.scope=all` на `main` `8c3c387` в отдельном
   worktree — **зелёный**: 639 unit-тестов, archTest 7/7, приёмка 128/128 без пропусков, integrity, Checkstyle, PMD, CRAP,
   CPD 0; 4 мин 56 с (первый запуск упал без Docker после перезапуска контейнера — Docker поднят, прогон повторён).
