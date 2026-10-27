@@ -1,12 +1,15 @@
 package ru.projectx.datareference.service.leadership;
 
 import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.jdbc.lock.DefaultLockRepository;
 import org.springframework.integration.jdbc.lock.JdbcLockRegistry;
 import org.springframework.integration.support.leader.LockRegistryLeaderInitiator;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import ru.projectx.datareference.config.LeadershipProperties;
+import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 
 @Configuration(proxyBeanMethods = false)
 public class LeadershipConfiguration {
@@ -26,11 +29,14 @@ public class LeadershipConfiguration {
     }
 
     @Bean
-    DefaultLockRepository leaderLockStore(DataSource dataSource, LeaderLock lock) {
-        DefaultLockRepository store = new DefaultLockRepository(dataSource, lock.instanceId());
+    DefaultLockRepository leaderLockStore(
+            @Qualifier(LeaderLockPoolConfig.LEADER_LOCK_POOL) DataSource leaderLockPool, LeaderLock lock) {
+
+        DefaultLockRepository store = new DefaultLockRepository(leaderLockPool, lock.instanceId());
         store.setPrefix(TABLE_PREFIX);
         store.setRegion(lock.group());
         store.setInsertQuery(store.getInsertQuery() + SKIP_TAKEN_LOCK);
+        store.setTransactionManager(new DataSourceTransactionManager(leaderLockPool));
         return store;
     }
 

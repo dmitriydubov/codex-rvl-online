@@ -10,12 +10,14 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 import ru.projectx.datareference.config.DatabaseSessionTimeouts;
 import ru.projectx.datareference.config.ReferenceApiProperties;
+import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 import ru.projectx.datareference.config.restread.RestReadPoolProperties;
 import ru.projectx.datareference.repository.database.SessionSettingsRepository;
 
@@ -25,6 +27,7 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DatabaseTimeoutsCheck.class);
 
     private static final String POOL = "пул приложения";
+    private static final String LEADER_LOCK_POOL = "пул блокировки ведущего";
     private static final String MIGRATIONS = "миграции";
 
     private final DatabaseSessionTimeouts configured;
@@ -44,15 +47,17 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
 
     @Override
     public void run(@Nullable ApplicationArguments arguments) {
-        read(POOL, connections.pool()).ifPresent(this::checkPool);
+        read(POOL, connections.pool()).ifPresent(actual -> checkConnection(POOL, configured, actual));
+        read(LEADER_LOCK_POOL, connections.leaderLockPool())
+                .ifPresent(actual -> checkConnection(LEADER_LOCK_POOL, configured.withoutLockWait(), actual));
         migrationsSource().flatMap(source -> read(MIGRATIONS, source)).ifPresent(this::checkMigrations);
         warnIfReadLimitNotBelowLockTimeout();
         warnIfRestSocketTimeoutBelowReadLimitAndCancel();
     }
 
-    private void checkPool(Map<String, Duration> actual) {
-        for (Map.Entry<String, String> setting : configured.byParameter().entrySet()) {
-            checkPoolParameter(setting.getKey(), setting.getValue(), actual);
+    private void checkConnection(String connection, DatabaseSessionTimeouts expected, Map<String, Duration> actual) {
+        for (Map.Entry<String, String> setting : expected.byParameter().entrySet()) {
+            checkParameter(connection, setting.getKey(), setting.getValue(), actual);
         }
     }
 
@@ -62,13 +67,15 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
         }
     }
 
-    private void checkPoolParameter(String parameter, String configuredValue, Map<String, Duration> actual) {
+    private static void checkParameter(String connection, String parameter, String configuredValue,
+            Map<String, Duration> actual) {
+
         Optional<Duration> expected = PostgresDurations.parse(configuredValue);
         if (expected.isEmpty()) {
             log.warn("проверка таймаутов PostgreSQL: настройка {} не разобрана, параметр не проверен", parameter);
             return;
         }
-        warnIfDiffers(POOL, parameter, expected.get(), actual);
+        warnIfDiffers(connection, parameter, expected.get(), actual);
     }
 
     private Optional<Map<String, Duration>> read(String connection, DataSource source) {
@@ -122,6 +129,9 @@ public class DatabaseTimeoutsCheck implements ApplicationRunner {
 
     @Component
     public record Connections(
-            SessionSettingsRepository sessionSettings, DataSource pool, ObjectProvider<SpringLiquibase> liquibase) {
+            SessionSettingsRepository sessionSettings,
+            DataSource pool,
+            @Qualifier(LeaderLockPoolConfig.LEADER_LOCK_POOL) DataSource leaderLockPool,
+            ObjectProvider<SpringLiquibase> liquibase) {
     }
 }

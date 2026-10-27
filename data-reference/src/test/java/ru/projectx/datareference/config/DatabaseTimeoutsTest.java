@@ -15,7 +15,9 @@ import javax.sql.DataSource;
 import liquibase.integration.spring.SpringLiquibase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.NestedExceptionUtils;
+import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 import ru.projectx.datareference.repository.database.SessionSettingsRepository;
 import ru.projectx.datareference.support.IntegrationTest;
@@ -30,6 +32,10 @@ class DatabaseTimeoutsTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    @Qualifier(LeaderLockPoolConfig.LEADER_LOCK_POOL)
+    private DataSource leaderLockPool;
 
     @Autowired
     private SpringLiquibase liquibase;
@@ -49,6 +55,17 @@ class DatabaseTimeoutsTest {
             assertThat(setting(connection, "lock_timeout")).isEqualTo("5s");
             assertThat(setting(connection, "statement_timeout")).isEqualTo("30s");
             assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
+            assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
+        }
+    }
+
+    @Test
+    void leaderLockConnection_waitsForLocksWithoutLimit_underItsOwnName() throws SQLException {
+        try (Connection connection = leaderLockPool.getConnection()) {
+            assertThat(setting(connection, "lock_timeout")).isEqualTo(DISABLED);
+            assertThat(setting(connection, "statement_timeout")).isEqualTo("30s");
+            assertThat(setting(connection, "idle_in_transaction_session_timeout")).isEqualTo("1min");
+            assertThat(setting(connection, "application_name")).isEqualTo("data-reference-leader-lock");
             assertThat(connection.getNetworkTimeout()).isEqualTo((int) Duration.ofSeconds(60).toMillis());
         }
     }
