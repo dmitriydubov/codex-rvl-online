@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import liquibase.integration.spring.SpringLiquibase;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,7 +80,7 @@ class DatabaseTimeoutsCheckTest {
 
         assertThat(output).contains("соединение=пул блокировки ведущего, параметр=lock_timeout, ожидается=PT0S, "
                 + "фактически=PT5S");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+        assertThat(ownWarnings(output)).hasSize(1);
     }
 
     @Test
@@ -95,7 +96,7 @@ class DatabaseTimeoutsCheckTest {
                 "соединение=пул блокировки ведущего, параметр=statement_timeout, ожидается=PT30S, фактически=PT0S",
                 "соединение=пул блокировки ведущего, параметр=idle_in_transaction_session_timeout, ожидается=PT1M, "
                         + "фактически=PT0S");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(2);
+        assertThat(ownWarnings(output)).hasSize(2);
     }
 
     @Test
@@ -110,7 +111,7 @@ class DatabaseTimeoutsCheckTest {
 
         assertThat(output).contains("соединение=пул блокировки ведущего не прочитано: DataAccessResourceFailureException")
                 .doesNotContain("Иванов");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+        assertThat(ownWarnings(output)).hasSize(1);
     }
 
     @Test
@@ -121,7 +122,7 @@ class DatabaseTimeoutsCheckTest {
 
         check.run(null);
 
-        assertThat(output).doesNotContain("WARN");
+        assertThat(ownWarnings(output)).isEmpty();
     }
 
     @Test
@@ -132,7 +133,7 @@ class DatabaseTimeoutsCheckTest {
 
         check.run(null);
 
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(3);
+        assertThat(ownWarnings(output)).hasSize(3);
         assertThat(output).contains(
                 "соединение=пул приложения, параметр=lock_timeout, ожидается=PT5S, фактически=PT0S",
                 "параметр=statement_timeout, ожидается=PT30S, фактически=PT0S",
@@ -151,7 +152,7 @@ class DatabaseTimeoutsCheckTest {
         check.run(null);
 
         assertThat(output).contains("соединение=миграции, параметр=statement_timeout, ожидается=PT0S, фактически=PT30S");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+        assertThat(ownWarnings(output)).hasSize(1);
     }
 
     @Test
@@ -176,7 +177,7 @@ class DatabaseTimeoutsCheckTest {
         check.run(null);
 
         assertThat(output).contains("настройка lock_timeout не разобрана, параметр не проверен");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+        assertThat(ownWarnings(output)).hasSize(1);
     }
 
     @Test
@@ -197,7 +198,7 @@ class DatabaseTimeoutsCheckTest {
                 "соединение=пул блокировки ведущего, параметр=lock_timeout, ожидается=PT0S, фактически=PT5S",
                 "соединение=миграции, параметр=statement_timeout, ожидается=PT0S, фактически=PT30S")
                 .doesNotContain("Иванов");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(3);
+        assertThat(ownWarnings(output)).hasSize(3);
     }
 
     @Test
@@ -208,7 +209,7 @@ class DatabaseTimeoutsCheckTest {
         check.run(null);
 
         assertThat(output).contains("соединение миграций не проверено: Liquibase в контексте нет");
-        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+        assertThat(ownWarnings(output)).hasSize(1);
     }
 
     @Test
@@ -257,7 +258,7 @@ class DatabaseTimeoutsCheckTest {
 
         check.run(null);
 
-        assertThat(output).doesNotContain("WARN");
+        assertThat(ownWarnings(output)).isEmpty();
     }
 
     @Test
@@ -285,5 +286,10 @@ class DatabaseTimeoutsCheckTest {
                 new RestReadPoolProperties(5, Duration.ofSeconds(2), restSocketTimeoutSeconds, 2);
         return new DatabaseTimeoutsCheck(timeouts, TestApiProperties.defaults(), restReadPool,
                 new DatabaseTimeoutsCheck.Connections(sessionSettings, pool, leaderLockPool, liquibaseProvider));
+    }
+
+    private static Stream<String> ownWarnings(CapturedOutput output) {
+        return output.getOut().lines()
+                .filter(line -> line.contains("WARN") && line.contains(DatabaseTimeoutsCheck.class.getSimpleName()));
     }
 }

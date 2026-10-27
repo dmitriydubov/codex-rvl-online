@@ -1,7 +1,9 @@
 package ru.projectx.contracts.acceptance;
 
 import io.cucumber.spring.ScenarioScope;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -13,11 +15,29 @@ import org.springframework.stereotype.Component;
 public class PublishedMessages {
 
     private final Map<String, byte[]> byMessageId = new HashMap<>();
+    private final Map<String, List<String>> queuedByAlias = new HashMap<>();
+    private final Map<String, Integer> returnedByAlias = new HashMap<>();
     private byte @Nullable [] defectiveEnvelope;
     private byte @Nullable [] defectiveEnvelopeSource;
 
     void remember(String messageId, byte[] body) {
         byMessageId.putIfAbsent(messageId, body);
+    }
+
+    void rememberQueued(String queueAlias, String messageId) {
+        queuedByAlias.computeIfAbsent(queueAlias, alias -> new ArrayList<>()).add(messageId);
+    }
+
+    void rememberReturned(String queueAlias) {
+        returnedByAlias.merge(queueAlias, 1, Integer::sum);
+    }
+
+    List<String> queuedTo(String queueAlias) {
+        return List.copyOf(queuedByAlias.getOrDefault(queueAlias, List.of()));
+    }
+
+    int returnedTo(String queueAlias) {
+        return returnedByAlias.getOrDefault(queueAlias, 0);
     }
 
     void rememberDefectiveEnvelope(byte[] body) {

@@ -1,0 +1,50 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 012-leader-lock
+      author: contract-service
+      comment: >
+        Блокировка ведущего экземпляра. Приём из очередей обоих брокеров, разбор журнала входящих, публикация
+        исходящих, запросы в 1С:УСК и проходы по расписанию идут только на экземпляре, который держит строку
+        этой таблицы; остальные экземпляры отвечают по REST. Строку ведут DefaultLockRepository и
+        JdbcLockRegistry Spring Integration: ключ блокировки, группа экземпляров (region), идентификатор
+        держащего экземпляра и срок, после которого её может забрать другой. Состав колонок и ключ — как в
+        schema-postgresql.sql из spring-integration-jdbc; имя таблицы задаёт префикс репозитория блокировок.
+      changes:
+        - createTable:
+            tableName: leader_lock
+            columns:
+              - column: { name: lock_key, type: char(36), constraints: { nullable: false } }
+              - column: { name: region, type: varchar(100), constraints: { nullable: false } }
+              - column: { name: client_id, type: char(36) }
+              - column: { name: created_date, type: timestamp, constraints: { nullable: false } }
+              - column: { name: expired_after, type: timestamp, constraints: { nullable: false } }
+        - addPrimaryKey:
+            tableName: leader_lock
+            columnNames: lock_key, region
+            constraintName: leader_lock_pk
+      rollback:
+        - dropTable: { tableName: leader_lock }
+
+  - changeSet:
+      id: 012-inbox-quarantine
+      author: contract-service
+      comment: >
+        Карантин входящих сообщений, тело которых база не примет никогда (нулевой символ, непарный суррогат
+        в JSON). Такое сообщение нельзя ни записать в журнал входящих, ни вернуть брокеру: возвращённое оно
+        выдаётся снова первым и останавливает очередь. Тело хранится байт в байт вместе с очередью-источником,
+        причиной и моментом приёма; повтор того же message_id второй записи не даёт. Тело несёт персональные
+        данные и стирается по сроку хранения тел входящих, запись с причиной остаётся.
+      changes:
+        - createTable:
+            tableName: inbox_quarantine
+            columns:
+              - column: { name: message_id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_inbox_quarantine, nullable: false } }
+              - column: { name: source_queue, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: body, type: bytea }
+              - column: { name: reason, type: text, constraints: { nullable: false } }
+              - column: { name: received_at, type: timestamptz, constraints: { nullable: false } }
+        - sql:
+            sql: CREATE INDEX ix_inbox_quarantine_retention ON inbox_quarantine (received_at) WHERE body IS NOT NULL;
+      rollback:
+        - dropTable: { tableName: inbox_quarantine }

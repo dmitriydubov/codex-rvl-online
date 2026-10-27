@@ -10,6 +10,8 @@ import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.SqlStates;
 import ru.projectx.contracts.service.TemporaryFailures;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
@@ -29,12 +31,13 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
     private final ReferenceMetrics metrics;
     private final UskPreparationMetrics preparationMetrics;
     private final Limit batch;
+    private final BackgroundLeadership leadership;
     private final Logger log;
 
     protected UskRequests(IssuanceKind<R, S> kind, UskRecordRepository<R, S> records,
             UskRequestRecording<R, S, ?> recording, SubmissionPrerequisites<R> prerequisites,
             IssuanceReferences references, ReferenceMetrics metrics, UskPreparationMetrics preparationMetrics,
-            int batchSize, Logger log) {
+            int batchSize, BackgroundLeadership leadership, Logger log) {
         this.kind = kind;
         this.records = records;
         this.recording = recording;
@@ -43,10 +46,15 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
         this.metrics = metrics;
         this.preparationMetrics = preparationMetrics;
         this.batch = Limit.of(batchSize);
+        this.leadership = leadership;
         this.log = log;
     }
 
     public int prepareDue() {
+        return leadership.countAsLeader(this::prepareDueAsLeader);
+    }
+
+    private int prepareDueAsLeader() {
         int prepared = 0;
         for (R record : records.findByStatusOrderByCreatedAtAscIdAsc(kind.readyForUsk(), batch)) {
             if (!prepare(record)) {
@@ -102,6 +110,9 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
     }
 
     private void failPreparation(R record, RuntimeException failure) {
+        if (failure instanceof LeadershipLostException lost) {
+            throw lost;
+        }
         if (TemporaryFailures.temporary(failure)) {
             throw failure;
         }

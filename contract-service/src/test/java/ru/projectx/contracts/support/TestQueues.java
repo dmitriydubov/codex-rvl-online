@@ -31,4 +31,8 @@ public final class TestQueues {
     public long depth(String queue) {
         return broker.execute(channel -> channel.messageCount(queue));
     }
+
+    public long consumers(String queue) {
+        return broker.execute(channel -> channel.consumerCount(queue));
+    }
 }

@@ -16,6 +16,7 @@ import org.awaitility.Awaitility;
 import ru.projectx.contracts.service.inbox.InboxProcessor;
 import ru.projectx.contracts.service.retention.InboxPayloadRetention;
 import ru.projectx.contracts.service.retention.OutboxPayloadRetention;
+import ru.projectx.contracts.service.retention.QuarantinePayloadRetention;
 
 public class InboxSteps {
 
@@ -29,12 +30,13 @@ public class InboxSteps {
     private final InboxProcessor processor;
     private final InboxPayloadRetention erasure;
     private final OutboxPayloadRetention outboxErasure;
+    private final QuarantinePayloadRetention quarantineErasure;
     private final OutboxRecords outbox;
     private final ErasureStates statesBeforeErasure;
 
     public InboxSteps(InboxJournal journal, StandQueues queues, TaskMessages messages, PublishedMessages published,
             InboxProcessor processor, InboxPayloadRetention erasure, OutboxPayloadRetention outboxErasure,
-            OutboxRecords outbox, ErasureStates statesBeforeErasure) {
+            QuarantinePayloadRetention quarantineErasure, OutboxRecords outbox, ErasureStates statesBeforeErasure) {
         this.journal = journal;
         this.queues = queues;
         this.messages = messages;
@@ -42,6 +44,7 @@ public class InboxSteps {
         this.processor = processor;
         this.erasure = erasure;
         this.outboxErasure = outboxErasure;
+        this.quarantineErasure = quarantineErasure;
         this.outbox = outbox;
         this.statesBeforeErasure = statesBeforeErasure;
     }
@@ -170,6 +173,7 @@ public class InboxSteps {
         outbox.all().forEach(entry -> statesBeforeErasure.remember(entry.messageId(), entry.status(), entry.attempts()));
         erasure.eraseExpired();
         outboxErasure.eraseExpired();
+        quarantineErasure.eraseExpired();
     }
 
     @Тогда("статус и число попыток сообщения {string} те же, что до прохода стирания")

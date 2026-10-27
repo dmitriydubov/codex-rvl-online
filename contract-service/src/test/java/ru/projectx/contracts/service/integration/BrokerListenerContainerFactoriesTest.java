@@ -2,7 +2,6 @@ package ru.projectx.contracts.service.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AcknowledgeMode;
@@ -12,12 +11,8 @@ import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
-import ru.projectx.contracts.config.InternalBrokerProperties;
 
 class BrokerListenerContainerFactoriesTest {
-
-    private static final int PORT = 5672;
 
     private final CachingConnectionFactory connectionFactory = new CachingConnectionFactory("broker.example");
 
@@ -28,7 +23,7 @@ class BrokerListenerContainerFactoriesTest {
 
     @Test
     void container_acknowledgesManuallyOneMessageAtATimeAndFailsWithoutQueue() {
-        SimpleMessageListenerContainer container = container(true);
+        SimpleMessageListenerContainer container = container();
 
         assertThat(container.getAcknowledgeMode()).isEqualTo(AcknowledgeMode.MANUAL);
         assertThat(container.getConnectionFactory()).isSameAs(connectionFactory);
@@ -40,7 +35,7 @@ class BrokerListenerContainerFactoriesTest {
 
     @Test
     void factory_setsConsumerCountAndMissingQueuesExplicitly() {
-        SimpleRabbitListenerContainerFactory factory = factory(true);
+        SimpleRabbitListenerContainerFactory factory = factory();
 
         assertThat(factory)
                 .hasFieldOrPropertyWithValue("concurrentConsumers", 1)
@@ -48,34 +43,34 @@ class BrokerListenerContainerFactoriesTest {
     }
 
     @Test
-    void autoStartup_comesFromBrokerSettings() {
-        assertThat(container(true).isAutoStartup()).isTrue();
-        assertThat(container(false).isAutoStartup()).isFalse();
+    void endpointWithoutAutoStartup_givesAContainerThatWaitsForAnExplicitStart() {
+        SimpleRabbitListenerEndpoint endpoint = new SimpleRabbitListenerEndpoint();
+        endpoint.setId("test-endpoint");
+        endpoint.setQueueNames("test-queue");
+        endpoint.setMessageListener(message -> { });
+        endpoint.setAutoStartup(false);
+
+        assertThat(factory().createListenerContainer(endpoint).isAutoStartup()).isFalse();
     }
 
     @Test
     void consumers_runOnVirtualThreadsNamedAfterTheBroker() {
-        Object executor = ReflectionTestUtils.getField(container(true), "taskExecutor");
+        Object executor = ReflectionTestUtils.getField(container(), "taskExecutor");
 
         assertThat(executor).isInstanceOf(VirtualThreadTaskExecutor.class);
         assertThat(((VirtualThreadTaskExecutor) executor).getVirtualThreadFactory().newThread(() -> { }).getName())
                 .startsWith("rabbit-onec-");
     }
 
-    private SimpleRabbitListenerContainerFactory factory(boolean autoStartup) {
-        InternalBrokerProperties broker = new InternalBrokerProperties(
-                new BrokerConnectionProperties("broker.example", PORT, "/", "contract_service", "secret",
-                        Duration.ofSeconds(1), new BrokerConnectionProperties.Tls(false, true, true)),
-                autoStartup,
-                new InternalBrokerProperties.Queues("in", "out"));
-        return BrokerListenerContainerFactories.create("onec", connectionFactory, broker);
+    private SimpleRabbitListenerContainerFactory factory() {
+        return BrokerListenerContainerFactories.create("onec", connectionFactory);
     }
 
-    private SimpleMessageListenerContainer container(boolean autoStartup) {
+    private SimpleMessageListenerContainer container() {
         SimpleRabbitListenerEndpoint endpoint = new SimpleRabbitListenerEndpoint();
         endpoint.setId("test-endpoint");
         endpoint.setQueueNames("test-queue");
         endpoint.setMessageListener(message -> { });
-        return factory(autoStartup).createListenerContainer(endpoint);
+        return factory().createListenerContainer(endpoint);
     }
 }

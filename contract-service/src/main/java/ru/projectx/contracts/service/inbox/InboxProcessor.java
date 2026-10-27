@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.service.leadership.BackgroundLeadership;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 @Service
 public class InboxProcessor {
@@ -16,21 +18,30 @@ public class InboxProcessor {
     private final InboxMessageHandling handling;
     private final InboxOutcomes outcomes;
     private final InboxProperties properties;
+    private final BackgroundLeadership leadership;
     private final Clock clock;
 
     public InboxProcessor(InboxMessageRepository messages, InboxMessageHandling handling, InboxOutcomes outcomes,
-            InboxProperties properties, Clock clock) {
+            InboxProperties properties, BackgroundLeadership leadership, Clock clock) {
         this.messages = messages;
         this.handling = handling;
         this.outcomes = outcomes;
         this.properties = properties;
+        this.leadership = leadership;
         this.clock = clock;
     }
 
     public int processDue() {
-        List<UUID> due = messages.findDue(clock.instant(), Limit.of(properties.processing().batchSize())).stream()
+        return leadership.countAsLeader(() -> process(dueMessageIds()));
+    }
+
+    private List<UUID> dueMessageIds() {
+        return messages.findDue(clock.instant(), Limit.of(properties.processing().batchSize())).stream()
                 .map(InboxMessage::id)
                 .toList();
+    }
+
+    private int process(List<UUID> due) {
         for (UUID id : due) {
             processOne(id);
         }
@@ -42,7 +53,14 @@ public class InboxProcessor {
             handling.process(id);
         }
         catch (RuntimeException failure) {
-            outcomes.recordFailure(id, InboxFailure.of(failure));
+            recordUnlessLeadershipLost(id, failure);
         }
+    }
+
+    private void recordUnlessLeadershipLost(UUID id, RuntimeException failure) {
+        if (failure instanceof LeadershipLostException lost) {
+            throw lost;
+        }
+        outcomes.recordFailure(id, InboxFailure.of(failure));
     }
 }

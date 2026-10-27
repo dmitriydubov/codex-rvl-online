@@ -9,6 +9,7 @@ public class InboxMetrics {
 
     static final String FAILED = "contracts.inbox.failed";
     static final String LOST = "contracts.inbox.lost";
+    static final String QUARANTINED = "contracts.inbox.quarantined";
     static final String EVENT_TYPE = "event_type";
     static final String REASON = "reason";
 
@@ -22,6 +23,13 @@ public class InboxMetrics {
         Counter.builder(FAILED)
                 .description("входящие сообщения сервиса Заявок, отклонённые окончательно")
                 .tag(EVENT_TYPE, eventType)
+                .register(registry)
+                .increment();
+    }
+
+    public void countQuarantined() {
+        Counter.builder(QUARANTINED)
+                .description("входящие сообщения, тело которых база не принимает: записаны в карантин и подтверждены")
                 .register(registry)
                 .increment();
     }

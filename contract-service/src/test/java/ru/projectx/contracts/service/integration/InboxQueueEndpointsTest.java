@@ -35,6 +35,7 @@ class InboxQueueEndpointsTest {
         assertThat(endpoint.getValue().getId()).isEqualTo("task-changes");
         assertThat(endpoint.getValue().getQueueNames()).containsExactly("task-changes");
         assertThat(endpoint.getValue().getMessageListener()).isSameAs(listener);
+        assertThat(endpoint.getValue().getAutoStartup()).as("контейнеры запускает роль ведущего").isFalse();
     }
 
     @Test
@@ -51,6 +52,7 @@ class InboxQueueEndpointsTest {
                 .containsExactly("lm-policy-issues", "km-contract-registrations");
         assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getMessageListener)
                 .containsOnly(listener);
+        assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getAutoStartup).containsOnly(false);
     }
 
     private static InternalBrokerProperties internal() {

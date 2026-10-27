@@ -10,14 +10,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,7 +24,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.integration.jdbc.channel.PostgresChannelMessageTableSubscriber;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.datareference.DataReferenceApplication;
 import ru.projectx.datareference.config.cache.ReconnectingListenerConnections;
 import ru.projectx.datareference.config.cache.ReferenceCacheListenerConfig;
 import ru.projectx.datareference.config.cache.ReferenceCaches;
@@ -35,6 +32,7 @@ import ru.projectx.datareference.service.inbound.OneCMessageApplied;
 import ru.projectx.datareference.support.DatabaseCleaner;
 import ru.projectx.datareference.support.FreezableTcpProxy;
 import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.ServiceInstances;
 
 @IntegrationTest
 class ReferenceCacheAcrossInstancesTest {
@@ -252,20 +250,9 @@ class ReferenceCacheAcrossInstancesTest {
 
     private ConfigurableApplicationContext start(String databaseUrl, Map<String, Object> overrides) {
         Map<String, Object> properties = new HashMap<>();
-        properties.put("spring.datasource.url", databaseUrl);
-        properties.put("spring.datasource.username", environment.getRequiredProperty("spring.datasource.username"));
-        properties.put("spring.datasource.password", environment.getRequiredProperty("spring.datasource.password"));
-        properties.put("spring.autoconfigure.exclude",
-                "org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration");
-        properties.put("spring.main.web-application-type", "none");
-        properties.put("projectx.scheduling.enabled", false);
-        properties.put("projectx.leadership.group", "instances-" + UUID.randomUUID());
         properties.put("projectx.cache.notifications.reconnect-delay", "100ms");
         properties.put("projectx.cache.notifications.reconnect-max-delay", "500ms");
         properties.putAll(overrides);
-        String[] arguments = properties.entrySet().stream()
-                .map(property -> "--" + property.getKey() + "=" + property.getValue())
-                .toArray(String[]::new);
-        return new SpringApplicationBuilder(DataReferenceApplication.class).run(arguments);
+        return ServiceInstances.startWithoutBroker(environment, databaseUrl, properties);
     }
 }

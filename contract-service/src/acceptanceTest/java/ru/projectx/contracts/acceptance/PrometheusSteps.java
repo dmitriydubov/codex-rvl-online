@@ -63,6 +63,12 @@ public class PrometheusSteps {
         assertThat(values).as("значения ряда %s", name).containsExactly((double) expected);
     }
 
+    @Тогда("ряда Prometheus {string} нет")
+    public void noSeries(String name) throws IOException, InterruptedException {
+        Pattern series = Pattern.compile("^" + Pattern.quote(name) + "(?:\\{[^}]*})? \\S+$", Pattern.MULTILINE);
+        assertThat(series.matcher(scrape()).find()).as("ряд %s в выдаче Prometheus", name).isFalse();
+    }
+
     @Тогда("счётчик Prometheus {string} вырос за сценарий на {int}")
     public void counterGrew(String name, int growth) throws IOException, InterruptedException {
         assertDocumentedWithoutLabels(name);

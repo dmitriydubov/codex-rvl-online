@@ -3,40 +3,42 @@ package ru.projectx.datareference.config.restread;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.zaxxer.hikari.HikariDataSource;
-import java.sql.SQLException;
-import javax.sql.DataSource;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.core.env.Environment;
+import org.springframework.integration.jdbc.channel.PostgresChannelMessageTableSubscriber;
 import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 import ru.projectx.datareference.support.IntegrationTest;
+import ru.projectx.datareference.support.ServiceInstances;
 
 @IntegrationTest
-@TestPropertySource(properties = "spring.application.name=data-reference-pool-shutdown")
-@DirtiesContext
 class PoolShutdownTest {
 
     @Autowired
-    private ConfigurableApplicationContext context;
-
-    @Autowired
-    private DataSource dataSource;
-
-    @Autowired
-    @Qualifier(LeaderLockPoolConfig.LEADER_LOCK_POOL)
-    private HikariDataSource leaderLockPool;
+    private Environment environment;
 
     @Test
-    void contextClose_closesAllPools() throws SQLException {
-        RestReadDataSource pools = dataSource.unwrap(RestReadDataSource.class);
+    void instanceStop_closesAllPools_andStopsTheCacheListener() {
+        ConfigurableApplicationContext instance = ServiceInstances.startWithoutBroker(
+                environment, environment.getRequiredProperty("spring.datasource.url"), Map.of());
+        HikariDataSource applicationPool;
+        HikariDataSource restReadPool;
+        HikariDataSource leaderLockPool;
+        PostgresChannelMessageTableSubscriber listener;
+        try {
+            applicationPool = instance.getBean(ApplicationPool.class).pool();
+            restReadPool = instance.getBean(RestReadPoolConfig.REST_READ_POOL, HikariDataSource.class);
+            leaderLockPool = instance.getBean(LeaderLockPoolConfig.LEADER_LOCK_POOL, HikariDataSource.class);
+            listener = instance.getBean(PostgresChannelMessageTableSubscriber.class);
+        } finally {
+            instance.close();
+        }
 
-        context.getBeanFactory().destroySingletons();
-
-        assertThat(pools.applicationPool().isClosed()).as("пул приложения закрыт").isTrue();
-        assertThat(pools.restReadPool().isClosed()).as("пул REST-чтений закрыт").isTrue();
+        assertThat(applicationPool.isClosed()).as("пул приложения закрыт").isTrue();
+        assertThat(restReadPool.isClosed()).as("пул REST-чтений закрыт").isTrue();
         assertThat(leaderLockPool.isClosed()).as("пул блокировки ведущего закрыт").isTrue();
+        assertThat(listener.isRunning()).as("слушатель сброса кэша остановлен").isFalse();
     }
 }
