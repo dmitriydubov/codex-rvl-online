@@ -35,6 +35,27 @@ class KmContractAwaitingMetricsTest {
         assertThat(overdue().getId().getDescription()).isEqualTo("договоры КМ, которые ждут ответа 1С:УСК дольше порога");
     }
 
+    @Test
+    void withdraw_removesBothGaugesUntilTheNextSnapshotPublishesThemAgain() {
+        metrics.show(Duration.ofMinutes(50), 1);
+
+        metrics.withdraw();
+
+        assertThat(registry.find("contracts.km.contracts.awaiting.oldest").gauge()).isNull();
+        assertThat(registry.find("contracts.km.contracts.awaiting.overdue").gauge()).isNull();
+        metrics.show(Duration.ofMinutes(50), 1);
+        assertThat(oldest().value()).isEqualTo(3000);
+        assertThat(overdue().value()).isEqualTo(1);
+    }
+
+    @Test
+    void repeatedWithdraw_changesNothing() {
+        metrics.withdraw();
+        metrics.withdraw();
+
+        assertThat(registry.getMeters()).isEmpty();
+    }
+
     private Gauge oldest() {
         return registry.get("contracts.km.contracts.awaiting.oldest").gauge();
     }

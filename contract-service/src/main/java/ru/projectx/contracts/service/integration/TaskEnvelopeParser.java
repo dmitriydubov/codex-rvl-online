@@ -27,14 +27,12 @@ public class TaskEnvelopeParser {
         this.json = json;
     }
 
-    public InboxReceipt parse(byte[] body) {
+    public TaskEnvelope parse(byte[] body) {
         JsonNode root = root(body);
-        if (UnstorableText.present(root)) {
-            throw InboxEnvelopeException.unstorableText();
-        }
         JsonNode meta = root.path(META);
-        return new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID),
+        InboxReceipt receipt = new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID),
                 bounded(meta, TOPIC, TOPIC_MAX_LENGTH), bounded(meta, EVENT_TYPE, EVENT_TYPE_MAX_LENGTH), version(meta));
+        return UnstorableText.present(root) ? new TaskEnvelope.Unstorable(receipt) : new TaskEnvelope.Storable(receipt);
     }
 
     private JsonNode root(byte[] body) {

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -27,6 +28,8 @@ import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 class InboxMessageHandlingTest {
 
@@ -45,8 +48,9 @@ class InboxMessageHandlingTest {
     private final InboxEventHandler handler = mock();
     private final InboxWork work = mock();
     private final PlatformTransactionManager transactions = mock();
+    private final LeadershipFence fence = mock();
     private final InboxMessageHandling handling = new InboxMessageHandling(messages, handlers,
-            new TransactionTemplate(transactions), Clock.fixed(NOW, ZoneOffset.UTC));
+            new TransactionTemplate(transactions), fence, Clock.fixed(NOW, ZoneOffset.UTC));
     private final InboxMessage message = InboxMessage.receive(RECEIPT, "{\"data\":{}}", NOW.minusSeconds(60));
 
     @BeforeEach
@@ -202,5 +206,30 @@ class InboxMessageHandlingTest {
 
         assertThatThrownBy(() -> handling.process(unknown)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(unknown.toString());
+    }
+
+    @Test
+    void lostLeaderLock_failsTheHandlingBeforeTheMessageIsRead() {
+        org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
+                .given(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> handling.process(message.id()))
+                .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
+
+        verify(handlers, never()).forEventType(anyString());
+        verify(messages, never()).findById(any());
+    }
+
+    @Test
+    void leaderLockLostWhileTheWorkWasPrepared_appliesNothingAndLeavesMessageNew() {
+        given(messages.maxProcessedVersion(REQUEST, TASKS)).willReturn(Optional.empty());
+        willDoNothing().willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> handling.process(message.id())).isInstanceOf(LeadershipLostException.class);
+
+        verify(handler).prepare("{\"data\":{}}");
+        verify(work, never()).apply(any());
+        assertThat(message.status()).isEqualTo(InboxStatus.NEW);
+        verify(transactions).rollback(any());
     }
 }

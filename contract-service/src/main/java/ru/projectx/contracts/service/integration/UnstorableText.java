@@ -5,6 +5,8 @@ import tools.jackson.databind.JsonNode;
 
 final class UnstorableText {
 
+    static final String REASON = "в теле символ, который база не хранит: нулевой или непарный суррогат";
+
     private UnstorableText() {
     }
 

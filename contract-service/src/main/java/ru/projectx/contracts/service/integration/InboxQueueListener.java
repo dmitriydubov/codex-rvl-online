@@ -8,11 +8,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.InboxProperties;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.InboxLogContext;
-import ru.projectx.contracts.service.SqlStates;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.InboxReceiver;
 import ru.projectx.contracts.service.inbox.ReceiptOutcome;
@@ -24,16 +22,14 @@ public class InboxQueueListener implements ChannelAwareMessageListener {
 
     private final TaskEnvelopeParser envelopes;
     private final InboxReceiver receiver;
-    private final InboxProperties properties;
-    private final Pauses pauses;
+    private final InboxStorageFailures failures;
     private final InboxMetrics metrics;
 
-    public InboxQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxProperties properties,
-            Pauses pauses, InboxMetrics metrics) {
+    public InboxQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxStorageFailures failures,
+            InboxMetrics metrics) {
         this.envelopes = envelopes;
         this.receiver = receiver;
-        this.properties = properties;
-        this.pauses = pauses;
+        this.failures = failures;
         this.metrics = metrics;
     }
 
@@ -50,15 +46,23 @@ public class InboxQueueListener implements ChannelAwareMessageListener {
     }
 
     private void receive(TaskDelivery delivery) throws IOException {
-        InboxReceipt receipt;
+        TaskEnvelope envelope;
         try {
-            receipt = envelopes.parse(delivery.body());
+            envelope = envelopes.parse(delivery.body());
         }
         catch (InboxEnvelopeException unusable) {
             lose(delivery, unusable);
             return;
         }
-        InboxLogContext.run(receipt, () -> store(delivery, receipt));
+        InboxLogContext.run(envelope.receipt(), () -> accept(delivery, envelope));
+    }
+
+    private void accept(TaskDelivery delivery, TaskEnvelope envelope) throws IOException {
+        switch (envelope) {
+            case TaskEnvelope.Storable storable -> store(delivery, storable.receipt());
+            case TaskEnvelope.Unstorable unstorable ->
+                    failures.quarantine(delivery, unstorable.receipt(), UnstorableText.REASON);
+        }
     }
 
     private void store(TaskDelivery delivery, InboxReceipt receipt) throws IOException {
@@ -67,21 +71,11 @@ public class InboxQueueListener implements ChannelAwareMessageListener {
             outcome = receiver.receive(receipt, delivery.payload());
         }
         catch (RuntimeException storageFailure) {
-            returnAfterPause(delivery, receipt, storageFailure);
+            failures.handle(delivery, receipt, storageFailure);
             return;
         }
         log.debug("сообщение {} из очереди {}: {}", receipt.messageId(), delivery.queue(), outcome);
         delivery.acknowledge();
-    }
-
-    private void returnAfterPause(TaskDelivery delivery, InboxReceipt receipt, RuntimeException storageFailure)
-            throws IOException {
-        log.warn("сообщение {} не сохранено в журнал входящих, вернётся в очередь через {}: {}, SQLSTATE {}",
-                receipt.messageId(), properties.requeueDelay(), storageFailure.getClass().getName(),
-                SqlStates.deepestOrNone(storageFailure));
-        if (pauses.hold(properties.requeueDelay())) {
-            delivery.returnToQueue();
-        }
     }
 
     private void lose(TaskDelivery delivery, InboxEnvelopeException unusable) throws IOException {

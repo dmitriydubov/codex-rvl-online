@@ -38,6 +38,8 @@ import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
 import ru.projectx.contracts.service.PersonSnapshots;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
@@ -60,9 +62,10 @@ class LmPolicyRequestRecordingTest {
     private final LmPolicyRequestMessages messages = mock();
     private final OutboxJournal journal = mock();
     private final RequestStatusPublication statuses = mock();
+    private final LeadershipFence fence = mock();
     private final LmPolicyRequestRecording recording = new LmPolicyRequestRecording(policies,
             new LmPolicyRequestFacts(persons), messages,
-            journal, statuses, Clock.fixed(NOW, ZoneOffset.UTC));
+            journal, statuses, fence, Clock.fixed(NOW, ZoneOffset.UTC));
     private final LmPolicy policy = Issuances.policy(POLICY_ID.toString(), Tasks.CHILD);
     private final MessageMeta meta = new MessageMeta(MESSAGE_ID, Tasks.REQUEST, "rvl.lm-policy.requested",
             "LmPolicyRequested", "1.0", OffsetDateTime.parse("2026-02-10T10:12:00+03:00"), 2, "RVL-CONTRACTS");
@@ -207,5 +210,18 @@ class LmPolicyRequestRecordingTest {
         assertThatThrownBy(() -> recording.submit(unknown, IDENTIFIERS)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(unknown.toString());
         verify(journal, never()).record(any(), any());
+    }
+
+    @Test
+    void lostLeaderLock_failsTheSubmissionBeforeThePolicyIsLocked() {
+        org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> recording.submit(POLICY_ID, IDENTIFIERS))
+                .isInstanceOf(LeadershipLostException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> recording.refuse(POLICY_ID, ARCHIVED))
+                .isInstanceOf(LeadershipLostException.class);
+
+        org.mockito.Mockito.verify(policies, org.mockito.Mockito.never()).findLockedById(POLICY_ID);
+        org.mockito.Mockito.verifyNoInteractions(journal, statuses);
     }
 }

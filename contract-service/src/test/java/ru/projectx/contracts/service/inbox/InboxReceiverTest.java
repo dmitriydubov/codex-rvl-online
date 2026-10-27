@@ -1,8 +1,11 @@
 package ru.projectx.contracts.service.inbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,6 +20,8 @@ import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 class InboxReceiverTest {
 
@@ -27,7 +32,8 @@ class InboxReceiverTest {
             "rvl.contract-task.upserted", "ContractTaskUpserted", 1);
 
     private final InboxMessageRepository messages = mock();
-    private final InboxReceiver receiver = new InboxReceiver(messages, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final LeadershipFence fence = mock();
+    private final InboxReceiver receiver = new InboxReceiver(messages, fence, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void newMessage_isStoredWithReceiptBodyAndReceiptTime() {
@@ -41,6 +47,25 @@ class InboxReceiverTest {
         assertThat(saved.getValue().payload()).contains("{\"meta\":{}}");
         assertThat(saved.getValue().status()).isEqualTo(InboxStatus.NEW);
         assertThat(saved.getValue()).hasFieldOrPropertyWithValue("receivedAt", NOW);
+    }
+
+    @Test
+    void leaderLockRow_isHeldBeforeTheJournalIsRead() {
+        given(messages.existsByMessageId(RECEIPT.messageId())).willReturn(false);
+
+        receiver.receive(RECEIPT, "{}");
+
+        inOrder(fence, messages).verify(fence).holdUntilCommit();
+        inOrder(fence, messages).verify(messages).existsByMessageId(RECEIPT.messageId());
+    }
+
+    @Test
+    void lostLeaderLock_failsTheReceiptBeforeAnythingIsStored() {
+        willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> receiver.receive(RECEIPT, "{}")).isInstanceOf(LeadershipLostException.class);
+        verify(messages, never()).existsByMessageId(any());
+        verify(messages, never()).save(any());
     }
 
     @Test

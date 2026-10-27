@@ -4,7 +4,6 @@ import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.core.task.VirtualThreadTaskExecutor;
-import ru.projectx.contracts.config.BrokerProperties;
 
 final class BrokerListenerContainerFactories {
 
@@ -14,15 +13,13 @@ final class BrokerListenerContainerFactories {
     private BrokerListenerContainerFactories() {
     }
 
-    static SimpleRabbitListenerContainerFactory create(
-            String brokerName, ConnectionFactory connectionFactory, BrokerProperties broker) {
+    static SimpleRabbitListenerContainerFactory create(String brokerName, ConnectionFactory connectionFactory) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         factory.setConcurrentConsumers(SINGLE_CONSUMER);
         factory.setPrefetchCount(ONE_MESSAGE_IN_FLIGHT);
         factory.setMissingQueuesFatal(true);
-        factory.setAutoStartup(broker.listenerAutoStartup());
         factory.setTaskExecutor(new VirtualThreadTaskExecutor("rabbit-" + brokerName + "-"));
         return factory;
     }

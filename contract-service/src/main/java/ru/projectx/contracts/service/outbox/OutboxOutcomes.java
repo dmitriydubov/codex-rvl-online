@@ -12,6 +12,7 @@ import ru.projectx.contracts.config.OutboxProperties;
 import ru.projectx.contracts.entity.OutboxMessage;
 import ru.projectx.contracts.entity.OutboxStatus;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service
 public class OutboxOutcomes {
@@ -21,18 +22,21 @@ public class OutboxOutcomes {
     private final OutboxMessageRepository messages;
     private final OutboxProperties.Retry retry;
     private final OutboxRejection rejection;
+    private final LeadershipFence fence;
     private final Clock clock;
 
     public OutboxOutcomes(OutboxMessageRepository messages, OutboxProperties properties, OutboxRejection rejection,
-            Clock clock) {
+            LeadershipFence fence, Clock clock) {
         this.retry = properties.retry();
         this.messages = messages;
         this.rejection = rejection;
+        this.fence = fence;
         this.clock = clock;
     }
 
     @Transactional
     public void record(UUID id, PublishOutcome.Attempted outcome) {
+        fence.holdUntilCommit();
         OutboxMessage message = messages.findById(id)
                 .orElseThrow(() -> new IllegalStateException("в журнале исходящих нет записи " + id));
         if (message.status() != OutboxStatus.NEW) {

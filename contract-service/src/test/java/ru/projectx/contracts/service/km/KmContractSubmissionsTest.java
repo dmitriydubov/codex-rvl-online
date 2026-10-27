@@ -45,6 +45,7 @@ import ru.projectx.contracts.service.reference.RequestResolution;
 import ru.projectx.contracts.service.usk.Prerequisites;
 import ru.projectx.contracts.service.usk.UskPreparationMetrics;
 import ru.projectx.contracts.support.Issuances;
+import ru.projectx.contracts.support.TestLeadership;
 import ru.projectx.contracts.support.Tasks;
 
 class KmContractSubmissionsTest {
@@ -65,7 +66,7 @@ class KmContractSubmissionsTest {
     private final KmContractCertificates certificates = mock();
     private final KmContractSubmissions submissions = new KmContractSubmissions(contracts, recording, references,
             metrics, preparationMetrics, certificates, new KmContractSubmissionProperties(Duration.ofSeconds(10), 7,
-                    Duration.ofMinutes(1), Duration.ofHours(1)));
+                    Duration.ofMinutes(1), Duration.ofHours(1)), TestLeadership.leader());
     private final Contract first = Issuances.paidContract("0f4b8e2a-6c13-4d7e-b9a1-2e5c7d3f8a64", Tasks.SPOUSE,
             "DKM-2026-000001", PAID_AT);
     private final Contract second = Issuances.paidContract("9f3e1c28-6b55-4da1-83f4-82a1d7b56e4a", Tasks.CHILD,

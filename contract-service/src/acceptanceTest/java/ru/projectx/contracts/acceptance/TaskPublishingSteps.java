@@ -74,6 +74,7 @@ public class TaskPublishingSteps {
         }
         byte[] bytes = defectiveBytes(defect, new String(messages.bytes(body), StandardCharsets.UTF_8));
         published.rememberDefectiveEnvelope(bytes);
+        published.rememberQueued(queueName, "b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11");
         published.rememberDefectiveEnvelopeSource(messages.bytes(messages.upserted(
                 "b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11", "61a7982c-a0b4-4bbf-9527-60b40b752803", 1,
                 DEFAULT_PARTICIPANTS)));
@@ -101,6 +102,7 @@ public class TaskPublishingSteps {
     private void publish(String messageId, ObjectNode body) {
         byte[] bytes = messages.bytes(body);
         published.remember(messageId, bytes);
+        published.rememberQueued(queue.alias(), messageId);
         queue.publish(bytes);
     }
 

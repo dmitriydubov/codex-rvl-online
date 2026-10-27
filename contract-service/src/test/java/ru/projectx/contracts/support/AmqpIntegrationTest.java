@@ -21,7 +21,8 @@ import org.springframework.context.annotation.Import;
         "projectx.storage.endpoint=http://storage.test:9000",
         "projectx.storage.bucket=contracts-test",
         "projectx.storage.access-key=no-storage",
-        "projectx.storage.secret-key=no-storage"})
-@Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class})
+        "projectx.storage.secret-key=no-storage",
+        "projectx.leadership.group=${random.uuid}"})
+@Import({PostgresTestcontainer.class, RabbitTestcontainer.class, FixedClockConfig.class, LeadershipAwaitConfig.class})
 public @interface AmqpIntegrationTest {
 }

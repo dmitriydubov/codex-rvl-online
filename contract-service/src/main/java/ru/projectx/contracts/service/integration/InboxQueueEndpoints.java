@@ -39,6 +39,7 @@ public class InboxQueueEndpoints implements RabbitListenerConfigurer {
         endpoint.setId(queue);
         endpoint.setQueueNames(queue);
         endpoint.setMessageListener(listener);
+        endpoint.setAutoStartup(false);
         return endpoint;
     }
 }

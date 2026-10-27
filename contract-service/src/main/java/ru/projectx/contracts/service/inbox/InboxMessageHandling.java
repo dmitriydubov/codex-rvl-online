@@ -11,6 +11,7 @@ import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service
 public class InboxMessageHandling {
@@ -20,13 +21,15 @@ public class InboxMessageHandling {
     private final InboxMessageRepository messages;
     private final InboxEventHandlers handlers;
     private final TransactionTemplate transaction;
+    private final LeadershipFence fence;
     private final Clock clock;
 
     public InboxMessageHandling(InboxMessageRepository messages, InboxEventHandlers handlers,
-            TransactionTemplate transaction, Clock clock) {
+            TransactionTemplate transaction, LeadershipFence fence, Clock clock) {
         this.messages = messages;
         this.handlers = handlers;
         this.transaction = transaction;
+        this.fence = fence;
         this.clock = clock;
     }
 
@@ -46,6 +49,7 @@ public class InboxMessageHandling {
     }
 
     private Optional<PendingMessage> begin(UUID id) {
+        fence.holdUntilCommit();
         InboxMessage message = load(id);
         if (message.status() != InboxStatus.NEW) {
             return Optional.empty();
@@ -70,6 +74,7 @@ public class InboxMessageHandling {
     }
 
     private void complete(UUID id, InboxWork work) {
+        fence.holdUntilCommit();
         InboxMessage message = load(id);
         if (message.status() != InboxStatus.NEW) {
             return;

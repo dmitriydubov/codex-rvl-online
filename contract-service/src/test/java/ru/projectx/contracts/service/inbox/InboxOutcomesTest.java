@@ -22,6 +22,7 @@ import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 class InboxOutcomesTest {
 
@@ -34,7 +35,8 @@ class InboxOutcomesTest {
 
     private final InboxMessageRepository messages = mock();
     private final InboxMetrics metrics = mock();
-    private final InboxOutcomes outcomes = new InboxOutcomes(messages, properties(), metrics,
+    private final LeadershipFence fence = mock();
+    private final InboxOutcomes outcomes = new InboxOutcomes(messages, properties(), metrics, fence,
             Clock.fixed(NOW, ZoneOffset.UTC));
     private final InboxMessage message = InboxMessage.receive(RECEIPT, "{}", NOW);
 
@@ -112,6 +114,19 @@ class InboxOutcomesTest {
     private static InboxProperties properties() {
         return new InboxProperties(new InboxProperties.Processing(Duration.ofSeconds(10), 100),
                 new InboxProperties.Retry(List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15))),
-                new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500), Duration.ofSeconds(5));
+                new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
+                new InboxProperties.Pause(Duration.ofSeconds(10), Duration.ofSeconds(30)), Duration.ofSeconds(5));
+    }
+
+    @Test
+    void lostLeaderLock_failsTheRecordingBeforeTheMessageIsRead() {
+        org.mockito.BDDMockito.willThrow(new ru.projectx.contracts.service.leadership.LeadershipLostException("0b5f3c1e"))
+                .given(fence).holdUntilCommit();
+
+        assertThatThrownBy(() -> outcomes.recordFailure(message.id(), new InboxFailure.Permanent("отказ", "нет")))
+                .isInstanceOf(ru.projectx.contracts.service.leadership.LeadershipLostException.class);
+
+        verify(messages, never()).findById(message.id());
+        assertThat(message.status()).isEqualTo(InboxStatus.NEW);
     }
 }

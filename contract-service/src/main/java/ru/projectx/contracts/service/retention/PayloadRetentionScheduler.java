@@ -12,16 +12,20 @@ public class PayloadRetentionScheduler {
     private static final Logger log = LoggerFactory.getLogger(PayloadRetentionScheduler.class);
 
     private final InboxPayloadRetention inbox;
+    private final QuarantinePayloadRetention quarantine;
     private final OutboxPayloadRetention outbox;
 
-    public PayloadRetentionScheduler(InboxPayloadRetention inbox, OutboxPayloadRetention outbox) {
+    public PayloadRetentionScheduler(InboxPayloadRetention inbox, QuarantinePayloadRetention quarantine,
+            OutboxPayloadRetention outbox) {
         this.inbox = inbox;
+        this.quarantine = quarantine;
         this.outbox = outbox;
     }
 
     @Scheduled(fixedDelayString = "${projectx.inbox.retention.interval}")
     public void eraseInboxPayloads() {
         ScheduledPasses.run(log, "стирания тел входящих сообщений", inbox::eraseExpired);
+        ScheduledPasses.run(log, "стирания тел карантина", quarantine::eraseExpired);
     }
 
     @Scheduled(fixedDelayString = "${projectx.outbox.retention.interval}")

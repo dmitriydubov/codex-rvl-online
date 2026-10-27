@@ -2,7 +2,9 @@ package ru.projectx.contracts.acceptance;
 
 import io.cucumber.spring.CucumberContextConfiguration;
 import java.io.IOException;
+import javax.sql.DataSource;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -23,7 +25,6 @@ import ru.projectx.contracts.service.integration.OneCBroker;
         "management.server.port=0",
         "management.health.brokers.enabled=false",
         "projectx.scheduling.enabled=false",
-        "projectx.inbox.requeue-delay=1s",
         "projectx.brokers.internal.connection.tls.enabled=false",
         "projectx.brokers.onec.connection.tls.enabled=false",
         "projectx.brokers.internal.listener-auto-startup=true",
@@ -48,6 +49,7 @@ public class CucumberSpringConfiguration {
         private static final String LM_POLICY_RESULTS = "результаты выпуска полисов ЛМ";
         private static final String KM_CONTRACT_SUBMISSIONS = "передачи договоров КМ";
         private static final String KM_CONTRACT_REGISTRATIONS = "результаты регистрации договоров КМ";
+        private static final String DATA_SOURCE_BEAN = "dataSource";
 
         @Bean
         @ServiceConnection
@@ -140,6 +142,19 @@ public class CucumberSpringConfiguration {
         @Bean
         OneCQueue kmContractRegistrationQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
             return new OneCQueue(connections, KM_CONTRACT_REGISTRATIONS, broker.queues().kmContractRegistrations());
+        }
+
+        @Bean
+        static BeanPostProcessor switchableDataSource() {
+            return new BeanPostProcessor() {
+                @Override
+                public Object postProcessAfterInitialization(Object bean, String beanName) {
+                    if (bean instanceof DataSource pool && DATA_SOURCE_BEAN.equals(beanName)) {
+                        return new SwitchableDataSource(pool);
+                    }
+                    return bean;
+                }
+            };
         }
     }
 }
