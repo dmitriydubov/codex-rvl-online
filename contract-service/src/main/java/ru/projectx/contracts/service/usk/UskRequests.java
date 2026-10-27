@@ -11,6 +11,7 @@ import ru.projectx.contracts.exception.SubmissionRefusedException;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.SqlStates;
+import ru.projectx.contracts.service.TemporaryFailures;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
@@ -89,7 +90,7 @@ public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
     }
 
     private void failPreparation(R record, RuntimeException failure) {
-        if (UskPreparationFailures.temporary(failure)) {
+        if (TemporaryFailures.temporary(failure)) {
             throw failure;
         }
         if (refuseAsNotPrepared(record, failure)) {
