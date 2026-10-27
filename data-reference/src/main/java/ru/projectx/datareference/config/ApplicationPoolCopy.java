@@ -16,6 +16,7 @@ public final class ApplicationPoolCopy {
     public static HikariDataSource named(String poolName, HikariDataSource application, Environment environment) {
         HikariDataSource copy = new HikariDataSource();
         Binder.get(environment).bind(APPLICATION_POOL_PROPERTIES, Bindable.ofInstance(copy));
+        SessionStartupOptions.copy(application, copy);
         copy.setJdbcUrl(application.getJdbcUrl());
         copy.setUsername(application.getUsername());
         copy.setPassword(application.getPassword());

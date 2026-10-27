@@ -105,6 +105,9 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 
 Обязательны только пароли. Остальные умолчания ведут на локальный контур из `docker-compose.yml` или заданы под рабочий
 режим. Таймауты PostgreSQL пишутся с единицей (`ms`, `s`, `min`): число без неё PostgreSQL читает как миллисекунды.
+Таймауты сеанса задаются только переменными `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT` и `DB_IDLE_IN_TRANSACTION_TIMEOUT`:
+стартовый параметр драйвера `options` собирает сервис, и свойство `spring.datasource.hikari.data-source-properties.options`,
+заданное в окружении, перезаписывается.
 
 **База**
 

@@ -98,7 +98,6 @@ class LeaderLockPoolsTest {
                 .withProperty("spring.datasource.hikari.maximum-pool-size", "10")
                 .withProperty("spring.datasource.hikari.connection-timeout", "2000")
                 .withProperty("spring.datasource.hikari.validation-timeout", "1000")
-                .withProperty("spring.datasource.hikari.data-source-properties.options", "-c lock_timeout=5s")
                 .withProperty("spring.datasource.hikari.data-source-properties.logServerErrorDetail", "false")
                 .withProperty("spring.datasource.hikari.data-source-properties.socketTimeout", "60");
     }

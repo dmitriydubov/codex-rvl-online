@@ -58,6 +58,16 @@ class RestReadPoolsTest {
     }
 
     @Test
+    void restReadPool_takesStartupOptionsOfApplicationPool_notOfEnvironment() {
+        MockEnvironment environment = applicationPoolProperties()
+                .withProperty("spring.datasource.hikari.data-source-properties.options", "-c lock_timeout=9s");
+
+        HikariDataSource restRead = RestReadPools.restReadPool(application(), environment, SETTINGS);
+
+        assertThat(restRead.getDataSourceProperties()).containsEntry("options", "-c lock_timeout=5s");
+    }
+
+    @Test
     void restReadPool_takesOtherSettingsOfApplicationPool() {
         HikariDataSource restRead = RestReadPools.restReadPool(application(), applicationPoolProperties(), SETTINGS);
 
@@ -80,6 +90,7 @@ class RestReadPoolsTest {
         application.setUsername("data_reference");
         application.setPassword("secret");
         application.setDriverClassName("org.postgresql.Driver");
+        application.addDataSourceProperty("options", "-c lock_timeout=5s");
         application.addDataSourceProperty("socketTimeout", "60");
         return application;
     }
@@ -92,7 +103,6 @@ class RestReadPoolsTest {
                 .withProperty("spring.datasource.hikari.validation-timeout", "1000")
                 .withProperty("spring.datasource.hikari.leak-detection-threshold", "30000")
                 .withProperty("spring.datasource.hikari.schema", "public")
-                .withProperty("spring.datasource.hikari.data-source-properties.options", "-c lock_timeout=5s")
                 .withProperty("spring.datasource.hikari.data-source-properties.logServerErrorDetail", "false")
                 .withProperty("spring.datasource.hikari.data-source-properties.socketTimeout", "60");
     }
