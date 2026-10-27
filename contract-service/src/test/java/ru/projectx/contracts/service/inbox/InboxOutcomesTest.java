@@ -130,4 +130,14 @@ class InboxOutcomesTest {
         assertThat(message.status()).isEqualTo(InboxStatus.NEW);
         assertThat(message.attempts()).isZero();
     }
+
+    @Test
+    void outcomeAlreadyRecorded_isLeftWithoutTheLeaderLockRowBeingHeld() {
+        message.markProcessed(NOW.minusSeconds(1));
+
+        outcomes.recordFailure(message.id(), LOCKED);
+
+        org.mockito.Mockito.verifyNoInteractions(fence);
+        assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
+    }
 }

@@ -40,7 +40,6 @@ public class InboxOutcomes {
     public void recordFailure(UUID id, InboxFailure failure) {
         InboxMessage message = messages.findById(id)
                 .orElseThrow(() -> new IllegalStateException("в журнале входящих нет записи " + id));
-        fence.holdUntilCommit();
         InboxLogContext.run(message.receipt(), () -> record(message, failure));
     }
 
@@ -50,6 +49,7 @@ public class InboxOutcomes {
                     message.receipt().messageId(), message.status());
             return;
         }
+        fence.holdUntilCommit();
         int attempt = message.attempts() + 1;
         Optional<Duration> delay = retryDelay(failure, attempt);
         if (delay.isPresent()) {

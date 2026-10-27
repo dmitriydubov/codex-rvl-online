@@ -51,8 +51,8 @@ class FencedTransactionRowWaitIT {
     private static final String HOLD_POLICY_ROW = "select id from lm_policies where id = ? for update";
     private static final String OTHER_INSTANCE = "5c1d9e2f-3a4b-4c5d-8e6f-7a8b9c0d1e2f";
     private static final String SHORT_LOCK_WAIT = "set local lock_timeout = '300ms'";
-    private static final String RENEW_OWN_ROW = "update leader_lock set expired_after = ?"
-            + " where region = ? and lock_key = ? and client_id = ?";
+    private static final String ACQUIRE_OWN_ROW = "update leader_lock set client_id = ?, expired_after = ?"
+            + " where region = ? and lock_key = ? and (client_id = ? or expired_after < ?)";
 
     @Autowired
     private LmPolicyRepository policies;
@@ -168,11 +168,14 @@ class FencedTransactionRowWaitIT {
             try (Statement shortWait = renewal.createStatement()) {
                 shortWait.execute(SHORT_LOCK_WAIT);
             }
-            try (PreparedStatement renew = renewal.prepareStatement(RENEW_OWN_ROW)) {
-                renew.setTimestamp(1, Timestamp.valueOf(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(2)));
-                renew.setString(2, lock.group());
-                renew.setString(3, lock.key());
-                renew.setString(4, lock.instanceId());
+            try (PreparedStatement renew = renewal.prepareStatement(ACQUIRE_OWN_ROW)) {
+                LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+                renew.setString(1, lock.instanceId());
+                renew.setTimestamp(2, Timestamp.valueOf(now.plusMinutes(2)));
+                renew.setString(3, lock.group());
+                renew.setString(4, lock.key());
+                renew.setString(5, lock.instanceId());
+                renew.setTimestamp(6, Timestamp.valueOf(now));
                 int rows = renew.executeUpdate();
                 renewal.commit();
                 return rows;
