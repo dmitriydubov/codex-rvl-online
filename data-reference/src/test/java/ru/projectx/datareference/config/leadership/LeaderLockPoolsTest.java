@@ -23,11 +23,19 @@ class LeaderLockPoolsTest {
     }
 
     @Test
-    void leaderLockPool_hasOwnNameAndKeepsConfiguredConnectionsOpen() {
+    void leaderLockPool_hasOwnNameAndSize() {
         HikariDataSource leaderLock = leaderLockPool(new LeaderLockPoolProperties(2));
 
         assertThat(leaderLock.getPoolName()).isEqualTo("leader-lock");
         assertThat(leaderLock.getMaximumPoolSize()).isEqualTo(2);
+    }
+
+    @Test
+    void leaderLockPool_keepsEveryConnectionOpen_evenWhenApplicationPoolLetsIdleOnesGo() {
+        HikariDataSource leaderLock = LeaderLockPools.leaderLockPool(application(),
+                applicationPoolProperties().withProperty("spring.datasource.hikari.minimum-idle", "0"),
+                new LeaderLockPoolProperties(2), SESSION_TIMEOUTS);
+
         assertThat(leaderLock.getMinimumIdle()).isEqualTo(2);
     }
 

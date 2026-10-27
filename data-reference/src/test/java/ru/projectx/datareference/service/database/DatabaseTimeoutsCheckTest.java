@@ -180,16 +180,24 @@ class DatabaseTimeoutsCheckTest {
     }
 
     @Test
-    void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnection(CapturedOutput output) {
+    void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnections(CapturedOutput output) {
         withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS))
                 .thenThrow(new DataAccessResourceFailureException("Иванов 1980-05-17"));
-        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        when(sessionSettings.durations(leaderLockPool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(Map.of(
+                "lock_timeout", Duration.ZERO,
+                "statement_timeout", Duration.ofSeconds(30),
+                "idle_in_transaction_session_timeout", Duration.ZERO));
 
         check.run(null);
 
-        assertThat(output).contains("соединение=пул приложения", "DataAccessResourceFailureException")
+        assertThat(output).contains(
+                "соединение=пул приложения не прочитано: DataAccessResourceFailureException",
+                "соединение=пул блокировки ведущего, параметр=lock_timeout, ожидается=PT0S, фактически=PT5S",
+                "соединение=миграции, параметр=statement_timeout, ожидается=PT0S, фактически=PT30S")
                 .doesNotContain("Иванов");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(3);
     }
 
     @Test
