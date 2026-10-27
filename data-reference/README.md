@@ -38,10 +38,9 @@ Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер
 
 ## Сообщения и REST
 
-Из 1С — 11 очередей (`ONEC_QUEUE_*`), по потребителю на ведущем. Сообщение подтверждается после записи в
-базу; без пригодного `message-id` — подтверждается и теряется. Разбор — по порядку приёма (часы базы), действует
-последнее. Не наше — `SKIPPED` с причиной: санаторий без РВЛ со всем своим, договор не ДМС, программа не
-РВЛ, страхователь (сохраняется). Наружу — `GET /internal/v1/…`: справочники и полисы, [openapi.yaml](docs/openapi.yaml).
+Из 1С — 11 очередей (`ONEC_QUEUE_*`), по потребителю на ведущем; сообщение подтверждается после записи в базу.
+Разбор — по порядку приёма (часы базы), действует последнее; не наше — `SKIPPED` с причиной. Наружу —
+`GET /internal/v1/…`: справочники и полисы, [openapi.yaml](docs/openapi.yaml).
 
 ## Диагностика по базе
 
@@ -62,6 +61,7 @@ select stream, awaited_parent_kind, awaited_parent_id, count(*), min(parent_wait
 
 ## Подробнее
 
-- [operations.md](docs/operations.md) — настройки, выкатка, метрики, сбои.
+- [troubleshooting.md](docs/troubleshooting.md) — известные проблемы: признак, проверка, что делать.
+- [operations.md](docs/operations.md) — настройки, выкатка, метрики, ручные операции.
 - [design.md](docs/design.md) — почему так устроено; [code-style.md](docs/code-style.md) — как пишем код.
 - [load-testing.md](docs/load-testing.md) — нагрузка.
