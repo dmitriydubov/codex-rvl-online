@@ -13,18 +13,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class RestReadPoolConfig {
 
+    public static final String REST_READ_POOL = "restReadPool";
+
     @Bean
     static BeanPostProcessor restReadDataSourcePostProcessor(BeanFactory beans) {
         return new RestReadDataSourcePostProcessor(beans);
     }
 
-    @Bean(defaultCandidate = false, destroyMethod = "close")
+    @Bean(name = REST_READ_POOL, defaultCandidate = false, destroyMethod = "close")
     HikariDataSource restReadPool(DataSource dataSource) throws SQLException {
         return dataSource.unwrap(RestReadDataSource.class).restReadPool();
     }
 
     @Bean
-    HealthContributor dbHealthContributor(DataSource dataSource) throws SQLException {
-        return new DataSourceHealthIndicator(dataSource.unwrap(RestReadDataSource.class).applicationPool());
+    ApplicationPool applicationPool(DataSource dataSource) throws SQLException {
+        return new ApplicationPool(dataSource.unwrap(RestReadDataSource.class).applicationPool());
+    }
+
+    @Bean
+    HealthContributor dbHealthContributor(ApplicationPool application) {
+        return new DataSourceHealthIndicator(application.pool());
     }
 }

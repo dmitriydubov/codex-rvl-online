@@ -1,27 +1,28 @@
 package ru.projectx.datareference.acceptance;
 
+import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 import java.util.Optional;
 import javax.sql.DataSource;
-import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 final class SwitchableDataSource extends DelegatingDataSource {
 
-    private volatile @Nullable String failingSqlState;
+    private final DatabaseSwitch availability;
 
-    SwitchableDataSource(DataSource pool) {
+    SwitchableDataSource(DataSource pool, DatabaseSwitch availability) {
         super(pool);
+        this.availability = availability;
     }
 
     void failConnectionsWith(String sqlState) {
-        failingSqlState = sqlState;
+        availability.failConnectionsWith(sqlState);
     }
 
     void restore() {
-        failingSqlState = null;
+        availability.restore();
     }
 
     @Override
@@ -36,8 +37,14 @@ final class SwitchableDataSource extends DelegatingDataSource {
         return super.getConnection(username, password);
     }
 
+    public void close() {
+        if (obtainTargetDataSource() instanceof HikariDataSource pool) {
+            pool.close();
+        }
+    }
+
     private void failIfUnavailable() throws SQLException {
-        Optional<String> sqlState = Optional.ofNullable(failingSqlState);
+        Optional<String> sqlState = availability.failure();
         if (sqlState.isPresent()) {
             throw new SQLTransientConnectionException("стенд приёмки: база недоступна", sqlState.get());
         }

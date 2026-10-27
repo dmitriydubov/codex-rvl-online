@@ -2,14 +2,12 @@ package ru.projectx.datareference.config.cache;
 
 import io.micrometer.core.instrument.binder.MeterBinder;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.Properties;
-import javax.sql.DataSource;
 import org.postgresql.jdbc.PgConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import ru.projectx.datareference.config.FlagGauges;
-import ru.projectx.datareference.config.restread.RestReadDataSource;
+import ru.projectx.datareference.config.restread.ApplicationPool;
 
 @Configuration(proxyBeanMethods = false)
 public class ReferenceCacheListenerConfig {
@@ -22,12 +20,11 @@ public class ReferenceCacheListenerConfig {
             "1 — экземпляр слушает оповещения о сбросе кэша справочников; 0 — соединения нет";
 
     @Bean
-    ReconnectingListenerConnections referenceCacheListenerConnections(DataSource dataSource,
-            ReferenceCacheNotificationProperties properties) throws SQLException {
+    ReconnectingListenerConnections referenceCacheListenerConnections(ApplicationPool application,
+            ReferenceCacheNotificationProperties properties) {
 
-        RestReadDataSource pools = dataSource.unwrap(RestReadDataSource.class);
-        String url = pools.applicationPool().getJdbcUrl();
-        Properties settings = ListenerConnectionSettings.like(pools.applicationPool());
+        String url = application.pool().getJdbcUrl();
+        Properties settings = ListenerConnectionSettings.like(application.pool());
         return new ReconnectingListenerConnections(
                 () -> DriverManager.getConnection(url, settings).unwrap(PgConnection.class), properties);
     }

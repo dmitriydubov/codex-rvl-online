@@ -747,9 +747,10 @@ Central через прокси иногда отвечает 429 на пачк�
 ```
 ru.projectx.datareference
 ├── DataReferenceApplication
-├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
+├── config/            — @Configuration и @ConfigurationProperties; свойства приёма из 1С и прогрева (`*Properties`, `WarmupProperties`), таймауты сеанса базы и их строка `options` для пулов (`DatabaseSessionTimeouts`, `SessionStartupOptions`, `SessionTimeoutsPostProcessor`), правило «это пул Spring Boot» (`BootPool`), копия настроек пула приложения для других пулов (`ApplicationPoolCopy`) и метрики-флаги 0/1 (`FlagGauges`) — в корне
 │   ├── cache/         — кэши справочников: Spring Cache + Caffeine, имена (`ReferenceCaches`), срок и предел; соединение слушателя оповещений о сбросе вне пулов (`ReferenceCacheListenerConfig`, `ReconnectingListenerConnections`, `ListenerConnectionSettings`) и его настройки (`ReferenceCacheNotificationProperties`)
-│   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него
+│   ├── leadership/    — пул соединений блокировки ведущего `leader-lock` без `lock_timeout` (`LeaderLockPoolConfig`, `LeaderLockPools`, `LeaderLockPoolProperties`)
+│   └── restread/      — отдельный пул соединений для REST-чтений и переключение на него; пул приложения для конфигураций — бин `ApplicationPool`
 ├── entity/            — JPA-сущности
 │   ├── catalog/       — справочники 1С и общая основа `OneCEntity`
 │   ├── policy/        — полис с программами и строками условий
@@ -772,7 +773,7 @@ ru.projectx.datareference
 │   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`
 │   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`), оповещение всех экземпляров (`ReferenceCacheNotifications`, `ReferenceCacheChannel`) и подписчик канала (`ReferenceCacheNotificationsConfiguration`, `StreamCacheSubscription`)
 │   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
-│   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
+│   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`; продлевает её свой пул `config.leadership`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
 │   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
 │   ├── onec/          — разбор сырья: диспетчер потоков, сохранённый конверт (`StoredEnvelope`), сборка передач прайса
 │   ├── database/      — классы отказов и таймауты базы (`DatabaseOutages`, `SqlStates`, `DatabaseTimeoutsCheck`)
@@ -1089,9 +1090,17 @@ PR #203), поэтому порядок разбора не зависит от 
 - **Таймауты базы — на пуле приложения, у миграций их нет** (Ш4, PR #15). `lock_timeout` 5 с,
   `statement_timeout` 30 с, `idle_in_transaction_session_timeout` 1 мин (стартовый `options` pgjdbc)
   и `socketTimeout` 60 с (у пула REST-чтений — 5 с, `projectx.database.rest-read-pool`; адрес, таймауты сеанса и
-  проверку соединений он берёт у пула приложения, с 2026-10-07): значения заданы один раз в `projectx.database.session-timeouts.*` и
-  подставляются в `spring.datasource.hikari.data-source-properties`; при старте `DatabaseTimeoutsCheck`
-  сверяет их с `pg_settings` на соединении пула и миграций и пишет WARN при расхождении (с 2026-10-01).
+  проверку соединений он берёт у пула приложения, с 2026-10-07): значения заданы один раз в `projectx.database.session-timeouts.*`,
+  строку `options` пулу Spring Boot ставит `config.SessionTimeoutsPostProcessor` (`SessionStartupOptions`), копии пула
+  берут её с него (`ApplicationPoolCopy`); при старте `DatabaseTimeoutsCheck`
+  сверяет их с `pg_settings` на соединении пула приложения, пула блокировки ведущего и миграций и пишет WARN при
+  расхождении (с 2026-10-01). **У пула блокировки ведущего** (`leader-lock`, `projectx.database.leader-lock-pool`,
+  `DB_LEADER_POOL_SIZE` 1; Ш86, PR #259) адрес и остальные настройки — с пула приложения, `lock_timeout` = 0, свой
+  `DataSourceTransactionManager` (не бин) и `application_name` `data-reference-leader-lock`. Продление роли
+  (`DefaultLockRepository`) ждёт конца собственной транзакции приёма или разбора, которая держит строку `FOR SHARE`
+  (`LeadershipFence`), и не зависит от занятости пула приложения: с `lock_timeout` 5 с оно через 5 с получало 55P03,
+  Spring переводил его в `UncategorizedSQLException`, а `JdbcLockRegistry` такую ошибку не повторяет — роль
+  снималась. Причины — `docs/design.md`. Соединений на экземпляр — 17 (10 + 5 + 1 + слушатель сброса кэша).
   Отказ по ним — временная ошибка: разбор идёт по лестнице, слушатель ставит потребителей на паузу
   (сообщение остаётся в очереди), REST отвечает 503. У REST-чтений свой, более короткий лимит — 3 с (`@RestReadTransaction`, раздел
   «Структура пакетов»). Отсюда для кода: один оператор укладывается в 30 с, чтение REST — в 3 с,

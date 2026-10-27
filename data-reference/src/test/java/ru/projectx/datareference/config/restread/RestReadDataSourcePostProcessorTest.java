@@ -20,6 +20,7 @@ class RestReadDataSourcePostProcessorTest {
     void hikariPool_becomesApplicationPoolBesideRestReadPool() {
         HikariDataSource application = new HikariDataSource();
         application.setJdbcUrl("jdbc:postgresql://db:5432/data_reference");
+        application.addDataSourceProperty("options", "-c lock_timeout=5s");
 
         Object processed = postProcessor.postProcessAfterInitialization(application, "dataSource");
 

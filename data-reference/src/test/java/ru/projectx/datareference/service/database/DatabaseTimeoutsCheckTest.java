@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -36,12 +37,19 @@ class DatabaseTimeoutsCheckTest {
             "lock_timeout", Duration.ZERO,
             "statement_timeout", Duration.ZERO,
             "idle_in_transaction_session_timeout", Duration.ZERO);
+    private static final Map<String, Duration> WITHOUT_LOCK_WAIT = Map.of(
+            "lock_timeout", Duration.ZERO,
+            "statement_timeout", Duration.ofSeconds(30),
+            "idle_in_transaction_session_timeout", Duration.ofMinutes(1));
 
     @Mock
     private SessionSettingsRepository sessionSettings;
 
     @Mock
     private DataSource pool;
+
+    @Mock
+    private DataSource leaderLockPool;
 
     @Mock
     private DataSource migrations;
@@ -57,6 +65,52 @@ class DatabaseTimeoutsCheckTest {
     @BeforeEach
     void setUp() {
         check = check(new DatabaseSessionTimeouts("5s", "30s", "1min"));
+        lenient().when(sessionSettings.durations(leaderLockPool, PARAMETERS)).thenReturn(WITHOUT_LOCK_WAIT);
+    }
+
+    @Test
+    void leaderLockPoolWaitingForLocksWithLimit_warnsAboutLockTimeoutOnly(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(leaderLockPool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+
+        check.run(null);
+
+        assertThat(output).contains("соединение=пул блокировки ведущего, параметр=lock_timeout, ожидается=PT0S, "
+                + "фактически=PT5S");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
+    }
+
+    @Test
+    void leaderLockPoolWithoutStatementTimeout_warnsWithConfiguredValue(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(leaderLockPool, PARAMETERS)).thenReturn(DISABLED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+
+        check.run(null);
+
+        assertThat(output).contains(
+                "соединение=пул блокировки ведущего, параметр=statement_timeout, ожидается=PT30S, фактически=PT0S",
+                "соединение=пул блокировки ведущего, параметр=idle_in_transaction_session_timeout, ожидается=PT1M, "
+                        + "фактически=PT0S");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(2);
+    }
+
+    @Test
+    void leaderLockPoolReadFailure_warnsWithConnectionName_andChecksTheOthers(CapturedOutput output) {
+        withMigrations();
+        when(sessionSettings.durations(pool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(leaderLockPool, PARAMETERS))
+                .thenThrow(new DataAccessResourceFailureException("Иванов 1980-05-17"));
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+
+        check.run(null);
+
+        assertThat(output).contains("соединение=пул блокировки ведущего не прочитано: DataAccessResourceFailureException")
+                .doesNotContain("Иванов");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(1);
     }
 
     @Test
@@ -126,16 +180,24 @@ class DatabaseTimeoutsCheckTest {
     }
 
     @Test
-    void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnection(CapturedOutput output) {
+    void readFailure_warnsWithConnectionAndType_andChecksTheOtherConnections(CapturedOutput output) {
         withMigrations();
         when(sessionSettings.durations(pool, PARAMETERS))
                 .thenThrow(new DataAccessResourceFailureException("Иванов 1980-05-17"));
-        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(DISABLED);
+        when(sessionSettings.durations(leaderLockPool, PARAMETERS)).thenReturn(CONFIGURED);
+        when(sessionSettings.durations(migrations, PARAMETERS)).thenReturn(Map.of(
+                "lock_timeout", Duration.ZERO,
+                "statement_timeout", Duration.ofSeconds(30),
+                "idle_in_transaction_session_timeout", Duration.ZERO));
 
         check.run(null);
 
-        assertThat(output).contains("соединение=пул приложения", "DataAccessResourceFailureException")
+        assertThat(output).contains(
+                "соединение=пул приложения не прочитано: DataAccessResourceFailureException",
+                "соединение=пул блокировки ведущего, параметр=lock_timeout, ожидается=PT0S, фактически=PT5S",
+                "соединение=миграции, параметр=statement_timeout, ожидается=PT0S, фактически=PT30S")
                 .doesNotContain("Иванов");
+        assertThat(output.getOut().lines().filter(line -> line.contains("WARN"))).hasSize(3);
     }
 
     @Test
@@ -222,6 +284,6 @@ class DatabaseTimeoutsCheckTest {
         RestReadPoolProperties restReadPool =
                 new RestReadPoolProperties(5, Duration.ofSeconds(2), restSocketTimeoutSeconds, 2);
         return new DatabaseTimeoutsCheck(timeouts, TestApiProperties.defaults(), restReadPool,
-                new DatabaseTimeoutsCheck.Connections(sessionSettings, pool, liquibaseProvider));
+                new DatabaseTimeoutsCheck.Connections(sessionSettings, pool, leaderLockPool, liquibaseProvider));
     }
 }
