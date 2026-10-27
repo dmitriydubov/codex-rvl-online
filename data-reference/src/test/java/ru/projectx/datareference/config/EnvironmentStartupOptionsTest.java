@@ -10,6 +10,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 import ru.projectx.datareference.config.restread.ApplicationPool;
@@ -18,6 +19,7 @@ import ru.projectx.datareference.support.IntegrationTest;
 
 @IntegrationTest
 @TestPropertySource(properties = "spring.datasource.hikari.data-source-properties.options=-c lock_timeout=9s")
+@DirtiesContext
 class EnvironmentStartupOptionsTest {
 
     @Autowired
