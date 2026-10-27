@@ -33,3 +33,10 @@ ru.projectx.contracts.service.status.RecordOutcome#looksLike                 Boo
 # (RUN_ERROR appeared in earlier runs of the step and was absent in the final one).
 ru.projectx.contracts.message.TaskParticipant#pays                           BooleanTrueReturnValsMutator         # ContractTaskParserTest.zeroAmountDue_isAccepted: pays() for 0.00 isFalse() fails; DocumentKindsTest.kind_followsRelativeFlagAndPositiveAmountDue: relative with 0.00 expects LM_POLICY, gets KM_CONTRACT
 ru.projectx.contracts.message.TaskParticipant#path                           EmptyObjectReturnValsMutator         # KmContractIssuanceTest / LmPolicyIssuanceTest: IssueError text "поле participants[1].program_id обязательно ..." becomes "поле .program_id ..."; PersonSnapshotsTest: hasMessage("поле participants[1].personal_data.relation_type ...") fails
+
+# LeadershipPropertiesTest: lock TTL versus heartbeat check of the leadership settings (record LeadershipProperties,
+# @AssertTrue isLockTtlLongerThanHeartbeat = lockTtl != null && heartbeat != null && lockTtl.compareTo(heartbeat) > 0).
+# Verified by the coordinator 2026-10-27 on the leader-instance step branch (26578b3), owner "1) да".
+ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator          # > 0 -> >= 0: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; heartbeatNotShorterThanTtl_failsValidation (30s/30s) hasFailed() fails
+ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_EQUAL_ELSE  # null check forced to the else branch -> always false: ttlCheck_... row "PT30S, PT1S, true" isEqualTo(true) fails; completeConfiguration_bindsGroupTtlAndHeartbeat context fails validation
+ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE  # compareTo > 0 forced to the else branch -> always false: same two tests fail
