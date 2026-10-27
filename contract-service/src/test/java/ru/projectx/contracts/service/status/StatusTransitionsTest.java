@@ -103,6 +103,67 @@ class StatusTransitionsTest {
     }
 
     @Test
+    void newLmPolicyAfterTheParticipantsErrorOne_isPublished() {
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, CHILD_LM), List.of(), List.of(failed));
+        IssuanceSnapshot after = snapshot(false, List.of(INSURED, CHILD_LM), List.of(),
+                List.of(failed, Issuances.policy(LATER_POLICY_ID, Tasks.CHILD)));
+
+        assertThat(StatusTransitions.publishAfterChange(before, after)).isTrue();
+        assertThat(StatusTransitions.publishAfterChange(after, after)).isFalse();
+    }
+
+    @Test
+    void oneOfTwoParticipantsLeavingTheirErrors_isPublishedWhileTheOtherStaysInError() {
+        Contract failedContract = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        failedContract.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        List<RequestParticipant> composition = List.of(INSURED, SPOUSE_KM, CHILD_LM);
+        IssuanceSnapshot before = snapshot(false, composition, List.of(failedContract), List.of(failed));
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, composition, List.of(failedContract),
+                List.of(failed, Issuances.policy(LATER_POLICY_ID, Tasks.CHILD))))).isTrue();
+    }
+
+    @Test
+    void participantWhoseKmContractFailedAndWhoNowGetsAnLmPolicy_isPublished() {
+        Contract failed = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, SPOUSE_KM), List.of(failed), List.of());
+        RequestParticipant spouseLm = new RequestParticipant(Tasks.SPOUSE, DocumentKind.LM_POLICY);
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED, spouseLm),
+                List.of(failed), List.of(Issuances.policy(LATER_POLICY_ID, Tasks.SPOUSE))))).isTrue();
+    }
+
+    @Test
+    void participantInErrorWhoLeftTheComposition_isPublished() {
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        Contract drafted = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        drafted.offerDraft();
+        IssuanceSnapshot before = snapshot(false, List.of(INSURED, SPOUSE_KM, CHILD_LM), List.of(drafted),
+                List.of(failed));
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, List.of(INSURED, SPOUSE_KM),
+                List.of(drafted), List.of(failed)))).isTrue();
+    }
+
+    @Test
+    void participantLeavingTheErrorNextToAnUndraftedKmContract_defersThePublication() {
+        LmPolicy failed = Issuances.policy(POLICY_ID, Tasks.CHILD);
+        failed.markError(new IssueError("RELATION_TYPE_REQUIRED", "поле обязательно"), NOW);
+        Contract fresh = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
+        List<RequestParticipant> composition = List.of(INSURED, SPOUSE_KM, CHILD_LM);
+        IssuanceSnapshot before = snapshot(false, composition, List.of(fresh), List.of(failed));
+
+        assertThat(StatusTransitions.publishAfterChange(before, snapshot(false, composition, List.of(fresh),
+                List.of(failed, Issuances.policy(LATER_POLICY_ID, Tasks.CHILD))))).isFalse();
+    }
+
+    @Test
     void kmContractThatBecameReadyForAcceptance_isPublished() {
         Contract drafted = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
         drafted.offerDraft();
