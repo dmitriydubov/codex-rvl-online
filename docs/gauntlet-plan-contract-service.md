@@ -1147,6 +1147,10 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   передано сессии (только документы): в CHANGELOG, «Перенос → Файлы», не хватает `config/LeaderLockPoolProperties`,
   `service/SessionTimeoutsCheck`, `InboxConsumerSubscriptions`, `InboxQueueConsumers`; в описании PR — ответ владельца
   по пункту 8.
+  22:19 UTC: `3fefdf0` — только `CHANGELOG.md` (четыре класса дописаны), описание PR дополнено ответом по пункту 8;
+  следы — пусто, конфликтов с `main` `b6b3672` нет. **PR #258 готов к мержу** (координатор, два контрольных прогона:
+  `117ef11` и `d76ddcb` + `main`). После мержа — пункты 2–4 PR (README, `contract-service/CLAUDE.md`, журнал Д-09,
+  «Структура данных — редакция 2»), архив сессии К10, сверка раскладки К11 по `main`.
 - 2026-10-27, **владелец: новое правило `docs/troubleshooting.md`** (переслал текст координатора data-reference: в
   `gauntlet/CLAUDE.md`, «README модуля», `<module>/docs/troubleshooting.md` — известные проблемы эксплуатации: признак, как
   проверить, что делать; операции, меняющие данные, — в `operations.md`; README ссылается; файл переносится в контур;
