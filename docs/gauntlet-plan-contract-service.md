@@ -1129,6 +1129,10 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   правки.
   Контрольный `gauntletFast` на `33ca5ea` (до пула) — зелёный: unit 1411/0, archTest 7/0, приёмка 342/0, CRAP 1206
   методов, CPD 0; 12 мин 2 с.
+  20:50 UTC: на ветке К10 новых коммитов нет, сессия гоняет `gauntlet` на локальном `117ef11` (пул). Ш86 data-reference в
+  `main` (PR #259–#261, `cfa9d1f`): настройка `projectx.database.leader-lock-pool.maximum-pool-size`, переменная
+  `DB_LEADER_POOL_SIZE` (умолчание 1), классы `config/leadership/LeaderLockPool*`; имена и порядок (сверить, слить `main`,
+  полный `gauntlet`, push) переданы сессии К10 20:52 UTC.
 - 2026-10-13, **хвост К5 (координатор):** контрольный `gauntletFast -Pgauntlet.scope=all` на `main` `8c3c387` в отдельном
   worktree — **зелёный**: 639 unit-тестов, archTest 7/7, приёмка 128/128 без пропусков, integrity, Checkstyle, PMD, CRAP,
   CPD 0; 4 мин 56 с (первый запуск упал без Docker после перезапуска контейнера — Docker поднят, прогон повторён).
