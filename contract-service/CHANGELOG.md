@@ -282,6 +282,9 @@
   `RequestResolution.java` → `service/reference/`, `service/lm/LmPolicyReferences.java` →
   `service/reference/IssuanceReferences.java`, `service/lm/PolicyExpectation.java` → `service/usk/ResultExpectation.java`
   — при ручном переносе старые файлы удаляются, иначе останутся дубли классов и бинов.
+- **Файлы:** удалены `service/usk/UskPreparationFailures.java` (с тестом `UskPreparationFailuresTest.java`), правило
+  временного отказа теперь в `service/TemporaryFailures.java` — при ручном переносе старые файлы удаляются, иначе
+  останется второй экземпляр правила.
 - **Переменные:** новые необязательные `LM_POLICY_REQUEST_AWAITING_INTERVAL` (`1m`) и
   `LM_POLICY_REQUEST_AWAITING_THRESHOLD` (`1h`).
 - **Оповещение:** правило `contracts_lm_policies_awaiting_overdue > 0` — полис ЛМ ждёт ответа 1С:УСК дольше порога;

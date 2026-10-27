@@ -66,6 +66,15 @@ class InboxFailureTest {
     }
 
     @Test
+    void poolTimeoutCarryingRefusalOfNewConnections_isTransientKeepingTheStateForDiagnosis() {
+        InboxFailure failure = InboxFailure.of(new CannotCreateTransactionException("нет соединения",
+                new SQLTransientConnectionException("пул исчерпан", "28P01")));
+
+        assertThat(failure).isEqualTo(new InboxFailure.Transient(
+                "временный отказ доступа к данным: java.sql.SQLTransientConnectionException", "28P01"));
+    }
+
+    @Test
     void lockRefusedWithItsState_isTransientWithTheState() {
         InboxFailure failure = InboxFailure.of(new CannotAcquireLockException("строка занята",
                 new SQLException("строка занята", "55P03")));

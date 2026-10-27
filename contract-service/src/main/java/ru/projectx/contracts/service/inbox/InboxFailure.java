@@ -43,7 +43,7 @@ public sealed interface InboxFailure {
         }
 
         private static Transient dataAccess(RuntimeException failure) {
-            Throwable cause = TemporaryFailures.temporaryCause(failure).orElse(failure);
+            Throwable cause = TemporaryFailures.temporaryCause(failure).orElseThrow();
             return new Transient("временный отказ доступа к данным: " + cause.getClass().getName(),
                     SqlStates.deepestOrNone(failure));
         }
