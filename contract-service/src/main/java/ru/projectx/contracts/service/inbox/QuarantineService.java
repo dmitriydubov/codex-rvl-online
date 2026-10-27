@@ -6,20 +6,24 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.entity.QuarantinedMessage;
 import ru.projectx.contracts.entity.RejectedMessage;
 import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service
 public class QuarantineService {
 
     private final QuarantineRepository quarantine;
+    private final LeadershipFence fence;
     private final Clock clock;
 
-    public QuarantineService(QuarantineRepository quarantine, Clock clock) {
+    public QuarantineService(QuarantineRepository quarantine, LeadershipFence fence, Clock clock) {
         this.quarantine = quarantine;
+        this.fence = fence;
         this.clock = clock;
     }
 
     @Transactional
     public boolean quarantine(RejectedMessage rejected, String reason) {
+        fence.holdUntilCommit();
         if (quarantine.existsById(rejected.messageId())) {
             return false;
         }

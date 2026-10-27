@@ -7,8 +7,8 @@ import static org.mockito.Mockito.mock;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class InboxPauseGaugeTest {
@@ -24,7 +24,7 @@ class InboxPauseGaugeTest {
         assertThat(gauge().value()).isZero();
 
         given(pause.paused()).willReturn(Optional.of(new InboxConsumerPause.Paused(
-                new StorageOutage("08006", "DataAccessResourceFailureException"), Instant.EPOCH, Set.of())));
+                new StorageOutage("08006", "DataAccessResourceFailureException"), Instant.EPOCH, List.of())));
         assertThat(gauge().value()).isEqualTo(1);
         assertThat(gauge().getId().getDescription()).contains("паузе");
     }

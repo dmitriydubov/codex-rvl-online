@@ -2,9 +2,9 @@ package ru.projectx.contracts.service.integration;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -103,14 +103,14 @@ public class InboxConsumerPause {
                 current.paused().since());
     }
 
-    public record Paused(StorageOutage outage, Instant since, Set<String> queues) {
+    public record Paused(StorageOutage outage, Instant since, List<String> queues) {
     }
 
     private record PauseState(Paused paused, CompletableFuture<Void> consumersStopped) {
 
         static PauseState of(StorageOutage outage, Instant since, Map<String, CompletableFuture<Void>> stops) {
             return new PauseState(
-                    new Paused(outage, since, Set.copyOf(stops.keySet())),
+                    new Paused(outage, since, stops.keySet().stream().sorted().toList()),
                     CompletableFuture.allOf(stops.values().toArray(CompletableFuture[]::new)));
         }
     }

@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.health.contributor.Health;
@@ -62,7 +61,7 @@ class InboxHealthIndicatorTest {
         given(consumers.queuesWithoutConsumer()).willReturn(List.of(QueueContainersFixture.TASKS));
         given(pause.paused()).willReturn(Optional.of(new InboxConsumerPause.Paused(
                 new StorageOutage("55P03", "CannotAcquireLockException"), SINCE,
-                Set.of(QueueContainersFixture.TASKS))));
+                List.of(QueueContainersFixture.TASKS))));
 
         Health health = new InboxHealthIndicator(pause, consumers, TestLeadership.leader()).health();
 
@@ -72,14 +71,14 @@ class InboxHealthIndicatorTest {
                 .containsEntry("sqlstate", "55P03")
                 .containsEntry("failure", "CannotAcquireLockException")
                 .containsEntry("since", "2026-02-10T07:05:00Z")
-                .containsEntry("queues", Set.of(QueueContainersFixture.TASKS))
+                .containsEntry("queues", List.of(QueueContainersFixture.TASKS))
                 .doesNotContainKey("queuesWithoutConsumer");
     }
 
     @Test
     void pausedStandby_isDownToo() {
         given(pause.paused()).willReturn(Optional.of(new InboxConsumerPause.Paused(
-                new StorageOutage("08001", "DataAccessResourceFailureException"), SINCE, Set.of())));
+                new StorageOutage("08001", "DataAccessResourceFailureException"), SINCE, List.of())));
 
         Health health = new InboxHealthIndicator(pause, consumers, TestLeadership.standby()).health();
 

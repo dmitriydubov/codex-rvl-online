@@ -47,9 +47,8 @@ class InboxStorageFailures {
             recordQuarantine(quarantine.quarantine(delivery.rejected(receipt.messageId()), reason), delivery, receipt, reason);
         }
         catch (RuntimeException storageFailure) {
-            if (!quarantinedByConcurrentDelivery(delivery, receipt, storageFailure)) {
-                return;
-            }
+            quarantineFailed(delivery, receipt, storageFailure);
+            return;
         }
         delivery.acknowledge();
     }
@@ -64,14 +63,19 @@ class InboxStorageFailures {
                 reason, delivery.body().length);
     }
 
-    private boolean quarantinedByConcurrentDelivery(TaskDelivery delivery, InboxReceipt receipt,
-            RuntimeException storageFailure) {
-        if (InboxStorageFailure.of(storageFailure) instanceof InboxStorageFailure.DuplicateRace) {
-            log.debug("сообщение {} уже положила в карантин параллельная доставка", receipt.messageId());
-            return true;
+    private void quarantineFailed(TaskDelivery delivery, InboxReceipt receipt, RuntimeException failure)
+            throws IOException {
+        switch (InboxStorageFailure.of(failure)) {
+            case InboxStorageFailure.DuplicateRace ignored -> acknowledgeQuarantinedElsewhere(delivery, receipt);
+            case InboxStorageFailure.LeadershipLost ignored -> standDown(delivery, receipt);
+            case InboxStorageFailure.Poison ignored -> pauseConsumers(delivery, receipt, StorageOutage.of(failure));
+            case InboxStorageFailure.Outage outage -> pauseConsumers(delivery, receipt, outage.outage());
         }
-        pauseConsumers(delivery, receipt, StorageOutage.of(storageFailure));
-        return false;
+    }
+
+    private void acknowledgeQuarantinedElsewhere(TaskDelivery delivery, InboxReceipt receipt) throws IOException {
+        log.debug("сообщение {} уже положила в карантин параллельная доставка", receipt.messageId());
+        delivery.acknowledge();
     }
 
     private void returnAfterPause(TaskDelivery delivery, InboxReceipt receipt, RuntimeException failure)
@@ -84,10 +88,9 @@ class InboxStorageFailures {
         }
     }
 
-    private void standDown(TaskDelivery delivery, InboxReceipt receipt) throws IOException {
-        log.info("сообщение {} возвращено в очередь {}: экземпляр больше не ведущий, потребители останавливаются",
-                receipt.messageId(), delivery.queue());
-        delivery.returnToQueue();
+    private void standDown(TaskDelivery delivery, InboxReceipt receipt) {
+        log.info("сообщение {} из очереди {} оставлено без ответа: экземпляр больше не ведущий, потребители "
+                + "останавливаются, закрытие канала вернёт сообщение в очередь", receipt.messageId(), delivery.queue());
         consumers.stopConsumersWithoutProbe();
         leadership.stepDown();
     }

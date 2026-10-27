@@ -196,10 +196,25 @@ class InboxStorageFailuresTest {
     }
 
     @Test
-    void lostLeaderLock_returnsTheMessageStopsConsumersWithoutProbeAndYieldsTheRole() throws IOException {
+    void lostLeaderLockWhileQuarantining_standsDownWithoutAcknowledging() throws IOException {
+        given(quarantine.quarantine(any(), any()))
+                .willThrow(new LeadershipLostException(TestLeadership.LOCK.instanceId()));
+
+        failures.quarantine(delivery, RECEIPT, REASON);
+
+        verify(channel, never()).basicAck(7L, false);
+        verify(consumers).stopConsumersWithoutProbe();
+        verify(consumers, never()).pause(any());
+        verify(election).yield();
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void lostLeaderLock_leavesTheMessageUnansweredStopsConsumersWithoutProbeAndYieldsTheRole() throws IOException {
         failures.handle(delivery, RECEIPT, new LeadershipLostException(TestLeadership.LOCK.instanceId()));
 
-        verify(channel).basicNack(7L, false, true);
+        verify(channel, never()).basicNack(7L, false, true);
+        verify(channel, never()).basicAck(7L, false);
         verify(consumers).stopConsumersWithoutProbe();
         verify(consumers, never()).pause(any());
         verify(election).yield();

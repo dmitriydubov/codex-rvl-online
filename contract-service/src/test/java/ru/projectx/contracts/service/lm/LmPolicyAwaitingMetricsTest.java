@@ -13,9 +13,8 @@ class LmPolicyAwaitingMetricsTest {
     private final LmPolicyAwaitingMetrics metrics = new LmPolicyAwaitingMetrics(registry);
 
     @Test
-    void beforeTheFirstPass_bothGaugesAreZero() {
-        assertThat(oldest().value()).isZero();
-        assertThat(overdue().value()).isZero();
+    void beforeTheFirstPass_noGaugeIsPublished() {
+        assertThat(registry.getMeters()).isEmpty();
     }
 
     @Test
@@ -38,6 +37,8 @@ class LmPolicyAwaitingMetricsTest {
 
     @Test
     void gauges_carryUnitAndDescription() {
+        metrics.show(Duration.ZERO, 0);
+
         assertThat(oldest().getId().getBaseUnit()).isEqualTo("seconds");
         assertThat(oldest().getId().getDescription()).isEqualTo("сколько ждёт ответа 1С:УСК самый старый переданный полис ЛМ");
         assertThat(overdue().getId().getBaseUnit()).isNull();

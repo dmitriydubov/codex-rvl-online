@@ -17,6 +17,8 @@ import org.mockito.ArgumentCaptor;
 import ru.projectx.contracts.entity.QuarantinedMessage;
 import ru.projectx.contracts.entity.RejectedMessage;
 import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
+import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 class QuarantineServiceTest {
 
@@ -24,7 +26,8 @@ class QuarantineServiceTest {
     private static final UUID MESSAGE_ID = UUID.fromString("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11");
 
     private final QuarantineRepository quarantine = mock();
-    private final QuarantineService service = new QuarantineService(quarantine, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final LeadershipFence fence = mock();
+    private final QuarantineService service = new QuarantineService(quarantine, fence, Clock.fixed(NOW, ZoneOffset.UTC));
     private final RejectedMessage rejected = new RejectedMessage(MESSAGE_ID, "task-changes",
             "{\"meta\":{}}".getBytes(StandardCharsets.UTF_8));
 
@@ -41,6 +44,17 @@ class QuarantineServiceTest {
         assertThat(saved.getValue().reason()).isEqualTo("SQLSTATE 22P05");
         assertThat(saved.getValue().receivedAt()).isEqualTo(NOW);
         assertThat(saved.getValue().body()).contains("{\"meta\":{}}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void lostLeaderLock_failsBeforeTheQuarantineIsRead() {
+        org.mockito.BDDMockito.willThrow(new LeadershipLostException("0b5f3c1e")).given(fence).holdUntilCommit();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.quarantine(rejected, "SQLSTATE 22P05"))
+                .isInstanceOf(LeadershipLostException.class);
+
+        verify(quarantine, never()).existsById(any());
+        verify(quarantine, never()).save(any());
     }
 
     @Test

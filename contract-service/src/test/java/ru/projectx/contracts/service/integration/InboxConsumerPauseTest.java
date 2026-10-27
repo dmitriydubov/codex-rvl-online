@@ -114,7 +114,7 @@ class InboxConsumerPauseTest {
         assertThat(pause.paused()).hasValueSatisfying(paused -> {
             assertThat(paused.outage()).isEqualTo(CONNECTION_LOST);
             assertThat(paused.since()).isEqualTo(NOW);
-            assertThat(paused.queues()).containsExactlyInAnyOrder(TASKS, LM_RESULTS);
+            assertThat(paused.queues()).containsExactly(LM_RESULTS, TASKS);
         });
         assertThat(pause.consumersStopped()).isTrue();
         assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.WARN).singleElement()

@@ -13,9 +13,8 @@ class KmContractAwaitingMetricsTest {
     private final KmContractAwaitingMetrics metrics = new KmContractAwaitingMetrics(registry);
 
     @Test
-    void beforeTheFirstPass_bothGaugesAreZero() {
-        assertThat(oldest().value()).isZero();
-        assertThat(overdue().value()).isZero();
+    void beforeTheFirstPass_noGaugeIsPublished() {
+        assertThat(registry.getMeters()).isEmpty();
     }
 
     @Test
@@ -28,6 +27,8 @@ class KmContractAwaitingMetricsTest {
 
     @Test
     void gauges_carryUnitAndDescriptionOfKmContracts() {
+        metrics.show(Duration.ZERO, 0);
+
         assertThat(oldest().getId().getBaseUnit()).isEqualTo("seconds");
         assertThat(oldest().getId().getDescription())
                 .isEqualTo("сколько ждёт ответа 1С:УСК самый старый переданный договор КМ");

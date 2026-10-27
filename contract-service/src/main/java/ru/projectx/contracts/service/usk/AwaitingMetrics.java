@@ -22,7 +22,6 @@ public class AwaitingMetrics {
     protected AwaitingMetrics(MeterRegistry registry, AwaitingGauges gauges) {
         this.registry = registry;
         this.gauges = gauges;
-        publish();
     }
 
     public void show(Duration oldest, long overdueCount) {
