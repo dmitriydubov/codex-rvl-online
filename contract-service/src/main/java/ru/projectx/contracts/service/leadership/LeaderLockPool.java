@@ -27,16 +27,19 @@ public final class LeaderLockPool implements LeaderLockConnections, AutoCloseabl
     }
 
     public static LeaderLockPool besideApplicationPool(DataSource application, int connections, MeterRegistry registry) {
-        HikariDataSource source = applicationPool(application);
-        HikariDataSource pool = new HikariDataSource();
-        BeanUtils.copyProperties(source, pool, NOT_COPIED);
-        pool.setPoolName(POOL_NAME);
-        pool.setMaximumPoolSize(connections);
-        pool.setMinimumIdle(connections);
-        pool.addDataSourceProperty(SESSION_OPTIONS_PROPERTY,
+        return configured(new LeaderLockPool(new HikariDataSource()), applicationPool(application), connections, registry);
+    }
+
+    private static LeaderLockPool configured(LeaderLockPool target, HikariDataSource source, int connections,
+            MeterRegistry registry) {
+        BeanUtils.copyProperties(source, target.pool, NOT_COPIED);
+        target.pool.setPoolName(POOL_NAME);
+        target.pool.setMaximumPoolSize(connections);
+        target.pool.setMinimumIdle(connections);
+        target.pool.addDataSourceProperty(SESSION_OPTIONS_PROPERTY,
                 lockTimeoutDisabled(source.getDataSourceProperties().getProperty(SESSION_OPTIONS_PROPERTY, "")));
-        pool.setMetricsTrackerFactory(new MicrometerMetricsTrackerFactory(registry));
-        return new LeaderLockPool(pool);
+        target.pool.setMetricsTrackerFactory(new MicrometerMetricsTrackerFactory(registry));
+        return target;
     }
 
     private static HikariDataSource applicationPool(DataSource application) {
