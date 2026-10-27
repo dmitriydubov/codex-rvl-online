@@ -1112,6 +1112,15 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   `org.springframework.integration.support.leader` и `…jdbc.lock`. По просьбе владельца подробности переданы координатору
   data-reference (session_01NGcFQBukkn1fjszvj8xCbd, 15:10 UTC): у него тот же порядок «фенс первым» в
   `ReferenceImportService`, `ParentWaitExpiry`, `OneCIngestService`, после фенса — `PESSIMISTIC_WRITE` сборки прайса.
+  **Причина найдена координатором data-reference** (ответ 15:22 UTC, воспроизведена отдельной программой; ключевой пункт
+  координатор Договоров сверил по sources-jar `spring-jdbc` 7.0.8): продление роли (`DefaultLockRepository.acquire`,
+  основной пул с `lock_timeout` 5 с) ждёт `FOR SHARE` фенса и получает 55P03; собственный `JdbcTemplate` репозитория
+  переводит его `SQLStateSQLExceptionTranslator`, где класса `55` нет, → `UncategorizedSQLException`, не временный —
+  `JdbcLock.tryLock` не повторяет, `unlockAndHandleException` снимает роль, 50 мс, роль снова. Условие — фенс держится
+  дольше `lock_timeout` плюс задержка продления; вторая дыра — пул не выдал соединение (`CannotCreateTransactionException`).
+  Лечение (как Ш86 data-reference, утверждён их владельцем): у `DefaultLockRepository` свой пул на 1–2 соединения без
+  `lock_timeout` и свой менеджер транзакций; детерминированный тест; `design.md`. Передано сессии К10 15:23 UTC, прежнее
+  предложение «фенс после блокировок» снято.
 - 2026-10-13, **хвост К5 (координатор):** контрольный `gauntletFast -Pgauntlet.scope=all` на `main` `8c3c387` в отдельном
   worktree — **зелёный**: 639 unit-тестов, archTest 7/7, приёмка 128/128 без пропусков, integrity, Checkstyle, PMD, CRAP,
   CPD 0; 4 мин 56 с (первый запуск упал без Docker после перезапуска контейнера — Docker поднят, прогон повторён).
