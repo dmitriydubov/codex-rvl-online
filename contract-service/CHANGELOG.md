@@ -319,12 +319,13 @@
   блокировки ведущего — по часам экземпляра). Каждый экземпляр держит к базе `DB_LEADER_POOL_SIZE` соединений сверх основного
   пула. Оповещения по `contracts_*_awaiting_*` строятся по `max()` по экземплярам.
 - **Файлы:** удалён метод `InboxEnvelopeException.unstorableText` и причина `UNSTORABLE_TEXT`; новые классы —
-  `config/LeadershipProperties`, `entity/QuarantinedMessage`, `entity/RejectedMessage`, `repository/LeaderLockRepository`,
-  `repository/InboxProbeRepository`, `repository/QuarantineRepository`, `service/FlagGauges`, пакет `service/leadership`,
-  `service/inbox/QuarantineService`, `service/retention/QuarantinePayloadRetention`, в `service/integration` —
-  `TaskEnvelope`, `InboxQueues`, `InboxQueueContainers`, `InboxConsumerPause`, `InboxConsumerPauseSchedule`,
-  `InboxIngestLeadership`, `InboxStorageProbe`, `InboxStorageFailure`, `InboxStorageFailures`, `StorageOutage`,
-  `InboxHealthIndicator`, `InboxPauseGauge`.
+  `config/LeadershipProperties`, `config/LeaderLockPoolProperties`, `entity/QuarantinedMessage`, `entity/RejectedMessage`,
+  `repository/LeaderLockRepository`, `repository/InboxProbeRepository`, `repository/QuarantineRepository`,
+  `service/FlagGauges`, `service/SessionTimeoutsCheck`, пакет `service/leadership`, `service/inbox/QuarantineService`,
+  `service/retention/QuarantinePayloadRetention`, в `service/integration` — `TaskEnvelope`, `InboxQueues`,
+  `InboxQueueContainers`, `InboxConsumerPause`, `InboxConsumerPauseSchedule`, `InboxIngestLeadership`,
+  `InboxStorageProbe`, `InboxStorageFailure`, `InboxStorageFailures`, `StorageOutage`, `InboxHealthIndicator`,
+  `InboxPauseGauge`, `InboxConsumerSubscriptions`, `InboxQueueConsumers`.
 - **Миграции:** changeSet `006-outbox-messages` изменён — из него убрана таблица `message_attachments` с индексами, новой
   миграции нет. Liquibase сверяет контрольную сумму применённых changeSet'ов и не даст сервису стартовать на базе, где
   прежний `006` уже применён: такие базы (локальный контур, стенды) пересоздаются.
