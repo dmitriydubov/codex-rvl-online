@@ -1151,6 +1151,18 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   следы — пусто, конфликтов с `main` `b6b3672` нет. **PR #258 готов к мержу** (координатор, два контрольных прогона:
   `117ef11` и `d76ddcb` + `main`). После мержа — пункты 2–4 PR (README, `contract-service/CLAUDE.md`, журнал Д-09,
   «Структура данных — редакция 2»), архив сессии К10, сверка раскладки К11 по `main`.
+- 2026-10-28, **К11 — `mutationGate` на `58ff2a6` (с `main` `3b69d7a`): 1172 мутанта, убито 1162 + 7 по тайм-ауту,
+  выжило 0, без покрытия 0, RUN_ERROR 3** (один закрыт строкой `TaskParticipant#pays`). Перенесённые и затронутые
+  импортом record'ы снова в области мутаций, и RUN_ERROR выпал на соседних методах и мутаторах уже записанных классов.
+  Координатор сверил по тестам три строки (две выпали на `58ff2a6`, третья — на прогоне от `a0f3bd0`):
+  `service.status.RecordOutcome#of` NullReturnVals (`IssuanceSnapshotTest.knownOutcome_…` — NPE на первом `isTrue()`),
+  `config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat` BooleanTrueReturnVals (строка CSV «PT1S, PT1S,
+  false», `ttlCheck_isFalseWhileAValueIsMissing`, `heartbeatNotShorterThanTtl_failsValidation`),
+  `entity.party.PersonOwner#lmPolicy` NullReturnVals (`lmPolicy_ownsPersonsThroughPolicyIdOnly`); PR координатора.
+  Отправку в сессию координатора К11 делать отказалась (просьба пришла запланированной задачей, а не от владельца) —
+  текст переслал владелец. Ответы К11 по пунктам 1–2 — владелец «ок» в чате координатора, в чат К11 их даёт владелец.
+  Сверка ветки координатором: `src/main` — только пакеты, импорты, видимость и пустые строки; тесты — разнос
+  `StatusTest` и проверки `ContractNumberingProperties` без потери ассертов; приёмка — только импорты.
 - 2026-10-28, **К11 — остановка перед PR** (ветка `claude/k11-contract-service-subpackages`, `a0f3bd0`, 42 коммита).
   Новые полные имена классов allowlist RUN_ERROR: `config.journal.InboxProperties$Retry`,
   `config.leadership.LeadershipProperties`, `entity.party.PersonOwner`, `message.task.TaskParticipant`;
