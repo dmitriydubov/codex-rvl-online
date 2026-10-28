@@ -88,12 +88,14 @@ class OneCConsumerPauseTest {
         logged.start();
         pauseLog().addAppender(logged);
         containersLog().addAppender(logged);
+        journalLog().addAppender(logged);
     }
 
     @AfterEach
     void releaseLog() {
         pauseLog().detachAppender(logged);
         containersLog().detachAppender(logged);
+        journalLog().detachAppender(logged);
         logged.stop();
     }
 
@@ -248,6 +250,36 @@ class OneCConsumerPauseTest {
         verify(policies, never()).start();
         verify(mkb10, never()).start();
         verify(stopped, never()).start();
+        assertThat(pause.paused()).isPresent();
+    }
+
+    @Test
+    void unlessPaused_runsTheConsumersChangeOnlyWhileNotPaused() {
+        OneCConsumerPause pause = pause();
+        AtomicInteger runs = new AtomicInteger();
+
+        pause.unlessPaused(runs::incrementAndGet);
+        pause.pause(CONNECTION_LOST);
+        pause.unlessPaused(runs::incrementAndGet);
+
+        assertThat(runs).hasValue(1);
+    }
+
+    @Test
+    void unlessPaused_holdsTheSameLockAsThePause() throws Exception {
+        OneCConsumerPause pause = pause();
+        Thread listener = new Thread(() -> pause.pause(CONNECTION_LOST));
+        AtomicBoolean listenerWaited = new AtomicBoolean();
+
+        pause.unlessPaused(() -> {
+            listener.start();
+            long changing = Thread.currentThread().threadId();
+            await().atMost(Duration.ofSeconds(10)).until(() -> waitsInPauseForLockOf(listener, changing));
+            listenerWaited.set(true);
+        });
+
+        assertThat(listenerWaited).isTrue();
+        assertThat(listener.join(Duration.ofSeconds(10))).isTrue();
         assertThat(pause.paused()).isPresent();
     }
 
@@ -472,6 +504,10 @@ class OneCConsumerPauseTest {
 
     private static Logger containersLog() {
         return (Logger) LoggerFactory.getLogger(OneCQueueContainers.class);
+    }
+
+    private static Logger journalLog() {
+        return (Logger) LoggerFactory.getLogger(OneCConsumerOutageJournal.class);
     }
 
     private static Logger pauseLog() {

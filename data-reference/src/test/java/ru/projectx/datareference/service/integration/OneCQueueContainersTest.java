@@ -67,40 +67,14 @@ class OneCQueueContainersTest {
         when(mkb10.isRunning()).thenReturn(false);
         logged.start();
         containersLog().addAppender(logged);
+        journalLog().addAppender(logged);
     }
 
     @AfterEach
     void releaseLog() {
         containersLog().detachAppender(logged);
+        journalLog().detachAppender(logged);
         logged.stop();
-    }
-
-    @Test
-    void leaderWithIngestEnabled_expectsConsumers() {
-        assertThat(QueueContainersFixture.containers(registryProvider, TestLeadership.leader()).consumersExpected())
-                .isTrue();
-    }
-
-    @Test
-    void standby_expectsNoConsumers() {
-        assertThat(QueueContainersFixture.containers(registryProvider, TestLeadership.standby()).consumersExpected())
-                .isFalse();
-    }
-
-    @Test
-    void leaderWithIngestDisabledBySettings_expectsNoConsumers() {
-        OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader(),
-                QueueContainersFixture.rabbitWithAutoStartup(false));
-
-        assertThat(containers.consumersExpected()).isFalse();
-    }
-
-    @Test
-    void leaderWithoutBroker_expectsNoConsumers() {
-        OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader(),
-                QueueContainersFixture.withoutBroker());
-
-        assertThat(containers.consumersExpected()).isFalse();
     }
 
     @Test
@@ -128,6 +102,56 @@ class OneCQueueContainersTest {
         assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.ERROR)
                 .singleElement()
                 .satisfies(event -> assertThat(event.getFormattedMessage()).contains(MKB10, "не запущен"));
+    }
+
+    @Test
+    void repeatedStartFailure_isReportedOnce() {
+        doThrow(new AmqpException("очередь пропала")).when(mkb10).start();
+        OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader());
+
+        containers.startExpected();
+        containers.startExpected();
+        containers.start(MKB10);
+
+        assertThat(logged.list).filteredOn(event -> event.getLevel() == Level.ERROR)
+                .singleElement()
+                .satisfies(event -> assertThat(event.getFormattedMessage()).contains(MKB10, "AmqpException"));
+    }
+
+    @Test
+    void successfulStartWithoutEarlierFailure_writesNothing() {
+        QueueContainersFixture.containers(registryProvider, TestLeadership.leader()).start(MKB10);
+
+        verify(mkb10).start();
+        assertThat(logged.list).isEmpty();
+    }
+
+    @Test
+    void stopped_namesExpectedContainersThatAreNotRunning() {
+        assertThat(QueueContainersFixture.containers(registryProvider, TestLeadership.leader()).stopped())
+                .containsExactly(MKB10);
+    }
+
+    @Test
+    void stopped_isEmptyWhenConsumersAreNotExpected() {
+        assertThat(QueueContainersFixture.containers(registryProvider, TestLeadership.standby()).stopped()).isEmpty();
+    }
+
+    @Test
+    void stopped_omitsAContainerUntilItsStopHasFinished() {
+        AtomicReference<Runnable> stopFinishes = new AtomicReference<>();
+        doAnswer(invocation -> {
+            stopFinishes.set(invocation.getArgument(0, Runnable.class));
+            return null;
+        }).when(policies).stop(any(Runnable.class));
+        OneCQueueContainers containers = QueueContainersFixture.containers(registryProvider, TestLeadership.leader());
+        containers.stopRunning();
+        when(policies.isRunning()).thenReturn(false);
+
+        assertThat(containers.stopped()).containsExactly(MKB10);
+
+        stopFinishes.get().run();
+        assertThat(containers.stopped()).containsExactlyInAnyOrder(MKB10, POLICIES);
     }
 
     @Test
@@ -210,5 +234,9 @@ class OneCQueueContainersTest {
 
     private static Logger containersLog() {
         return (Logger) LoggerFactory.getLogger(OneCQueueContainers.class);
+    }
+
+    private static Logger journalLog() {
+        return (Logger) LoggerFactory.getLogger(OneCConsumerOutageJournal.class);
     }
 }

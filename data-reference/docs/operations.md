@@ -196,6 +196,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `projectx.import.parent-wait-report-limit`, `stuck-transfer-report-limit` | `20` | сколько GUID называет одна запись журнала |
 | `projectx.onec.ingest.storage-check-interval` | `10s` | проверка базы, пока приём на паузе |
 | `projectx.onec.ingest.consumer-stop-timeout` | `30s` | сколько получение роли ждёт конца остановки потребителей перед их запуском |
+| `projectx.onec.ingest.consumer-restart-interval` | `30s` | как часто ведущий проверяет, вернулась ли на брокер очередь остановленного потребителя, и поднимает его |
 | `projectx.onec.ingest.duplicate-delivery-backoff` | `5s` | пауза перед возвратом в очередь двух столкнувшихся доставок одного сообщения |
 | `projectx.onec.contract.rvl-activity-id` | `f3876c53-c7d8-4620-b364-9538164ba5d4` | GUID вида деятельности РВЛ в 1С:УСК; неверный GUID оставит справочник санаториев пустым |
 | `projectx.onec.contract.rvl-contract-property` | не задано | имя признака договора на РВЛ; пока не задано, договоры ЛПУ этим признаком не отбираются |
@@ -290,6 +291,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `onec_leader` | 1 — экземпляр ведущий: читает очереди 1С:УСК и выполняет задачи по расписанию; 0 — нет | `sum(onec_leader)` не равна 1 дольше минуты: ведущего нет или их больше одного |
 | `onec_ingest_paused` | 1 — приём на паузе: база не принимает записи | держится 1: база недоступна |
 | `onec_ingest_pauses_total` | сколько раз приём вставал на паузу | частый рост: база работает с перебоями |
+| `onec_ingest_queues_without_consumer` | очереди 1С:УСК, которые ведущий должен читать, но у которых нет подтверждённого брокером потребителя: окно запуска, очередь, пропавшая на брокере, или брокер недоступен; на неведущем, при выключенных слушателях и на паузе из-за базы — 0 | `max(onec_ingest_queues_without_consumer) > 0` дольше 2 минут (`for: 2m`): окно запуска после получения роли или снятия паузы столько не длится, а очередь, которой нет на брокере, ведущий ищет каждые `consumer-restart-interval` (30 с) и поднимает её потребителя сам — тревога значит, что 1С:УСК не завела очередь заново или имя в `ONEC_QUEUE_*` неверно ([troubleshooting.md](troubleshooting.md), «Очередь без потребителя») |
 | `onec_inbound_messages{stream,status}` | строки сырья в `NEW`, `RETRY`, `BUFFERED`, `AWAITING_PARENT`, `FAILED` | рост `FAILED` |
 | `onec_inbound_pending_oldest_age_seconds{stream}` | сколько ждёт разбора самое давнее сообщение потока (`NEW` или `RETRY`) | растёт и не падает: разбор потока стоит |
 | `onec_inbound_transitions_total{stream,status}` | переходы статусов при разборе | — |
@@ -316,7 +318,8 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 Среди компонентов `/actuator/health` — `db`, `rabbit` (соединение с брокером) и `onecIngest`. `onecIngest` в `DOWN` с
 деталями `sqlstate`, `failure`, `since`, `queues` — приём на паузе из-за базы; с деталью `queuesWithoutConsumer` вне
 паузы — у этих очередей нет потребителя: окно запуска, потерянная на брокере очередь или потребитель, не поднявшийся
-после паузы. При выключенных слушателях (`RABBITMQ_LISTENER_AUTO_STARTUP=false`) `onecIngest` очередей не ждёт и
+после паузы; остановленного потребителя ведущий поднимает сам, как только очередь снова есть на брокере (раз в
+`consumer-restart-interval`), то же число очередей отдаёт показатель `onec_ingest_queues_without_consumer`. При выключенных слушателях (`RABBITMQ_LISTENER_AUTO_STARTUP=false`) `onecIngest` очередей не ждёт и
 отвечает `UP`. Деталь `role` называет роль экземпляра: `leader` или `standby`. Неведущий потребителей не ждёт и
 отвечает `UP`, а пока его приём стоит на паузе из-за базы, отвечает `DOWN` с деталями паузы, как и ведущий.
 

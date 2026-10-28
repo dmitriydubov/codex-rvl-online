@@ -396,7 +396,9 @@ class OneCQueueListenerTest {
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, consumers,
-                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL, Duration.ofSeconds(30)), ingestMetrics,
+                        new IngestProperties(duplicateDeliveryBackoff, STORAGE_CHECK_INTERVAL, Duration.ofSeconds(30),
+                                Duration.ofSeconds(30)),
+                        ingestMetrics,
                         leadership),
                 ingestMetrics);
     }

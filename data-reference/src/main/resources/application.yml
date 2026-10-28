@@ -164,6 +164,7 @@ projectx:
       duplicate-delivery-backoff: 5s
       storage-check-interval: 10s
       consumer-stop-timeout: 30s
+      consumer-restart-interval: 30s
     contract:
       rvl-activity-id: f3876c53-c7d8-4620-b364-9538164ba5d4
     queues:
