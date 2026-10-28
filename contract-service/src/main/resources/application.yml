@@ -12,7 +12,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 6
+        size: 8
 
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -134,6 +134,13 @@ projectx:
       lock-timeout: ${DB_LOCK_TIMEOUT:5s}
       statement-timeout: ${DB_STATEMENT_TIMEOUT:30s}
       idle-in-transaction-session-timeout: ${DB_IDLE_IN_TRANSACTION_TIMEOUT:1min}
+    leader-lock-pool:
+      maximum-pool-size: ${DB_LEADER_POOL_SIZE:1}
+
+  leadership:
+    group: contract-service
+    lock-ttl: ${LEADER_LOCK_TTL:30s}
+    heartbeat: 1s
 
   inbox:
     processing:
@@ -145,7 +152,10 @@ projectx:
       payload: ${INBOX_PAYLOAD_RETENTION:30d}
       interval: ${INBOX_RETENTION_INTERVAL:1h}
       batch-size: ${INBOX_RETENTION_BATCH_SIZE:500}
-    requeue-delay: ${INBOX_REQUEUE_DELAY:5s}
+    pause:
+      storage-check-interval: ${INBOX_STORAGE_CHECK_INTERVAL:10s}
+      consumer-stop-timeout: ${INBOX_CONSUMER_STOP_TIMEOUT:30s}
+    duplicate-delivery-backoff: ${INBOX_DUPLICATE_DELIVERY_BACKOFF:5s}
 
   outbox:
     publishing:

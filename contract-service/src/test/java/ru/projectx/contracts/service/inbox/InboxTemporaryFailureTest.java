@@ -25,6 +25,8 @@ import ru.projectx.contracts.entity.InboxMessage;
 import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
+import ru.projectx.contracts.support.TestLeadership;
 
 class InboxTemporaryFailureTest {
 
@@ -40,9 +42,10 @@ class InboxTemporaryFailureTest {
             new InboxProperties.Processing(Duration.ofSeconds(10), 7),
             new InboxProperties.Retry(List.of(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15))),
             new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500),
-            Duration.ofSeconds(5));
+            new InboxProperties.Pause(Duration.ofSeconds(10), Duration.ofSeconds(30)), Duration.ofSeconds(5));
     private final InboxProcessor processor = new InboxProcessor(messages, handling,
-            new InboxOutcomes(messages, properties, metrics, clock), properties, clock);
+            new InboxOutcomes(messages, properties, metrics, mock(LeadershipFence.class), clock), properties,
+            TestLeadership.leader(), clock);
     private final InboxMessage message = InboxMessage.receive(new InboxReceipt(
             UUID.fromString("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11"),
             UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"),

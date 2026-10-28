@@ -33,6 +33,7 @@ import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.OutboxDraft;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
@@ -53,7 +54,7 @@ class KmContractSubmissionRecordingTest {
     private final OutboxJournal journal = mock();
     private final RequestStatusPublication statuses = mock();
     private final KmContractSubmissionRecording recording = new KmContractSubmissionRecording(contracts, facts,
-            messages, journal, statuses, Clock.fixed(NOW, ZoneOffset.UTC));
+            messages, journal, statuses, mock(LeadershipFence.class), Clock.fixed(NOW, ZoneOffset.UTC));
     private final Contract contract = Issuances.paidContract(CONTRACT_ID.toString(), Tasks.SPOUSE, "DKM-2026-000001",
             PAID_AT);
     private final SubmissionFacts gathered = KmContractSubmissionMessagesTest.facts(List.of(

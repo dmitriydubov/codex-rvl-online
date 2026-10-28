@@ -21,7 +21,8 @@ class InboxPropertiesTest {
                 "projectx.inbox.processing.interval=10s", "projectx.inbox.processing.batch-size=100",
                 "projectx.inbox.retry.backoff=1m,5m,15m",
                 "projectx.inbox.retention.payload=30d", "projectx.inbox.retention.interval=1h",
-                "projectx.inbox.retention.batch-size=500", "projectx.inbox.requeue-delay=5s",
+                "projectx.inbox.retention.batch-size=500", "projectx.inbox.pause.storage-check-interval=10s",
+                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s",
                 "projectx.contracts.numbering.zone=Europe/Moscow").run(context -> {
             InboxProperties inbox = context.getBean(InboxProperties.class);
 
@@ -30,7 +31,8 @@ class InboxPropertiesTest {
                     .containsExactly(Duration.ofMinutes(1), Duration.ofMinutes(5), Duration.ofMinutes(15));
             assertThat(inbox.retention())
                     .isEqualTo(new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500));
-            assertThat(inbox.requeueDelay()).isEqualTo(Duration.ofSeconds(5));
+            assertThat(inbox.pause()).isEqualTo(new InboxProperties.Pause(Duration.ofSeconds(10), Duration.ofSeconds(30)));
+            assertThat(inbox.duplicateDeliveryBackoff()).isEqualTo(Duration.ofSeconds(5));
             assertThat(context.getBean(ContractNumberingProperties.class).zone()).isEqualTo(ZoneId.of("Europe/Moscow"));
         });
     }
@@ -41,7 +43,8 @@ class InboxPropertiesTest {
                 "projectx.inbox.processing.interval=10s", "projectx.inbox.processing.batch-size=100",
                 "projectx.inbox.retry.backoff=",
                 "projectx.inbox.retention.payload=30d", "projectx.inbox.retention.interval=1h",
-                "projectx.inbox.retention.batch-size=500", "projectx.inbox.requeue-delay=5s",
+                "projectx.inbox.retention.batch-size=500", "projectx.inbox.pause.storage-check-interval=10s",
+                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s",
                 "projectx.contracts.numbering.zone=Europe/Moscow")
                 .run(context -> assertThat(context).hasFailed());
     }

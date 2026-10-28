@@ -11,8 +11,9 @@ import org.junit.jupiter.api.Test;
 class PayloadRetentionSchedulerTest {
 
     private final InboxPayloadRetention inbox = mock();
+    private final QuarantinePayloadRetention quarantine = mock();
     private final OutboxPayloadRetention outbox = mock();
-    private final PayloadRetentionScheduler scheduler = new PayloadRetentionScheduler(inbox, outbox);
+    private final PayloadRetentionScheduler scheduler = new PayloadRetentionScheduler(inbox, quarantine, outbox);
 
     @Test
     void eachPass_runsItsOwnRetention() {
@@ -20,6 +21,7 @@ class PayloadRetentionSchedulerTest {
         scheduler.eraseOutboxPayloads();
 
         verify(inbox).eraseExpired();
+        verify(quarantine).eraseExpired();
         verify(outbox).eraseExpired();
     }
 

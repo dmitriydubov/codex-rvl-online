@@ -137,7 +137,25 @@ class ApplicationDefaultsTest {
 
     @Test
     void schedulerPool_hasAThreadPerScheduledPass() {
-        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("6");
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("8");
+    }
+
+    @Test
+    void inboxPauseDefaults_probeStorageEveryTenSecondsAndWaitHalfAMinuteForConsumers() {
+        assertThat(application.getProperty("projectx.inbox.pause.storage-check-interval")).asString()
+                .isEqualTo("${INBOX_STORAGE_CHECK_INTERVAL:10s}");
+        assertThat(application.getProperty("projectx.inbox.pause.consumer-stop-timeout")).asString()
+                .isEqualTo("${INBOX_CONSUMER_STOP_TIMEOUT:30s}");
+        assertThat(application.getProperty("projectx.inbox.duplicate-delivery-backoff")).asString()
+                .isEqualTo("${INBOX_DUPLICATE_DELIVERY_BACKOFF:5s}");
+        assertThat(application.getProperty("projectx.inbox.requeue-delay")).isNull();
+    }
+
+    @Test
+    void leadershipDefaults_holdTheLockHalfAMinuteAndRenewItEverySecond() {
+        assertThat(application.getProperty("projectx.leadership.group")).asString().isEqualTo("contract-service");
+        assertThat(application.getProperty("projectx.leadership.lock-ttl")).asString().isEqualTo("${LEADER_LOCK_TTL:30s}");
+        assertThat(application.getProperty("projectx.leadership.heartbeat")).asString().isEqualTo("1s");
     }
 
     @Test

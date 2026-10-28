@@ -17,7 +17,8 @@ public record InboxProperties(
         @Valid @NotNull Processing processing,
         @Valid @NotNull Retry retry,
         @Valid @NotNull Retention retention,
-        @NotNull @DurationMin(millis = 0) Duration requeueDelay) {
+        @Valid @NotNull Pause pause,
+        @NotNull @DurationMin(millis = 0) Duration duplicateDeliveryBackoff) {
 
     public record Processing(@NotNull @DurationMin(millis = 1) Duration interval, @Min(1) int batchSize) {
     }
@@ -33,5 +34,10 @@ public record InboxProperties(
             @NotNull @DurationMin(millis = 1) Duration payload,
             @NotNull @DurationMin(millis = 1) Duration interval,
             @Min(1) int batchSize) {
+    }
+
+    public record Pause(
+            @NotNull @DurationMin(millis = 1) Duration storageCheckInterval,
+            @NotNull @DurationMin(millis = 1) Duration consumerStopTimeout) {
     }
 }

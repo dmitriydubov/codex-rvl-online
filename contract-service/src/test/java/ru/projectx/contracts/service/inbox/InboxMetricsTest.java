@@ -25,6 +25,17 @@ class InboxMetricsTest {
     }
 
     @Test
+    void countQuarantined_incrementsAnUntaggedCounter() {
+        metrics.countQuarantined();
+        metrics.countQuarantined();
+
+        assertThat(registry.get("contracts.inbox.quarantined").counter().count()).isEqualTo(2);
+        assertThat(registry.get("contracts.inbox.quarantined").counter().getId().getTags()).isEmpty();
+        assertThat(registry.get("contracts.inbox.quarantined").counter().getId().getDescription())
+                .isEqualTo("входящие сообщения, тело которых база не принимает: записаны в карантин и подтверждены");
+    }
+
+    @Test
     void countLost_incrementsCounterTaggedWithReason() {
         metrics.countLost("unusable_envelope");
         metrics.countLost("unusable_envelope");

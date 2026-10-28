@@ -35,8 +35,8 @@ public class BrokerConfig {
     @Bean
     @InternalBroker
     public SimpleRabbitListenerContainerFactory internalBrokerListenerContainerFactory(
-            @InternalBroker ConnectionFactory connectionFactory, InternalBrokerProperties properties) {
-        return BrokerListenerContainerFactories.create(INTERNAL, connectionFactory, properties);
+            @InternalBroker ConnectionFactory connectionFactory) {
+        return BrokerListenerContainerFactories.create(INTERNAL, connectionFactory);
     }
 
     @Bean
@@ -60,8 +60,8 @@ public class BrokerConfig {
     @Bean
     @OneCBroker
     public SimpleRabbitListenerContainerFactory onecBrokerListenerContainerFactory(
-            @OneCBroker ConnectionFactory connectionFactory, OneCBrokerProperties properties) {
-        return BrokerListenerContainerFactories.create(ONEC, connectionFactory, properties);
+            @OneCBroker ConnectionFactory connectionFactory) {
+        return BrokerListenerContainerFactories.create(ONEC, connectionFactory);
     }
 
     @Bean

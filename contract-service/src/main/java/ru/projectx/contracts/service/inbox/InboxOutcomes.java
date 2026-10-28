@@ -14,6 +14,7 @@ import ru.projectx.contracts.entity.InboxReceipt;
 import ru.projectx.contracts.entity.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
+import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service
 public class InboxOutcomes {
@@ -23,13 +24,15 @@ public class InboxOutcomes {
     private final InboxMessageRepository messages;
     private final InboxProperties properties;
     private final InboxMetrics metrics;
+    private final LeadershipFence fence;
     private final Clock clock;
 
     public InboxOutcomes(InboxMessageRepository messages, InboxProperties properties, InboxMetrics metrics,
-            Clock clock) {
+            LeadershipFence fence, Clock clock) {
         this.messages = messages;
         this.properties = properties;
         this.metrics = metrics;
+        this.fence = fence;
         this.clock = clock;
     }
 
@@ -46,6 +49,7 @@ public class InboxOutcomes {
                     message.receipt().messageId(), message.status());
             return;
         }
+        fence.holdUntilCommit();
         int attempt = message.attempts() + 1;
         Optional<Duration> delay = retryDelay(failure, attempt);
         if (delay.isPresent()) {
