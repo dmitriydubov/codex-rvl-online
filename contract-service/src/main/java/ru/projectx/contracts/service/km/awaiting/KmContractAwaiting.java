@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.awaiting;
 
 import java.time.Clock;
 import org.springframework.stereotype.Service;
@@ -7,6 +7,7 @@ import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.service.km.KmContractKind;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.usk.awaiting.UskAwaiting;
 

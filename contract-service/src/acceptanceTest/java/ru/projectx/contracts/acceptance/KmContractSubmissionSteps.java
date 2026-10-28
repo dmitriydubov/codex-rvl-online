@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 import org.assertj.core.api.SoftAssertions;
 import org.awaitility.Awaitility;
 import ru.projectx.contracts.config.storage.StorageProperties;
-import ru.projectx.contracts.service.km.KmContractAwaiting;
+import ru.projectx.contracts.service.km.awaiting.KmContractAwaiting;
 import ru.projectx.contracts.service.km.submission.KmContractSubmissionScheduler;
 import tools.jackson.databind.JsonNode;
 

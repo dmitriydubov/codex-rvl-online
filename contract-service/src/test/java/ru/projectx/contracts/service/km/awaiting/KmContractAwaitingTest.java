@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.awaiting;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;

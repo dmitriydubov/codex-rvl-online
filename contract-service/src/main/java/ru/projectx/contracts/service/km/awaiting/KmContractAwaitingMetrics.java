@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.awaiting;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;

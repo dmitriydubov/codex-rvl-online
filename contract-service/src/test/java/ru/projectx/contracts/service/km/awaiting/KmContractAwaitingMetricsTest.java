@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.awaiting;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
