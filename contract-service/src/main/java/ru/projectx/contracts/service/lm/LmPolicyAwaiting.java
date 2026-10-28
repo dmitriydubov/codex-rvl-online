@@ -8,7 +8,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
-import ru.projectx.contracts.service.usk.UskAwaiting;
+import ru.projectx.contracts.service.usk.awaiting.UskAwaiting;
 
 @Service
 public class LmPolicyAwaiting extends UskAwaiting<LmPolicy, LmPolicyStatus> {

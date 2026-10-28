@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.km;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.service.usk.AwaitingGauges;
-import ru.projectx.contracts.service.usk.AwaitingMetrics;
+import ru.projectx.contracts.service.usk.awaiting.AwaitingGauges;
+import ru.projectx.contracts.service.usk.awaiting.AwaitingMetrics;
 
 @Component
 public class KmContractAwaitingMetrics extends AwaitingMetrics {

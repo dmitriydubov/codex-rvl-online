@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.awaiting;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -10,6 +10,7 @@ import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
+import ru.projectx.contracts.service.usk.IssuanceKind;
 
 public class UskAwaiting<R extends IssuanceRecord, S extends IssuanceStatus> {
 
