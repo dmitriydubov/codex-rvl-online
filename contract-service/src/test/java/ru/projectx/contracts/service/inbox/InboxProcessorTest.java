@@ -21,7 +21,7 @@ import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.repository.journal.InboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.support.TestLeadership;

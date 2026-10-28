@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import ru.projectx.contracts.entity.inbox.QuarantinedMessage;
 import ru.projectx.contracts.entity.inbox.RejectedMessage;
-import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.repository.journal.QuarantineRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 

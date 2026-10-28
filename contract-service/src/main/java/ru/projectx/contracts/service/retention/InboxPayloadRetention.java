@@ -4,7 +4,7 @@ import java.time.Clock;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.contracts.config.journal.InboxProperties;
-import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.repository.journal.InboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Component

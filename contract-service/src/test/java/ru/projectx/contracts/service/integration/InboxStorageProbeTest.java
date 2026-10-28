@@ -20,7 +20,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import ru.projectx.contracts.repository.InboxProbeRepository;
+import ru.projectx.contracts.repository.journal.InboxProbeRepository;
 
 class InboxStorageProbeTest {
 

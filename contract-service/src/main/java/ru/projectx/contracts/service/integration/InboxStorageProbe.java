@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.repository.InboxProbeRepository;
+import ru.projectx.contracts.repository.journal.InboxProbeRepository;
 
 @Component
 public class InboxStorageProbe {

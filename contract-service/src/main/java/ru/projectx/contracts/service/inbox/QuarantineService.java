@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.entity.inbox.QuarantinedMessage;
 import ru.projectx.contracts.entity.inbox.RejectedMessage;
-import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.repository.journal.QuarantineRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 
 @Service

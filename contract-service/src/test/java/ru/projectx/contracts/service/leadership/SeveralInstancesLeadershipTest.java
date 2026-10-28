@@ -24,7 +24,7 @@ import org.springframework.test.context.TestPropertySource;
 import ru.projectx.contracts.ContractServiceApplication;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.config.broker.OneCBrokerProperties;
-import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.repository.journal.InboxMessageRepository;
 import ru.projectx.contracts.service.integration.InternalBroker;
 import ru.projectx.contracts.service.integration.OneCBroker;
 import ru.projectx.contracts.support.AmqpIntegrationTest;

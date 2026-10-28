@@ -26,7 +26,7 @@ import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;
-import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.support.TestLeadership;

@@ -12,7 +12,7 @@ import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;
 import ru.projectx.contracts.entity.outbox.OutboxStatus;
-import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
 
 class OutboxJournalTest {
 

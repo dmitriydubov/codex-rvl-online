@@ -1,4 +1,4 @@
-package ru.projectx.contracts.repository;
+package ru.projectx.contracts.repository.journal;
 
 import java.time.Instant;
 import java.util.List;

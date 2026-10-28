@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;
-import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Service

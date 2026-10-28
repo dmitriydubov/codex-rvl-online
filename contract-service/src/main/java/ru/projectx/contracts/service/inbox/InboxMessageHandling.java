@@ -9,7 +9,7 @@ import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.repository.InboxMessageRepository;
+import ru.projectx.contracts.repository.journal.InboxMessageRepository;
 import ru.projectx.contracts.service.InboxLogContext;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 

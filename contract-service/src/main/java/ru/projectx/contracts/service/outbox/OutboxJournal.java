@@ -4,7 +4,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;
-import ru.projectx.contracts.repository.OutboxMessageRepository;
+import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
 
 @Service
 public class OutboxJournal {
