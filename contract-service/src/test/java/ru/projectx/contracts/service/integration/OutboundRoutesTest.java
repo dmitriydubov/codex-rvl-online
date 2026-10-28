@@ -6,9 +6,9 @@ import static org.mockito.Mockito.mock;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
+import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 
 class OutboundRoutesTest {
 

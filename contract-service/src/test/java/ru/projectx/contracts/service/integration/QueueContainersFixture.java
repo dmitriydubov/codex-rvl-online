@@ -4,10 +4,10 @@ import java.time.Duration;
 import java.util.List;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
+import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
 import ru.projectx.contracts.config.InboxProperties;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.support.TestLeadership;
 

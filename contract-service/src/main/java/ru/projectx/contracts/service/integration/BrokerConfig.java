@@ -9,8 +9,8 @@ import org.springframework.boot.health.autoconfigure.contributor.ConditionalOnEn
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 
 @Configuration(proxyBeanMethods = false)
 @EnableRabbit

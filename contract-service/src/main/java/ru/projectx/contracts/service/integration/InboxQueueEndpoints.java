@@ -5,8 +5,8 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerEndpoint;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistrar;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 
 @Component
 public class InboxQueueEndpoints implements RabbitListenerConfigurer {

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.broker;
 
 import java.util.Arrays;
 import java.util.HashSet;

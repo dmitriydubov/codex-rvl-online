@@ -8,7 +8,7 @@ import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionNameStrategy;
 import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
 import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
+import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
 
 class BrokerConnectionFactoriesTest {
 

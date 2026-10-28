@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import ru.projectx.contracts.config.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.service.outbox.OutboundMessage;
 import ru.projectx.contracts.service.outbox.PublishOutcome;
 import ru.projectx.contracts.support.AmqpIntegrationTest;

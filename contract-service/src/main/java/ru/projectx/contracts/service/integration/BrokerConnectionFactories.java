@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.integration;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory.ConfirmType;
 import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
+import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
 
 final class BrokerConnectionFactories {
 

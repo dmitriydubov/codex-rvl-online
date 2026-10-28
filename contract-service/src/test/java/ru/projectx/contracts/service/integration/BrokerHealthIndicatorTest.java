@@ -15,7 +15,7 @@ import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
-import ru.projectx.contracts.config.BrokerConnectionProperties;
+import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
 
 class BrokerHealthIndicatorTest {
 
