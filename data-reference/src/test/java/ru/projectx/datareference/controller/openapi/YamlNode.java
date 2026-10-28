@@ -23,6 +23,10 @@ record YamlNode(@Nullable Object value) {
         return value instanceof String text ? Optional.of(text) : Optional.empty();
     }
 
+    Optional<Integer> integer() {
+        return value instanceof Integer number ? Optional.of(number) : Optional.empty();
+    }
+
     List<YamlNode> items() {
         return value instanceof List<?> list ? list.stream().map(YamlNode::new).toList() : List.of();
     }

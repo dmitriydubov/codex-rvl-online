@@ -15,6 +15,7 @@ import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -55,6 +56,7 @@ final class ErrorCatalog {
         return new Exception[] {
             new InvalidRequestException(FIELD, TEXT),
             new MissingServletRequestParameterException(FIELD, UUID.class.getSimpleName()),
+            new MissingPathVariableException(FIELD, failingParameter(), true),
             new MethodArgumentTypeMismatchException(TEXT, UUID.class, FIELD, failingParameter(), null),
             new UnsatisfiedServletRequestParameterException(new String[] {FIELD}, Map.of()),
             new NoResourceFoundException(HttpMethod.GET, "/unknown", "unknown"),
