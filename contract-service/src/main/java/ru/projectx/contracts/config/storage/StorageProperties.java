@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.storage;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

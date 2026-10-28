@@ -23,7 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.util.unit.DataSize;
-import ru.projectx.contracts.config.AttachmentProperties;
+import ru.projectx.contracts.config.storage.AttachmentProperties;
 import ru.projectx.contracts.dto.AttachmentResponse;
 import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.AttachmentConflictException;

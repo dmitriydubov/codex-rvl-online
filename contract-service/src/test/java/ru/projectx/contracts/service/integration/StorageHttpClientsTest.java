@@ -21,7 +21,7 @@ import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.boot.ssl.SslManagerBundle;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import ru.projectx.contracts.config.StorageProperties;
+import ru.projectx.contracts.config.storage.StorageProperties;
 
 class StorageHttpClientsTest {
 

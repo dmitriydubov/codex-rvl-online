@@ -4,7 +4,7 @@ import io.minio.MinioClient;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import ru.projectx.contracts.config.StorageProperties;
+import ru.projectx.contracts.config.storage.StorageProperties;
 
 @Configuration(proxyBeanMethods = false)
 public class StorageClientConfig {
