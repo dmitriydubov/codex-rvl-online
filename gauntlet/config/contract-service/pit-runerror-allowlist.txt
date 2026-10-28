@@ -13,12 +13,12 @@
 # InboxPropertiesTest: ladder_givesPauseAfterEachFailedAttemptAndNothingBeyondIt (attempt 1 -> contains 1m,
 # attempt 3 -> contains 15m, attempt 4 -> isEmpty, attempt 0 -> isEmpty). Verified by the coordinator 2026-10-12
 # (RUN_ERROR on these record methods appeared in one of three full runs of the step).
-ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  RemoveConditionalMutator_ORDER_ELSE  # attempt 0 -> get(-1), attempt 4 -> get(3): IndexOutOfBoundsException instead of isEmpty()
-ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  ConditionalsBoundaryMutator          # index <= 0: attempt 1 gets empty, contains(1m) fails; index > size: attempt 4 -> get(3) throws
-ru.projectx.contracts.config.InboxProperties$Retry#delayAfterFailedAttempt  EmptyObjectReturnValsMutator         # always empty: attempt 1 contains(1m) fails
+ru.projectx.contracts.config.journal.InboxProperties$Retry#delayAfterFailedAttempt  RemoveConditionalMutator_ORDER_ELSE  # attempt 0 -> get(-1), attempt 4 -> get(3): IndexOutOfBoundsException instead of isEmpty()
+ru.projectx.contracts.config.journal.InboxProperties$Retry#delayAfterFailedAttempt  ConditionalsBoundaryMutator          # index <= 0: attempt 1 gets empty, contains(1m) fails; index > size: attempt 4 -> get(3) throws
+ru.projectx.contracts.config.journal.InboxProperties$Retry#delayAfterFailedAttempt  EmptyObjectReturnValsMutator         # always empty: attempt 1 contains(1m) fails
 
 # PersonOwnerTest: contract_ownsPersonsThroughContractIdOnly (isEqualTo(new PersonOwner(ID, null)) fails on a null actual).
-ru.projectx.contracts.entity.PersonOwner#contract                            NullReturnValsMutator                # contract_owns...: isEqualTo(new PersonOwner(ID, null)) on null
+ru.projectx.contracts.entity.party.PersonOwner#contract                            NullReturnValsMutator                # contract_owns...: isEqualTo(new PersonOwner(ID, null)) on null
 
 # StatusTransitionsTest / IssuanceSnapshotTest: outcome of a record in the issuance snapshot (record RecordOutcome).
 # stopped() is the filter of StatusTransitions.stoppedSince, looksLike() is the body of IssuanceSnapshot.knows.
@@ -31,12 +31,12 @@ ru.projectx.contracts.service.status.RecordOutcome#looksLike                 Boo
 # ContractTaskParserTest / DocumentKindsTest / KmContractIssuanceTest / LmPolicyIssuanceTest / PersonSnapshotsTest: participant of a
 # task (record TaskParticipant). Verified by the coordinator 2026-10-13 on main after the merge of the LM policies step
 # (RUN_ERROR appeared in earlier runs of the step and was absent in the final one).
-ru.projectx.contracts.message.TaskParticipant#pays                           BooleanTrueReturnValsMutator         # ContractTaskParserTest.zeroAmountDue_isAccepted: pays() for 0.00 isFalse() fails; DocumentKindsTest.kind_followsRelativeFlagAndPositiveAmountDue: relative with 0.00 expects LM_POLICY, gets KM_CONTRACT
-ru.projectx.contracts.message.TaskParticipant#path                           EmptyObjectReturnValsMutator         # KmContractIssuanceTest / LmPolicyIssuanceTest: IssueError text "поле participants[1].program_id обязательно ..." becomes "поле .program_id ..."; PersonSnapshotsTest: hasMessage("поле participants[1].personal_data.relation_type ...") fails
+ru.projectx.contracts.message.task.TaskParticipant#pays                           BooleanTrueReturnValsMutator         # ContractTaskParserTest.zeroAmountDue_isAccepted: pays() for 0.00 isFalse() fails; DocumentKindsTest.kind_followsRelativeFlagAndPositiveAmountDue: relative with 0.00 expects LM_POLICY, gets KM_CONTRACT
+ru.projectx.contracts.message.task.TaskParticipant#path                           EmptyObjectReturnValsMutator         # KmContractIssuanceTest / LmPolicyIssuanceTest: IssueError text "поле participants[1].program_id обязательно ..." becomes "поле .program_id ..."; PersonSnapshotsTest: hasMessage("поле participants[1].personal_data.relation_type ...") fails
 
 # LeadershipPropertiesTest: lock TTL versus heartbeat check of the leadership settings (record LeadershipProperties,
 # @AssertTrue isLockTtlLongerThanHeartbeat = lockTtl != null && heartbeat != null && lockTtl.compareTo(heartbeat) > 0).
 # Verified by the coordinator 2026-10-27 on the leader-instance step branch (26578b3), owner "1) да".
-ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator          # > 0 -> >= 0: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; heartbeatNotShorterThanTtl_failsValidation (30s/30s) hasFailed() fails
-ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_EQUAL_ELSE  # null check forced to the else branch -> always false: ttlCheck_... row "PT30S, PT1S, true" isEqualTo(true) fails; completeConfiguration_bindsGroupTtlAndHeartbeat context fails validation
-ru.projectx.contracts.config.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE  # compareTo > 0 forced to the else branch -> always false: same two tests fail
+ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator          # > 0 -> >= 0: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; heartbeatNotShorterThanTtl_failsValidation (30s/30s) hasFailed() fails
+ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_EQUAL_ELSE  # null check forced to the else branch -> always false: ttlCheck_... row "PT30S, PT1S, true" isEqualTo(true) fails; completeConfiguration_bindsGroupTtlAndHeartbeat context fails validation
+ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE  # compareTo > 0 forced to the else branch -> always false: same two tests fail
