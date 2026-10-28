@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.repository.ContractRepository;

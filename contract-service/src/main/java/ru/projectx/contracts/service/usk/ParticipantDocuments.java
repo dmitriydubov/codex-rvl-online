@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.usk;
 
-import ru.projectx.contracts.entity.IdentityDocument;
+import ru.projectx.contracts.entity.party.IdentityDocument;
 import ru.projectx.contracts.message.ParticipantDocument;
 
 public final class ParticipantDocuments {

@@ -16,11 +16,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.AcceptanceChannel;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractAcceptance;
-import ru.projectx.contracts.entity.ContractPerson;
+import ru.projectx.contracts.entity.party.ContractPerson;
 import ru.projectx.contracts.entity.OfferAcceptance;
 import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PersonOwner;
-import ru.projectx.contracts.entity.PersonRole;
+import ru.projectx.contracts.entity.party.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.StoredFile;
@@ -128,7 +128,7 @@ class KmContractSubmissionFactsTest {
                 .hasMessageContaining(FIRST_DOCUMENT.toString());
     }
 
-    private static ContractPerson person(PersonRole role, ru.projectx.contracts.entity.PersonSnapshot person) {
+    private static ContractPerson person(PersonRole role, ru.projectx.contracts.entity.party.PersonSnapshot person) {
         return ContractPerson.snapshot(PersonOwner.contract(CONTRACT_ID), role, person, NOW);
     }
 

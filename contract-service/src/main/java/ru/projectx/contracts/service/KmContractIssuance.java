@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
 import ru.projectx.contracts.entity.ContractTerms;
-import ru.projectx.contracts.entity.PersonOwner;
-import ru.projectx.contracts.entity.PersonRole;
+import ru.projectx.contracts.entity.party.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.repository.ContractRepository;
 
 @Component

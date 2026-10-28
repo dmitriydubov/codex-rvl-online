@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.lm;
 
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.message.LmPolicyEvents;
 import ru.projectx.contracts.service.IssueErrors;
 import ru.projectx.contracts.service.usk.IssuanceKind;

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.party;
 
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;

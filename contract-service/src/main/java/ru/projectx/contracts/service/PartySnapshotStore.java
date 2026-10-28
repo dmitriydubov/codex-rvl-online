@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.ContractPerson;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.ContractPerson;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 
 @Component

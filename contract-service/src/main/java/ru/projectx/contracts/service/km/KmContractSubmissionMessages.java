@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.PersonSnapshot;
+import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.message.CertificateDocument;
 import ru.projectx.contracts.message.KmContractEvents;

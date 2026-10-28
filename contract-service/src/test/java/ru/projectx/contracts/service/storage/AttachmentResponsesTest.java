@@ -10,7 +10,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.AttachmentResponse;
 import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.StoredFile;

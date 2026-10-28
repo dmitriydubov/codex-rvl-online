@@ -15,6 +15,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.contracts.entity.party.PersonOwner;
 
 @Entity
 @Table(name = "contract_documents")

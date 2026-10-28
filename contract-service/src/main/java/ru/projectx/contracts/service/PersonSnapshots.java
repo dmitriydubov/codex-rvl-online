@@ -1,9 +1,9 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.Gender;
-import ru.projectx.contracts.entity.IdentityDocument;
-import ru.projectx.contracts.entity.IdentityDocumentType;
-import ru.projectx.contracts.entity.PersonSnapshot;
+import ru.projectx.contracts.entity.party.Gender;
+import ru.projectx.contracts.entity.party.IdentityDocument;
+import ru.projectx.contracts.entity.party.IdentityDocumentType;
+import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.exception.ParticipantDataException;
 import ru.projectx.contracts.message.ParticipantDocument;
 import ru.projectx.contracts.message.ParticipantPerson;

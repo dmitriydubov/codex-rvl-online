@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.party;
 
 import java.time.LocalDate;
 import java.util.UUID;

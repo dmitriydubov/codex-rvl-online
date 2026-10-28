@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.km;
 
 import java.time.Instant;
 import java.util.List;
-import ru.projectx.contracts.entity.PersonSnapshot;
+import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 
 public record SubmissionFacts(

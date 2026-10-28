@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuanceState;
 import ru.projectx.contracts.entity.issuance.IssueError;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.exception.ParticipantDataException;
 
 public abstract class RecordIssuance<R extends IssuanceRecord> {

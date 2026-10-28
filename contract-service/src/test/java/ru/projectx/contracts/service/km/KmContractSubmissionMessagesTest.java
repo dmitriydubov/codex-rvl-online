@@ -14,7 +14,7 @@ import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.config.StorageProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.PrintedFormType;
-import ru.projectx.contracts.entity.PersonSnapshot;
+import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.entity.StoredFile;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.service.PersonSnapshots;

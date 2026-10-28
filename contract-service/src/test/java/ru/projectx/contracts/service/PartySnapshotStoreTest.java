@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import ru.projectx.contracts.entity.ContractPerson;
-import ru.projectx.contracts.entity.PersonOwner;
-import ru.projectx.contracts.entity.PersonRole;
+import ru.projectx.contracts.entity.party.ContractPerson;
+import ru.projectx.contracts.entity.party.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.repository.ContractPersonRepository;
 import ru.projectx.contracts.support.Tasks;
 

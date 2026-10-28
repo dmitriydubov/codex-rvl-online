@@ -16,7 +16,7 @@ import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.PrintedForm;
 import ru.projectx.contracts.entity.PrintedFormType;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;

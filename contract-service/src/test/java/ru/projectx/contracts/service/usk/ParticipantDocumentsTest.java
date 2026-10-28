@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.entity.IdentityDocument;
-import ru.projectx.contracts.entity.IdentityDocumentType;
+import ru.projectx.contracts.entity.party.IdentityDocument;
+import ru.projectx.contracts.entity.party.IdentityDocumentType;
 import ru.projectx.contracts.message.ParticipantDocument;
 
 class ParticipantDocumentsTest {

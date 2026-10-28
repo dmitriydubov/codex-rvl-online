@@ -7,8 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
-import ru.projectx.contracts.entity.PersonOwner;
-import ru.projectx.contracts.entity.PersonRole;
+import ru.projectx.contracts.entity.party.PersonOwner;
+import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.repository.LmPolicyRepository;
 
 @Component
