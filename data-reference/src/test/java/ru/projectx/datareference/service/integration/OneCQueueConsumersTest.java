@@ -23,7 +23,7 @@ class OneCQueueConsumersTest {
             "q-contragent-services");
 
     @Mock
-    private OneCQueueContainers containers;
+    private OneCConsumerExpectation expectation;
 
     @Mock
     private OneCConsumerSubscriptions subscriptions;
@@ -32,8 +32,8 @@ class OneCQueueConsumersTest {
 
     @BeforeEach
     void leaderExpectsConsumers() {
-        consumers = new OneCQueueConsumers(QUEUES, containers, subscriptions);
-        when(containers.consumersExpected()).thenReturn(true);
+        consumers = new OneCQueueConsumers(QUEUES, expectation, subscriptions);
+        when(expectation.consumersExpected()).thenReturn(true);
     }
 
     @Test
@@ -61,7 +61,7 @@ class OneCQueueConsumersTest {
 
     @Test
     void consumersNotExpected_noQueueIsNamedEvenWithoutSubscriptions() {
-        when(containers.consumersExpected()).thenReturn(false);
+        when(expectation.consumersExpected()).thenReturn(false);
 
         assertThat(consumers.queuesWithoutConsumer()).isEmpty();
     }

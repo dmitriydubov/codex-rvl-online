@@ -25,8 +25,10 @@ class OneCConsumerPauseScheduleTest {
     void storageCheck_isOneFixedDelayTaskWithTheConfiguredInterval() {
         ScheduledTaskRegistrar registrar = new ScheduledTaskRegistrar();
 
-        new OneCConsumerPauseSchedule(pause, new IngestProperties(Duration.ofSeconds(5), CHECK_INTERVAL, Duration.ofSeconds(30)))
-                .configureTasks(registrar);
+        IngestProperties properties = new IngestProperties(
+                Duration.ofSeconds(5), CHECK_INTERVAL, Duration.ofSeconds(30), Duration.ofSeconds(30));
+
+        new OneCConsumerPauseSchedule(pause, properties).configureTasks(registrar);
 
         List<IntervalTask> tasks = registrar.getFixedDelayTaskList();
         assertThat(tasks).hasSize(1);

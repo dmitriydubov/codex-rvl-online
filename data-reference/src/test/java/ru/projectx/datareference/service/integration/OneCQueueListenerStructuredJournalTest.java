@@ -127,7 +127,9 @@ class OneCQueueListenerStructuredJournalTest {
                 new OneCEnvelopeParser(OneCJson.mapper()),
                 ingestService,
                 new OneCStorageFailures(quarantineService, pause,
-                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10), Duration.ofSeconds(30)), metrics,
+                        new IngestProperties(Duration.ofMillis(1), Duration.ofSeconds(10), Duration.ofSeconds(30),
+                                Duration.ofSeconds(30)),
+                        metrics,
                         TestLeadership.leader()),
                 metrics);
     }

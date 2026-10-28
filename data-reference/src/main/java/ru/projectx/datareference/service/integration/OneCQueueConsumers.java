@@ -9,19 +9,19 @@ import ru.projectx.datareference.config.OneCQueueProperties;
 public class OneCQueueConsumers {
 
     private final OneCQueueProperties queues;
-    private final OneCQueueContainers containers;
+    private final OneCConsumerExpectation expectation;
     private final OneCConsumerSubscriptions subscriptions;
 
-    OneCQueueConsumers(OneCQueueProperties queues, OneCQueueContainers containers,
+    OneCQueueConsumers(OneCQueueProperties queues, OneCConsumerExpectation expectation,
             OneCConsumerSubscriptions subscriptions) {
 
         this.queues = queues;
-        this.containers = containers;
+        this.expectation = expectation;
         this.subscriptions = subscriptions;
     }
 
     public List<String> queuesWithoutConsumer() {
-        if (!containers.consumersExpected()) {
+        if (!expectation.consumersExpected()) {
             return List.of();
         }
         return Arrays.stream(OneCQueue.values())
