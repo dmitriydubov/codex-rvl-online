@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

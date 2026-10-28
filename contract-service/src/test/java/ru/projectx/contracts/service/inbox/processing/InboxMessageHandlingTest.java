@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,6 +28,9 @@ import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.service.inbox.InboxEventHandler;
+import ru.projectx.contracts.service.inbox.InboxOrdering;
+import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 

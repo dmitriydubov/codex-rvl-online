@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import java.time.Clock;
 import java.util.Optional;
@@ -10,6 +10,8 @@ import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.service.inbox.InboxOrdering;
+import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.InboxLogContext;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 

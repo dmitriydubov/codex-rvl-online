@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -25,6 +25,7 @@ import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.support.TestLeadership;
 

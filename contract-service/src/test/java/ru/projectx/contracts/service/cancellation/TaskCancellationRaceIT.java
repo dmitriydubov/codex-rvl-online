@@ -25,7 +25,7 @@ import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
-import ru.projectx.contracts.service.inbox.InboxFailure;
+import ru.projectx.contracts.service.inbox.processing.InboxFailure;
 import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.RowRaces;

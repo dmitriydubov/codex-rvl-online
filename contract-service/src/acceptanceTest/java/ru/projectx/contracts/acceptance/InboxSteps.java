@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.awaitility.Awaitility;
-import ru.projectx.contracts.service.inbox.InboxProcessor;
+import ru.projectx.contracts.service.inbox.processing.InboxProcessor;
 import ru.projectx.contracts.service.retention.InboxPayloadRetention;
 import ru.projectx.contracts.service.retention.OutboxPayloadRetention;
 import ru.projectx.contracts.service.retention.QuarantinePayloadRetention;

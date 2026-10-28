@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

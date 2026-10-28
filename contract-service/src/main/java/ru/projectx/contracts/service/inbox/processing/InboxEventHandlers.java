@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import java.util.List;
 import java.util.Map;
@@ -7,6 +7,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
+import ru.projectx.contracts.service.inbox.InboxEventHandler;
+import ru.projectx.contracts.service.inbox.InboxOrdering;
 
 @Component
 public class InboxEventHandlers {

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.processing;
 
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.service.database.SqlStates;
