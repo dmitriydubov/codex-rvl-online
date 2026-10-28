@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.lm.awaiting;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
