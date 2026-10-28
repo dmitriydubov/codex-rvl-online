@@ -3,6 +3,7 @@ package ru.projectx.datareference.controller.openapi;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -11,12 +12,15 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.env.Environment;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.controller.InternalApi;
 import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.dto.ErrorResponse;
@@ -26,6 +30,7 @@ class OpenApiContractTest {
 
     private static final Set<String> PROBES = Set.of("/livez", "/readyz");
     private static final String PROBES_PROPERTY = "management.endpoint.health.probes.";
+    private static final String API_SETTINGS = "projectx.api";
 
     private static OpenApiDescription description;
 
@@ -86,6 +91,22 @@ class OpenApiContractTest {
     }
 
     @Test
+    void parameterLimitsMatchTheServiceSettings() {
+        api.run(context -> ParameterLimits.compare(ParameterLimits.configured(settings(context.getEnvironment())),
+                ParameterLimits.described(description), mismatches));
+
+        mismatches.assertNone();
+    }
+
+    @Test
+    void everyNightLimitInTheDescriptionIsTheConfiguredOne() throws IOException {
+        Set<Integer> described = ParameterLimits.nightLimits(Files.readString(OpenApiDescription.FILE));
+
+        api.run(context -> assertThat(described).as("«не больше N ночей» в описании против %s.price.max-nights",
+                API_SETTINGS).containsExactly(settings(context.getEnvironment()).price().maxNights()));
+    }
+
+    @Test
     void probesAreTheOnlyDescribedPathsOutsideTheApiAndTheServicePublishesThem() {
         Set<String> outsideApi = description.paths().stream()
                 .filter(path -> !path.startsWith(InternalApi.BASE_PATH + "/"))
@@ -105,6 +126,10 @@ class OpenApiContractTest {
                 .collect(Collectors.toMap(ResolvableType::toString, type -> type, (first, second) -> first))
                 .values()
                 .forEach(type -> schemas.compare(type, schema, operation + " → 200"));
+    }
+
+    private static ReferenceApiProperties settings(Environment environment) {
+        return Binder.get(environment).bindOrCreate(API_SETTINGS, ReferenceApiProperties.class);
     }
 
     private static Set<String> answeredErrors() {

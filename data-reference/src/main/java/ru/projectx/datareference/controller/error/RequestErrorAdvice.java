@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -50,13 +51,23 @@ public class RequestErrorAdvice {
         return validationError(List.of(new ErrorResponse.Violation(missing.getParameterName(), REQUIRED_PARAMETER)));
     }
 
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ResponseEntity<ErrorResponse> missingPathVariable(MissingPathVariableException missing) {
+        if (!missing.isMissingAfterConversion()) {
+            return UnexpectedFailure.answer(missing);
+        }
+        Class<?> type = missing.getParameter().getParameterType();
+        return ResponseEntity.badRequest()
+                .body(validationError(List.of(new ErrorResponse.Violation(missing.getVariableName(), expected(type)))));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse malformedArgument(MethodArgumentTypeMismatchException mismatch) {
         String expected = Optional.ofNullable(mismatch.getRequiredType())
-                .map(type -> EXPECTED_VALUES.getOrDefault(type, type.getSimpleName()))
-                .orElse("другой тип");
-        return validationError(List.of(new ErrorResponse.Violation(mismatch.getName(), "ожидается " + expected)));
+                .map(RequestErrorAdvice::expected)
+                .orElse("ожидается другой тип");
+        return validationError(List.of(new ErrorResponse.Violation(mismatch.getName(), expected)));
     }
 
     @ExceptionHandler(UnsatisfiedServletRequestParameterException.class)
@@ -91,6 +102,10 @@ public class RequestErrorAdvice {
 
     private static ErrorResponse validationError(List<ErrorResponse.Violation> violations) {
         return ErrorResponse.of(VALIDATION_ERROR, MALFORMED_REQUEST, violations, CurrentRequest.id());
+    }
+
+    private static String expected(Class<?> type) {
+        return "ожидается " + EXPECTED_VALUES.getOrDefault(type, type.getSimpleName());
     }
 
     private static Set<HttpMethod> allowedMethods(HttpRequestMethodNotSupportedException unsupported) {

@@ -269,14 +269,18 @@
   select name from appeal_types where not is_archive order by name;
   ```
 
-  Названия совпадают, а WARN есть — проверьте локаль базы:
+  Названия совпадают, а WARN есть — проверьте, меняет ли база регистр кириллицы:
 
   ```sql
-  select datctype from pg_database where datname = current_database();
+  select lower('РВЛ и СКЛ') = 'рвл и скл' as cyrillic_case,
+         datlocprovider, datctype, daticulocale
+  from pg_database where datname = current_database();
   ```
 
-  При `C` или `POSIX` PostgreSQL не меняет регистр кириллицы, и названия без учёта регистра не совпадают; так же
-  без учёта регистра перестают работать поиск по МКБ-10 и поиск полисов. Требование к локали — в
+  `cyrillic_case = false` — база создана с локалью `C` или `POSIX` провайдера `libc` (`datlocprovider = c`): в ней
+  регистр есть только у латиницы, и названия без учёта регистра не совпадают; так же без учёта регистра перестают
+  работать поиск по МКБ-10 и поиск полисов. У базы с провайдером ICU (`datlocprovider = i`) `datctype` бывает `C`, а
+  регистр кириллицы при этом работает, поэтому решает `cyrillic_case`, а не `datctype`. Требование к локали — в
   [operations.md](operations.md), «Выкатка и сеть».
 
 - **`SECURITY ALERT` клиента RabbitMQ** — выключена проверка сертификата брокера, см. [Брокер недоступен](#брокер-недоступен).
