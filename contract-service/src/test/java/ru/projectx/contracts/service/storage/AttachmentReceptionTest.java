@@ -25,7 +25,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.dto.AttachmentResponse;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.AttachmentConflictException;
 import ru.projectx.contracts.exception.AttachmentRejectedException;
 import ru.projectx.contracts.exception.StorageUnavailableException;

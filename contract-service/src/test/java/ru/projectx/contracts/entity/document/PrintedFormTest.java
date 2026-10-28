@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

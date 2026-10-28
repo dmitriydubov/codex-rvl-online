@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.ssl.DefaultSslBundleRegistry;
 import org.testcontainers.containers.MinIOContainer;
 import ru.projectx.contracts.config.StorageProperties;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.support.TestStorage;

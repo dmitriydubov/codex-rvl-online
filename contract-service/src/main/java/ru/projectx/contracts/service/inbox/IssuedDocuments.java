@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.inbox;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.projectx.contracts.entity.PrintedFormType;
+import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.IssuedDocument;
 import ru.projectx.contracts.service.Enums;

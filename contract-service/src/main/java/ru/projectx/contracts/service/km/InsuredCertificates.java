@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.km;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.repository.PrintedFormRepository;
 

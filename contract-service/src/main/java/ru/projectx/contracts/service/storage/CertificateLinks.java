@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.storage;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.StorageProperties;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 
 @Component
 public class CertificateLinks {

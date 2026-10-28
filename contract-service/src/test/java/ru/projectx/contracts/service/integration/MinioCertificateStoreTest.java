@@ -25,7 +25,7 @@ import java.security.InvalidKeyException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.service.storage.ContentSource;

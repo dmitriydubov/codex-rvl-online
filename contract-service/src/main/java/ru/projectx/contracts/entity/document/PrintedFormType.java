@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.document;
 
 public enum PrintedFormType {
     CONTRACT(true), POLICY(true), APPENDIX(true), MEDICAL_CERTIFICATE(false);

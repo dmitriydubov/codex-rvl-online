@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.packages;
 
 import java.util.List;
 import ru.projectx.contracts.dto.PackageItem.PackageDocument;
-import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedForm;
 
 final class PackageDocuments {
 

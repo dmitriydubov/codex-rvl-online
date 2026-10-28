@@ -1,9 +1,9 @@
 package ru.projectx.contracts.service.storage;
 
 import ru.projectx.contracts.dto.AttachmentResponse;
-import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PrintedForm;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.ParticipantAttachment;
+import ru.projectx.contracts.entity.document.PrintedForm;
+import ru.projectx.contracts.entity.document.StoredFile;
 
 final class AttachmentResponses {
 

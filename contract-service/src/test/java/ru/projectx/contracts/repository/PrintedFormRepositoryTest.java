@@ -14,11 +14,11 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssuanceRequest;
-import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PrintedForm;
-import ru.projectx.contracts.entity.PrintedFormType;
+import ru.projectx.contracts.entity.document.ParticipantAttachment;
+import ru.projectx.contracts.entity.document.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.support.IntegrationTest;
 
 @IntegrationTest

@@ -10,7 +10,7 @@ import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.IssuedDocumentKind;
 import ru.projectx.contracts.message.KmContractState;

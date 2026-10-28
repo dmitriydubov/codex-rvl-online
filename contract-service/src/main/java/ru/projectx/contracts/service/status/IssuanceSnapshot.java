@@ -13,7 +13,7 @@ import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.RequestStatus;
 
