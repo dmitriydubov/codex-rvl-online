@@ -37,6 +37,11 @@ public class RequestSteps {
         contracts.monitor(path);
     }
 
+    @Когда("Kubernetes запрашивает {string}")
+    public void kubernetesProbes(String path) {
+        contracts.request(path);
+    }
+
     @Когда("мониторинг запрашивает {string}, пока поле {string} ответа не станет равно {string}")
     public void monitoringRequestsUntil(String path, String field, String expected) {
         await().atMost(UNTIL_TIMEOUT).pollInterval(POLL_INTERVAL)

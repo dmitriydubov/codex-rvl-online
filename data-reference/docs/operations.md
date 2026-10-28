@@ -23,7 +23,9 @@ BOM Spring Boot.
 ## REST `/internal/v1`
 
 Только `GET`, ответы в JSON с полями в snake_case. Ручки доступны только сервисам Заявок и Договоров: своей
-авторизации у них нет, защищает сетевая политика.
+авторизации у них нет, защищает сетевая политика. Одновременно экземпляр обрабатывает не больше `API_MAX_CONCURRENT_REQUESTS` (100)
+запросов ко всем ручкам сразу; лишние сразу получают 503 `SERVICE_UNAVAILABLE`, пробы и порт актуатора под предел не
+попадают.
 
 | Метод | Путь | Что отдаёт |
 |---|---|---|
@@ -133,6 +135,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `DB_REST_CANCEL_SIGNAL_TIMEOUT_SECONDS` | `2` | сколько драйвер ждёт отправки отмены запроса в пуле REST-чтений, с |
 | `DB_LEADER_POOL_SIZE` | `1` | соединений в пуле блокировки ведущего `leader-lock`, не меньше 1; соединения держатся открытыми постоянно; у пула нет `lock_timeout`, остальные таймауты сеанса и ожидание соединения — как у пула приёма и разбора |
 | `API_READ_TIMEOUT_SECONDS` | `3` | лимит REST-чтения на каждый оператор, с; меньше `DB_LOCK_TIMEOUT` |
+| `API_MAX_CONCURRENT_REQUESTS` | `100` | сколько запросов к `/internal/v1` экземпляр обрабатывает одновременно; лишние сразу получают 503 `SERVICE_UNAVAILABLE`; целое не меньше 1, иначе сервис не стартует; больше `DB_REST_POOL_SIZE`; умолчание подобрано замером на 1 CPU / 1 ГБ ([load-testing.md](load-testing.md)) |
 
 **Брокер 1С:УСК**
 
@@ -297,6 +300,8 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `policies_retention_overdue_personal_data` | полисы, чьи ФИО, дата рождения и почта должны быть стёрты, но ещё нет | больше 0 дольше двух проходов стирания (2 ч) |
 | `hikaricp_*{pool}` | пулы соединений: `application` (приём и разбор), `rest-read` (REST-чтения) и `leader-lock` (блокировка ведущего; `hikaricp_connections_timeout_total{pool="leader-lock"}` растёт при недоступной базе, а ещё на остановке экземпляра, если в этот момент его транзакция приёма или разбора ещё держала строку блокировки) | `increase(hikaricp_connections_timeout_total{pool="application"}[5m]) > 0`; `hikaricp_connections_pending{pool="rest-read"} > 0` дольше минуты — REST-чтений больше, чем успевает пул: следующий шаг нагрузки даёт 503 ([load-testing.md](load-testing.md)) |
 | `http_server_requests_seconds_count{status,uri}` | запросы REST по статусу и шаблону пути | доля `status="503"` среди `uri=~"/internal/v1/.*"` выше 5 % за 10 минут |
+| `rest_read_rejected_total` | запросы к `/internal/v1`, отклонённые сразу по пределу одновременно обрабатываемых (`API_MAX_CONCURRENT_REQUESTS`) | `increase(rest_read_rejected_total[5m]) > 0`: экземпляр перегружен — нагрузка выше предела, нужна ещё реплика или больше CPU; вместе с `hikaricp_connections_pending{pool="rest-read"}` — база не успевает |
+| `rest_read_in_flight` | запросы к `/internal/v1` в обработке сейчас | держится у предела дольше минуты: следующий шаг нагрузки даст отказы |
 | `cache_gets_total`, `cache_puts_total`, `cache_evictions_total`, `cache_size` с меткой `cache` | кэш ответов | — |
 | `reference_cache_notifications_connected` | 1 — экземпляр слушает оповещения о сбросе кэша; 0 — соединения слушателя нет | хотя бы у одного экземпляра 0 дольше минуты — `min(reference_cache_notifications_connected) == 0` или правило по каждому экземпляру, не `sum()`: такой экземпляр не получает сбросов и отдаёт ответы, которые могут отставать до `REFERENCE_CACHE_TTL` |
 

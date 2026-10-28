@@ -52,7 +52,7 @@ info:
     | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны; в `details` — кандидаты |
     | 422 | `NO_ACTIVE_PRICE_CONTRACT`, `PRICE_NOT_COVERED` | данных 1С не хватает для ответа |
     | 500 | `INTERNAL_ERROR` | необработанная ошибка сервиса |
-    | 503 | `SERVICE_UNAVAILABLE` | база недоступна или не ответила за 3 с (`API_READ_TIMEOUT_SECONDS`); повторить позже, ограниченное число раз |
+    | 503 | `SERVICE_UNAVAILABLE` | база недоступна или не ответила за 3 с (`API_READ_TIMEOUT_SECONDS`), либо сервис перегружен — запрос пришёл сверх предела одновременно обрабатываемых (`API_MAX_CONCURRENT_REQUESTS`) и отклонён сразу; повторить позже с паузой, ограниченное число раз; `message` не разбирать |
 
     Запрос длиннее 8 КБ (строка запроса с заголовками) отбивает встроенный Tomcat: 400 в HTML, без `X-Request-Id`.
 
@@ -606,7 +606,7 @@ components:
               details: [{field: id, reason: ожидается UUID}]
               request_id: 3f1c2a9e-5b7d-4c11-9a2e-7d0f6b8e1a42
     ServiceUnavailable:
-      description: '`SERVICE_UNAVAILABLE` — база недоступна или не ответила вовремя; повторить позже'
+      description: '`SERVICE_UNAVAILABLE` — база недоступна или не ответила вовремя, либо сервис перегружен (запрос сверх предела одновременно обрабатываемых, отказ сразу); повторить позже с паузой'
       headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
       content:
         application/json:

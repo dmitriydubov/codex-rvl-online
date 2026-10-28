@@ -32,6 +32,7 @@ import org.springframework.transaction.TransactionTimedOutException;
 import ru.projectx.datareference.controller.FailingController;
 import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
+import ru.projectx.datareference.exception.RestOverloadException;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ServerFailureAdviceTest {
@@ -39,6 +40,7 @@ class ServerFailureAdviceTest {
     private static final String FOREIGN_TEXT = "Иванов Иван 1980-05-17";
     private static final String REQUEST_ID = "handler-test-1";
     private static final String JPQL = "select p from Policy p where p.externalId = ?1";
+    private static final int OVERLOAD_LIMIT = 4242;
 
     private final FailingController controller = new FailingController();
     private MockMvcTester mvc;
@@ -137,6 +139,30 @@ class ServerFailureAdviceTest {
 
         assertThat(output).contains("ERROR", "BadJpqlGrammarException at ", "request_id=" + REQUEST_ID)
                 .doesNotContain("WARN", FOREIGN_TEXT);
+    }
+
+    @Test
+    void overload_isServiceUnavailable_inUnifiedFormat_withItsOwnMessage() {
+        controller.failWith(new RestOverloadException(OVERLOAD_LIMIT));
+
+        MvcTestResult result = request();
+
+        assertThat(result).hasStatus(503);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(result).bodyJson().extractingPath("$.error.message")
+                .isEqualTo("сервис перегружен, повторите запрос позже");
+        assertThat(result).bodyJson().extractingPath("$.error.details").asArray().isEmpty();
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+        assertThat(result.getResponse().getHeader("Retry-After")).isNull();
+    }
+
+    @Test
+    void overload_isNotLogged(CapturedOutput output) {
+        controller.failWith(new RestOverloadException(OVERLOAD_LIMIT));
+
+        request();
+
+        assertThat(output).doesNotContain("WARN", "ERROR", String.valueOf(OVERLOAD_LIMIT));
     }
 
     static Stream<RuntimeException> permanentFailures() {
