@@ -3694,6 +3694,16 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   (Javadoc: ответы не того типа отбрасываются); свойства Boot для него нет — `ConnectionFactoryCustomizer`. Модель —
   Opus 5.5 (владелец «2) давай на Опус 5.5»; рекомендация координатора была Fable 5.1). **Сессия открыта 2026-10-28
   19:56 UTC**: session_01MHdnEr3HBVmAzfhaHBt3jV, окружение `default`, ветка `claude/sh90-channel-rpc-timeout`.
+  Реализация d99f42b5 (21:15 UTC): вариант (а) — `spring.rabbitmq.channel-rpc-timeout: ${RABBITMQ_CHANNEL_RPC_TIMEOUT:30s}`
+  и `ConnectionFactoryCustomizer` с `setChannelShouldCheckRpcResponseType(true)` (`service.integration.
+  OneCBrokerChannelsConfiguration` — про AMQP знает только этот пакет); тест на «замороженном» брокере
+  (`OneCFrozenBrokerTest`, `docker pause`); `operations.md`, `design.md`, `troubleshooting.md` (504, лишние каналы).
+  Решения владельца по остановке (2026-10-28, рекомендации координатора): «1) да» — без спецификации Gherkin (внешние
+  ответы не меняются, инфраструктура); «2) да» — остаточные риски приняты: (а) поздний ответ того же типа на том же
+  канале — одна лишняя неудачная попытка запуска; (б) 504 и переподключение всех потребителей, если брокер замер между
+  открытием канала и объявлением очереди — неподтверждённые сообщения приходят снова и принимаются как дубли (подтверждение
+  только после записи в базу), подтверждено по коду Spring AMQP; (в) каналы, не дождавшиеся открытия, открыты у брокера
+  до закрытия соединения (в тесте 19 вместо 12). README и `data-reference/CLAUDE.md` — координатор после мержа.
 - **Бэклог без номера, владелец «2) да» 2026-10-28, взят в Ш90 — явный предел команд канала RabbitMQ для всего клиента**
   (`spring.rabbitmq.channel-rpc-timeout`; Boot 4.0.7: `Duration`, умолчание 10m, «Continuation timeout for RPC calls in
   channels. Set it to zero to wait forever»). Основание — Ш89: брокер, который принял соединение и не отвечает на команды
