@@ -3,13 +3,11 @@ package ru.projectx.contracts.config.journal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
-import ru.projectx.contracts.config.ContractNumberingProperties;
 
 class InboxPropertiesTest {
 
@@ -17,14 +15,14 @@ class InboxPropertiesTest {
             .withUserConfiguration(Inbox.class);
 
     @Test
-    void completeConfiguration_bindsProcessingRetryRetentionAndNumbering() {
+    void completeConfiguration_bindsProcessingRetryRetentionAndPause() {
         contexts.withPropertyValues(
                 "projectx.inbox.processing.interval=10s", "projectx.inbox.processing.batch-size=100",
                 "projectx.inbox.retry.backoff=1m,5m,15m",
                 "projectx.inbox.retention.payload=30d", "projectx.inbox.retention.interval=1h",
                 "projectx.inbox.retention.batch-size=500", "projectx.inbox.pause.storage-check-interval=10s",
-                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s",
-                "projectx.contracts.numbering.zone=Europe/Moscow").run(context -> {
+                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s")
+                .run(context -> {
             InboxProperties inbox = context.getBean(InboxProperties.class);
 
             assertThat(inbox.processing()).isEqualTo(new InboxProperties.Processing(Duration.ofSeconds(10), 100));
@@ -34,7 +32,6 @@ class InboxPropertiesTest {
                     .isEqualTo(new InboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500));
             assertThat(inbox.pause()).isEqualTo(new InboxProperties.Pause(Duration.ofSeconds(10), Duration.ofSeconds(30)));
             assertThat(inbox.duplicateDeliveryBackoff()).isEqualTo(Duration.ofSeconds(5));
-            assertThat(context.getBean(ContractNumberingProperties.class).zone()).isEqualTo(ZoneId.of("Europe/Moscow"));
         });
     }
 
@@ -45,8 +42,7 @@ class InboxPropertiesTest {
                 "projectx.inbox.retry.backoff=",
                 "projectx.inbox.retention.payload=30d", "projectx.inbox.retention.interval=1h",
                 "projectx.inbox.retention.batch-size=500", "projectx.inbox.pause.storage-check-interval=10s",
-                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s",
-                "projectx.contracts.numbering.zone=Europe/Moscow")
+                "projectx.inbox.pause.consumer-stop-timeout=30s", "projectx.inbox.duplicate-delivery-backoff=5s")
                 .run(context -> assertThat(context).hasFailed());
     }
 
@@ -62,7 +58,7 @@ class InboxPropertiesTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @EnableConfigurationProperties({InboxProperties.class, ContractNumberingProperties.class})
+    @EnableConfigurationProperties(InboxProperties.class)
     static class Inbox {
     }
 }

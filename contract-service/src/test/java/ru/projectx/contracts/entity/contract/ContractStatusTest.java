@@ -1,13 +1,11 @@
-package ru.projectx.contracts.entity.issuance;
+package ru.projectx.contracts.entity.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import ru.projectx.contracts.entity.contract.ContractStatus;
-import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 
-class StatusTest {
+class ContractStatusTest {
 
     @ParameterizedTest
     @EnumSource(value = ContractStatus.class, names = {"ISSUED", "ERROR", "CANCELLED"})
@@ -22,26 +20,8 @@ class StatusTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = LmPolicyStatus.class, names = {"ISSUED", "ERROR", "CANCELLED"})
-    void lmPolicy_isFinishedOnceIssuedFailedOrCancelled(LmPolicyStatus status) {
-        assertThat(status.finished()).isTrue();
-    }
-
-    @ParameterizedTest
-    @EnumSource(value = LmPolicyStatus.class, names = {"NEW", "SUBMITTED"})
-    void lmPolicy_isUnfinishedWhileWorkContinues(LmPolicyStatus status) {
-        assertThat(status.finished()).isFalse();
-    }
-
-    @ParameterizedTest
     @EnumSource(ContractStatus.class)
     void contract_outcomeNamesItsStatusOnceFinished(ContractStatus status) {
-        assertThat(status.outcome().name().equals(status.name())).isEqualTo(status.finished());
-    }
-
-    @ParameterizedTest
-    @EnumSource(LmPolicyStatus.class)
-    void lmPolicy_outcomeNamesItsStatusOnceFinished(LmPolicyStatus status) {
         assertThat(status.outcome().name().equals(status.name())).isEqualTo(status.finished());
     }
 
@@ -52,14 +32,5 @@ class StatusTest {
         assertThat(status.error()).isEqualTo(status == ContractStatus.ERROR);
         assertThat(status.stopped())
                 .isEqualTo(status == ContractStatus.ERROR || status == ContractStatus.CANCELLED);
-    }
-
-    @ParameterizedTest
-    @EnumSource(LmPolicyStatus.class)
-    void lmPolicy_isIssuedOnlyWhenIssuedAndInErrorOnlyWhenError(LmPolicyStatus status) {
-        assertThat(status.issued()).isEqualTo(status == LmPolicyStatus.ISSUED);
-        assertThat(status.error()).isEqualTo(status == LmPolicyStatus.ERROR);
-        assertThat(status.stopped())
-                .isEqualTo(status == LmPolicyStatus.ERROR || status == LmPolicyStatus.CANCELLED);
     }
 }
