@@ -17,6 +17,7 @@ Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер
 | Что | Значение | Переменная |
 |---|---|---|
 | Чтение по REST | 3 с | `API_READ_TIMEOUT_SECONDS` |
+| Запросов REST одновременно, лишние — сразу 503 | 100 | `API_MAX_CONCURRENT_REQUESTS` |
 | Ожидание соединения | 2 с | `DB_REST_CONNECTION_TIMEOUT_MS`, `DB_CONNECTION_TIMEOUT_MS` |
 | Зависшая база: REST; приём и разбор | 5 с; 60 с | `DB_REST_SOCKET_TIMEOUT_SECONDS`; `DB_SOCKET_TIMEOUT_SECONDS` |
 | Оператор; блокировка; простой транзакции | 30 с; 5 с; 1 мин | `DB_STATEMENT_TIMEOUT`; `DB_LOCK_TIMEOUT`; `DB_IDLE_IN_TRANSACTION_TIMEOUT` |
@@ -26,7 +27,7 @@ Java 21, Spring Boot 4.0.7, PostgreSQL 16, Liquibase, RabbitMQ 4.1 (брокер
 | Повторы разбора | 30 с, 5 мин, 30 мин | — |
 | Прогрев | 30 с | `WARMUP_TIMEOUT` |
 | Кэш справочников | 10 мин | `REFERENCE_CACHE_TTL` |
-| Переподключение сброса кэша | 1–10 с | `REFERENCE_CACHE_RECONNECT_DELAY`, `REFERENCE_CACHE_RECONNECT_MAX_DELAY` |
+| Переподключение сброса кэша | 1–10 с | `REFERENCE_CACHE_RECONNECT_DELAY`, `…_MAX_DELAY` |
 
 ## Без базы и без брокера
 
@@ -61,7 +62,7 @@ select stream, awaited_parent_kind, awaited_parent_id, count(*), min(parent_wait
 
 ## Подробнее
 
-- [troubleshooting.md](docs/troubleshooting.md) — известные проблемы: признак, проверка, что делать.
+- [troubleshooting.md](docs/troubleshooting.md) — известные проблемы и что делать.
 - [operations.md](docs/operations.md) — настройки, выкатка, метрики, ручные операции.
 - [design.md](docs/design.md) — почему так устроено; [code-style.md](docs/code-style.md) — как пишем код.
 - [load-testing.md](docs/load-testing.md) — нагрузка.
