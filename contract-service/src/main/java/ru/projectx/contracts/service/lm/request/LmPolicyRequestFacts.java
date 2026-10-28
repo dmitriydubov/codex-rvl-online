@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.lm.request;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.policy.LmPolicy;

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.lm;
+package ru.projectx.contracts.service.lm.request;
 
 import java.time.Clock;
 import java.time.Instant;
