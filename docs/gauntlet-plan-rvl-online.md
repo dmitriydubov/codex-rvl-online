@@ -3691,6 +3691,21 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   запуском потребителя контейнера Spring AMQP 4.0.4 и `amqp-client` 5.27.1 `channelRpcTimeout`), переменная окружения,
   `application.yml`, `docs/operations.md` и `design.md`, тест, что предел доходит до фабрики соединений. Около 1 ч. Текст
   Jira — координатор, до начала работы, на утверждение владельцу.
+- **Ш89 сделан: PR #276 смержен 2026-10-28 19:07 UTC (`main` a94a6e64); сессия заархивирована.** Голова PR — коммит
+  координатора `spec:` 64530d39; сессия после него перепрогнала `gherkinMutation` с повторной приёмкой (108 из 108), код
+  после 998ba705 не менялся. Гейты сессии: 735 сценариев, PIT 88/88 (1 TIMED_OUT), покрытие строк 219/220, Gherkin
+  108/108, max CRAP 3.0; ревьюер — раунд 1 (2 major, 4 minor, исправлено), раунд 2 APPROVED; Grok не комментировал; факт
+  ≈ 7 ч против 6–8 ч. Новые классы `service.integration`: `OneCConsumerExpectation`, `OneCConsumerOutageJournal`,
+  `OneCQueuePresence`, `OneCConsumerRestart`, `OneCConsumerRestartSchedule`, `OneCQueuesWithoutConsumerGauge`; настройка
+  `projectx.onec.ingest.consumer-restart-interval` (30s, без переменной окружения); показатель
+  `onec_ingest_queues_without_consumer`. Проверка после мержа: код `data-reference` в `main` = голова PR; фичи менялись
+  только коммитами `spec:` d8195646, 9346cfbf, 64530d39; защищённые файлы и файлы сборки не тронуты; удалённых и
+  переименованных файлов, зависимостей нет; обе команды следов разработки на `main` пусты. Контрольный `gauntletFast` на
+  `main` a94a6e64 зелёный: 2122 теста, 735 сценариев, 7 архитектурных, 0 skipped (21 мин 11 с). README (координатор):
+  строка «Пропала очередь — ведущий вернёт потребителя сам, раз в 30 с (`onec_ingest_queues_without_consumer`)»; ради
+  места убраны `Caffeine` из стека, перечень `health`/`prometheus` у порта актуатора, пул `DB_LEADER_POOL_SIZE` и
+  «занятый пул» в строке о недоступной базе (всё есть в `operations.md`), сокращены две подписи; 3490 символов.
+  `data-reference/CLAUDE.md` — на подтверждении владельца.
 - **Бэклог без номера, взят в Ш87 2026-10-28 — сверка пределов параметров `openapi.yaml` с `projectx.api.*`**
   (`maxLength`, `minimum`, `maximum`, `maxItems` против `max-query-length`, лимитов `limit`, `max-codes`, `max-nights`; около 1–2 ч). Сейчас
   правка предела в `application.yml` тестом Ш85 не ловится, пределы проверяет `reviewer`. Владелец 2026-10-21 «1) да» —
