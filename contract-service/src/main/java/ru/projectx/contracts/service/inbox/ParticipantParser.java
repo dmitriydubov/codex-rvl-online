@@ -4,6 +4,7 @@ import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ParticipantDocument;
 import ru.projectx.contracts.message.task.ParticipantPerson;
 import ru.projectx.contracts.message.task.TaskParticipant;
+import ru.projectx.contracts.service.inbox.parse.JsonFields;
 
 final class ParticipantParser {
 

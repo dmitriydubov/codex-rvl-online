@@ -5,6 +5,9 @@ import java.time.format.DateTimeParseException;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
+import ru.projectx.contracts.service.inbox.parse.JsonFields;
+import ru.projectx.contracts.service.inbox.parse.MessageBodies;
+import ru.projectx.contracts.service.inbox.parse.PayloadParser;
 
 @Component
 public class TaskCancellationParser implements PayloadParser<ContractTaskCancellation> {

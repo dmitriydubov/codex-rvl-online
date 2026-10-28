@@ -6,6 +6,9 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskParticipant;
+import ru.projectx.contracts.service.inbox.parse.JsonFields;
+import ru.projectx.contracts.service.inbox.parse.MessageBodies;
+import ru.projectx.contracts.service.inbox.parse.PayloadParser;
 
 @Component
 public class ContractTaskParser implements PayloadParser<ContractTask> {

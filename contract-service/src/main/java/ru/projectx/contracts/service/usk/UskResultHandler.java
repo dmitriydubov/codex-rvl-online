@@ -11,7 +11,7 @@ import ru.projectx.contracts.message.usk.UskResult;
 import ru.projectx.contracts.service.inbox.InboxOrdering;
 import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.inbox.ParsedEventHandler;
-import ru.projectx.contracts.service.inbox.PayloadParser;
+import ru.projectx.contracts.service.inbox.parse.PayloadParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
 
 public class UskResultHandler<R extends IssuanceRecord, S extends IssuanceStatus> extends ParsedEventHandler<UskResult> {

@@ -6,6 +6,7 @@ import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.service.Enums;
+import ru.projectx.contracts.service.inbox.parse.JsonFields;
 
 final class IssuedDocuments {
 

@@ -4,6 +4,9 @@ import java.util.List;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
+import ru.projectx.contracts.service.inbox.parse.JsonFields;
+import ru.projectx.contracts.service.inbox.parse.MessageBodies;
+import ru.projectx.contracts.service.inbox.parse.PayloadParser;
 
 public class UskResultParser implements PayloadParser<UskResult> {
 

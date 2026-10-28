@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
+import ru.projectx.contracts.service.inbox.parse.FieldPresence;
+import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.support.LmPolicyResultBodies;
 import ru.projectx.contracts.support.UskResultBodies;
 import tools.jackson.databind.json.JsonMapper;

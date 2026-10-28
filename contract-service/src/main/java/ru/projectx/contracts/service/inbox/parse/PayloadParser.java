@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.parse;
 
 @FunctionalInterface
 public interface PayloadParser<T> {

@@ -12,6 +12,7 @@ import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.ParticipantDocument;
 import ru.projectx.contracts.message.task.ParticipantPerson;
 import ru.projectx.contracts.message.task.TaskParticipant;
+import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.support.TaskBodies;
 import tools.jackson.databind.json.JsonMapper;
 

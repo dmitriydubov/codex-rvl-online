@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.parse;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,21 +10,21 @@ import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.service.Guids;
 import tools.jackson.databind.JsonNode;
 
-record JsonFields(JsonNode node, String path) {
+public record JsonFields(JsonNode node, String path) {
 
     JsonFields child(String name) {
         return new JsonFields(node.path(name), pathOf(name));
     }
 
-    String pathOf(String name) {
+    public String pathOf(String name) {
         return path.isEmpty() ? name : path + "." + name;
     }
 
-    JsonFields item(int index) {
+    public JsonFields item(int index) {
         return new JsonFields(node.path(index), path + "[" + index + "]");
     }
 
-    JsonFields requiredObject(String name) {
+    public JsonFields requiredObject(String name) {
         JsonFields child = child(name);
         if (!child.node.isObject()) {
             throw absentOrInvalid(name);
@@ -32,7 +32,7 @@ record JsonFields(JsonNode node, String path) {
         return child;
     }
 
-    JsonFields requiredArray(String name) {
+    public JsonFields requiredArray(String name) {
         JsonFields child = child(name);
         if (!child.node.isArray()) {
             throw absentOrInvalid(name);
@@ -51,11 +51,11 @@ record JsonFields(JsonNode node, String path) {
         return true;
     }
 
-    int size() {
+    public int size() {
         return node.size();
     }
 
-    @Nullable Long longOrNull(String name) {
+    public @Nullable Long longOrNull(String name) {
         JsonNode value = node.path(name);
         if (absent(value)) {
             return null;
@@ -74,7 +74,7 @@ record JsonFields(JsonNode node, String path) {
         return !value.isIntegralNumber() || !value.canConvertToLong();
     }
 
-    String text(String name) {
+    public String text(String name) {
         return optionalText(name).orElseThrow(() -> absentOrInvalid(name));
     }
 
@@ -90,19 +90,19 @@ record JsonFields(JsonNode node, String path) {
         return value.isString() ? Optional.of(value.stringValue()) : Optional.empty();
     }
 
-    @Nullable String textOrNull(String name) {
+    public @Nullable String textOrNull(String name) {
         return optionalText(name).orElse(null);
     }
 
-    UUID uuid(String name) {
+    public UUID uuid(String name) {
         return Guids.canonical(text(name)).orElseThrow(() -> ContractViolationException.invalidValue(pathOf(name)));
     }
 
-    @Nullable UUID uuidOrNull(String name) {
+    public @Nullable UUID uuidOrNull(String name) {
         return optionalText(name).isPresent() ? uuid(name) : null;
     }
 
-    int integer(String name) {
+    public int integer(String name) {
         JsonNode value = node.path(name);
         if (!value.isIntegralNumber() || !value.canConvertToInt()) {
             throw absentOrInvalid(name);
@@ -110,7 +110,7 @@ record JsonFields(JsonNode node, String path) {
         return value.intValue();
     }
 
-    LocalDate date(String name) {
+    public LocalDate date(String name) {
         try {
             return LocalDate.parse(text(name));
         }
@@ -119,11 +119,11 @@ record JsonFields(JsonNode node, String path) {
         }
     }
 
-    @Nullable LocalDate dateOrNull(String name) {
+    public @Nullable LocalDate dateOrNull(String name) {
         return optionalText(name).isPresent() ? date(name) : null;
     }
 
-    BigDecimal decimal(String name) {
+    public BigDecimal decimal(String name) {
         JsonNode value = node.path(name);
         if (!value.isNumber()) {
             throw absentOrInvalid(name);
@@ -131,7 +131,7 @@ record JsonFields(JsonNode node, String path) {
         return value.decimalValue();
     }
 
-    boolean bool(String name) {
+    public boolean bool(String name) {
         JsonNode value = node.path(name);
         if (!value.isBoolean()) {
             throw absentOrInvalid(name);

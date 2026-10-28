@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.km;
 
-import ru.projectx.contracts.service.inbox.FieldPresence;
+import ru.projectx.contracts.service.inbox.parse.FieldPresence;
 import ru.projectx.contracts.service.inbox.UskResultLayout;
 import ru.projectx.contracts.service.usk.UskWording;
 

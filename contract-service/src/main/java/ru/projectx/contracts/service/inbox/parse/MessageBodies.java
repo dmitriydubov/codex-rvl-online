@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.parse;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
@@ -10,8 +10,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class MessageBodies {
 
-    static final String META = "meta";
-    static final String DATA = "data";
+    public static final String META = "meta";
+    public static final String DATA = "data";
 
     private static final String ROOT = "";
 
@@ -21,11 +21,11 @@ public class MessageBodies {
         this.json = json.reader(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     }
 
-    JsonFields data(String payload) {
+    public JsonFields data(String payload) {
         return body(payload).requiredObject(DATA);
     }
 
-    JsonFields body(String payload) {
+    public JsonFields body(String payload) {
         try {
             return new JsonFields(json.readTree(payload), ROOT);
         }
