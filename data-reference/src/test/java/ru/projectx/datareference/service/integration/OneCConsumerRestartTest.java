@@ -118,6 +118,19 @@ class OneCConsumerRestartTest {
     }
 
     @Test
+    void brokerLostAfterTheFirstQueueWasFound_startsTheFoundOneAndPostponesTheRest() {
+        when(containers.stopped()).thenReturn(inOrder(POLICIES, MKB10));
+        when(presence.of(POLICIES)).thenReturn(OneCQueuePresence.OnBroker.PRESENT);
+        when(presence.of(MKB10)).thenReturn(OneCQueuePresence.OnBroker.UNREACHABLE);
+
+        restart.restartStopped();
+
+        verify(containers).start(POLICIES);
+        verify(containers, never()).start(MKB10);
+        verifyNoInteractions(journal);
+    }
+
+    @Test
     void brokerRefusesTheQueue_isReportedNotStartedAndTheNextQueueIsProbed() {
         when(containers.stopped()).thenReturn(inOrder(POLICIES, MKB10));
         when(presence.of(POLICIES)).thenReturn(OneCQueuePresence.OnBroker.REFUSED);
