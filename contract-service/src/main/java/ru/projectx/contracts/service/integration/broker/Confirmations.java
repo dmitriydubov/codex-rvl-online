@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.broker;
 
 import java.time.Duration;
 import java.util.Optional;

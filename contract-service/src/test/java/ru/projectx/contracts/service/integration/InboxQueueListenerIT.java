@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.service.integration.broker.InternalBroker;
 import ru.projectx.contracts.support.AmqpIntegrationTest;
 import ru.projectx.contracts.support.TaskBodies;
 import ru.projectx.contracts.support.TestQueues;

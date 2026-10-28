@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.broker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

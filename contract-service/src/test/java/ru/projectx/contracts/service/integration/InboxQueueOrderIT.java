@@ -20,6 +20,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.service.integration.broker.InternalBroker;
+import ru.projectx.contracts.service.integration.broker.OneCBroker;
 import ru.projectx.contracts.support.AmqpIntegrationTest;
 import ru.projectx.contracts.support.TaskBodies;
 import ru.projectx.contracts.support.TestQueues;

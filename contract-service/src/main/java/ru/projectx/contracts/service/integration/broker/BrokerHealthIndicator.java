@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.broker;
 
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.connection.Connection;
