@@ -10,7 +10,7 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
-import ru.projectx.contracts.message.RequestStatus;
+import ru.projectx.contracts.message.status.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

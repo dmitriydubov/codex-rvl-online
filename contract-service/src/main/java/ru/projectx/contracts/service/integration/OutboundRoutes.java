@@ -8,7 +8,7 @@ import ru.projectx.contracts.config.InternalBrokerProperties;
 import ru.projectx.contracts.config.OneCBrokerProperties;
 import ru.projectx.contracts.message.KmContractEvents;
 import ru.projectx.contracts.message.LmPolicyEvents;
-import ru.projectx.contracts.message.StatusEvents;
+import ru.projectx.contracts.message.status.StatusEvents;
 
 @Component
 public class OutboundRoutes {

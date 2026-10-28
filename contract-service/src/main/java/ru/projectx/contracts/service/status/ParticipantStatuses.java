@@ -12,11 +12,11 @@ import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
-import ru.projectx.contracts.message.IssuedDocumentKind;
-import ru.projectx.contracts.message.KmContractState;
-import ru.projectx.contracts.message.ParticipantStatus;
-import ru.projectx.contracts.message.PaymentStatus;
-import ru.projectx.contracts.message.StatusDocument;
+import ru.projectx.contracts.message.status.IssuedDocumentKind;
+import ru.projectx.contracts.message.status.KmContractState;
+import ru.projectx.contracts.message.status.ParticipantStatus;
+import ru.projectx.contracts.message.status.PaymentStatus;
+import ru.projectx.contracts.message.status.StatusDocument;
 
 final class ParticipantStatuses {
 

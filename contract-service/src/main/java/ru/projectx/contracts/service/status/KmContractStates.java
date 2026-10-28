@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.status;
 import java.util.Optional;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
-import ru.projectx.contracts.message.KmContractState;
+import ru.projectx.contracts.message.status.KmContractState;
 
 final class KmContractStates {
 

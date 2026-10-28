@@ -22,7 +22,7 @@ import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.entity.document.UskDocument;
-import ru.projectx.contracts.message.RequestStatus;
+import ru.projectx.contracts.message.status.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.status;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.UUID;

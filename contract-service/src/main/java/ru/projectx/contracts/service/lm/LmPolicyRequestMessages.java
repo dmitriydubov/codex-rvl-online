@@ -13,7 +13,7 @@ import ru.projectx.contracts.message.LmPolicyEvents;
 import ru.projectx.contracts.message.LmPolicyRequest;
 import ru.projectx.contracts.message.LmPolicyRequested;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.message.StatusEvents;
+import ru.projectx.contracts.message.status.StatusEvents;
 import ru.projectx.contracts.service.usk.ParticipantDocuments;
 import ru.projectx.contracts.service.usk.RequestTerms;
 import ru.projectx.contracts.service.usk.UskRequestMessages;

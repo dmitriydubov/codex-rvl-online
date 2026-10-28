@@ -15,7 +15,7 @@ import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
-import ru.projectx.contracts.message.RequestStatus;
+import ru.projectx.contracts.message.status.RequestStatus;
 
 public final class IssuanceSnapshot {
 

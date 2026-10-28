@@ -2,10 +2,10 @@ package ru.projectx.contracts.service.status;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.message.ContractStatusChanged;
+import ru.projectx.contracts.message.status.ContractStatusChanged;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.message.ParticipantStatus;
-import ru.projectx.contracts.message.RequestIssuanceStatus;
+import ru.projectx.contracts.message.status.ParticipantStatus;
+import ru.projectx.contracts.message.status.RequestIssuanceStatus;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component

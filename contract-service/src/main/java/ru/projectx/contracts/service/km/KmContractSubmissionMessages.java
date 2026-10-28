@@ -18,7 +18,7 @@ import ru.projectx.contracts.message.KmContractPerson;
 import ru.projectx.contracts.message.KmContractSubmission;
 import ru.projectx.contracts.message.KmContractSubmitted;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.message.StatusEvents;
+import ru.projectx.contracts.message.status.StatusEvents;
 import ru.projectx.contracts.service.storage.CertificateLinks;
 import ru.projectx.contracts.service.usk.ParticipantDocuments;
 import ru.projectx.contracts.service.usk.RequestTerms;
