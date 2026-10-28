@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.storage;
 
 import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;

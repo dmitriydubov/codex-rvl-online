@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.storage;
 
 import io.minio.MinioClient;
 import org.springframework.boot.ssl.SslBundles;

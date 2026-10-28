@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.storage;
 
 import java.util.Arrays;
 import java.util.Optional;
