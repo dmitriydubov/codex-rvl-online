@@ -251,7 +251,7 @@
       | начало      | 2026-01-01T00:00:00                  |
       | окончание   | 2030-12-31T23:59:59                  |
     Тогда очередь "<первая очередь>" пуста и у неё есть потребитель
-    И сырьё в порядке приёма — сообщения "<message-id>"
+    И сырьё в порядке приёма — сообщения "<сырьё в порядке приёма>"
     И мониторинг запрашивает "/actuator/health"
     И Дата-референс отвечает <health HTTP>
     И поле "components.onecIngest.status" ответа равно "<health status>"
@@ -269,8 +269,8 @@
     И поля "components.onecIngest.details.queuesWithoutConsumer" в ответе нет
 
     Примеры:
-      | проход                             | первая очередь       | вторая очередь | первая в health                        | вторая в health               | показатель                           | пропали обе | пропала одна | вернулись обе | ERROR на очередь | INFO вернувшейся | INFO отсутствующей | message-id                           | health HTTP | health status | health HTTP после | health status после |
-      | запуск остановленных потребителей | договоры страхования | полисы         | 1c-usk_to_rvl-online_contracts-changes | 1c-usk_to_rvl-online_policies | onec_ingest_queues_without_consumer | 2           | 1            | 0             | 1                | 1                | 0                  | b16c9d7e-4f8b-4c0d-9e2f-6a7b8c9d0e51 | 503         | DOWN          | 200               | UP                  |
+      | проход                             | первая очередь       | вторая очередь | первая в health                        | вторая в health               | показатель                           | пропали обе | пропала одна | вернулись обе | ERROR на очередь | INFO вернувшейся | INFO отсутствующей | message-id                           | сырьё в порядке приёма               | health HTTP | health status | health HTTP после | health status после |
+      | запуск остановленных потребителей | договоры страхования | полисы         | 1c-usk_to_rvl-online_contracts-changes | 1c-usk_to_rvl-online_policies | onec_ingest_queues_without_consumer | 2           | 1            | 0             | 1                | 1                | 0                  | b16c9d7e-4f8b-4c0d-9e2f-6a7b8c9d0e51 | b16c9d7e-4f8b-4c0d-9e2f-6a7b8c9d0e51 | 503         | DOWN          | 200               | UP                  |
 
   # ---------------------------------------------------------------------------------------------------------------------
   # Брокер разорвал соединения — потребители переподключаются сами, сервис их не трогает
@@ -386,7 +386,7 @@
     И в журнале Дата-референса записей уровня ERROR о незапущенном потребителе очереди "<очередь в health>" — <ERROR на паузе>
     Когда Дата-референс проверяет доступность базы
     Тогда очередь "договоры страхования" пуста и у неё есть потребитель
-    И сырьё в порядке приёма — сообщения "<message-id>"
+    И сырьё в порядке приёма — сообщения "<сырьё в порядке приёма>"
     И в журнале Дата-референса записей уровня ERROR о незапущенном потребителе очереди "<очередь в health>" — <ERROR после пробы>
     И мониторинг запрашивает "/actuator/health"
     И Дата-референс отвечает <health HTTP>
@@ -408,5 +408,5 @@
     И поля "components.onecIngest.details.queuesWithoutConsumer" в ответе нет
 
     Примеры:
-      | проход                             | очередь | очередь в health              | показатель                           | SQLSTATE отказа | SQLSTATE в health | message-id                           | на паузе | пропавших | без пропавших | ERROR на паузе | ERROR после пробы | INFO после возврата | роль ведущего | роль неведущего | health HTTP паузы | health status паузы | health HTTP | health status | health HTTP после | health status после |
-      | запуск остановленных потребителей | полисы  | 1c-usk_to_rvl-online_policies | onec_ingest_queues_without_consumer | 08001           | 08001             | f50a3b1c-8d2f-4a4b-9c6d-0e1f2a3b4c91 | 0        | 1         | 0             | 0              | 1                 | 1                   | leader        | standby         | 503               | DOWN                | 503         | DOWN          | 200               | UP                  |
+      | проход                             | очередь | очередь в health              | показатель                           | SQLSTATE отказа | SQLSTATE в health | message-id                           | сырьё в порядке приёма               | на паузе | пропавших | без пропавших | ERROR на паузе | ERROR после пробы | INFO после возврата | роль ведущего | роль неведущего | health HTTP паузы | health status паузы | health HTTP | health status | health HTTP после | health status после |
+      | запуск остановленных потребителей | полисы  | 1c-usk_to_rvl-online_policies | onec_ingest_queues_without_consumer | 08001           | 08001             | f50a3b1c-8d2f-4a4b-9c6d-0e1f2a3b4c91 | f50a3b1c-8d2f-4a4b-9c6d-0e1f2a3b4c91 | 0        | 1         | 0             | 0              | 1                 | 1                   | leader        | standby         | 503               | DOWN                | 503         | DOWN          | 200               | UP                  |
