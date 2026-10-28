@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.lm;
 
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.LmPolicyRepository;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 import ru.projectx.contracts.service.usk.UndeliveredUskRequests;

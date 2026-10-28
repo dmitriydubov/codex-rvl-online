@@ -9,8 +9,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyDraft;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyDraft;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

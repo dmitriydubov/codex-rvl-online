@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.IssuanceRequest;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;

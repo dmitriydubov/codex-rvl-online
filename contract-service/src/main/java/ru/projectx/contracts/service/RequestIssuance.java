@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 
 public final class RequestIssuance {
 

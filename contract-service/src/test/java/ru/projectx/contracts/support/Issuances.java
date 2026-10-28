@@ -9,8 +9,8 @@ import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.IssuanceTerms;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyDraft;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyDraft;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
 

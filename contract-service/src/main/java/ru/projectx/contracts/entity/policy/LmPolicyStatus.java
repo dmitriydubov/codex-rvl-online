@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.policy;
 
 import ru.projectx.contracts.entity.issuance.IssuanceOutcome;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;

@@ -28,7 +28,7 @@ import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.contract.OfferAcceptance;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.document.PrintedForm;

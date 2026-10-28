@@ -1,8 +1,8 @@
 package ru.projectx.contracts.service.lm;
 
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.service.inbox.MessageBodies;
 import ru.projectx.contracts.service.inbox.UskResultParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;

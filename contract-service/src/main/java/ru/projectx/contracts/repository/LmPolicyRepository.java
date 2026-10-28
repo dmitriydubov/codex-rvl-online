@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyStatus;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 
 public interface LmPolicyRepository extends JpaRepository<LmPolicy, UUID>, IssuanceRepositoryLocking<LmPolicy>,
         UskRecordRepository<LmPolicy, LmPolicyStatus> {

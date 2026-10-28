@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.party.Gender;
 import ru.projectx.contracts.entity.party.IdentityDocument;
 import ru.projectx.contracts.entity.party.IdentityDocumentType;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.support.Issuances;

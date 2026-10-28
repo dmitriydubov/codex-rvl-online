@@ -19,7 +19,7 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.issuance.IssueError;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 
