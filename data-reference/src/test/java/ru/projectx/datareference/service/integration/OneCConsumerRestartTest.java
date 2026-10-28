@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -24,12 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 import org.slf4j.LoggerFactory;
 
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.LENIENT)
 class OneCConsumerRestartTest {
 
     private static final String POLICIES = "q-policies";
@@ -71,8 +69,8 @@ class OneCConsumerRestartTest {
 
     @BeforeEach
     void notPaused() {
-        when(pause.paused()).thenReturn(Optional.empty());
-        doAnswer(invocation -> {
+        lenient().when(pause.paused()).thenReturn(Optional.empty());
+        lenient().doAnswer(invocation -> {
             invocation.getArgument(0, Runnable.class).run();
             return null;
         }).when(pause).unlessPaused(any(Runnable.class));
