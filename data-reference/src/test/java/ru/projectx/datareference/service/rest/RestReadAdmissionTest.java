@@ -75,8 +75,9 @@ class RestReadAdmissionTest {
     }
 
     @Test
-    void inFlightGauge_keepsItsSource_afterGarbageCollection() {
-        admission.tryEnter();
+    void inFlightGauge_keepsItsSource_afterGarbageCollection_whenOnlyTheRegistryRemains() {
+        SimpleMeterRegistry survivingMeters = new SimpleMeterRegistry();
+        enterOnceAndDropTheAdmission(survivingMeters);
         WeakReference<Object> canary = new WeakReference<>(new Object());
 
         await().atMost(Duration.ofSeconds(10)).until(() -> {
@@ -84,7 +85,11 @@ class RestReadAdmissionTest {
             return canary.get() == null;
         });
 
-        assertThat(inFlight()).isEqualTo(1.0);
+        assertThat(survivingMeters.get(RestReadAdmission.IN_FLIGHT).gauge().value()).isEqualTo(1.0);
+    }
+
+    private static void enterOnceAndDropTheAdmission(SimpleMeterRegistry meters) {
+        new RestReadAdmission(withLimit(LIMIT), meters).tryEnter();
     }
 
     private double rejected() {
