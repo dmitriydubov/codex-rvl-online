@@ -38,8 +38,8 @@ import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
-import ru.projectx.contracts.repository.ContractAcceptanceRepository;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

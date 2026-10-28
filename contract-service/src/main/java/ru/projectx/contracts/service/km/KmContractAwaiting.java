@@ -6,7 +6,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.usk.UskAwaiting;
 

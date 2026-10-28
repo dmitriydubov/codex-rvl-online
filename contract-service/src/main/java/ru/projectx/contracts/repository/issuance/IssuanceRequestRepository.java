@@ -1,4 +1,4 @@
-package ru.projectx.contracts.repository;
+package ru.projectx.contracts.repository.issuance;
 
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

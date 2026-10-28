@@ -36,7 +36,7 @@ import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.ReferenceKind;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;

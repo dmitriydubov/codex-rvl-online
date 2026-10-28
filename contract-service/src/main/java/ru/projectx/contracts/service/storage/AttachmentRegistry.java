@@ -14,8 +14,8 @@ import ru.projectx.contracts.exception.AttachmentConflictException;
 import ru.projectx.contracts.exception.ParticipantNotFoundException;
 import ru.projectx.contracts.exception.RequestCancelledException;
 import ru.projectx.contracts.exception.RequestNotFoundException;
-import ru.projectx.contracts.repository.IssuanceRequestRepository;
-import ru.projectx.contracts.repository.PrintedFormRepository;
+import ru.projectx.contracts.repository.issuance.IssuanceRequestRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 
 @Component
 public class AttachmentRegistry {

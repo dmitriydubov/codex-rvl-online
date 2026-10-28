@@ -18,8 +18,8 @@ import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskParticipant;
-import ru.projectx.contracts.repository.ContractRepository;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 
 @Service
 public class IssuanceService {

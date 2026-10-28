@@ -8,8 +8,8 @@ import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.party.ContractPerson;
 import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
-import ru.projectx.contracts.repository.ContractAcceptanceRepository;
-import ru.projectx.contracts.repository.ContractPersonRepository;
+import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
+import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.usk.UskRequestFacts;
 

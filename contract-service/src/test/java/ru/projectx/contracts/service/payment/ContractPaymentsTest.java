@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.CannotAcquireLockException;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

@@ -10,7 +10,7 @@ import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractTerms;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.party.PersonRole;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 
 @Component
 public class KmContractIssuance extends RecordIssuance<Contract> {

@@ -33,7 +33,7 @@ import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.exception.ReferenceKind;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;

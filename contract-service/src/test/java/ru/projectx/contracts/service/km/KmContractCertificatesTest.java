@@ -25,7 +25,7 @@ import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
-import ru.projectx.contracts.repository.PrintedFormRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.CertificateStore;
 import ru.projectx.contracts.service.usk.Prerequisites;

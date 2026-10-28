@@ -12,8 +12,8 @@ import ru.projectx.contracts.dto.PackageResponse;
 import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.exception.RequestNotFoundException;
-import ru.projectx.contracts.repository.ContractAcceptanceRepository;
-import ru.projectx.contracts.repository.IssuanceRequestRepository;
+import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
+import ru.projectx.contracts.repository.issuance.IssuanceRequestRepository;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.IssuanceSnapshots;
 

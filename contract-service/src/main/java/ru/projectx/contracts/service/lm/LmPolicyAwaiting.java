@@ -6,7 +6,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import ru.projectx.contracts.config.usk.LmPolicyRequestProperties;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.usk.UskAwaiting;
 

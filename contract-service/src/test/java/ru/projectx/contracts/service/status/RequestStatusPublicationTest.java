@@ -24,7 +24,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.repository.IssuanceRequestRepository;
+import ru.projectx.contracts.repository.issuance.IssuanceRequestRepository;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;

@@ -22,7 +22,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyDraft;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.message.task.ContractTask;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.inbox.InboxFailure;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 import ru.projectx.contracts.support.IntegrationTest;

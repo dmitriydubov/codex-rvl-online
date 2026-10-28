@@ -26,7 +26,7 @@ import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.task.ContractTask;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

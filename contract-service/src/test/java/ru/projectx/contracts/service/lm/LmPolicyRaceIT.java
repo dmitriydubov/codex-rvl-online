@@ -26,7 +26,7 @@ import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.entity.document.UskDocument;
 import ru.projectx.contracts.message.usk.LmPolicyEvents;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
 import ru.projectx.contracts.service.inbox.InboxFailure;
 import ru.projectx.contracts.service.outbox.OutboxJournal;

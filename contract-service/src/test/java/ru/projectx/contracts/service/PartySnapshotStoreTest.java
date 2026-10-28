@@ -15,7 +15,7 @@ import org.mockito.ArgumentCaptor;
 import ru.projectx.contracts.entity.party.ContractPerson;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.party.PersonRole;
-import ru.projectx.contracts.repository.ContractPersonRepository;
+import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.support.Tasks;
 
 class PartySnapshotStoreTest {

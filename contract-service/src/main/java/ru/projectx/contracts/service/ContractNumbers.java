@@ -3,7 +3,7 @@ package ru.projectx.contracts.service;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.ContractNumberingProperties;
-import ru.projectx.contracts.repository.ContractNumberRepository;
+import ru.projectx.contracts.repository.issuance.ContractNumberRepository;
 
 @Component
 public class ContractNumbers {

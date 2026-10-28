@@ -4,7 +4,7 @@ import java.time.Clock;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.status.RequestStatusPublication;

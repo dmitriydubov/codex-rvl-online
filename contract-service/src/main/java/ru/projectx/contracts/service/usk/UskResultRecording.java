@@ -13,7 +13,7 @@ import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.document.UskDocument;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.repository.PrintedFormRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;

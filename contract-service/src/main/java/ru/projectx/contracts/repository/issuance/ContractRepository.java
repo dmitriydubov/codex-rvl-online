@@ -1,4 +1,4 @@
-package ru.projectx.contracts.repository;
+package ru.projectx.contracts.repository.issuance;
 
 import java.util.Collection;
 import java.util.List;
@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.repository.IssuanceRepositoryLocking;
+import ru.projectx.contracts.repository.UskRecordRepository;
 
 public interface ContractRepository extends JpaRepository<Contract, UUID>, IssuanceRepositoryLocking<Contract>,
         UskRecordRepository<Contract, ContractStatus> {

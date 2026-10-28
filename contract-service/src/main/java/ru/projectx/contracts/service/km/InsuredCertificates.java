@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.exception.CertificateKeyMissingException;
-import ru.projectx.contracts.repository.PrintedFormRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 
 @Component
 public class InsuredCertificates {

@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.party.ContractPerson;
 import ru.projectx.contracts.entity.party.PersonOwner;
-import ru.projectx.contracts.repository.ContractPersonRepository;
+import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 
 @Component
 public class PartySnapshotStore {

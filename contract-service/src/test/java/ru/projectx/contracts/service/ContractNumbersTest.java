@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.config.ContractNumberingProperties;
-import ru.projectx.contracts.repository.ContractNumberRepository;
+import ru.projectx.contracts.repository.issuance.ContractNumberRepository;
 
 class ContractNumbersTest {
 

@@ -9,7 +9,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyDraft;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.party.PersonRole;
-import ru.projectx.contracts.repository.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 
 @Component
 public class LmPolicyIssuance extends RecordIssuance<LmPolicy> {
