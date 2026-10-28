@@ -3716,7 +3716,10 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   следов разработки на `main` пусты. Контрольный `gauntletFast` на `main` ecbf3fb7 зелёный: 2130 тестов, 735 сценариев,
   7 архитектурных, 0 skipped (21 мин 42 с). README (координатор): строка «Брокер: соединение; ответ на команду | 10 с;
   30 с | —; `RABBITMQ_CHANNEL_RPC_TIMEOUT`»; ради места убраны `leader_lock`, `ONEC_QUEUE_*` и «(часы базы)» (есть в
-  `operations.md` и `design.md`); 3498 символов. `data-reference/CLAUDE.md` — на подтверждении владельца.
+  `operations.md` и `design.md`); 3498 символов. `data-reference/CLAUDE.md` (владелец «1 да»): в «Контракт 1С:УСК»
+  («Соединение — целиком конфигурация») — предел `RABBITMQ_CHANNEL_RPC_TIMEOUT` и проверка типа ответа; в дереве
+  `service/integration/` — `OneCBrokerChannelsConfiguration`; в абзаце о проходе подъёма потребителей — команда без ответа
+  за предел означает «брокер не отвечает».
 - **Бэклог без номера, владелец «2) да» 2026-10-28, взят в Ш90 — явный предел команд канала RabbitMQ для всего клиента**
   (`spring.rabbitmq.channel-rpc-timeout`; Boot 4.0.7: `Duration`, умолчание 10m, «Continuation timeout for RPC calls in
   channels. Set it to zero to wait forever»). Основание — Ш89: брокер, который принял соединение и не отвечает на команды
