@@ -157,6 +157,7 @@ projectx:
     price:
       max-nights: 366
     read-timeout-seconds: ${API_READ_TIMEOUT_SECONDS:3}
+    max-concurrent-requests: ${API_MAX_CONCURRENT_REQUESTS:100}
 
   onec:
     ingest:

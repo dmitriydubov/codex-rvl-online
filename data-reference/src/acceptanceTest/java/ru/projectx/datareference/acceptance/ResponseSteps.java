@@ -6,6 +6,7 @@ import io.cucumber.java.ru.Тогда;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.assertj.core.api.InstanceOfAssertFactories;
+import org.springframework.http.HttpHeaders;
 import tools.jackson.databind.JsonNode;
 
 public class ResponseSteps {
@@ -77,6 +78,13 @@ public class ResponseSteps {
     @Тогда("заголовок X-Request-Id ответа равен {string}")
     public void requestIdEquals(String expected) {
         assertThat(contracts.lastResponse().requestIds()).as("заголовок X-Request-Id").containsExactly(expected);
+    }
+
+    @Тогда("заголовка Retry-After в ответе нет")
+    public void noRetryAfter() {
+        assertThat(contracts.lastResponse().headers().getOrEmpty(HttpHeaders.RETRY_AFTER))
+                .as("заголовки Retry-After")
+                .isEmpty();
     }
 
     @Тогда("заголовок X-Request-Id ответа заполнен")

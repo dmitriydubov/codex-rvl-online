@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.projectx.datareference.controller.request.CurrentRequest;
 import ru.projectx.datareference.dto.ErrorResponse;
+import ru.projectx.datareference.exception.RestOverloadException;
 import ru.projectx.datareference.service.database.DatabaseOutages;
 
 @RestControllerAdvice
@@ -19,11 +20,18 @@ public class ServerFailureAdvice {
 
     private static final String INTERNAL_ERROR = "INTERNAL_ERROR";
     private static final String SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE";
+    private static final String OVERLOADED = "сервис перегружен, повторите запрос позже";
 
     private final DatabaseOutages outages;
 
     public ServerFailureAdvice(DatabaseOutages outages) {
         this.outages = outages;
+    }
+
+    @ExceptionHandler(RestOverloadException.class)
+    public ResponseEntity<ErrorResponse> overloaded() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ErrorResponse.of(SERVICE_UNAVAILABLE, OVERLOADED, CurrentRequest.id()));
     }
 
     @ExceptionHandler(Exception.class)

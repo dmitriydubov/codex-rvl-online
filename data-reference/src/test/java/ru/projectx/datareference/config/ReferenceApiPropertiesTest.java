@@ -17,7 +17,30 @@ class ReferenceApiPropertiesTest {
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(ReferenceApiPropertiesBinding.class)
-            .withPropertyValues("projectx.api.rvl-appeal-types=РВЛ и СКЛ", "projectx.api.read-timeout-seconds=3");
+            .withPropertyValues("projectx.api.rvl-appeal-types=РВЛ и СКЛ", "projectx.api.read-timeout-seconds=3",
+                    "projectx.api.max-concurrent-requests=100");
+
+    @Test
+    void maxConcurrentRequests_isBoundFromItsProperty() {
+        context.withPropertyValues("projectx.api.max-concurrent-requests=7")
+                .run(started -> assertThat(started.getBean(ReferenceApiProperties.class).maxConcurrentRequests())
+                        .isEqualTo(7));
+    }
+
+    @Test
+    void zeroMaxConcurrentRequests_failsStartup() {
+        context.withPropertyValues("projectx.api.max-concurrent-requests=0")
+                .run(started -> assertThat(started).getFailure()
+                        .hasRootCauseInstanceOf(BindValidationException.class)
+                        .rootCause().hasMessageContaining("maxConcurrentRequests"));
+    }
+
+    @Test
+    void oneConcurrentRequest_isAccepted() {
+        context.withPropertyValues("projectx.api.max-concurrent-requests=1")
+                .run(started -> assertThat(started.getBean(ReferenceApiProperties.class).maxConcurrentRequests())
+                        .isEqualTo(1));
+    }
 
     @Test
     void inputLimits_defaultToHundred() {

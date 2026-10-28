@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.test.web.server.LocalManagementPort;
@@ -106,16 +107,18 @@ public class ContractsService {
         requireAbsolutePath(path);
         Object[] variables = Stream.concat(Arrays.stream(uriVariables(path)), Arrays.stream(parameterValues))
                 .toArray();
-        return remember(target.method(method).uri(path, variables).headers(headers).exchange().returnResult());
+        return timed(() -> target.method(method).uri(path, variables).headers(headers).exchange().returnResult());
     }
 
     private ServiceResponse monitorOn(RestTestClient target, String path) {
         requireAbsolutePath(path);
-        return remember(target.get().uri(path).exchange().returnResult());
+        return timed(() -> target.get().uri(path).exchange().returnResult());
     }
 
-    private ServiceResponse remember(ExchangeResult result) {
-        lastResponse = ServiceResponse.of(result);
+    private ServiceResponse timed(Supplier<ExchangeResult> exchange) {
+        long started = System.nanoTime();
+        ExchangeResult result = exchange.get();
+        lastResponse = ServiceResponse.of(result, Duration.ofNanos(System.nanoTime() - started));
         return lastResponse;
     }
 

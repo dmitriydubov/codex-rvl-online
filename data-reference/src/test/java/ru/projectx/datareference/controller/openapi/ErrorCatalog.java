@@ -25,6 +25,7 @@ import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.MissingReference;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
+import ru.projectx.datareference.exception.RestOverloadException;
 
 final class ErrorCatalog {
 
@@ -66,7 +67,8 @@ final class ErrorCatalog {
     private static Exception[] serverFailures() {
         return new Exception[] {
             new IllegalStateException(TEXT),
-            new CannotGetJdbcConnectionException(TEXT, new SQLException(TEXT))
+            new CannotGetJdbcConnectionException(TEXT, new SQLException(TEXT)),
+            new RestOverloadException(1)
         };
     }
 
