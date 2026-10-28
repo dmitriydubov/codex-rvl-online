@@ -14,7 +14,7 @@ public final class KmContractTexts {
             "передача договора КМ {} не доставлена, договор уже в статусе {} и не меняется",
             "передача договора КМ {} не доставлена, договор переведён в ERROR");
 
-    static final UskResultLayout LAYOUT = new UskResultLayout("REGISTERED", "contract_usk_id", "contract_usk_number",
+    public static final UskResultLayout LAYOUT = new UskResultLayout("REGISTERED", "contract_usk_id", "contract_usk_number",
             FieldPresence.REQUIRED, FieldPresence.REQUIRED);
 
     private KmContractTexts() {

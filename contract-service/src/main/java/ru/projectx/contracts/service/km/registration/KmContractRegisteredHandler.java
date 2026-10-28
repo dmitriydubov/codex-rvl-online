@@ -1,10 +1,12 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.registration;
 
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.usk.UskResultParser;
+import ru.projectx.contracts.service.km.KmContractKind;
+import ru.projectx.contracts.service.km.KmContractTexts;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
 import ru.projectx.contracts.service.usk.result.UskResultHandler;
 
