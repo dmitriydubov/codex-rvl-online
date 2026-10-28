@@ -18,15 +18,22 @@ ru.projectx.contracts.config.journal.InboxProperties$Retry#delayAfterFailedAttem
 ru.projectx.contracts.config.journal.InboxProperties$Retry#delayAfterFailedAttempt  EmptyObjectReturnValsMutator         # always empty: attempt 1 contains(1m) fails
 
 # PersonOwnerTest: contract_ownsPersonsThroughContractIdOnly (isEqualTo(new PersonOwner(ID, null)) fails on a null actual).
+# lmPolicy_ownsPersonsThroughPolicyIdOnly (isEqualTo(new PersonOwner(null, ID)) fails on a null actual): verified by the
+# coordinator 2026-10-28 on the package regroup branch (58ff2a6), RUN_ERROR in a run from a0f3bd0.
 ru.projectx.contracts.entity.party.PersonOwner#contract                            NullReturnValsMutator                # contract_owns...: isEqualTo(new PersonOwner(ID, null)) on null
+ru.projectx.contracts.entity.party.PersonOwner#lmPolicy                            NullReturnValsMutator                # lmPolicy_owns...: isEqualTo(new PersonOwner(null, ID)) on null
 
 # StatusTransitionsTest / IssuanceSnapshotTest: outcome of a record in the issuance snapshot (record RecordOutcome).
 # stopped() is the filter of StatusTransitions.stoppedSince, looksLike() is the body of IssuanceSnapshot.knows.
 # Verified by the coordinator 2026-10-13 on main after the merge of the step that added the record
 # (RUN_ERROR appeared only in the final full run of the step; 246/246 killed in the run before).
+# of() is the factory IssuanceSnapshot builds every outcome with (a null breaks the snapshot or knows() with an NPE):
+# verified by the coordinator 2026-10-28 on the package regroup branch (58ff2a6), where the file re-entered the mutation
+# scope through its imports.
 ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanTrueReturnValsMutator         # taskLeavingOnlyNewRecords_isNotPublished: a NEW record counts as stopped, the empty "before" does not know it -> isFalse() fails
 ru.projectx.contracts.service.status.RecordOutcome#stopped                   BooleanFalseReturnValsMutator        # recordThatEnteredError_isPublished: nothing is stopped, request status ERROR is not COMPLETED -> isTrue() fails
 ru.projectx.contracts.service.status.RecordOutcome#looksLike                 BooleanTrueReturnValsMutator         # IssuanceSnapshotTest.knownOutcome_isTheRecordsOwnOrOtherwiseTheLatestOfItsParticipant: knows(failedOtherwise) isFalse() fails; StatusTransitionsTest.newRecordInAnotherError_isPublished isTrue() fails
+ru.projectx.contracts.service.status.RecordOutcome#of                        NullReturnValsMutator                # IssuanceSnapshotTest.knownOutcome_isTheRecordsOwnOrOtherwiseTheLatestOfItsParticipant: knows(of(cancelled)) dereferences null -> NPE at the first isTrue()
 
 # ContractTaskParserTest / DocumentKindsTest / KmContractIssuanceTest / LmPolicyIssuanceTest / PersonSnapshotsTest: participant of a
 # task (record TaskParticipant). Verified by the coordinator 2026-10-13 on main after the merge of the LM policies step
@@ -37,6 +44,8 @@ ru.projectx.contracts.message.task.TaskParticipant#path                         
 # LeadershipPropertiesTest: lock TTL versus heartbeat check of the leadership settings (record LeadershipProperties,
 # @AssertTrue isLockTtlLongerThanHeartbeat = lockTtl != null && heartbeat != null && lockTtl.compareTo(heartbeat) > 0).
 # Verified by the coordinator 2026-10-27 on the leader-instance step branch (26578b3), owner "1) да".
+# BooleanTrueReturnVals: verified by the coordinator 2026-10-28 on the package regroup branch (58ff2a6).
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  ConditionalsBoundaryMutator          # > 0 -> >= 0: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; heartbeatNotShorterThanTtl_failsValidation (30s/30s) hasFailed() fails
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_EQUAL_ELSE  # null check forced to the else branch -> always false: ttlCheck_... row "PT30S, PT1S, true" isEqualTo(true) fails; completeConfiguration_bindsGroupTtlAndHeartbeat context fails validation
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE  # compareTo > 0 forced to the else branch -> always false: same two tests fail
+ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  BooleanTrueReturnValsMutator         # always true: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; ttlCheck_isFalseWhileAValueIsMissing isFalse() fails; heartbeatNotShorterThanTtl_failsValidation hasFailed() fails
