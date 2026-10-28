@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
-import ru.projectx.contracts.entity.ContractAcceptance;
+import ru.projectx.contracts.entity.contract.ContractAcceptance;
 
 public interface ContractAcceptanceRepository extends JpaRepository<ContractAcceptance, UUID> {
 

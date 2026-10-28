@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.PackageResponse;
-import ru.projectx.contracts.entity.ContractAcceptance;
+import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.exception.RequestNotFoundException;
 import ru.projectx.contracts.repository.ContractAcceptanceRepository;

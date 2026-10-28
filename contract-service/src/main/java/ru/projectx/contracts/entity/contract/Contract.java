@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.contract;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;

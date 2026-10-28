@@ -9,7 +9,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.LmPolicy;

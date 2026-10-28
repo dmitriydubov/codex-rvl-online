@@ -18,7 +18,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.document.ParticipantAttachment;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.document.StoredFile;

@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 
 final class PaidContracts {
 

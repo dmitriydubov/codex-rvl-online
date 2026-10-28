@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 
 class StatusTest {

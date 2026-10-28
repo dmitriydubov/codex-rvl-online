@@ -6,8 +6,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 
 public interface ContractRepository extends JpaRepository<Contract, UUID>, IssuanceRepositoryLocking<Contract>,
         UskRecordRepository<Contract, ContractStatus> {

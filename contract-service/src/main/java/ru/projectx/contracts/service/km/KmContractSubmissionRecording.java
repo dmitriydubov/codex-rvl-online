@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.km;
 
 import java.time.Clock;
 import org.springframework.stereotype.Service;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.outbox.OutboxJournal;

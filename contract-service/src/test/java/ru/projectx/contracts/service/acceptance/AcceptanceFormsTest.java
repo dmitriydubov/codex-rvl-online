@@ -10,8 +10,8 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.AcceptanceRequest;
-import ru.projectx.contracts.entity.AcceptanceChannel;
-import ru.projectx.contracts.entity.OfferAcceptance;
+import ru.projectx.contracts.entity.contract.AcceptanceChannel;
+import ru.projectx.contracts.entity.contract.OfferAcceptance;
 
 class AcceptanceFormsTest {
 

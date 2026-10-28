@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service.packages;
 
 import ru.projectx.contracts.dto.DocumentState;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 
 final class PackageStates {

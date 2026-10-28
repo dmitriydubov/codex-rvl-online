@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;
-import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;

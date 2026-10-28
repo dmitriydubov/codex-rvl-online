@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.contract;
 
 import java.time.Instant;
 import java.util.Optional;

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.LmPolicy;
 

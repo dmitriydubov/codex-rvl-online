@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.contract;
 
 import java.math.BigDecimal;
 import java.util.UUID;

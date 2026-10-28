@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.util.unit.DataSize;
 import ru.projectx.contracts.config.AttachmentProperties;
 import ru.projectx.contracts.config.StorageProperties;
-import ru.projectx.contracts.entity.Contract;
+import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.entity.document.StoredFile;
