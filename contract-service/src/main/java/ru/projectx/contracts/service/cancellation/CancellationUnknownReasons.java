@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.cancellation;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

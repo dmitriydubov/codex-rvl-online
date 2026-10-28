@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.cancellation;
 
 import java.util.Map;
 import java.util.Optional;

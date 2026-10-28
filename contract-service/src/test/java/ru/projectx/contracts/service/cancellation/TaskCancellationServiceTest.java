@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.cancellation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;

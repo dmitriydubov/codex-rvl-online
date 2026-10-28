@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.cancellation;
 
 import java.time.Instant;
 import java.util.List;
