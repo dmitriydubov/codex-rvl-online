@@ -25,7 +25,7 @@ import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyDraft;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
-import ru.projectx.contracts.message.ContractTaskCancellation;
+import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;
 import ru.projectx.contracts.support.Issuances;

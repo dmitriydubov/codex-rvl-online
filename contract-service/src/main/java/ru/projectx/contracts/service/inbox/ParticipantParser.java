@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.inbox;
 
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ParticipantDocument;
-import ru.projectx.contracts.message.ParticipantPerson;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ParticipantPerson;
+import ru.projectx.contracts.message.task.TaskParticipant;
 
 final class ParticipantParser {
 

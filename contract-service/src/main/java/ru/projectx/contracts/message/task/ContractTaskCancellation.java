@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.task;
 
 import java.time.Instant;
 import java.util.UUID;

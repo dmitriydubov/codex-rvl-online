@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.message.ContractTask;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ContractTask;
+import ru.projectx.contracts.message.task.TaskParticipant;
 
 @Component
 public class ContractTaskParser implements PayloadParser<ContractTask> {

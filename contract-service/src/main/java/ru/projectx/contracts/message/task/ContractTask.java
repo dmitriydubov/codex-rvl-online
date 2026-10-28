@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.task;
 
 import java.time.LocalDate;
 import java.util.List;

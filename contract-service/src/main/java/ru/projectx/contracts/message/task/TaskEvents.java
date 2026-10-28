@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.task;
 
 public final class TaskEvents {
 

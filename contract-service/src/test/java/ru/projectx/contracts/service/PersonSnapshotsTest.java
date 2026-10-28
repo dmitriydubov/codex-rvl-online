@@ -11,8 +11,8 @@ import ru.projectx.contracts.entity.party.IdentityDocument;
 import ru.projectx.contracts.entity.party.IdentityDocumentType;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.exception.ParticipantDataException;
-import ru.projectx.contracts.message.ParticipantPerson;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ParticipantPerson;
+import ru.projectx.contracts.message.task.TaskParticipant;
 import ru.projectx.contracts.support.Tasks;
 
 class PersonSnapshotsTest {

@@ -2,7 +2,7 @@ package ru.projectx.contracts.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.projectx.contracts.message.ContractTask;
+import ru.projectx.contracts.message.task.ContractTask;
 
 final class IssuedRecords {
 

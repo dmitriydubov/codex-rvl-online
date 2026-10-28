@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.message.ContractTaskCancellation;
+import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.support.TaskBodies;
 import tools.jackson.databind.json.JsonMapper;
 

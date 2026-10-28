@@ -5,8 +5,8 @@ import java.util.UUID;
 import ru.projectx.contracts.entity.issuance.IssuanceTerms;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
-import ru.projectx.contracts.message.ContractTask;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ContractTask;
+import ru.projectx.contracts.message.task.TaskParticipant;
 
 public record Issue(ContractTask task, TaskParticipant participant) {
 

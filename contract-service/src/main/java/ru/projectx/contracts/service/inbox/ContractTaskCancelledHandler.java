@@ -1,8 +1,8 @@
 package ru.projectx.contracts.service.inbox;
 
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.message.ContractTaskCancellation;
-import ru.projectx.contracts.message.TaskEvents;
+import ru.projectx.contracts.message.task.ContractTaskCancellation;
+import ru.projectx.contracts.message.task.TaskEvents;
 import ru.projectx.contracts.service.TaskCancellationService;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

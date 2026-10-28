@@ -6,8 +6,8 @@ import ru.projectx.contracts.entity.party.IdentityDocumentType;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.exception.ParticipantDataException;
 import ru.projectx.contracts.message.ParticipantDocument;
-import ru.projectx.contracts.message.ParticipantPerson;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ParticipantPerson;
+import ru.projectx.contracts.message.task.TaskParticipant;
 
 public final class PersonSnapshots {
 

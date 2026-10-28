@@ -8,10 +8,10 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.message.ContractTask;
+import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.ParticipantDocument;
-import ru.projectx.contracts.message.ParticipantPerson;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ParticipantPerson;
+import ru.projectx.contracts.message.task.TaskParticipant;
 import ru.projectx.contracts.support.TaskBodies;
 import tools.jackson.databind.json.JsonMapper;
 

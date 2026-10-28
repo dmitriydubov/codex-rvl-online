@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.task;
 
 import java.math.BigDecimal;
 import java.util.UUID;

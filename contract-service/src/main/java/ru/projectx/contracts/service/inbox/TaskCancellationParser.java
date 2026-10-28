@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.message.ContractTaskCancellation;
+import ru.projectx.contracts.message.task.ContractTaskCancellation;
 
 @Component
 public class TaskCancellationParser implements PayloadParser<ContractTaskCancellation> {
