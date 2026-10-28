@@ -2,8 +2,10 @@ package ru.projectx.datareference.controller.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,16 +13,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import ru.projectx.datareference.controller.FailingController;
 import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
+import ru.projectx.datareference.controller.request.UuidParameters;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -51,6 +57,44 @@ class RequestErrorAdviceTest {
         MvcTestResult result = get(FailingController.WITH_PARAMETER);
 
         assertValidationError(result, "key", "обязательный параметр");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" ", "  ", "\t"})
+    void blankPathVariable_isValidationError_namingVariableAndExpectedType(String blank, CapturedOutput output) {
+        mvc = StandaloneMvc.withRequestId(new FailingController(), new RequestErrorAdvice(),
+                StandaloneMvc.serverFailureAdvice(), new UuidParameters());
+
+        MvcTestResult result = mvc.get().uri(FailingController.WITH_ID, blank)
+                .header(RequestIdFilter.HEADER, REQUEST_ID).exchange();
+
+        assertValidationError(result, "id", "ожидается UUID");
+        assertThat(output).doesNotContain("ERROR");
+    }
+
+    @Test
+    void mismatchWithoutRequiredType_isValidationError_expectingAnotherType() {
+        Method withId = ReflectionUtils.findMethod(FailingController.class, "withId", UUID.class);
+        FailingController controller = new FailingController();
+        MethodParameter id = new MethodParameter(withId, 0);
+        controller.failWith(new MethodArgumentTypeMismatchException(" ", null, "id", id, null));
+        mvc = StandaloneMvc.withRequestId(controller, new RequestErrorAdvice());
+
+        MvcTestResult result = get(FailingController.FAILING);
+
+        assertValidationError(result, "id", "ожидается другой тип");
+    }
+
+    @Test
+    void pathVariableMissingFromTemplate_isInternalError_writtenToJournal(CapturedOutput output) {
+        mvc = StandaloneMvc.withRequestId(new FailingController(), StandaloneMvc.errorAdvices());
+
+        MvcTestResult result = get(FailingController.WITHOUT_ID_IN_TEMPLATE);
+
+        assertThat(result).hasStatus(500);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("INTERNAL_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+        assertThat(output).contains("ERROR").contains("MissingPathVariableException");
     }
 
     @Test
