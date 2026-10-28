@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.entity.InboxMessage;
-import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxMessage;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 

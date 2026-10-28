@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.integration;
 
-import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
 
 public sealed interface TaskEnvelope {
 

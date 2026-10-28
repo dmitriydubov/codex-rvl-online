@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.inbox;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,6 +12,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.contracts.entity.JournalMessage;
+import ru.projectx.contracts.entity.MessageEnvelope;
 
 @Entity
 @Table(name = "inbox_messages")

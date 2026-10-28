@@ -10,8 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import ru.projectx.contracts.entity.InboxMessage;
-import ru.projectx.contracts.entity.InboxStatus;
+import ru.projectx.contracts.entity.inbox.InboxMessage;
+import ru.projectx.contracts.entity.inbox.InboxStatus;
 
 public interface InboxMessageRepository extends JpaRepository<InboxMessage, UUID> {
 

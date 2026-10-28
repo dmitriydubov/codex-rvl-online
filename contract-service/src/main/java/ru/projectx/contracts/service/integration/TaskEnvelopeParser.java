@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.integration;
 
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.Guids;
 import tools.jackson.core.JacksonException;

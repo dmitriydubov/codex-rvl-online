@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service;
 
 import org.slf4j.MDC;
-import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
 
 public final class InboxLogContext {
 

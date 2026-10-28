@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.InboxLogContext;
 import ru.projectx.contracts.service.inbox.InboxMetrics;

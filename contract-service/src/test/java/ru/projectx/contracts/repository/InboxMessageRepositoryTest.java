@@ -12,9 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.entity.InboxMessage;
-import ru.projectx.contracts.entity.InboxReceipt;
-import ru.projectx.contracts.entity.InboxStatus;
+import ru.projectx.contracts.entity.inbox.InboxMessage;
+import ru.projectx.contracts.entity.inbox.InboxReceipt;
+import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.support.IntegrationTest;
 
 @IntegrationTest

@@ -13,7 +13,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.entity.InboxStatus;
+import ru.projectx.contracts.entity.inbox.InboxStatus;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.support.AmqpIntegrationTest;
 import ru.projectx.contracts.support.TaskBodies;

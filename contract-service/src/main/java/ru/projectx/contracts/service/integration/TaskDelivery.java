@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.amqp.core.Message;
-import ru.projectx.contracts.entity.RejectedMessage;
+import ru.projectx.contracts.entity.inbox.RejectedMessage;
 
 record TaskDelivery(Message message, Channel channel) {
 

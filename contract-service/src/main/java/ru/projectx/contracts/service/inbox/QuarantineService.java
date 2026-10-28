@@ -3,8 +3,8 @@ package ru.projectx.contracts.service.inbox;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.contracts.entity.QuarantinedMessage;
-import ru.projectx.contracts.entity.RejectedMessage;
+import ru.projectx.contracts.entity.inbox.QuarantinedMessage;
+import ru.projectx.contracts.entity.inbox.RejectedMessage;
 import ru.projectx.contracts.repository.QuarantineRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.inbox;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

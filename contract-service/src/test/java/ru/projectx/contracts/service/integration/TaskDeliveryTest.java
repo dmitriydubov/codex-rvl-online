@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import ru.projectx.contracts.entity.RejectedMessage;
+import ru.projectx.contracts.entity.inbox.RejectedMessage;
 
 class TaskDeliveryTest {
 
