@@ -24,7 +24,7 @@ import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
-import ru.projectx.contracts.service.PersonSnapshots;
+import ru.projectx.contracts.service.issuance.PersonSnapshots;
 import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.RowRaces;

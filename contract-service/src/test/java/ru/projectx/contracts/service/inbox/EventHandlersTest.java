@@ -15,7 +15,7 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
-import ru.projectx.contracts.service.IssuanceService;
+import ru.projectx.contracts.service.issuance.IssuanceService;
 import ru.projectx.contracts.service.cancellation.TaskCancellationService;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;

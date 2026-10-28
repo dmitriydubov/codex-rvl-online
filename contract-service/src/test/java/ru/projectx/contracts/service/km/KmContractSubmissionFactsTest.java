@@ -28,7 +28,7 @@ import ru.projectx.contracts.entity.document.UskDocument;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
-import ru.projectx.contracts.service.PersonSnapshots;
+import ru.projectx.contracts.service.issuance.PersonSnapshots;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;

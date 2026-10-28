@@ -15,7 +15,7 @@ public final class IssueErrors {
     private IssueErrors() {
     }
 
-    static ParticipantDataException programRequired(String participantPath) {
+    public static ParticipantDataException programRequired(String participantPath) {
         return new ParticipantDataException(PROGRAM_REQUIRED,
                 "поле " + participantPath + ".program_id обязательно для участника, которому выпускается документ");
     }

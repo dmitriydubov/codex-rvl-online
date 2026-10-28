@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.issuance;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -7,6 +7,7 @@ import ru.projectx.contracts.entity.issuance.RequestReference;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskParticipant;
+import ru.projectx.contracts.service.IssueErrors;
 
 public record Issue(ContractTask task, TaskParticipant participant) {
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.issuance;
 
 import java.util.LinkedHashMap;
 import java.util.List;

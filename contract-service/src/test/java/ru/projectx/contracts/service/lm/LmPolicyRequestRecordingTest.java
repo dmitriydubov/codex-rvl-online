@@ -37,7 +37,7 @@ import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
-import ru.projectx.contracts.service.PersonSnapshots;
+import ru.projectx.contracts.service.issuance.PersonSnapshots;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.service.outbox.OutboxJournal;

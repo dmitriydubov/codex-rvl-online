@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.issuance;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

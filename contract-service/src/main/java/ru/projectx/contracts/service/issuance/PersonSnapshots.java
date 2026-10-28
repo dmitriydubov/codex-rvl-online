@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.issuance;
 
 import ru.projectx.contracts.entity.party.Gender;
 import ru.projectx.contracts.entity.party.IdentityDocument;
@@ -8,6 +8,7 @@ import ru.projectx.contracts.exception.ParticipantDataException;
 import ru.projectx.contracts.message.ParticipantDocument;
 import ru.projectx.contracts.message.task.ParticipantPerson;
 import ru.projectx.contracts.message.task.TaskParticipant;
+import ru.projectx.contracts.service.Enums;
 
 public final class PersonSnapshots {
 

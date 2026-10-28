@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.issuance;
 
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import static org.assertj.core.api.Assertions.assertThat;

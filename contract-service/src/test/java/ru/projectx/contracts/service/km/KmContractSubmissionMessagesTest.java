@@ -17,7 +17,7 @@ import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.service.PersonSnapshots;
+import ru.projectx.contracts.service.issuance.PersonSnapshots;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.storage.CertificateLinks;
 import ru.projectx.contracts.support.Issuances;
