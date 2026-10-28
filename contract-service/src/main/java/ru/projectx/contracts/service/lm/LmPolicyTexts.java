@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service.lm;
 
 import ru.projectx.contracts.service.inbox.parse.FieldPresence;
-import ru.projectx.contracts.service.inbox.UskResultLayout;
+import ru.projectx.contracts.service.inbox.usk.UskResultLayout;
 import ru.projectx.contracts.service.usk.UskWording;
 
 final class LmPolicyTexts {

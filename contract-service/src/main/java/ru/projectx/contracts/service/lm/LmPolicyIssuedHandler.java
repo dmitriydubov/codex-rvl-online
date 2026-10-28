@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
-import ru.projectx.contracts.service.inbox.UskResultParser;
+import ru.projectx.contracts.service.inbox.usk.UskResultParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
 import ru.projectx.contracts.service.usk.UskResultHandler;
 

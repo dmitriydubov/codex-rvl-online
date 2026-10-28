@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.usk;
 
 import java.util.List;
 import ru.projectx.contracts.exception.ContractViolationException;

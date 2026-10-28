@@ -4,7 +4,7 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
-import ru.projectx.contracts.service.inbox.UskResultParser;
+import ru.projectx.contracts.service.inbox.usk.UskResultParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
 import ru.projectx.contracts.service.usk.UskResultHandler;
 
