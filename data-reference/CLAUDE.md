@@ -339,8 +339,12 @@ RABBITMQ_SSL_VALIDATE_CERTIFICATE=false   RABBITMQ_LISTENER_AUTO_STARTUP=true
 **роняло запуск приложения** (проверено до Ш15, на `@RabbitListener`). С Ш81 (PR #199) контейнеры запускает
 роль ведущего уже после старта (`OneCQueueContainers`), отказ запуска контейнера пишется в журнал и дальше не
 идёт: сервис стартует и отвечает по REST, а неверное имя видно записью ERROR «потребитель очереди … не
-запущен» и компонентом `onecIngest` в `DOWN` с этой очередью в `queuesWithoutConsumer`. Это установлено по
-коду, прогоном с несуществующей очередью не проверялось.
+запущен» и компонентом `onecIngest` в `DOWN` с этой очередью в `queuesWithoutConsumer`. С Ш89 (PR #276) ведущий
+раз в `projectx.onec.ingest.consumer-restart-interval` (30 с) пассивным объявлением проверяет очереди остановленных
+потребителей и поднимает потребителя, как только очередь снова есть на брокере. Неверное имя при этом остаётся
+заметным: одна запись ERROR на эпизод, `DOWN` и показатель `onec_ingest_queues_without_consumer`. Очереди сервис
+по-прежнему не объявляет. Очередь, которой нет при запуске потребителей, проверена приёмкой
+(`onec_consumer_restart.feature`); неверное имя в настройке стенд не воспроизводит.
 
 Второй отказ запуска — **одно имя очереди в двух свойствах** `OneCQueueProperties`.
 Идентификатор точки приёма равен имени очереди, и реестр Spring AMQP вторую точку с тем же
@@ -779,7 +783,7 @@ ru.projectx.datareference
 │   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`, предел одновременных
 │   │                    запросов (`RestReadAdmission`)
 │   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`), оповещение всех экземпляров (`ReferenceCacheNotifications`, `ReferenceCacheChannel`) и подписчик канала (`ReferenceCacheNotificationsConfiguration`, `StreamCacheSubscription`)
-│   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
+│   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), ждём ли потребителей (`OneCConsumerExpectation`), подъём потребителей вернувшихся очередей (`OneCConsumerRestart`, `OneCConsumerRestartSchedule`; есть ли очередь — `OneCQueuePresence`, журнал эпизодов — `OneCConsumerOutageJournal`, показатель — `OneCQueuesWithoutConsumerGauge`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
 │   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`; продлевает её свой пул `config.leadership`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
 │   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
 │   ├── onec/          — разбор сырья: диспетчер потоков, сохранённый конверт (`StoredEnvelope`), сборка передач прайса
@@ -880,7 +884,8 @@ Confluence. Документ в контур не уходит. Сверка —
 prefetch и `missing-queues-fatal` берутся только из `spring.rabbitmq.listener.simple`, точка их не
 перекрывает. Автостарта у точек нет (`setAutoStartup(false)`, с Ш81): контейнеры запускает и останавливает
 роль ведущего (`OneCIngestLeadership`, `OneCQueueContainers`), и только если
-`spring.rabbitmq.listener.simple.auto-startup` включён; у неведущего экземпляра потребителей нет. Слушатель один — `OneCQueueListener.receive(поток, сообщение, канал)`:
+`spring.rabbitmq.listener.simple.auto-startup` включён (это решает `OneCConsumerExpectation`); у неведущего экземпляра
+потребителей нет, а остановленного потребителя ведущий поднимает сам (`OneCConsumerRestart`, абзац о здоровье приёма ниже). Слушатель один — `OneCQueueListener.receive(поток, сообщение, канал)`:
 из конверта берётся `message-id`, дальше — `OneCIngestService`, и по его исходу подтверждение
 (`OneCDelivery.acknowledge()` / `returnToQueue()`). **Новая очередь — новая строка `OneCQueue` и
 свойство, а не новый метод и не `@RabbitListener`:** аннотация получила бы автоматический id,
@@ -919,11 +924,15 @@ PR #23). Исходов ровно четыре (Ш30 и Ш31, PR #42):
 (`sqlstate`, `failure`, `since`, `queues`). Вне паузы очередь без потребителя — `DOWN` с деталью
 `queuesWithoutConsumer` (имена очередей по алфавиту): это и окно до первого запуска потребителей при старте,
 и возобновление, пока потребители подписываются, и потребитель, не поднявшийся после паузы или потерявший
-очередь на брокере. Сервис такой потребитель отдельно не перезапускает: потребителей всех очередей ведущий
-запускает при получении роли и после снятия паузы, иначе его возвращает перезапуск сервиса. Без
-брокера и при `auto-startup: false` ожидаемых очередей нет — `UP`. Readiness и liveness не меняются. Метрика
-`onec_ingest_paused` остаётся флагом паузы и очередь без потребителя не отражает: оповещение контура на
-очередь без потребителя строится на ответе `/actuator/health`. Учёт остановок потребителей держится на
+очередь на брокере. Потребителей всех очередей ведущий запускает при получении роли и после снятия паузы, а
+остановленного потребителя поднимает сам (с Ш89, PR #276): раз в `consumer-restart-interval` (30 с) проход
+`OneCConsumerRestart` вне блокировки паузы проверяет пассивным объявлением, есть ли очередь на брокере, и под
+блокировкой запускает найденные; брокер не отвечает — проход откладывается целиком; на паузе и у неведущего попыток нет.
+Контейнер, который сам переподключается после обрыва, считается работающим и не трогается; повторный `start()`
+работающего контейнера второго потребителя не даёт. Без брокера и при `auto-startup: false` ожидаемых очередей нет —
+`UP`. Readiness и liveness не меняются. Метрика `onec_ingest_paused` остаётся флагом паузы; очереди без потребителя
+считает показатель `onec_ingest_queues_without_consumer` (на неведущем и на паузе — 0), оповещение — по нему
+(`docs/operations.md`). Учёт остановок потребителей держится на
 простом контейнере (`spring.rabbitmq.listener.simple`): контейнер direct событий остановки не публикует,
 это закрепляет тест на брокере (`OneCQueueIngestTest`).
 

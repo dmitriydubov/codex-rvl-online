@@ -3705,7 +3705,11 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   строка «Пропала очередь — ведущий вернёт потребителя сам, раз в 30 с (`onec_ingest_queues_without_consumer`)»; ради
   места убраны `Caffeine` из стека, перечень `health`/`prometheus` у порта актуатора, пул `DB_LEADER_POOL_SIZE` и
   «занятый пул» в строке о недоступной базе (всё есть в `operations.md`), сокращены две подписи; 3490 символов.
-  `data-reference/CLAUDE.md` — на подтверждении владельца.
+  `data-reference/CLAUDE.md` (владелец «1) да»): «Контракт 1С:УСК» — подъём потребителя вернувшейся очереди, неверное
+  имя остаётся заметным, отсутствие при запуске проверено приёмкой; абзац о запуске контейнеров — `OneCConsumerExpectation`
+  и `OneCConsumerRestart`; абзац о здоровье приёма — вместо «сервис такой потребитель отдельно не перезапускает» и
+  «оповещение строится на ответе health» — проход раз в 30 с и показатель `onec_ingest_queues_without_consumer`; в дереве
+  `service/integration/` — новые классы.
 - **Бэклог без номера, взят в Ш87 2026-10-28 — сверка пределов параметров `openapi.yaml` с `projectx.api.*`**
   (`maxLength`, `minimum`, `maximum`, `maxItems` против `max-query-length`, лимитов `limit`, `max-codes`, `max-nights`; около 1–2 ч). Сейчас
   правка предела в `application.yml` тестом Ш85 не ловится, пределы проверяет `reviewer`. Владелец 2026-10-21 «1) да» —
