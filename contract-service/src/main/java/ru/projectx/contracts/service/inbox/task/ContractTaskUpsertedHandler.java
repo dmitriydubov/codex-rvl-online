@@ -1,10 +1,12 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.task;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskEvents;
+import ru.projectx.contracts.service.inbox.InboxWork;
+import ru.projectx.contracts.service.inbox.ParsedEventHandler;
 import ru.projectx.contracts.service.issuance.IssuanceService;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;

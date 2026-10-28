@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.task;
 
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;

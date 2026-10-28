@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.task;
 
 import java.util.ArrayList;
 import java.util.List;

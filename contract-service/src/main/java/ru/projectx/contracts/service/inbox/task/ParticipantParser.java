@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.task;
 
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.ParticipantDocument;

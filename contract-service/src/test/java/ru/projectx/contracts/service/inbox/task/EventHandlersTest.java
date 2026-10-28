@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -15,6 +15,8 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
+import ru.projectx.contracts.service.inbox.InboxOrdering;
+import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.issuance.IssuanceService;
 import ru.projectx.contracts.service.cancellation.TaskCancellationService;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
