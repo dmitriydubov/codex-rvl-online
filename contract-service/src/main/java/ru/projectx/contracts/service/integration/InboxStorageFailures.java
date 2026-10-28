@@ -8,6 +8,8 @@ import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.receipt.QuarantineService;
+import ru.projectx.contracts.service.integration.consumer.InboxConsumerPause;
+import ru.projectx.contracts.service.integration.consumer.StorageOutage;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Component

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.consumer;
 
 import java.util.Optional;
 import java.util.UUID;

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.consumer;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -83,7 +83,7 @@ public class InboxConsumerPause {
         }
     }
 
-    void stopConsumersWithoutProbe() {
+    public void stopConsumersWithoutProbe() {
         synchronized (lifecycle) {
             containers.stopRunning();
         }

@@ -7,9 +7,9 @@ import org.awaitility.Awaitility;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.service.integration.InboxConsumerPause;
-import ru.projectx.contracts.service.integration.InboxConsumerSubscriptions;
-import ru.projectx.contracts.service.integration.InboxQueueConsumers;
+import ru.projectx.contracts.service.integration.consumer.InboxConsumerPause;
+import ru.projectx.contracts.service.integration.consumer.InboxConsumerSubscriptions;
+import ru.projectx.contracts.service.integration.consumer.InboxQueueConsumers;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Component

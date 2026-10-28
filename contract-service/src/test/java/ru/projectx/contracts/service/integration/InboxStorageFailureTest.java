@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import ru.projectx.contracts.service.integration.consumer.StorageOutage;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 class InboxStorageFailureTest {

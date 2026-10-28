@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
