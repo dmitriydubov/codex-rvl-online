@@ -278,7 +278,12 @@ transactional outbox есть очередь **исходящих** событи
 контур из `docker-compose.yml`, паролей в умолчаниях нет (`DB_PASSWORD` и
 `RABBITMQ_PASSWORD` обязательны, Ш5), а слушатели очередей 1С по умолчанию включены —
 compose передаёт локальные пароли и выключает слушателей сам, вне compose их задают явно
-(`.env.example`). Учётных данных в репозитории нет и быть не должно.
+(`.env.example`). Учётных данных в репозитории нет и быть не должно. Ответа брокера на каждую команду канала
+(открыть канал, объявить или проверить очередь, подписаться, отменить подписку) клиент ждёт не дольше
+`RABBITMQ_CHANNEL_RPC_TIMEOUT` (`spring.rabbitmq.channel-rpc-timeout`, 30 с; у клиента RabbitMQ по умолчанию 10 мин;
+Ш90, PR #278). По истечении предела клиент канал не закрывает, поэтому вместе с пределом включена проверка типа ответа
+(`service.integration.OneCBrokerChannelsConfiguration`, `ConnectionFactoryCustomizer`): поздний ответ на просроченную
+команду не достаётся следующей команде другого типа. Причины и остаточные риски — `docs/design.md`.
 
 Тестовый контур поднимается набором переменных; пароль сюда не выписывается —
 его место в секретах развёртывания:
@@ -783,7 +788,7 @@ ru.projectx.datareference
 │   │                    кэша «на сегодня», пределы ввода, шаблоны поиска, `CanonicalGuids`, предел одновременных
 │   │                    запросов (`RestReadAdmission`)
 │   ├── cache/         — сброс кэшей после разбора сообщения 1С (`ReferenceCacheEviction`, `ReferenceCacheDependencies`), оповещение всех экземпляров (`ReferenceCacheNotifications`, `ReferenceCacheChannel`) и подписчик канала (`ReferenceCacheNotificationsConfiguration`, `StreamCacheSubscription`)
-│   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), ждём ли потребителей (`OneCConsumerExpectation`), подъём потребителей вернувшихся очередей (`OneCConsumerRestart`, `OneCConsumerRestartSchedule`; есть ли очередь — `OneCQueuePresence`, журнал эпизодов — `OneCConsumerOutageJournal`, показатель — `OneCQueuesWithoutConsumerGauge`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
+│   ├── integration/   — приём из брокера: очереди и их потоки (`OneCQueue`), регистрация точек приёма (`OneCQueueEndpoints`), запуск и остановка потребителей по роли (`OneCIngestLeadership`, `OneCQueueContainers`), ждём ли потребителей (`OneCConsumerExpectation`), подъём потребителей вернувшихся очередей (`OneCConsumerRestart`, `OneCConsumerRestartSchedule`; есть ли очередь — `OneCQueuePresence`, журнал эпизодов — `OneCConsumerOutageJournal`, показатель — `OneCQueuesWithoutConsumerGauge`), проверка типа ответа клиента RabbitMQ (`OneCBrokerChannelsConfiguration`), слушатель и ответы брокеру (`OneCDelivery`), разбор конверта
 │   ├── leadership/    — ведущий экземпляр: роль (`BackgroundLeadership`), блокировка в `leader_lock` (`LeaderLock`; продлевает её свой пул `config.leadership`), проверка строки блокировки в транзакциях (`LeadershipFence`), метрика `onec_leader` (`LeaderRoleGauge`)
 │   ├── inbound/       — учёт принятых сообщений: `inbox`, сырьё, карантин, исходы, журнал отказов, ключи MDC (`OneCLogContext`)
 │   ├── onec/          — разбор сырья: диспетчер потоков, сохранённый конверт (`StoredEnvelope`), сборка передач прайса
@@ -927,7 +932,8 @@ PR #23). Исходов ровно четыре (Ш30 и Ш31, PR #42):
 очередь на брокере. Потребителей всех очередей ведущий запускает при получении роли и после снятия паузы, а
 остановленного потребителя поднимает сам (с Ш89, PR #276): раз в `consumer-restart-interval` (30 с) проход
 `OneCConsumerRestart` вне блокировки паузы проверяет пассивным объявлением, есть ли очередь на брокере, и под
-блокировкой запускает найденные; брокер не отвечает — проход откладывается целиком; на паузе и у неведущего попыток нет.
+блокировкой запускает найденные; брокер не отвечает (в том числе команда канала не дождалась ответа за
+`RABBITMQ_CHANNEL_RPC_TIMEOUT`, 30 с) — проход откладывается целиком; на паузе и у неведущего попыток нет.
 Контейнер, который сам переподключается после обрыва, считается работающим и не трогается; повторный `start()`
 работающего контейнера второго потребителя не даёт. Без брокера и при `auto-startup: false` ожидаемых очередей нет —
 `UP`. Readiness и liveness не меняются. Метрика `onec_ingest_paused` остаётся флагом паузы; очереди без потребителя
