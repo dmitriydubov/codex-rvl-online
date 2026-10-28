@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.listener;
 
 import java.util.Optional;
 import ru.projectx.contracts.service.database.SqlStates;

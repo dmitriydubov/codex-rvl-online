@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.listener;
 
 import java.io.IOException;
 import org.slf4j.Logger;
