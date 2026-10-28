@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PackageItem(

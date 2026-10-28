@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.storage;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.AttachmentProperties;
+import ru.projectx.contracts.config.storage.AttachmentProperties;
 import ru.projectx.contracts.exception.AttachmentDefect;
 import ru.projectx.contracts.exception.AttachmentRejectedException;
 

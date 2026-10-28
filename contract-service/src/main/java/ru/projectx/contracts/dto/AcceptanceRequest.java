@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Pattern;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.contracts.entity.AcceptanceChannel;
+import ru.projectx.contracts.entity.contract.AcceptanceChannel;
 
 public record AcceptanceRequest(
         @NotNull Integer contractVersion,

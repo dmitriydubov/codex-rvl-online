@@ -22,7 +22,6 @@ class Jackson3JsonFormatMapperTest {
         assertThat(envelope).isEqualTo(new Envelope("ContractTaskUpserted", 3));
     }
 
-
     record Envelope(String eventType, int version) {
     }
 }

@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import ru.projectx.contracts.dto.AcceptanceRequest;
 import ru.projectx.contracts.dto.AcceptanceResponse;
 import ru.projectx.contracts.dto.DocumentState;
-import ru.projectx.contracts.entity.AcceptanceChannel;
+import ru.projectx.contracts.entity.contract.AcceptanceChannel;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
 import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;

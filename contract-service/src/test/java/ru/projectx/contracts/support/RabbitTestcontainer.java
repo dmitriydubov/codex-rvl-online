@@ -10,10 +10,10 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
-import ru.projectx.contracts.service.integration.InternalBroker;
-import ru.projectx.contracts.service.integration.OneCBroker;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
+import ru.projectx.contracts.service.integration.broker.InternalBroker;
+import ru.projectx.contracts.service.integration.broker.OneCBroker;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {

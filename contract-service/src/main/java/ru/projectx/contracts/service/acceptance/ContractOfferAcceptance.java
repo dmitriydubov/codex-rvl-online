@@ -11,16 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.AcceptanceRequest;
 import ru.projectx.contracts.dto.AcceptanceResponse;
 import ru.projectx.contracts.dto.DocumentState;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractAcceptance;
-import ru.projectx.contracts.entity.ContractStatus;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractAcceptance;
+import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
 import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
-import ru.projectx.contracts.repository.ContractAcceptanceRepository;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 
 @Service
 public class ContractOfferAcceptance implements OfferAcceptances {

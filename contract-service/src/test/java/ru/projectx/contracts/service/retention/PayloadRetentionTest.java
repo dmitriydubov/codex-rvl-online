@@ -17,11 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.config.InboxProperties;
-import ru.projectx.contracts.config.OutboxProperties;
-import ru.projectx.contracts.repository.InboxMessageRepository;
-import ru.projectx.contracts.repository.OutboxMessageRepository;
-import ru.projectx.contracts.repository.QuarantineRepository;
+import ru.projectx.contracts.config.journal.InboxProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
+import ru.projectx.contracts.repository.journal.InboxMessageRepository;
+import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
+import ru.projectx.contracts.repository.journal.QuarantineRepository;
 import ru.projectx.contracts.support.TestLeadership;
 
 class PayloadRetentionTest {

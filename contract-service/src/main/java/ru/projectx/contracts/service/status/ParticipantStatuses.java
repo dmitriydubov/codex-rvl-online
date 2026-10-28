@@ -3,20 +3,20 @@ package ru.projectx.contracts.service.status;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractProgress;
-import ru.projectx.contracts.entity.ContractRegistration;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssueError;
-import ru.projectx.contracts.entity.IssuedPolicy;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.PrintedForm;
-import ru.projectx.contracts.entity.RequestParticipant;
-import ru.projectx.contracts.message.IssuedDocumentKind;
-import ru.projectx.contracts.message.KmContractState;
-import ru.projectx.contracts.message.ParticipantStatus;
-import ru.projectx.contracts.message.PaymentStatus;
-import ru.projectx.contracts.message.StatusDocument;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractProgress;
+import ru.projectx.contracts.entity.contract.ContractRegistration;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.document.PrintedForm;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
+import ru.projectx.contracts.message.status.IssuedDocumentKind;
+import ru.projectx.contracts.message.status.KmContractState;
+import ru.projectx.contracts.message.status.ParticipantStatus;
+import ru.projectx.contracts.message.status.PaymentStatus;
+import ru.projectx.contracts.message.status.StatusDocument;
 
 final class ParticipantStatuses {
 

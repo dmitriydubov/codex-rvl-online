@@ -5,10 +5,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.contracts.message.ContractTask;
+import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.ParticipantDocument;
-import ru.projectx.contracts.message.ParticipantPerson;
-import ru.projectx.contracts.message.TaskParticipant;
+import ru.projectx.contracts.message.task.ParticipantPerson;
+import ru.projectx.contracts.message.task.TaskParticipant;
 
 public final class Tasks {
 

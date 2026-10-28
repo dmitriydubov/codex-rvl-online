@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import org.springframework.boot.test.web.server.LocalManagementPort;
-import ru.projectx.contracts.config.StorageProperties;
+import ru.projectx.contracts.config.storage.StorageProperties;
 
 public class CertificateContentSteps {
 

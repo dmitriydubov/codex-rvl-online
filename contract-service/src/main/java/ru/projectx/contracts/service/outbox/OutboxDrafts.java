@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.outbox;
 
 import java.util.UUID;
 import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxDraft;
+import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.message.MessageMeta;
 
 public final class OutboxDrafts {

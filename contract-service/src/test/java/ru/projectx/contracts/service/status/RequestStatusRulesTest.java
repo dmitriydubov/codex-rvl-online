@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.DocumentKind;
-import ru.projectx.contracts.entity.IssueError;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.RequestParticipant;
-import ru.projectx.contracts.message.RequestStatus;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
+import ru.projectx.contracts.entity.issuance.IssueError;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
+import ru.projectx.contracts.message.status.RequestStatus;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -45,7 +45,7 @@ class RequestStatusRulesTest {
     void everyParticipantWithoutIssuanceOrIssued_makesTheRequestCompleted() {
         Contract issued = Issuances.contract(CONTRACT_ID, Tasks.SPOUSE, "DKM-2026-000001");
         org.springframework.test.util.ReflectionTestUtils.setField(issued, "status",
-                ru.projectx.contracts.entity.ContractStatus.ISSUED);
+                ru.projectx.contracts.entity.contract.ContractStatus.ISSUED);
 
         assertThat(RequestStatusRules.of(new IssuanceSnapshot(Tasks.REQUEST, false, List.of(INSURED), List.of(),
                 List.of(), List.of()))).isEqualTo(RequestStatus.COMPLETED);

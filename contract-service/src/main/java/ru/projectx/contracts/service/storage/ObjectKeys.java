@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.storage;
 
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.StorageProperties;
+import ru.projectx.contracts.config.storage.StorageProperties;
 
 @Component
 public class ObjectKeys {

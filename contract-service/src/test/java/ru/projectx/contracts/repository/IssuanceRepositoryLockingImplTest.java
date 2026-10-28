@@ -9,7 +9,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import ru.projectx.contracts.entity.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

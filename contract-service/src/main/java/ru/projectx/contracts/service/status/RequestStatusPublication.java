@@ -6,11 +6,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
-import ru.projectx.contracts.entity.IssuanceRequest;
-import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.issuance.IssuanceRequest;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.MessageMeta;
-import ru.projectx.contracts.message.StatusEvents;
-import ru.projectx.contracts.repository.IssuanceRequestRepository;
+import ru.projectx.contracts.message.status.StatusEvents;
+import ru.projectx.contracts.repository.issuance.IssuanceRequestRepository;
 import ru.projectx.contracts.service.outbox.OutboxDrafts;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 

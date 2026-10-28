@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.storage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.dto.AttachmentResponse;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 
 @Service
