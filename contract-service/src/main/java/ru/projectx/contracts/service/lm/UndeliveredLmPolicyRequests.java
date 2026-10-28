@@ -6,7 +6,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
-import ru.projectx.contracts.service.usk.UndeliveredUskRequests;
+import ru.projectx.contracts.service.usk.request.UndeliveredUskRequests;
 
 @Component
 public class UndeliveredLmPolicyRequests extends UndeliveredUskRequests<LmPolicy, LmPolicyStatus> {

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import java.time.Instant;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;

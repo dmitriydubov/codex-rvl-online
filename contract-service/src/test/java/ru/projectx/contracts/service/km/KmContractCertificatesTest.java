@@ -28,7 +28,7 @@ import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.CertificateStore;
-import ru.projectx.contracts.service.usk.Prerequisites;
+import ru.projectx.contracts.service.usk.request.Prerequisites;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

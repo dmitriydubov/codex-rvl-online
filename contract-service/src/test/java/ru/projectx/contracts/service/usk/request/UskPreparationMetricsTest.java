@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

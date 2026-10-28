@@ -9,8 +9,8 @@ import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.CertificateStore;
-import ru.projectx.contracts.service.usk.Prerequisites;
-import ru.projectx.contracts.service.usk.SubmissionPrerequisites;
+import ru.projectx.contracts.service.usk.request.Prerequisites;
+import ru.projectx.contracts.service.usk.request.SubmissionPrerequisites;
 
 @Component
 public class KmContractCertificates implements SubmissionPrerequisites<Contract> {

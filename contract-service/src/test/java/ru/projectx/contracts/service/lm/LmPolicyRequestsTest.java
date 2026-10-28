@@ -44,7 +44,7 @@ import ru.projectx.contracts.support.Tasks;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.RequestResolution;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
-import ru.projectx.contracts.service.usk.UskPreparationMetrics;
+import ru.projectx.contracts.service.usk.request.UskPreparationMetrics;
 
 class LmPolicyRequestsTest {
 

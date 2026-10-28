@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -15,6 +15,7 @@ import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.service.usk.IssuanceKind;
 
 public class UskRequestRecording<R extends IssuanceRecord, S extends IssuanceStatus, F> {
 

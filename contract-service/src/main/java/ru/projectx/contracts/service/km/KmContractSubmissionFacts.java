@@ -11,7 +11,7 @@ import ru.projectx.contracts.entity.party.PersonSnapshot;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
-import ru.projectx.contracts.service.usk.UskRequestFacts;
+import ru.projectx.contracts.service.usk.request.UskRequestFacts;
 
 @Component
 public class KmContractSubmissionFacts implements UskRequestFacts<Contract, SubmissionFacts> {

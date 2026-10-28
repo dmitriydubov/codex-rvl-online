@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import org.slf4j.Logger;
 import org.slf4j.MDC;
@@ -16,6 +16,7 @@ import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
 import ru.projectx.contracts.service.reference.RequestResolution;
+import ru.projectx.contracts.service.usk.IssuanceKind;
 
 public class UskRequests<R extends IssuanceRecord, S extends IssuanceStatus> {
 

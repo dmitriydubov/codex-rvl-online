@@ -8,7 +8,7 @@ import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.outbox.OutboxJournal;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
-import ru.projectx.contracts.service.usk.UskRequestRecording;
+import ru.projectx.contracts.service.usk.request.UskRequestRecording;
 
 @Service
 public class LmPolicyRequestRecording extends UskRequestRecording<LmPolicy, LmPolicyStatus, LmRequestFacts> {

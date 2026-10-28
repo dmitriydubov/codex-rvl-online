@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import ru.projectx.contracts.entity.party.IdentityDocument;
 import ru.projectx.contracts.message.ParticipantDocument;

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import ru.projectx.contracts.entity.issuance.IssuanceState;
 import ru.projectx.contracts.message.usk.UskRequestTerms;

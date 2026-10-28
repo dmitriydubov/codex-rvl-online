@@ -14,9 +14,9 @@ import ru.projectx.contracts.message.usk.LmPolicyRequest;
 import ru.projectx.contracts.message.usk.LmPolicyRequested;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.status.StatusEvents;
-import ru.projectx.contracts.service.usk.ParticipantDocuments;
-import ru.projectx.contracts.service.usk.RequestTerms;
-import ru.projectx.contracts.service.usk.UskRequestMessages;
+import ru.projectx.contracts.service.usk.request.ParticipantDocuments;
+import ru.projectx.contracts.service.usk.request.RequestTerms;
+import ru.projectx.contracts.service.usk.request.UskRequestMessages;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component

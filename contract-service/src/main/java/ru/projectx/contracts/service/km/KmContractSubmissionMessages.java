@@ -20,9 +20,9 @@ import ru.projectx.contracts.message.usk.KmContractSubmitted;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.message.status.StatusEvents;
 import ru.projectx.contracts.service.storage.CertificateLinks;
-import ru.projectx.contracts.service.usk.ParticipantDocuments;
-import ru.projectx.contracts.service.usk.RequestTerms;
-import ru.projectx.contracts.service.usk.UskRequestMessages;
+import ru.projectx.contracts.service.usk.request.ParticipantDocuments;
+import ru.projectx.contracts.service.usk.request.RequestTerms;
+import ru.projectx.contracts.service.usk.request.UskRequestMessages;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component

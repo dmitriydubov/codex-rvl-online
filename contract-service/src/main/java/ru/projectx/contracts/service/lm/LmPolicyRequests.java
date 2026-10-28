@@ -9,9 +9,9 @@ import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.reference.IssuanceReferences;
 import ru.projectx.contracts.service.reference.ReferenceMetrics;
-import ru.projectx.contracts.service.usk.SubmissionPrerequisites;
-import ru.projectx.contracts.service.usk.UskPreparationMetrics;
-import ru.projectx.contracts.service.usk.UskRequests;
+import ru.projectx.contracts.service.usk.request.SubmissionPrerequisites;
+import ru.projectx.contracts.service.usk.request.UskPreparationMetrics;
+import ru.projectx.contracts.service.usk.request.UskRequests;
 
 @Service
 public class LmPolicyRequests extends UskRequests<LmPolicy, LmPolicyStatus> {

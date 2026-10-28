@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.request;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -8,6 +8,8 @@ import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.outbox.RejectedOutboxMessages;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.service.usk.IssuanceKind;
+import ru.projectx.contracts.service.usk.UskWording;
 
 public class UndeliveredUskRequests<R extends IssuanceRecord, S extends IssuanceStatus>
         implements RejectedOutboxMessages {

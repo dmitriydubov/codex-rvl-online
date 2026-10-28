@@ -5,7 +5,7 @@ import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.repository.issuance.ContractPersonRepository;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
-import ru.projectx.contracts.service.usk.UskRequestFacts;
+import ru.projectx.contracts.service.usk.request.UskRequestFacts;
 
 @Component
 public class LmPolicyRequestFacts implements UskRequestFacts<LmPolicy, LmRequestFacts> {
