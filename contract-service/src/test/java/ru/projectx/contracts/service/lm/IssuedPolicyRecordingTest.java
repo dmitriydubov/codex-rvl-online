@@ -42,7 +42,7 @@ import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
-import ru.projectx.contracts.service.usk.ResultExpectation;
+import ru.projectx.contracts.service.usk.result.ResultExpectation;
 
 class IssuedPolicyRecordingTest {
 

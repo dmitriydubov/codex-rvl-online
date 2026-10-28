@@ -7,7 +7,7 @@ import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
-import ru.projectx.contracts.service.usk.UskResultRecording;
+import ru.projectx.contracts.service.usk.result.UskResultRecording;
 
 @Service
 public class IssuedPolicyRecording extends UskResultRecording<LmPolicy, LmPolicyStatus> {

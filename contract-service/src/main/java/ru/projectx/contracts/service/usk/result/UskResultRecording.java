@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.result;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +17,8 @@ import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.service.usk.IssuanceKind;
+import ru.projectx.contracts.service.usk.UskWording;
 
 public class UskResultRecording<R extends IssuanceRecord, S extends IssuanceStatus> {
 

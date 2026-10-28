@@ -24,7 +24,7 @@ import ru.projectx.contracts.service.inbox.InboxOrdering;
 import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
-import ru.projectx.contracts.service.usk.ResultExpectation;
+import ru.projectx.contracts.service.usk.result.ResultExpectation;
 import ru.projectx.contracts.support.LmPolicyResultBodies;
 import tools.jackson.databind.json.JsonMapper;
 

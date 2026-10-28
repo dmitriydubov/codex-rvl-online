@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.result;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +13,7 @@ import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.inbox.ParsedEventHandler;
 import ru.projectx.contracts.service.inbox.parse.PayloadParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
+import ru.projectx.contracts.service.usk.IssuanceKind;
 
 public class UskResultHandler<R extends IssuanceRecord, S extends IssuanceStatus> extends ParsedEventHandler<UskResult> {
 

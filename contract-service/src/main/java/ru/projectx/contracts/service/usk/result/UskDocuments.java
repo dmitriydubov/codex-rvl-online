@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.usk;
+package ru.projectx.contracts.service.usk.result;
 
 import java.util.List;
 import ru.projectx.contracts.entity.document.PrintedFormType;

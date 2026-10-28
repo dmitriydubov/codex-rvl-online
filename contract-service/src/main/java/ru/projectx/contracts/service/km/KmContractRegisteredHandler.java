@@ -6,7 +6,7 @@ import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.usk.UskResultParser;
 import ru.projectx.contracts.service.reference.IssuedPolicyLookup;
-import ru.projectx.contracts.service.usk.UskResultHandler;
+import ru.projectx.contracts.service.usk.result.UskResultHandler;
 
 @Component
 public class KmContractRegisteredHandler extends UskResultHandler<Contract, ContractStatus> {

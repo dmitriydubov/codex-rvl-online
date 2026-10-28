@@ -44,7 +44,7 @@ import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
-import ru.projectx.contracts.service.usk.ResultExpectation;
+import ru.projectx.contracts.service.usk.result.ResultExpectation;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
