@@ -21,6 +21,7 @@ import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import ru.projectx.datareference.controller.FailingController;
 import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
+import ru.projectx.datareference.controller.request.UuidParameters;
 import ru.projectx.datareference.exception.InvalidRequestException;
 
 @ExtendWith(OutputCaptureExtension.class)
@@ -51,6 +52,31 @@ class RequestErrorAdviceTest {
         MvcTestResult result = get(FailingController.WITH_PARAMETER);
 
         assertValidationError(result, "key", "обязательный параметр");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" ", "  ", "\t"})
+    void blankPathVariable_isValidationError_namingVariableAndExpectedType(String blank, CapturedOutput output) {
+        mvc = StandaloneMvc.withRequestId(new FailingController(), new RequestErrorAdvice(),
+                StandaloneMvc.serverFailureAdvice(), new UuidParameters());
+
+        MvcTestResult result = mvc.get().uri(FailingController.WITH_ID, blank)
+                .header(RequestIdFilter.HEADER, REQUEST_ID).exchange();
+
+        assertValidationError(result, "id", "ожидается UUID");
+        assertThat(output).doesNotContain("ERROR");
+    }
+
+    @Test
+    void pathVariableMissingFromTemplate_isInternalError_writtenToJournal(CapturedOutput output) {
+        mvc = StandaloneMvc.withRequestId(new FailingController(), StandaloneMvc.errorAdvices());
+
+        MvcTestResult result = get(FailingController.WITHOUT_ID_IN_TEMPLATE);
+
+        assertThat(result).hasStatus(500);
+        assertThat(result).bodyJson().extractingPath("$.error.code").isEqualTo("INTERNAL_ERROR");
+        assertThat(result).bodyJson().extractingPath("$.error.requestId").isEqualTo(REQUEST_ID);
+        assertThat(output).contains("ERROR").contains("MissingPathVariableException");
     }
 
     @Test
