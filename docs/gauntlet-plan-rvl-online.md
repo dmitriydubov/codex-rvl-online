@@ -3656,6 +3656,18 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
   `container.start()` — старая фраза шапки неверна уже в PR. Текста шапки в ветке не было; координатор показал владельцу
   точную правку (одна фраза о стенде, сценарии и «Примеры» прежние), владелец «1) да». Внесено коммитом `spec:`
   9346cfbf в `claude/sh89-consumer-restart-and-metric` 2026-10-28; сессии — `git pull --no-rebase` перед следующим пушем.
+  Проверка координатора по запросу владельца (2026-10-28 ~15:30 UTC, по запушенному e3bc5ef9; PR ещё нет, сессия
+  закаляет — `gauntlet` с PIT, правки Checkstyle и приёмки не запушены). Вариант (а): `OneCConsumerRestartSchedule`
+  (`consumer-restart-interval` 30 с) → `OneCConsumerRestart.restartStopped()` под блокировкой `OneCConsumerPause`;
+  кандидаты — `OneCQueueContainers.stopped()` (ожидаемые, не `isRunning()`, без идущей остановки), перед запуском
+  `OneCQueuePresence` — пассивное объявление через `RabbitTemplate` (есть / нет / брокер не отвечает); журнал —
+  `OneCConsumerOutageJournal` (ERROR один раз на эпизод, INFO по `ConsumeOkEvent`); gauge
+  `onec.ingest.queues.without.consumer` (на паузе 0). Блокеров не найдено. Сверено по `javap` spring-rabbit 4.0.4:
+  `AbstractConnectionFactory$DefaultChannelCloseLogger` пишет закрытие канала после пассивного объявления в DEBUG, не
+  ERROR — проверка раз в 30 с журнал не засоряет. Замечание (не блокер): проверка очереди и запуск контейнера — сетевые
+  вызовы под блокировкой `lifecycle`; так же устроен и прежний `startExpected`, а `paused()` (health, gauge) читает
+  `volatile` без блокировки; задержка паузы и смены роли ограничена временем проверки и запуска — оценивает ревьюер шага.
+  Перезапуск брокера целиком стенд не воспроизводит (изображает `close_all_connections`) — остаточный риск в отчёт.
 - **Бэклог без номера, взят в Ш87 2026-10-28 — сверка пределов параметров `openapi.yaml` с `projectx.api.*`**
   (`maxLength`, `minimum`, `maximum`, `maxItems` против `max-query-length`, лимитов `limit`, `max-codes`, `max-nights`; около 1–2 ч). Сейчас
   правка предела в `application.yml` тестом Ш85 не ловится, пределы проверяет `reviewer`. Владелец 2026-10-21 «1) да» —
