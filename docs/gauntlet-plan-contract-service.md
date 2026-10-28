@@ -1151,6 +1151,20 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   следы — пусто, конфликтов с `main` `b6b3672` нет. **PR #258 готов к мержу** (координатор, два контрольных прогона:
   `117ef11` и `d76ddcb` + `main`). После мержа — пункты 2–4 PR (README, `contract-service/CLAUDE.md`, журнал Д-09,
   «Структура данных — редакция 2»), архив сессии К10, сверка раскладки К11 по `main`.
+- 2026-10-28, **К11 — остановка перед PR** (ветка `claude/k11-contract-service-subpackages`, `a0f3bd0`, 42 коммита).
+  Новые полные имена классов allowlist RUN_ERROR: `config.journal.InboxProperties$Retry`,
+  `config.leadership.LeadershipProperties`, `entity.party.PersonOwner`, `message.task.TaskParticipant`;
+  `service.status.RecordOutcome` не переехал. PR координатора — правка путей (мутанты, тесты и пояснения те же) и
+  комментариев набора: под `exclude.classes` — перечень того, что маски прячут сейчас (с К10 там ещё
+  `SchedulingConfig`, `ReferenceClientConfig`, `StorageClientConfig`, `LeadershipConfiguration`, `LeaderLockRepository`,
+  `InboxProbeRepository`, `QuarantineRepository`; комментарий говорил «none today» у `*Configuration`), в политике
+  архитектуры — вложенные пакеты любой глубины принадлежат компоненту верхнего уровня (правило не менялось).
+  Вопросы сессии владельцу: (1) `exception` плоский — полные имена исключений в журналах и `error_message`
+  (рекомендация координатора — да, как в data-reference); (2) `log.logger` перенесённых классов меняется (рекомендация —
+  да, список «было → стало» в PR). Координатору: «Структура пакетов» `contract-service/CLAUDE.md` и «Где в коде» журнала —
+  после мержа; долг (тест `InboxPropertiesTest` проверяет и `ContractNumberingProperties`, `StatusTest` — статусы трёх
+  подпакетов, `UskResultLayout` в `service.inbox.usk` нужен корням `service.km` и `service.lm`) — сделать в К11:
+  критерий «тесты рядом со своими классами» и раскладка по смыслу — задача шага.
 - 2026-10-28, **владелец: «запускай k11»** — сессия К11 открыта 06:16 UTC (session_01MHdnEptK9VUhoWzDsQLheb, Opus 5.5;
   уровень xhigh владелец ставит в настройках сессии). Первая попытка ушла в окружение координатора, а не в `default`
   шагов — сессия session_01MHdnEpRLRvjcWhDLWPCCdR остановлена и архивирована до начала работы (ветки не создала).
