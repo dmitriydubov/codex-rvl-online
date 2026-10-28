@@ -3621,6 +3621,9 @@ Opus 5.5, ветка `claude/sh80-warmup-after-start`). В задании: по�
     (координатор): строка «Запросов REST одновременно, лишние — сразу 503 | 100 | `API_MAX_CONCURRENT_REQUESTS`», ради
     места сокращены имя второй переменной переподключения кэша и подпись ссылки на `troubleshooting.md`; 3500 символов —
     ровно предел, следующая правка README потребует сокращений. Текст соседям отправляет владелец (ответ «2) ок»).
+    `data-reference/CLAUDE.md` (владелец «1) да»): 503 и при перегрузке — в «Что дала фаза 6», «Соседи по контуру» и в
+    абзаце о советниках (`RestOverloadException`, без записи в журнал); в дереве пакетов — `RestReadAdmission`,
+    `InternalApiInterceptors`, `ConcurrentRequestsInterceptor`.
 - **Бэклог без номера, взят в Ш87 2026-10-28 — сверка пределов параметров `openapi.yaml` с `projectx.api.*`**
   (`maxLength`, `minimum`, `maximum`, `maxItems` против `max-query-length`, лимитов `limit`, `max-codes`, `max-nights`; около 1–2 ч). Сейчас
   правка предела в `application.yml` тестом Ш85 не ловится, пределы проверяет `reviewer`. Владелец 2026-10-21 «1) да» —
