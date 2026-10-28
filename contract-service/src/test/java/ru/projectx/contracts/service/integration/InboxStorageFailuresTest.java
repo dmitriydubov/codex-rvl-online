@@ -34,7 +34,7 @@ import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.RejectedMessage;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
-import ru.projectx.contracts.service.inbox.QuarantineService;
+import ru.projectx.contracts.service.inbox.receipt.QuarantineService;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 import ru.projectx.contracts.support.TaskBodies;

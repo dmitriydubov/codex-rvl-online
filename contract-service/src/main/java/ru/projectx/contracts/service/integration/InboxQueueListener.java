@@ -12,8 +12,8 @@ import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.InboxLogContext;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
-import ru.projectx.contracts.service.inbox.InboxReceiver;
-import ru.projectx.contracts.service.inbox.ReceiptOutcome;
+import ru.projectx.contracts.service.inbox.receipt.InboxReceiver;
+import ru.projectx.contracts.service.inbox.receipt.ReceiptOutcome;
 
 @Component
 public class InboxQueueListener implements ChannelAwareMessageListener {

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox;
+package ru.projectx.contracts.service.inbox.receipt;
 
 import java.time.Clock;
 import org.springframework.stereotype.Service;

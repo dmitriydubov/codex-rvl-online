@@ -30,8 +30,8 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
-import ru.projectx.contracts.service.inbox.InboxReceiver;
-import ru.projectx.contracts.service.inbox.ReceiptOutcome;
+import ru.projectx.contracts.service.inbox.receipt.InboxReceiver;
+import ru.projectx.contracts.service.inbox.receipt.ReceiptOutcome;
 import ru.projectx.contracts.support.TaskBodies;
 import tools.jackson.databind.json.JsonMapper;
 
