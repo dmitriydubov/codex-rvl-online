@@ -20,7 +20,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.repository.LeaderLockRepository;
+import ru.projectx.contracts.repository.database.LeaderLockRepository;
 import ru.projectx.contracts.support.IntegrationTest;
 
 @IntegrationTest

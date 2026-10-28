@@ -1,10 +1,10 @@
 package ru.projectx.contracts.service.lm;
 
-import ru.projectx.contracts.service.inbox.FieldPresence;
-import ru.projectx.contracts.service.inbox.UskResultLayout;
+import ru.projectx.contracts.service.inbox.parse.FieldPresence;
+import ru.projectx.contracts.service.usk.UskResultLayout;
 import ru.projectx.contracts.service.usk.UskWording;
 
-final class LmPolicyTexts {
+public final class LmPolicyTexts {
 
     static final UskWording WORDING = new UskWording("полис ЛМ", "полиса ЛМ", "полису ЛМ", "результат выпуска",
             "запрос на выпуск полиса ЛМ ещё не отправлялся",
@@ -13,7 +13,7 @@ final class LmPolicyTexts {
             "запрос на выпуск полиса ЛМ {} не доставлен, полис уже в статусе {} и не меняется",
             "запрос на выпуск полиса ЛМ {} не доставлен, полис переведён в ERROR");
 
-    static final UskResultLayout LAYOUT = new UskResultLayout("ISSUED", "policy_usk_id", "policy_usk_number",
+    public static final UskResultLayout LAYOUT = new UskResultLayout("ISSUED", "policy_usk_id", "policy_usk_number",
             FieldPresence.OPTIONAL, FieldPresence.OPTIONAL);
 
     private LmPolicyTexts() {

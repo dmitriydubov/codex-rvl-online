@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.inbox;
 
+import ru.projectx.contracts.service.inbox.parse.PayloadParser;
+
 public abstract class ParsedEventHandler<T> implements InboxEventHandler {
 
     private final PayloadParser<T> parser;

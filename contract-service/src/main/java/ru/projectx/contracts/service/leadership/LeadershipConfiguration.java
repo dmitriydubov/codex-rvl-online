@@ -8,8 +8,8 @@ import org.springframework.integration.jdbc.lock.DefaultLockRepository;
 import org.springframework.integration.jdbc.lock.JdbcLockRegistry;
 import org.springframework.integration.support.leader.LockRegistryLeaderInitiator;
 import org.springframework.jdbc.support.JdbcTransactionManager;
-import ru.projectx.contracts.config.LeaderLockPoolProperties;
-import ru.projectx.contracts.config.LeadershipProperties;
+import ru.projectx.contracts.config.leadership.LeaderLockPoolProperties;
+import ru.projectx.contracts.config.leadership.LeadershipProperties;
 
 @Configuration(proxyBeanMethods = false)
 public class LeadershipConfiguration {

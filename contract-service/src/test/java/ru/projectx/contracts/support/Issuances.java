@@ -4,15 +4,15 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.entity.ContractDraft;
-import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.IssuanceTerms;
-import ru.projectx.contracts.entity.IssuedPolicy;
-import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.LmPolicyDraft;
-import ru.projectx.contracts.entity.RequestReference;
-import ru.projectx.contracts.entity.TripPeriod;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractDraft;
+import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.issuance.IssuanceTerms;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyDraft;
+import ru.projectx.contracts.entity.issuance.RequestReference;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 
 public final class Issuances {
 

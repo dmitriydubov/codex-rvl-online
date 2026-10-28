@@ -3,9 +3,9 @@ package ru.projectx.contracts.service.status;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuanceStatus;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssueError;
 
 record RecordOutcome(UUID recordId, UUID participantId, IssuanceStatus status, @Nullable IssueError error) {
 

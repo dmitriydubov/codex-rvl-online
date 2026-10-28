@@ -14,9 +14,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxDraft;
-import ru.projectx.contracts.entity.OutboxMessage;
-import ru.projectx.contracts.entity.OutboxStatus;
+import ru.projectx.contracts.entity.outbox.OutboxDraft;
+import ru.projectx.contracts.entity.outbox.OutboxMessage;
+import ru.projectx.contracts.entity.outbox.OutboxStatus;
 
 class OutboxRejectionTest {
 

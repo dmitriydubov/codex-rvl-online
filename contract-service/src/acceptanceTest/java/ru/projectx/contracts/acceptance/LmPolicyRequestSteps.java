@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.assertj.core.api.SoftAssertions;
 import org.awaitility.Awaitility;
-import ru.projectx.contracts.service.lm.LmPolicyRequestScheduler;
+import ru.projectx.contracts.service.lm.request.LmPolicyRequestScheduler;
 import tools.jackson.databind.JsonNode;
 
 public class LmPolicyRequestSteps {

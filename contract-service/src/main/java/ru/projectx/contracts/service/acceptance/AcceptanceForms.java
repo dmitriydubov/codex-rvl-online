@@ -4,7 +4,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Optional;
 import ru.projectx.contracts.dto.AcceptanceRequest;
-import ru.projectx.contracts.entity.OfferAcceptance;
+import ru.projectx.contracts.entity.contract.OfferAcceptance;
 
 final class AcceptanceForms {
 

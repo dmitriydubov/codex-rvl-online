@@ -1,0 +1,20 @@
+package ru.projectx.contracts.service.lm.issue;
+
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import ru.projectx.contracts.entity.policy.LmPolicy;
+import ru.projectx.contracts.entity.policy.LmPolicyStatus;
+import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
+import ru.projectx.contracts.service.lm.LmPolicyKind;
+import ru.projectx.contracts.service.status.RequestStatusPublication;
+import ru.projectx.contracts.service.usk.result.UskResultRecording;
+
+@Service
+public class IssuedPolicyRecording extends UskResultRecording<LmPolicy, LmPolicyStatus> {
+
+    public IssuedPolicyRecording(LmPolicyRepository policies, PrintedFormRepository forms,
+            RequestStatusPublication statuses) {
+        super(LmPolicyKind.KIND, policies, forms, statuses, LoggerFactory.getLogger(IssuedPolicyRecording.class));
+    }
+}

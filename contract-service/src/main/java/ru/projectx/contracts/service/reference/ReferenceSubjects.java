@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service.reference;
 
 import java.util.UUID;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceNotFoundException;

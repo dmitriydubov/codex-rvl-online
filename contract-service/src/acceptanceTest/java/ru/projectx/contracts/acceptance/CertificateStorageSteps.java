@@ -12,8 +12,8 @@ import io.minio.MinioClient;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import ru.projectx.contracts.config.AttachmentProperties;
-import ru.projectx.contracts.config.StorageProperties;
+import ru.projectx.contracts.config.storage.AttachmentProperties;
+import ru.projectx.contracts.config.storage.StorageProperties;
 
 public class CertificateStorageSteps {
 

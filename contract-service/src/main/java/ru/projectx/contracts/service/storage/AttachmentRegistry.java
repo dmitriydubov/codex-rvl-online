@@ -5,17 +5,17 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.AttachmentResponse;
-import ru.projectx.contracts.entity.IssuanceRequest;
-import ru.projectx.contracts.entity.ParticipantAttachment;
-import ru.projectx.contracts.entity.PrintedForm;
-import ru.projectx.contracts.entity.RequestParticipant;
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.issuance.IssuanceRequest;
+import ru.projectx.contracts.entity.document.ParticipantAttachment;
+import ru.projectx.contracts.entity.document.PrintedForm;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
+import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.AttachmentConflictException;
 import ru.projectx.contracts.exception.ParticipantNotFoundException;
 import ru.projectx.contracts.exception.RequestCancelledException;
 import ru.projectx.contracts.exception.RequestNotFoundException;
-import ru.projectx.contracts.repository.IssuanceRequestRepository;
-import ru.projectx.contracts.repository.PrintedFormRepository;
+import ru.projectx.contracts.repository.issuance.IssuanceRequestRepository;
+import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 
 @Component
 public class AttachmentRegistry {

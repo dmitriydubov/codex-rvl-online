@@ -5,8 +5,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.contracts.entity.Contract;
-import ru.projectx.contracts.repository.ContractRepository;
+import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.repository.issuance.ContractRepository;
 
 @Service
 public class ContractPayments {

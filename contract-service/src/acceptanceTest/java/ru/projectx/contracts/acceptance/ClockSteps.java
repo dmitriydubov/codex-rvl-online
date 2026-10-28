@@ -7,10 +7,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import ru.projectx.contracts.config.InboxProperties;
-import ru.projectx.contracts.config.KmContractSubmissionProperties;
-import ru.projectx.contracts.config.LmPolicyRequestProperties;
-import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
+import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
+import ru.projectx.contracts.config.usk.LmPolicyRequestProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
 
 public class ClockSteps {
 

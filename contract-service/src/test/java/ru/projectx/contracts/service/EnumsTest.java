@@ -3,7 +3,7 @@ package ru.projectx.contracts.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.entity.Gender;
+import ru.projectx.contracts.entity.party.Gender;
 
 class EnumsTest {
 

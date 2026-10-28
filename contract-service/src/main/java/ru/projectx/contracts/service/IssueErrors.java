@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.exception.ParticipantDataException;
 
 public final class IssueErrors {
@@ -15,7 +15,7 @@ public final class IssueErrors {
     private IssueErrors() {
     }
 
-    static ParticipantDataException programRequired(String participantPath) {
+    public static ParticipantDataException programRequired(String participantPath) {
         return new ParticipantDataException(PROGRAM_REQUIRED,
                 "поле " + participantPath + ".program_id обязательно для участника, которому выпускается документ");
     }

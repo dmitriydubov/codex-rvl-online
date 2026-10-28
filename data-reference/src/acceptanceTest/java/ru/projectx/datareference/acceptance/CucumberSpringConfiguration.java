@@ -25,7 +25,8 @@ import ru.projectx.datareference.config.leadership.LeaderLockPoolConfig;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "projectx.scheduling.enabled=false",
         "spring.rabbitmq.ssl.enabled=false",
-        "spring.rabbitmq.listener.simple.auto-startup=true"})
+        "spring.rabbitmq.listener.simple.auto-startup=true",
+        "projectx.api.max-concurrent-requests=20"})
 @Import(CucumberSpringConfiguration.Containers.class)
 public class CucumberSpringConfiguration {
 
@@ -89,7 +90,8 @@ public class CucumberSpringConfiguration {
                 @Override
                 public Object postProcessAfterInitialization(Object bean, String beanName) {
                     if (bean instanceof DataSource pool && DATA_SOURCE_BEAN.equals(beanName)) {
-                        return new SwitchableDataSource(new LateFirstReadDataSource(pool), availability);
+                        return new SwitchableDataSource(
+                                new LateFirstReadDataSource(new HeldReadsDataSource(pool)), availability);
                     }
                     if (bean instanceof DataSource pool && LeaderLockPoolConfig.LEADER_LOCK_POOL.equals(beanName)) {
                         return new SwitchableDataSource(pool, availability);

@@ -17,8 +17,6 @@ import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceRejectedException;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
 import ru.projectx.contracts.exception.TemporaryFailureException;
-import ru.projectx.contracts.service.reference.PolicyReads;
-import ru.projectx.contracts.service.reference.ReferenceMetrics;
 
 class IssuedPolicyLookupTest {
 

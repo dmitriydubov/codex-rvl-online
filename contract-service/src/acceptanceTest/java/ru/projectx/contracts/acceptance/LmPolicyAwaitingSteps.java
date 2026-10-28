@@ -1,7 +1,7 @@
 package ru.projectx.contracts.acceptance;
 
 import io.cucumber.java.ru.Когда;
-import ru.projectx.contracts.service.lm.LmPolicyAwaiting;
+import ru.projectx.contracts.service.lm.awaiting.LmPolicyAwaiting;
 
 public class LmPolicyAwaitingSteps {
 

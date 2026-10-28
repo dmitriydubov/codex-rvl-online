@@ -44,6 +44,20 @@ public class PrometheusSteps {
                 .isEqualTo(growth);
     }
 
+    @Тогда("счётчик Prometheus {string} вырос за сценарий на {int}")
+    public void counterWithoutLabelsGrew(String name, int growth) throws IOException, InterruptedException {
+        String series = Pattern.quote(name) + " ";
+        double now = sum(seriesValues(scrape(), series));
+
+        assertThat(now - sum(seriesValues(beforeScenario, series)))
+                .as("прирост %s за сценарий", name)
+                .isEqualTo(growth);
+    }
+
+    private static double sum(List<Double> values) {
+        return values.stream().mapToDouble(Double::doubleValue).sum();
+    }
+
     @Тогда("показатель Prometheus {string} равен {int}")
     public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
         assertThat(seriesValues(scrape(), Pattern.quote(name) + " "))

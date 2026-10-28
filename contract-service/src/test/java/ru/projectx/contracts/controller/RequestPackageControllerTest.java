@@ -24,7 +24,7 @@ import ru.projectx.contracts.dto.PackageItem.PackageDocument;
 import ru.projectx.contracts.dto.PackageItem.PackagePayment;
 import ru.projectx.contracts.dto.PackageItem.PaymentState;
 import ru.projectx.contracts.dto.PackageResponse;
-import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.exception.RequestNotFoundException;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.packages.RequestPackageReads;

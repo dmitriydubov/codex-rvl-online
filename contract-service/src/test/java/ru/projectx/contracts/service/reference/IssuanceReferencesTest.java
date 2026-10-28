@@ -14,14 +14,11 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.dto.ReferenceInsuranceContract;
 import ru.projectx.contracts.dto.ReferencePolicy;
 import ru.projectx.contracts.dto.ReferenceProgram;
-import ru.projectx.contracts.entity.IssuanceState;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuanceState;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.exception.ReferenceArchivedException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.exception.ReferenceUnavailableException;
-import ru.projectx.contracts.service.reference.InsuranceContractReads;
-import ru.projectx.contracts.service.reference.PolicyReads;
-import ru.projectx.contracts.service.reference.ProgramReads;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

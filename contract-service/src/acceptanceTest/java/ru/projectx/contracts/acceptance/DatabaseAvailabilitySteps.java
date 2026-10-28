@@ -9,7 +9,7 @@ import io.cucumber.java.ru.Когда;
 import java.time.Duration;
 import java.util.List;
 import javax.sql.DataSource;
-import ru.projectx.contracts.service.integration.InboxConsumerPause;
+import ru.projectx.contracts.service.integration.consumer.InboxConsumerPause;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeaderLockConnections;
 

@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.storage;
 
-import ru.projectx.contracts.entity.StoredFile;
+import ru.projectx.contracts.entity.document.StoredFile;
 
 public interface CertificateStore {
 

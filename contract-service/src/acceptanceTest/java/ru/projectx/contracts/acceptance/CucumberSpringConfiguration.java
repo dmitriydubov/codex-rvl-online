@@ -15,10 +15,10 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
-import ru.projectx.contracts.config.InternalBrokerProperties;
-import ru.projectx.contracts.config.OneCBrokerProperties;
-import ru.projectx.contracts.service.integration.InternalBroker;
-import ru.projectx.contracts.service.integration.OneCBroker;
+import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.OneCBrokerProperties;
+import ru.projectx.contracts.service.integration.broker.InternalBroker;
+import ru.projectx.contracts.service.integration.broker.OneCBroker;
 import ru.projectx.contracts.service.leadership.LeaderLockConnections;
 
 @CucumberContextConfiguration

@@ -19,7 +19,8 @@ public record ReferenceApiProperties(
         @Valid @DefaultValue Search search,
         @Valid @DefaultValue Mkb10 mkb10,
         @Valid @DefaultValue Price price,
-        @Min(1) int readTimeoutSeconds) {
+        @Min(1) int readTimeoutSeconds,
+        @Min(1) int maxConcurrentRequests) {
 
     public record Search(
             @Min(1) @DefaultValue("10") int defaultLimit,
