@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.submission;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.submission;
 
 import java.util.UUID;
 import ru.projectx.contracts.entity.document.PrintedFormType;

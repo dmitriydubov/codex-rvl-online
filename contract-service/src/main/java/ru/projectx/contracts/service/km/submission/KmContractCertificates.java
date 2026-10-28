@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.submission;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -7,6 +7,7 @@ import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
+import ru.projectx.contracts.service.km.KmContractTexts;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.CertificateStore;
 import ru.projectx.contracts.service.usk.request.Prerequisites;

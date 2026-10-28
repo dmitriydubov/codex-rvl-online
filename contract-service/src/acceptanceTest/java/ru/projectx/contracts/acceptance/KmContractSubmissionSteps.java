@@ -16,7 +16,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.awaitility.Awaitility;
 import ru.projectx.contracts.config.storage.StorageProperties;
 import ru.projectx.contracts.service.km.KmContractAwaiting;
-import ru.projectx.contracts.service.km.KmContractSubmissionScheduler;
+import ru.projectx.contracts.service.km.submission.KmContractSubmissionScheduler;
 import tools.jackson.databind.JsonNode;
 
 public class KmContractSubmissionSteps {

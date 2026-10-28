@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.submission;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

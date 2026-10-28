@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.km;
+package ru.projectx.contracts.service.km.submission;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;

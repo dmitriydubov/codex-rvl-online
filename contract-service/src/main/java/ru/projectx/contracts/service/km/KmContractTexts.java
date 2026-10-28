@@ -4,9 +4,9 @@ import ru.projectx.contracts.service.inbox.parse.FieldPresence;
 import ru.projectx.contracts.service.inbox.usk.UskResultLayout;
 import ru.projectx.contracts.service.usk.UskWording;
 
-final class KmContractTexts {
+public final class KmContractTexts {
 
-    static final UskWording WORDING = new UskWording("договор КМ", "договора КМ", "договору КМ",
+    public static final UskWording WORDING = new UskWording("договор КМ", "договора КМ", "договору КМ",
             "результат регистрации",
             "передача договора КМ в 1С:УСК ещё не отправлялась",
             "справочный сервис недоступен, передача отложена до следующего прохода",
