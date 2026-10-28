@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import ru.projectx.datareference.support.IntegrationTest;
 import tools.jackson.databind.JsonNode;
@@ -32,6 +34,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "projectx.api.max-concurrent-requests=" + ConcurrentRequestsLimitTest.LIMIT)
+@Import(HoldingController.class)
 class ConcurrentRequestsLimitTest {
 
     static final int LIMIT = 3;
@@ -116,7 +119,7 @@ class ConcurrentRequestsLimitTest {
     private static List<Integer> statuses(List<Future<HttpResponse<String>>> responses)
             throws InterruptedException, ExecutionException, TimeoutException {
 
-        List<Integer> statuses = new java.util.ArrayList<>();
+        List<Integer> statuses = new ArrayList<>();
         for (Future<HttpResponse<String>> response : responses) {
             statuses.add(response.get(TIMEOUT.toSeconds(), TimeUnit.SECONDS).statusCode());
         }

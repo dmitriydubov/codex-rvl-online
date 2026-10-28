@@ -45,10 +45,6 @@ public class RestReadAdmission {
         return limit;
     }
 
-    public int inFlight() {
-        return inFlight(limit, places);
-    }
-
     private static int inFlight(int limit, Semaphore places) {
         return limit - places.availablePermits();
     }

@@ -16,8 +16,9 @@ class ConcurrentRequestsInterceptorTest {
     private static final int LIMIT = 1;
     private static final Object HANDLER = new Object();
 
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final RestReadAdmission admission =
-            new RestReadAdmission(TestApiProperties.withMaxConcurrentRequests(LIMIT), new SimpleMeterRegistry());
+            new RestReadAdmission(TestApiProperties.withMaxConcurrentRequests(LIMIT), meters);
     private final ConcurrentRequestsInterceptor interceptor = new ConcurrentRequestsInterceptor(admission);
 
     @Test
@@ -25,7 +26,7 @@ class ConcurrentRequestsInterceptorTest {
         boolean proceed = interceptor.preHandle(request(), new MockHttpServletResponse(), HANDLER);
 
         assertThat(proceed).isTrue();
-        assertThat(admission.inFlight()).isEqualTo(1);
+        assertThat(inFlight()).isEqualTo(1.0);
     }
 
     @Test
@@ -34,9 +35,8 @@ class ConcurrentRequestsInterceptorTest {
 
         assertThatThrownBy(() -> interceptor.preHandle(request(), new MockHttpServletResponse(), HANDLER))
                 .isInstanceOf(RestOverloadException.class)
-                .satisfies(overload -> assertThat(((RestOverloadException) overload).limit()).isEqualTo(LIMIT))
-                .hasMessage("превышен предел одновременно обрабатываемых запросов: 1");
-        assertThat(admission.inFlight()).isEqualTo(1);
+                .hasMessage("превышен предел одновременно обрабатываемых запросов: " + LIMIT);
+        assertThat(inFlight()).isEqualTo(1.0);
     }
 
     @Test
@@ -45,8 +45,12 @@ class ConcurrentRequestsInterceptorTest {
 
         interceptor.afterCompletion(request(), new MockHttpServletResponse(), HANDLER, new IllegalStateException());
 
-        assertThat(admission.inFlight()).isZero();
+        assertThat(inFlight()).isZero();
         assertThat(interceptor.preHandle(request(), new MockHttpServletResponse(), HANDLER)).isTrue();
+    }
+
+    private double inFlight() {
+        return meters.get(RestReadAdmission.IN_FLIGHT).gauge().value();
     }
 
     private static MockHttpServletRequest request() {

@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.lang.ref.WeakReference;
@@ -8,8 +9,6 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.config.ReferenceApiProperties;
 import ru.projectx.datareference.support.TestApiProperties;
-
-import static org.awaitility.Awaitility.await;
 
 class RestReadAdmissionTest {
 

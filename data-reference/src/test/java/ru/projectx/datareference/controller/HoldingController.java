@@ -2,11 +2,13 @@ package ru.projectx.datareference.controller;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.boot.test.context.TestComponent;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@TestComponent
 public class HoldingController {
 
     public static final String HELD = InternalApi.BASE_PATH + "/held";
