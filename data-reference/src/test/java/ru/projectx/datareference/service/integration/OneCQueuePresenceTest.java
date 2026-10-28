@@ -9,10 +9,12 @@ import static org.mockito.Mockito.verify;
 
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ChannelContinuationTimeoutException;
 import com.rabbitmq.client.ShutdownSignalException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.AmqpConnectException;
 import org.springframework.amqp.AmqpIOException;
@@ -83,6 +85,14 @@ class OneCQueuePresenceTest {
     }
 
     @Test
+    void brokerLeavesThePassiveDeclarationUnanswered_isUnreachable() throws IOException {
+        doThrow(declarationUnanswered()).when(channel).queueDeclarePassive(QUEUE);
+        executeTranslatingFailures(channel);
+
+        assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
+    }
+
+    @Test
     void templateAnswersNothing_isUnreachable() {
         doAnswer(invocation -> null).when(template).execute(any());
 
@@ -95,6 +105,22 @@ class OneCQueuePresenceTest {
                 new StaticListableBeanFactory().getBeanProvider(RabbitTemplate.class));
 
         assertThat(presence.of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
+    }
+
+    private void executeTranslatingFailures(Channel onChannel) {
+        doAnswer(invocation -> {
+            try {
+                return invocation.getArgument(0, ChannelCallback.class).doInRabbit(onChannel);
+            }
+            catch (IOException failed) {
+                throw new AmqpIOException(failed);
+            }
+        }).when(template).execute(any());
+    }
+
+    private static ChannelContinuationTimeoutException declarationUnanswered() {
+        return new ChannelContinuationTimeoutException(new TimeoutException("no reply"), null, 1,
+                new AMQP.Queue.Declare.Builder().queue(QUEUE).passive().build());
     }
 
     private OneCQueuePresence presence() {
