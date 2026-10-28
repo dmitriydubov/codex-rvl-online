@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.leadership;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.contracts.repository.LeaderLockRepository;
+import ru.projectx.contracts.repository.database.LeaderLockRepository;
 
 @Component
 public class LeadershipFence {

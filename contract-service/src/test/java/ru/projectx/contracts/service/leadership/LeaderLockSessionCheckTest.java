@@ -16,7 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
-import ru.projectx.contracts.repository.SessionSettingsRepository;
+import ru.projectx.contracts.repository.database.SessionSettingsRepository;
 import ru.projectx.contracts.service.SessionTimeoutsCheck;
 
 class LeaderLockSessionCheckTest {

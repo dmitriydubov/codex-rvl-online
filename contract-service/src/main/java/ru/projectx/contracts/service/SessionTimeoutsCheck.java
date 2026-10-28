@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
-import ru.projectx.contracts.repository.SessionSettingsRepository;
+import ru.projectx.contracts.repository.database.SessionSettingsRepository;
 
 public final class SessionTimeoutsCheck {
 

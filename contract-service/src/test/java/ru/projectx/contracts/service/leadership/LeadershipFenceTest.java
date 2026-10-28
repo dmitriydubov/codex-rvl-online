@@ -6,7 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.repository.LeaderLockRepository;
+import ru.projectx.contracts.repository.database.LeaderLockRepository;
 import ru.projectx.contracts.support.TestLeadership;
 
 class LeadershipFenceTest {

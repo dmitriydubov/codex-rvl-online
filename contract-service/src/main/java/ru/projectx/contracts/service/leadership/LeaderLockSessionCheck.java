@@ -7,7 +7,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
-import ru.projectx.contracts.repository.SessionSettingsRepository;
+import ru.projectx.contracts.repository.database.SessionSettingsRepository;
 import ru.projectx.contracts.service.SessionTimeoutsCheck;
 
 @Component

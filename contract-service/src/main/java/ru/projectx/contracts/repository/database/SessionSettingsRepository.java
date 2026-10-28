@@ -1,4 +1,4 @@
-package ru.projectx.contracts.repository;
+package ru.projectx.contracts.repository.database;
 
 import java.time.Duration;
 import java.util.Collection;

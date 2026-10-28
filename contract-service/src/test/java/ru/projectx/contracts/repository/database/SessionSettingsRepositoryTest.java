@@ -1,4 +1,4 @@
-package ru.projectx.contracts.repository;
+package ru.projectx.contracts.repository.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

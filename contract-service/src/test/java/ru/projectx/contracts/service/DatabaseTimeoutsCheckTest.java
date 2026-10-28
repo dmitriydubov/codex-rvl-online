@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
-import ru.projectx.contracts.repository.SessionSettingsRepository;
+import ru.projectx.contracts.repository.database.SessionSettingsRepository;
 
 class DatabaseTimeoutsCheckTest {
 
