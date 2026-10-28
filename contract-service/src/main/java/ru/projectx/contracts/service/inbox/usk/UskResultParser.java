@@ -7,6 +7,7 @@ import ru.projectx.contracts.message.usk.UskResult;
 import ru.projectx.contracts.service.inbox.parse.JsonFields;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.parse.PayloadParser;
+import ru.projectx.contracts.service.usk.UskResultLayout;
 
 public class UskResultParser implements PayloadParser<UskResult> {
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.inbox.usk;
+package ru.projectx.contracts.service.usk;
 
 import ru.projectx.contracts.service.inbox.parse.FieldPresence;
 
