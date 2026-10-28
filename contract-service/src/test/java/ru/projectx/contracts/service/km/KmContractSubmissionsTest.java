@@ -30,7 +30,7 @@ import java.sql.SQLException;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
-import ru.projectx.contracts.config.KmContractSubmissionProperties;
+import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.IssueError;

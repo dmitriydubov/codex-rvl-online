@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.km;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import ru.projectx.contracts.config.KmContractSubmissionProperties;
+import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.repository.ContractRepository;

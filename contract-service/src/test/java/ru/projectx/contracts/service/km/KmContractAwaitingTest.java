@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import ru.projectx.contracts.config.KmContractSubmissionProperties;
+import ru.projectx.contracts.config.usk.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.repository.ContractRepository;

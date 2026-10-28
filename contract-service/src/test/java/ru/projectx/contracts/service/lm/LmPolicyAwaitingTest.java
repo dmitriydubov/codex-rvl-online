@@ -18,7 +18,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import ru.projectx.contracts.config.LmPolicyRequestProperties;
+import ru.projectx.contracts.config.usk.LmPolicyRequestProperties;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.LmPolicyRepository;

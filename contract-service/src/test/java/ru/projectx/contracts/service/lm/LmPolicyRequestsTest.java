@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Limit;
-import ru.projectx.contracts.config.LmPolicyRequestProperties;
+import ru.projectx.contracts.config.usk.LmPolicyRequestProperties;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;

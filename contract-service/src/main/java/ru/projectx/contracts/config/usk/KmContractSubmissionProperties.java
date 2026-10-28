@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.usk;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.lm;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import ru.projectx.contracts.config.LmPolicyRequestProperties;
+import ru.projectx.contracts.config.usk.LmPolicyRequestProperties;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.repository.LmPolicyRepository;
