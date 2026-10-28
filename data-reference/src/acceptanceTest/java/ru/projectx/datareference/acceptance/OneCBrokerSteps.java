@@ -94,6 +94,13 @@ public class OneCBrokerSteps {
                 () -> assertThat(broker.queue(queue).getConsumerCount()).as("потребителей у %s", queue).isPositive());
     }
 
+    @Тогда("у очереди {string} ровно один потребитель")
+    public void queueWithExactlyOneConsumer(String stream) {
+        String queue = broker.queueOf(stream);
+        await().atMost(SETTLE_TIMEOUT).untilAsserted(
+                () -> assertThat(broker.queue(queue).getConsumerCount()).as("потребителей у %s", queue).isEqualTo(1));
+    }
+
     @Дано("сырьё в порядке приёма — сообщения {string}")
     public void rawInOrder(String messageIds) {
         List<UUID> expected = List.of(messageIds.split("\\s*,\\s*")).stream().map(OneCBrokerSteps::canonical).toList();

@@ -23,18 +23,23 @@ final class QueueContainersFixture {
     static OneCQueueContainers containers(ObjectProvider<RabbitListenerEndpointRegistry> registry,
             BackgroundLeadership leadership, ObjectProvider<RabbitProperties> rabbit) {
 
-        return new OneCQueueContainers(registry, rabbit, leadership, ingestStoppingWithin(STOP_TIMEOUT));
+        return new OneCQueueContainers(registry, expectation(leadership, rabbit), new OneCConsumerOutageJournal(),
+                ingestStoppingWithin(STOP_TIMEOUT));
     }
 
     static OneCQueueContainers containersStoppingWithin(ObjectProvider<RabbitListenerEndpointRegistry> registry,
             Duration stopTimeout) {
 
-        return new OneCQueueContainers(registry, rabbitWithAutoStartup(true), TestLeadership.leader(),
-                ingestStoppingWithin(stopTimeout));
+        return new OneCQueueContainers(registry, expectation(TestLeadership.leader(), rabbitWithAutoStartup(true)),
+                new OneCConsumerOutageJournal(), ingestStoppingWithin(stopTimeout));
     }
 
-    private static IngestProperties ingestStoppingWithin(Duration stopTimeout) {
-        return new IngestProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), stopTimeout);
+    static OneCConsumerExpectation expectation(BackgroundLeadership leadership, ObjectProvider<RabbitProperties> rabbit) {
+        return new OneCConsumerExpectation(rabbit, leadership);
+    }
+
+    static IngestProperties ingestStoppingWithin(Duration stopTimeout) {
+        return new IngestProperties(Duration.ofSeconds(5), Duration.ofSeconds(10), stopTimeout, Duration.ofSeconds(30));
     }
 
     static ObjectProvider<RabbitProperties> rabbitWithAutoStartup(boolean autoStartup) {

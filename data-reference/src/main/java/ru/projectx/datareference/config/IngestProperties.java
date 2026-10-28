@@ -11,5 +11,6 @@ import org.springframework.validation.annotation.Validated;
 public record IngestProperties(
         @DefaultValue("5s") Duration duplicateDeliveryBackoff,
         @DefaultValue("10s") @DurationMin(millis = 1) Duration storageCheckInterval,
-        @DefaultValue("30s") @DurationMin(millis = 1) Duration consumerStopTimeout) {
+        @DefaultValue("30s") @DurationMin(millis = 1) Duration consumerStopTimeout,
+        @DefaultValue("30s") @DurationMin(millis = 1) Duration consumerRestartInterval) {
 }
