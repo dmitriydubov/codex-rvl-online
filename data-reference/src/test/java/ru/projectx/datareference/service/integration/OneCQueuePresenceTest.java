@@ -25,6 +25,7 @@ class OneCQueuePresenceTest {
 
     private static final String QUEUE = "1c-usk_to_rvl-online_policies";
     private static final int NOT_FOUND = 404;
+    private static final int ACCESS_REFUSED = 403;
     private static final int CONNECTION_FORCED = 320;
     private static final int QUEUE_CLASS = 50;
     private static final int BASIC_CLASS = 60;
@@ -52,17 +53,24 @@ class OneCQueuePresenceTest {
     }
 
     @Test
-    void notFoundOnAnotherOperation_isNotAnAbsence() {
-        doThrow(new AmqpIOException(new IOException(channelClose(NOT_FOUND, BASIC_CLASS, CONSUME_METHOD))))
+    void brokerClosesTheChannelWithAccessRefused_queueIsRefused() {
+        doThrow(new AmqpIOException(new IOException(channelClose(ACCESS_REFUSED, QUEUE_CLASS, DECLARE_METHOD))))
                 .when(template).execute(any());
 
-        assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
+        assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.REFUSED);
     }
 
     @Test
-    void connectionForcedByBroker_isUnreachable() {
-        doThrow(new AmqpConnectException(channelClose(CONNECTION_FORCED, QUEUE_CLASS, DECLARE_METHOD)))
+    void notFoundOnAnotherOperation_isARefusalNotAnAbsence() {
+        doThrow(new AmqpIOException(new IOException(channelClose(NOT_FOUND, BASIC_CLASS, CONSUME_METHOD))))
                 .when(template).execute(any());
+
+        assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.REFUSED);
+    }
+
+    @Test
+    void connectionClosedByBroker_isUnreachable() {
+        doThrow(new AmqpConnectException(connectionClose(CONNECTION_FORCED))).when(template).execute(any());
 
         assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
     }
@@ -70,6 +78,13 @@ class OneCQueuePresenceTest {
     @Test
     void connectionRefused_isUnreachable() {
         doThrow(new AmqpConnectException(new ConnectException("refused"))).when(template).execute(any());
+
+        assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
+    }
+
+    @Test
+    void templateAnswersNothing_isUnreachable() {
+        doAnswer(invocation -> null).when(template).execute(any());
 
         assertThat(presence().of(QUEUE)).isEqualTo(OneCQueuePresence.OnBroker.UNREACHABLE);
     }
@@ -96,5 +111,13 @@ class OneCQueuePresenceTest {
                 .methodId(methodId)
                 .build();
         return new ShutdownSignalException(false, false, reason, null);
+    }
+
+    private static ShutdownSignalException connectionClose(int replyCode) {
+        AMQP.Connection.Close reason = new AMQP.Connection.Close.Builder()
+                .replyCode(replyCode)
+                .replyText("reply " + replyCode)
+                .build();
+        return new ShutdownSignalException(true, false, reason, null);
     }
 }

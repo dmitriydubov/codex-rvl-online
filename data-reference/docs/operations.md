@@ -144,7 +144,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `RABBITMQ_HOST` | `localhost` | хост брокера; с TLS он должен быть в сертификате брокера |
 | `RABBITMQ_PORT` | `5672` | порт: 5672 без TLS, 5671 с TLS |
 | `RABBITMQ_VHOST` | `/` | vhost |
-| `RABBITMQ_USERNAME` | `data_reference` | логин брокера; на брокере 1С:УСК — `rvl-online` |
+| `RABBITMQ_USERNAME` | `data_reference` | логин брокера; на брокере 1С:УСК — `rvl-online`. Учётной записи нужны право `read` на очереди 1С:УСК и право пассивно объявлять их: потребитель объявляет очередь пассивно перед подпиской, тем же объявлением ведущий проверяет, вернулась ли очередь на брокер; `configure` не нужно — очереди сервис не объявляет |
 | `RABBITMQ_PASSWORD` | нет, обязательна | пароль брокера |
 | `RABBITMQ_SSL_ENABLED` | `false` | TLS к брокеру |
 | `RABBITMQ_SSL_VALIDATE_CERTIFICATE` | `true` | проверка сертификата брокера; на тестовом контуре с самоподписанным сертификатом — `false` |

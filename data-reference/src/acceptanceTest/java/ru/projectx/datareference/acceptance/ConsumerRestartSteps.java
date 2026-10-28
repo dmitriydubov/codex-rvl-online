@@ -9,6 +9,7 @@ import io.cucumber.java.ru.Тогда;
 import java.time.Duration;
 import java.util.List;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
+import ru.projectx.datareference.config.OneCQueueProperties;
 import ru.projectx.datareference.service.integration.OneCConsumerRestart;
 import ru.projectx.datareference.service.integration.OneCConsumerSubscriptions;
 
@@ -20,14 +21,19 @@ public class ConsumerRestartSteps {
     private final RabbitListenerEndpointRegistry containers;
     private final OneCConsumerSubscriptions subscriptions;
     private final ServiceJournal journal;
+    private final List<String> configuredQueues;
 
     public ConsumerRestartSteps(OneCConsumerRestart restart, RabbitListenerEndpointRegistry containers,
-            OneCConsumerSubscriptions subscriptions, ServiceJournal journal) {
+            OneCConsumerSubscriptions subscriptions, ServiceJournal journal, OneCQueueProperties queues) {
 
         this.restart = restart;
         this.containers = containers;
         this.subscriptions = subscriptions;
         this.journal = journal;
+        this.configuredQueues = List.of(
+                queues.policies(), queues.insuranceContracts(), queues.contragents(), queues.mkb10(),
+                queues.lpuContracts(), queues.programs(), queues.appealTypes(), queues.lpuContacts(),
+                queues.priceLists(), queues.priceListsFinal(), queues.contragentServices());
     }
 
     void restartPass() {
@@ -39,16 +45,21 @@ public class ConsumerRestartSteps {
 
     @Тогда("в журнале Дата-референса записей уровня ERROR о незапущенном потребителе очереди {string} — {int}")
     public void notStartedErrors(String queue, int expected) {
-        assertThat(entries(Level.ERROR, "потребитель очереди " + queue + " не запущен: "))
+        assertThat(entries(Level.ERROR, "потребитель очереди " + configured(queue) + " не запущен: "))
                 .as("записи ERROR о незапущенном потребителе очереди %s", queue)
                 .hasSize(expected);
     }
 
     @Тогда("в журнале Дата-референса записей уровня INFO о возвращённом потребителе очереди {string} — {int}")
     public void returnedInfos(String queue, int expected) {
-        assertThat(entries(Level.INFO, "потребитель очереди " + queue + " запущен: "))
+        assertThat(entries(Level.INFO, "потребитель очереди " + configured(queue) + " запущен: "))
                 .as("записи INFO о возвращённом потребителе очереди %s", queue)
                 .hasSize(expected);
+    }
+
+    private String configured(String queue) {
+        assertThat(configuredQueues).as("очереди 1С:УСК из настроек стенда").contains(queue);
+        return queue;
     }
 
     private List<ILoggingEvent> entries(Level level, String prefix) {
