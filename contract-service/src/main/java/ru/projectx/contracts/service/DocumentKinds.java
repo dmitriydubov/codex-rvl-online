@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.message.TaskParticipant;
 
 public final class DocumentKinds {

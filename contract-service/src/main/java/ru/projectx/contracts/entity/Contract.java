@@ -13,6 +13,9 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceTransition;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 
 @Entity
 @Table(name = "contracts")

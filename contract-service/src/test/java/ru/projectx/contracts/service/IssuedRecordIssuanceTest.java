@@ -25,7 +25,7 @@ import ru.projectx.contracts.entity.ContractStatus;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.entity.PersonOwner;
-import ru.projectx.contracts.entity.TripPeriod;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.repository.LmPolicyRepository;

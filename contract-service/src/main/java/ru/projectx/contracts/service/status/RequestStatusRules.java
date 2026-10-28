@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.status;
 
 import java.util.List;
 import java.util.Optional;
-import ru.projectx.contracts.entity.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.message.RequestStatus;
 
 final class RequestStatusRules {

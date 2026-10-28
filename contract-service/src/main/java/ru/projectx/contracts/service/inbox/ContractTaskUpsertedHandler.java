@@ -2,7 +2,7 @@ package ru.projectx.contracts.service.inbox;
 
 import java.util.List;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskEvents;
 import ru.projectx.contracts.service.IssuanceService;

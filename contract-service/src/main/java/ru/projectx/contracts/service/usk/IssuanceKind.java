@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.usk;
 
 import java.util.UUID;
 import java.util.function.Function;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.service.IssuanceErrors;
 

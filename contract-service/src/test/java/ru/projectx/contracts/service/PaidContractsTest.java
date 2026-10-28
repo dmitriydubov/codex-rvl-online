@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.entity.CancelReason;
-import ru.projectx.contracts.entity.Cancellation;
+import ru.projectx.contracts.entity.issuance.CancelReason;
+import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractDraft;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 

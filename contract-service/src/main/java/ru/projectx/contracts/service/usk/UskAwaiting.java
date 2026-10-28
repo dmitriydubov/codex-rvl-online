@@ -6,8 +6,8 @@ import java.time.Instant;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.repository.UskRecordRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 

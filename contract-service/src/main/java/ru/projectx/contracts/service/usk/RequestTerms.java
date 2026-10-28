@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.usk;
 
-import ru.projectx.contracts.entity.IssuanceState;
+import ru.projectx.contracts.entity.issuance.IssuanceState;
 import ru.projectx.contracts.message.UskRequestTerms;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 

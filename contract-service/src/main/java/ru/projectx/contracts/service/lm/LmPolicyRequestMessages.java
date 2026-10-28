@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.IssuanceState;
+import ru.projectx.contracts.entity.issuance.IssuanceState;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.PersonSnapshot;
 import ru.projectx.contracts.message.InsuredPerson;

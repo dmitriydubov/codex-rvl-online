@@ -1,5 +1,8 @@
 package ru.projectx.contracts.entity;
 
+import ru.projectx.contracts.entity.issuance.IssuanceOutcome;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
+
 public enum LmPolicyStatus implements IssuanceStatus {
     NEW(IssuanceOutcome.PENDING),
     SUBMITTED(IssuanceOutcome.PENDING),

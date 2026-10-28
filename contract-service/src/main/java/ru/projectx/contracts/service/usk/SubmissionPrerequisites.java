@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.usk;
 
-import ru.projectx.contracts.entity.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 
 @FunctionalInterface
 public interface SubmissionPrerequisites<R extends IssuanceRecord> {

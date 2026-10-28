@@ -1,4 +1,4 @@
-package ru.projectx.contracts.entity;
+package ru.projectx.contracts.entity.issuance;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;

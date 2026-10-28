@@ -3,7 +3,7 @@ package ru.projectx.contracts.service;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import ru.projectx.contracts.entity.CancelReason;
+import ru.projectx.contracts.entity.issuance.CancelReason;
 
 public final class CancelReasons {
 

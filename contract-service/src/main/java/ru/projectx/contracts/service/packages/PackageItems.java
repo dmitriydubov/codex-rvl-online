@@ -15,12 +15,12 @@ import ru.projectx.contracts.dto.PackageItem.PaymentState;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractAcceptance;
 import ru.projectx.contracts.entity.ContractRegistration;
-import ru.projectx.contracts.entity.DocumentKind;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuedPolicy;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
-import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 
 final class PackageItems {

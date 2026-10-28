@@ -12,6 +12,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.test.util.ReflectionTestUtils;
+import ru.projectx.contracts.entity.issuance.Cancellation;
+import ru.projectx.contracts.entity.issuance.CancelReason;
+import ru.projectx.contracts.entity.issuance.IssuanceTerms;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
+import ru.projectx.contracts.entity.issuance.IssueError;
+import ru.projectx.contracts.entity.issuance.RequestReference;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 
 class ContractTest {
 

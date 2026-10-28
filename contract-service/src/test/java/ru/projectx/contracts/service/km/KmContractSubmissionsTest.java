@@ -33,7 +33,7 @@ import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.config.KmContractSubmissionProperties;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.repository.ContractRepository;

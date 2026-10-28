@@ -10,9 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
-import ru.projectx.contracts.entity.DocumentKind;
-import ru.projectx.contracts.entity.IssuanceRequest;
-import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
+import ru.projectx.contracts.entity.issuance.IssuanceRequest;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.support.IntegrationTest;
 
 @IntegrationTest

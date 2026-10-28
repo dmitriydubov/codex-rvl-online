@@ -10,7 +10,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.Contract;
 import ru.projectx.contracts.entity.ContractStatus;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.service.IssuanceErrors;
 import ru.projectx.contracts.support.Issuances;

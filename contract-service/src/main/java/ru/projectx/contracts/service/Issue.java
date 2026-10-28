@@ -2,9 +2,9 @@ package ru.projectx.contracts.service;
 
 import java.util.Optional;
 import java.util.UUID;
-import ru.projectx.contracts.entity.IssuanceTerms;
-import ru.projectx.contracts.entity.RequestReference;
-import ru.projectx.contracts.entity.TripPeriod;
+import ru.projectx.contracts.entity.issuance.IssuanceTerms;
+import ru.projectx.contracts.entity.issuance.RequestReference;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.ContractTask;
 import ru.projectx.contracts.message.TaskParticipant;
 

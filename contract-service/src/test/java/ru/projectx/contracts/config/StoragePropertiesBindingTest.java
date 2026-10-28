@@ -49,13 +49,11 @@ class StoragePropertiesBindingTest {
         });
     }
 
-
     @Test
     void certificateBundle_isTakenByName() {
         contexts.withPropertyValues(PREFIX + ".ssl-bundle=storage").run(context ->
                 assertThat(context.getBean(StorageProperties.class).sslBundle()).isEqualTo("storage"));
     }
-
 
     @ParameterizedTest
     @CsvSource({

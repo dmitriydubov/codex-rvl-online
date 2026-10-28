@@ -1,8 +1,8 @@
 package ru.projectx.contracts.service.usk;
 
 import java.time.Instant;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 

@@ -4,7 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.util.Comparator;
 import java.util.List;
-import ru.projectx.contracts.entity.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 
 class IssuanceRepositoryLockingImpl<R extends IssuanceRecord> implements IssuanceRepositoryLocking<R> {
 

@@ -2,10 +2,10 @@ package ru.projectx.contracts.service.usk;
 
 import java.util.List;
 import java.util.UUID;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuanceStatus;
-import ru.projectx.contracts.entity.IssueError;
-import ru.projectx.contracts.entity.IssuedPolicy;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.UskDocument;
 import ru.projectx.contracts.message.UskResult;
 import ru.projectx.contracts.service.inbox.InboxOrdering;

@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.IssuanceState;
+import ru.projectx.contracts.entity.issuance.IssuanceState;
 import ru.projectx.contracts.exception.ReferenceKind;
 import ru.projectx.contracts.service.IssueErrors;
 

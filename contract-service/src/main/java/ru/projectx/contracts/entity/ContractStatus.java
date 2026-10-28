@@ -3,6 +3,9 @@ package ru.projectx.contracts.entity;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
+import ru.projectx.contracts.entity.issuance.IssuanceOutcome;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.IssuanceTransition;
 
 public enum ContractStatus implements IssuanceStatus {
     NEW(IssuanceOutcome.PENDING),

@@ -11,12 +11,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Limit;
-import ru.projectx.contracts.entity.IssuanceTerms;
+import ru.projectx.contracts.entity.issuance.IssuanceTerms;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyDraft;
 import ru.projectx.contracts.entity.LmPolicyStatus;
-import ru.projectx.contracts.entity.RequestReference;
-import ru.projectx.contracts.entity.TripPeriod;
+import ru.projectx.contracts.entity.issuance.RequestReference;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.support.IntegrationTest;
 
 @IntegrationTest

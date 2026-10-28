@@ -7,6 +7,13 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import ru.projectx.contracts.entity.issuance.Cancellation;
+import ru.projectx.contracts.entity.issuance.CancelReason;
+import ru.projectx.contracts.entity.issuance.IssuanceTerms;
+import ru.projectx.contracts.entity.issuance.IssuedPolicy;
+import ru.projectx.contracts.entity.issuance.IssueError;
+import ru.projectx.contracts.entity.issuance.RequestReference;
+import ru.projectx.contracts.entity.issuance.TripPeriod;
 
 class LmPolicyTest {
 

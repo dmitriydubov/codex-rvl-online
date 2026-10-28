@@ -3,8 +3,8 @@ package ru.projectx.contracts.service.status;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import ru.projectx.contracts.entity.IssuanceStatus;
-import ru.projectx.contracts.entity.RequestParticipant;
+import ru.projectx.contracts.entity.issuance.IssuanceStatus;
+import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.RequestStatus;
 
 final class StatusTransitions {

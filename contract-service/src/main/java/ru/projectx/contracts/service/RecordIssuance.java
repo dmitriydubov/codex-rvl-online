@@ -6,9 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.projectx.contracts.entity.IssuanceRecord;
-import ru.projectx.contracts.entity.IssuanceState;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssuanceRecord;
+import ru.projectx.contracts.entity.issuance.IssuanceState;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.PersonOwner;
 import ru.projectx.contracts.exception.ParticipantDataException;
 

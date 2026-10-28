@@ -29,7 +29,7 @@ import org.slf4j.MDC;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Limit;
 import ru.projectx.contracts.config.LmPolicyRequestProperties;
-import ru.projectx.contracts.entity.IssueError;
+import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.LmPolicy;
 import ru.projectx.contracts.entity.LmPolicyStatus;
 import ru.projectx.contracts.exception.ReferenceKind;

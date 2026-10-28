@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service;
 
-import ru.projectx.contracts.entity.DocumentKind;
+import ru.projectx.contracts.entity.issuance.DocumentKind;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
