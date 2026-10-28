@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.repository.InboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;

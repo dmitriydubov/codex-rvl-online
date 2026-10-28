@@ -4,7 +4,7 @@ import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 
 @Component
 public class InboxConsumerPauseSchedule implements SchedulingConfigurer {

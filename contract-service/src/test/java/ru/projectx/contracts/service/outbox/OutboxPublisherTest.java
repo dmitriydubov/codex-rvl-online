@@ -22,7 +22,7 @@ import org.mockito.InOrder;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.data.domain.Limit;
 import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;

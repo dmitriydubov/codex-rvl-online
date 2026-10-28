@@ -13,7 +13,7 @@ import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 
 @Component

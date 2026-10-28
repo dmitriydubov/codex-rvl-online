@@ -27,7 +27,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.config.broker.OneCBrokerProperties;
-import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.service.outbox.OutboundMessage;
 import ru.projectx.contracts.service.outbox.PublishOutcome;
 

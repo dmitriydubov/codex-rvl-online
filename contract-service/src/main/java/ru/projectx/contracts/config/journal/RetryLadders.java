@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.journal;
 
 import java.time.Duration;
 import java.util.List;

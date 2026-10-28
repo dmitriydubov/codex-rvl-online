@@ -24,7 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
-import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.MessageEnvelope;
 import ru.projectx.contracts.entity.outbox.OutboxMessage;

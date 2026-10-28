@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.journal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import ru.projectx.contracts.config.ContractNumberingProperties;
 
 class InboxPropertiesTest {
 

@@ -8,7 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;

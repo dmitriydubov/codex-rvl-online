@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxMessage;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.InboxStatus;

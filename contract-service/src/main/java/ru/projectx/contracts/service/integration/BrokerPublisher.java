@@ -7,7 +7,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.OutboxProperties;
+import ru.projectx.contracts.config.journal.OutboxProperties;
 import ru.projectx.contracts.service.outbox.OutboundMessage;
 import ru.projectx.contracts.service.outbox.OutboundPublisher;
 import ru.projectx.contracts.service.outbox.PublishOutcome;

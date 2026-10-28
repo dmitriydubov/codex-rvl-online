@@ -30,7 +30,7 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.integration.leader.Context;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.entity.inbox.RejectedMessage;
 import ru.projectx.contracts.service.inbox.InboxMetrics;

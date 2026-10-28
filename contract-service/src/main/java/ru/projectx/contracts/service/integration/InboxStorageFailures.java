@@ -4,7 +4,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.service.inbox.InboxMetrics;
 import ru.projectx.contracts.service.inbox.QuarantineService;

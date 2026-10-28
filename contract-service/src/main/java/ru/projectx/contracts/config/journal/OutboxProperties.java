@@ -1,4 +1,4 @@
-package ru.projectx.contracts.config;
+package ru.projectx.contracts.config.journal;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;

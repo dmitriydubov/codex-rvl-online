@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
-import ru.projectx.contracts.config.InboxProperties;
+import ru.projectx.contracts.config.journal.InboxProperties;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
 import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
