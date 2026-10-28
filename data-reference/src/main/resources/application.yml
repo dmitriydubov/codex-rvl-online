@@ -40,6 +40,7 @@ spring:
     username: ${RABBITMQ_USERNAME:data_reference}
     password: ${RABBITMQ_PASSWORD}
     connection-timeout: 10s
+    channel-rpc-timeout: ${RABBITMQ_CHANNEL_RPC_TIMEOUT:30s}
     ssl:
       enabled: ${RABBITMQ_SSL_ENABLED:false}
       validate-server-certificate: ${RABBITMQ_SSL_VALIDATE_CERTIFICATE:true}
