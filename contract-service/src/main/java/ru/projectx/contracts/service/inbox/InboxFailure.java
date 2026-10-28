@@ -1,8 +1,8 @@
 package ru.projectx.contracts.service.inbox;
 
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.service.SqlStates;
-import ru.projectx.contracts.service.TemporaryFailures;
+import ru.projectx.contracts.service.database.SqlStates;
+import ru.projectx.contracts.service.database.TemporaryFailures;
 
 public sealed interface InboxFailure {
 

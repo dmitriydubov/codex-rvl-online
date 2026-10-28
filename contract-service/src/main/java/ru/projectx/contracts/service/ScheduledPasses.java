@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service;
 
 import org.slf4j.Logger;
+import ru.projectx.contracts.service.database.SqlStates;
 
 public final class ScheduledPasses {
 

@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.database;
 
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ApplicationArguments;

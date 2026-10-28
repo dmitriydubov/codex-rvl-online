@@ -1,6 +1,6 @@
 package ru.projectx.contracts.service.integration;
 
-import ru.projectx.contracts.service.SqlStates;
+import ru.projectx.contracts.service.database.SqlStates;
 
 public record StorageOutage(String sqlState, String failureType) {
 

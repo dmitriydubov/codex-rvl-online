@@ -8,7 +8,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.DatabaseTimeoutsProperties;
 import ru.projectx.contracts.repository.database.SessionSettingsRepository;
-import ru.projectx.contracts.service.SessionTimeoutsCheck;
+import ru.projectx.contracts.service.database.SessionTimeoutsCheck;
 
 @Component
 public class LeaderLockSessionCheck implements ApplicationRunner {

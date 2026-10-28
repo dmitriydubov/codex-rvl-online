@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service.integration;
 
 import java.util.Optional;
-import ru.projectx.contracts.service.SqlStates;
+import ru.projectx.contracts.service.database.SqlStates;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
 
 sealed interface InboxStorageFailure {

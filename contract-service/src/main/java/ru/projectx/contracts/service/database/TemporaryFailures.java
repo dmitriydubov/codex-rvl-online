@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service;
+package ru.projectx.contracts.service.database;
 
 import java.sql.SQLTransientException;
 import java.util.List;
