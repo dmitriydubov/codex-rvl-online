@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.reference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

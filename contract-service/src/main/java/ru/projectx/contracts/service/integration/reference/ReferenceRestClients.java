@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.reference;
 
 import java.net.http.HttpClient;
 import org.springframework.http.HttpStatusCode;

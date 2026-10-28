@@ -1,4 +1,4 @@
-package ru.projectx.contracts.service.integration;
+package ru.projectx.contracts.service.integration.reference;
 
 import java.util.function.Predicate;
 import org.springframework.core.retry.RetryPolicy;
