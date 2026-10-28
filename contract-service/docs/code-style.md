@@ -1,8 +1,8 @@
 # Как пишем код
 
 Требования к коду сервиса. Почему что-то устроено именно так — [design.md](design.md), как сервис собирать, запускать
-и чинить — [operations.md](operations.md) и [troubleshooting.md](troubleshooting.md). Отступы, концы строк и кодировку задаёт `.editorconfig` модуля, концы строк
-в git — `.gitattributes`.
+и чинить — [operations.md](operations.md) и [troubleshooting.md](troubleshooting.md). Отступы, концы строк и
+кодировку задаёт `.editorconfig` модуля, концы строк в git — `.gitattributes`.
 
 ## Главное — понятность
 
