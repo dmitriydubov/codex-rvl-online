@@ -30,7 +30,7 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxDraft;
+import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.ContractRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;

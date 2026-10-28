@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import ru.projectx.contracts.entity.OutboxMessage;
-import ru.projectx.contracts.entity.OutboxStatus;
+import ru.projectx.contracts.entity.outbox.OutboxMessage;
+import ru.projectx.contracts.entity.outbox.OutboxStatus;
 
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
 

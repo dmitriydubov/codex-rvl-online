@@ -31,7 +31,7 @@ import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxDraft;
+import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.party.PersonRole;
 import ru.projectx.contracts.message.MessageMeta;

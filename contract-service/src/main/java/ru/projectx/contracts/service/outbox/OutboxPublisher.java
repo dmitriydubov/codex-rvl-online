@@ -9,7 +9,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import ru.projectx.contracts.config.OutboxProperties;
 import ru.projectx.contracts.entity.MessageEnvelope;
-import ru.projectx.contracts.entity.OutboxMessage;
+import ru.projectx.contracts.entity.outbox.OutboxMessage;
 import ru.projectx.contracts.repository.OutboxMessageRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 

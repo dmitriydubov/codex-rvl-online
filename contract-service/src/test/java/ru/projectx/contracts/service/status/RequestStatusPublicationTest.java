@@ -21,7 +21,7 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssuanceRequest;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicy;
-import ru.projectx.contracts.entity.OutboxDraft;
+import ru.projectx.contracts.entity.outbox.OutboxDraft;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.MessageMeta;
 import ru.projectx.contracts.repository.IssuanceRequestRepository;
