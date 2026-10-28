@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.usk;
 
 import org.jspecify.annotations.Nullable;
 

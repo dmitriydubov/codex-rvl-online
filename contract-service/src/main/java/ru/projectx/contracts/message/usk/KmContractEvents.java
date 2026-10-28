@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.usk;
 
 public final class KmContractEvents {
 

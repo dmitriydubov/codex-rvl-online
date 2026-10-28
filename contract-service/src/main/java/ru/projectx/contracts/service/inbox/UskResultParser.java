@@ -2,8 +2,8 @@ package ru.projectx.contracts.service.inbox;
 
 import java.util.List;
 import ru.projectx.contracts.exception.ContractViolationException;
-import ru.projectx.contracts.message.IssuedDocument;
-import ru.projectx.contracts.message.UskResult;
+import ru.projectx.contracts.message.usk.IssuedDocument;
+import ru.projectx.contracts.message.usk.UskResult;
 
 public class UskResultParser implements PayloadParser<UskResult> {
 

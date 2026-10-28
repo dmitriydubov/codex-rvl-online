@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.usk;
 
 import java.util.List;
 import java.util.UUID;

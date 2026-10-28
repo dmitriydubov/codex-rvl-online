@@ -1,14 +1,12 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.usk;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import ru.projectx.contracts.message.ParticipantDocument;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public record KmContractPerson(
+public record InsuredPerson(
         UUID participantId,
-        @Nullable Boolean isRelative,
         @Nullable String relationType,
         String lastName,
         String firstName,

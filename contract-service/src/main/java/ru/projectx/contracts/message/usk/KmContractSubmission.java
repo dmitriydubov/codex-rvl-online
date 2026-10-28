@@ -1,4 +1,4 @@
-package ru.projectx.contracts.message;
+package ru.projectx.contracts.message.usk;
 
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import java.math.BigDecimal;

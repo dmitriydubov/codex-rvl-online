@@ -1,7 +1,7 @@
 package ru.projectx.contracts.service.usk;
 
 import ru.projectx.contracts.entity.issuance.IssuanceState;
-import ru.projectx.contracts.message.UskRequestTerms;
+import ru.projectx.contracts.message.usk.UskRequestTerms;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
 
 public final class RequestTerms {

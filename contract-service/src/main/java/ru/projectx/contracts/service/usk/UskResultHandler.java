@@ -7,7 +7,7 @@ import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.document.UskDocument;
-import ru.projectx.contracts.message.UskResult;
+import ru.projectx.contracts.message.usk.UskResult;
 import ru.projectx.contracts.service.inbox.InboxOrdering;
 import ru.projectx.contracts.service.inbox.InboxWork;
 import ru.projectx.contracts.service.inbox.ParsedEventHandler;

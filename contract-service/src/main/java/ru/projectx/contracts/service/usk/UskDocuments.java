@@ -3,7 +3,7 @@ package ru.projectx.contracts.service.usk;
 import java.util.List;
 import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.document.UskDocument;
-import ru.projectx.contracts.message.IssuedDocument;
+import ru.projectx.contracts.message.usk.IssuedDocument;
 
 public final class UskDocuments {
 
