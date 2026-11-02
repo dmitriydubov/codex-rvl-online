@@ -12,7 +12,12 @@ spec:
       app: {{ .Values.app.name }}
   replicas: {{ .Values.REPLICA }}
   strategy:
-    type: Recreate
+    type: {{ .Values.STRATEGY }}
+    {{- if eq .Values.STRATEGY "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ .Values.MAX_SURGE }}
+      maxUnavailable: {{ .Values.MAX_UNAVAILABLE }}
+    {{- end }}
   template:
     metadata:
       labels:
@@ -46,6 +51,10 @@ spec:
           {{- end }}
           resources:
 {{ toYaml .Values.resources | indent 12 }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ .Values.PRE_STOP_DELAY }}"]
           readinessProbe:
             httpGet:
               path: /readyz
