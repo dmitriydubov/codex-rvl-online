@@ -23,18 +23,6 @@ public class NewDatabase {
     private static final String TIMES_EACH_CHANGE_SET_RECORDED = """
             select distinct count(*) from databasechangelog group by id, author, filename
             """;
-    private static final String CREATE_LOCK_TABLE = """
-            create table databasechangeloglock (
-              id integer primary key, locked boolean not null, lockgranted timestamp, lockedby varchar(255))
-            """;
-    private static final String HOLD_LOCK = """
-            insert into databasechangeloglock (id, locked, lockgranted, lockedby)
-            values (1, true, now(), 'другой экземпляр')
-            """;
-    private static final String RELEASE_LOCK = """
-            update databasechangeloglock set locked = false, lockgranted = null, lockedby = null where id = 1
-            """;
-    private static final String LOCK_HELD = "select locked from databasechangeloglock where id = 1";
 
     private final PostgreSQLContainer server;
     private final JdbcClient serviceDatabase;
@@ -55,19 +43,6 @@ public class NewDatabase {
     public void createWithAllChangeSetsButLast() {
         createEmpty();
         PriorVersionMigrations.apply(url(), server.getUsername(), server.getPassword(), changeSetsHere().size() - 1);
-    }
-
-    public void holdMigrationLock() {
-        jdbc().sql(CREATE_LOCK_TABLE).update();
-        jdbc().sql(HOLD_LOCK).update();
-    }
-
-    public void releaseMigrationLock() {
-        jdbc().sql(RELEASE_LOCK).update();
-    }
-
-    public boolean migrationLockHeld() {
-        return jdbc().sql(LOCK_HELD).query(Boolean.class).single();
     }
 
     public long changeSetCount() {
@@ -98,7 +73,15 @@ public class NewDatabase {
         name = null;
     }
 
-    private JdbcClient jdbc() {
+    public JdbcClient jdbc() {
         return JdbcClient.create(new DriverManagerDataSource(url(), server.getUsername(), server.getPassword()));
+    }
+
+    public String username() {
+        return server.getUsername();
+    }
+
+    public String password() {
+        return server.getPassword();
     }
 }

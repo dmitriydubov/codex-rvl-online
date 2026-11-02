@@ -2,12 +2,7 @@ package ru.projectx.datareference.acceptance;
 
 import static org.awaitility.Awaitility.await;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.ServerSocket;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -68,7 +63,7 @@ public class SecondInstance {
     public void begin() {
         jdbc.sql(CREATE_ROLE.formatted(ROLE, PASSWORD, database.getUsername())).update();
         allowConnections();
-        int apiPort = freePort();
+        int apiPort = ServiceApplication.freePort();
         port = apiPort;
         SpringApplication application = ServiceApplication.withoutAcceptanceStand();
         CompletableFuture<ConfigurableApplicationContext> started =
@@ -119,30 +114,8 @@ public class SecondInstance {
                 .join();
     }
 
-    private static int freePort() {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
-        }
-    }
-
     private String[] arguments(int apiPort) {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("spring.datasource.url", database.getJdbcUrl());
-        properties.put("spring.datasource.username", ROLE);
-        properties.put("spring.datasource.password", PASSWORD);
-        properties.put("spring.rabbitmq.host", broker.getHost());
-        properties.put("spring.rabbitmq.port", broker.getAmqpPort());
-        properties.put("spring.rabbitmq.username", broker.getAdminUsername());
-        properties.put("spring.rabbitmq.password", broker.getAdminPassword());
-        properties.put("spring.rabbitmq.ssl.enabled", false);
-        properties.put("spring.rabbitmq.listener.simple.auto-startup", true);
-        properties.put("projectx.scheduling.enabled", false);
-        properties.put("server.port", apiPort);
-        properties.put("management.server.port", 0);
-        return properties.entrySet().stream()
-                .map(property -> "--" + property.getKey() + "=" + property.getValue())
-                .toArray(String[]::new);
+        return ServiceApplication.arguments(ServiceApplication.properties(
+                new ServiceApplication.DatabaseLogin(database.getJdbcUrl(), ROLE, PASSWORD), broker, apiPort));
     }
 }

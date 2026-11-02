@@ -9,10 +9,19 @@ import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 public class MigrationLockDataSource extends DelegatingDataSource implements AutoCloseable {
 
+    public static final long MIGRATION_LOCK_KEY = 7_311_094_201_825_640_017L;
+
     private static final Logger log = LoggerFactory.getLogger(MigrationLockDataSource.class);
 
+    private final StaleMigrationLock staleLock;
+
     public MigrationLockDataSource(DataSource migrations) {
+        this(migrations, new StaleMigrationLock(LiquibaseLockServices::of));
+    }
+
+    MigrationLockDataSource(DataSource migrations, StaleMigrationLock staleLock) {
         super(migrations);
+        this.staleLock = staleLock;
     }
 
     @Override
@@ -20,6 +29,7 @@ public class MigrationLockDataSource extends DelegatingDataSource implements Aut
         Connection connection = obtainTargetDataSource().getConnection();
         try {
             takeLock(connection);
+            staleLock.releaseIfLeft(connection);
         } catch (SQLException failed) {
             connection.close();
             throw failed;

@@ -42,6 +42,11 @@ class ConcurrentFirstStartTest {
             having count(*) > 1
             """;
     private static final String LOCK_HELD = "select locked from databasechangeloglock where id = 1";
+    private static final String LOCK_LEFT_BY_DEAD_INSTANCE = """
+            create table databasechangeloglock (
+              id integer primary key, locked boolean not null, lockgranted timestamp, lockedby varchar(255));
+            insert into databasechangeloglock values (1, true, now(), 'погибший экземпляр');
+            """;
 
     @Autowired
     private Environment environment;
@@ -78,6 +83,15 @@ class ConcurrentFirstStartTest {
         instances.addAll(startTogether(INSTANCES_DURING_THREE_REPLICA_ROLLOUT, emptyDatabaseUrl()));
 
         assertEveryInstanceStartedAndMigrationsAppliedOnce(INSTANCES_DURING_THREE_REPLICA_ROLLOUT);
+    }
+
+    @Test
+    void lockLeftByDeadInstance_isReleasedByStartingInstances_andBothStartAtFirstAttempt() throws Exception {
+        JdbcClient.create(emptyDatabaseConnections()).sql(LOCK_LEFT_BY_DEAD_INSTANCE).update();
+
+        instances.addAll(startTogether(TWO_INSTANCES, emptyDatabaseUrl()));
+
+        assertEveryInstanceStartedAndMigrationsAppliedOnce(TWO_INSTANCES);
     }
 
     private void assertEveryInstanceStartedAndMigrationsAppliedOnce(int started) {

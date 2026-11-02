@@ -7,7 +7,7 @@ import java.sql.SQLException;
 
 final class MigrationAdvisoryLock {
 
-    static final long KEY = 7_311_094_201_825_640_017L;
+    static final long KEY = MigrationLockDataSource.MIGRATION_LOCK_KEY;
 
     private static final String TRY_LOCK = "select pg_try_advisory_lock(?)";
     private static final String LOCK = "select pg_advisory_lock(?)";
