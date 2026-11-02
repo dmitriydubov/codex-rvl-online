@@ -29,6 +29,6 @@ public class MigrationLockPostProcessor implements BeanPostProcessor {
     }
 
     private static DataSource withoutMigrationLock(DataSource dataSource) {
-        return dataSource instanceof MigrationLockDataSource locked ? locked.getTargetDataSource() : dataSource;
+        return locked(dataSource) ? ((MigrationLockDataSource) dataSource).getTargetDataSource() : dataSource;
     }
 }

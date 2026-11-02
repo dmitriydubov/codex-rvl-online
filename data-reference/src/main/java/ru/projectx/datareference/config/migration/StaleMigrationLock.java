@@ -26,8 +26,18 @@ final class StaleMigrationLock {
         boolean autoCommit = connection.getAutoCommit();
         try {
             releaseLeftLock(connection);
-        } finally {
+        } catch (SQLException | RuntimeException failed) {
+            restoreAfter(failed, connection, autoCommit);
+            throw failed;
+        }
+        restore(connection, autoCommit);
+    }
+
+    private static void restoreAfter(Exception failed, Connection connection, boolean autoCommit) {
+        try {
             restore(connection, autoCommit);
+        } catch (SQLException restoreFailed) {
+            failed.addSuppressed(restoreFailed);
         }
     }
 

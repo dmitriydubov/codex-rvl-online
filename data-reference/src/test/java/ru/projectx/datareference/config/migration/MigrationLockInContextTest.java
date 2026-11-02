@@ -16,12 +16,13 @@ import ru.projectx.datareference.support.IntegrationTest;
 @IntegrationTest
 class MigrationLockInContextTest {
 
+    private static final long KEY_IN_OPERATIONS_GUIDE = 7_311_094_201_825_640_017L;
     private static final String LOCK_HOLDER = """
             select a.pid
               from pg_locks l join pg_stat_activity a on a.pid = l.pid
              where l.locktype = 'advisory' and l.granted and l.objsubid = 1
-               and ((l.classid::bigint << 32) | l.objid::bigint) = 7311094201825640017
-            """;
+               and ((l.classid::bigint << 32) | l.objid::bigint) = %d
+            """.formatted(KEY_IN_OPERATIONS_GUIDE);
 
     @Autowired
     private SpringLiquibase liquibase;
@@ -32,6 +33,11 @@ class MigrationLockInContextTest {
     @Test
     void afterMigrations_liquibaseDataSourceIsNoLongerBehindTheMigrationLock() {
         assertThat(liquibase.getDataSource()).isNotInstanceOf(MigrationLockDataSource.class);
+    }
+
+    @Test
+    void keyInOperationsGuide_isTheMigrationLockKey() {
+        assertThat(KEY_IN_OPERATIONS_GUIDE).isEqualTo(MigrationLockDataSource.MIGRATION_LOCK_KEY);
     }
 
     @Test

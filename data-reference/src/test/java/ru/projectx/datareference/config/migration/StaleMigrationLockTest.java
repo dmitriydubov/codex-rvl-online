@@ -2,6 +2,7 @@ package ru.projectx.datareference.config.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -114,6 +115,28 @@ class StaleMigrationLockTest {
         staleLock.releaseIfLeft(connection);
 
         verify(connection, never()).rollback();
+        verify(connection).setAutoCommit(true);
+    }
+
+    @Test
+    void failedRollbackAfterFailedCheck_doesNotHideTheCheckFailure() throws Exception {
+        LockException checkFailed = new LockException("замок не прочитан");
+        SQLException rollbackFailed = new SQLException("откат не удался");
+        when(connection.getAutoCommit()).thenReturn(true, false);
+        when(lockService.listLocks()).thenThrow(checkFailed);
+        doThrow(rollbackFailed).when(connection).rollback();
+
+        assertThatThrownBy(() -> staleLock.releaseIfLeft(connection))
+                .hasCause(checkFailed)
+                .satisfies(failure -> assertThat(failure.getSuppressed()).containsExactly(rollbackFailed));
+    }
+
+    @Test
+    void failedCheck_stillRestoresAutoCommit() throws Exception {
+        when(connection.getAutoCommit()).thenReturn(true, false);
+        when(lockService.listLocks()).thenThrow(new LockException("замок не прочитан"));
+
+        assertThatThrownBy(() -> staleLock.releaseIfLeft(connection)).isInstanceOf(SQLException.class);
         verify(connection).setAutoCommit(true);
     }
 
