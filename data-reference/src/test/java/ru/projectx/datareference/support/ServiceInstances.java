@@ -3,7 +3,9 @@ package ru.projectx.datareference.support;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
 import ru.projectx.datareference.DataReferenceApplication;
@@ -16,6 +18,13 @@ public final class ServiceInstances {
     public static ConfigurableApplicationContext startWithoutBroker(Environment testEnvironment, String databaseUrl,
             Map<String, Object> overrides) {
 
+        return new SpringApplicationBuilder(DataReferenceApplication.class)
+                .run(arguments(withoutBroker(testEnvironment, databaseUrl, overrides)));
+    }
+
+    private static Map<String, Object> withoutBroker(Environment testEnvironment, String databaseUrl,
+            Map<String, Object> overrides) {
+
         Map<String, Object> properties = new HashMap<>();
         properties.put("spring.datasource.url", databaseUrl);
         properties.put("spring.datasource.username", testEnvironment.getRequiredProperty("spring.datasource.username"));
@@ -26,9 +35,22 @@ public final class ServiceInstances {
         properties.put("projectx.scheduling.enabled", false);
         properties.put("projectx.leadership.group", "instances-" + UUID.randomUUID());
         properties.putAll(overrides);
-        String[] arguments = properties.entrySet().stream()
+        return properties;
+    }
+
+    private static String[] arguments(Map<String, Object> properties) {
+        return properties.entrySet().stream()
                 .map(property -> "--" + property.getKey() + "=" + property.getValue())
                 .toArray(String[]::new);
-        return new SpringApplicationBuilder(DataReferenceApplication.class).run(arguments);
+    }
+
+    public static ConfigurableApplicationContext startWithoutBrokerOnSharedLogging(Environment testEnvironment,
+            String databaseUrl) {
+
+        SpringApplication application = new SpringApplicationBuilder(DataReferenceApplication.class).application();
+        application.setListeners(application.getListeners().stream()
+                .filter(listener -> !(listener instanceof LoggingApplicationListener))
+                .toList());
+        return application.run(arguments(withoutBroker(testEnvironment, databaseUrl, Map.of())));
     }
 }
