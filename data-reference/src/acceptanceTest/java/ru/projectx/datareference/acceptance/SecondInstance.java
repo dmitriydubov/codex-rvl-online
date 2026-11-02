@@ -14,18 +14,12 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.context.TypeExcludeFilter;
-import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.type.classreading.MetadataReader;
-import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Component;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
-import ru.projectx.datareference.DataReferenceApplication;
 
 @Component
 public class SecondInstance {
@@ -33,7 +27,6 @@ public class SecondInstance {
     private static final String ROLE = "second_instance";
     private static final String PASSWORD = "second-instance";
     private static final Duration DISCONNECT_TIMEOUT = Duration.ofSeconds(30);
-    private static final String WITHOUT_ACCEPTANCE_STAND = "withoutAcceptanceStand";
     private static final Duration START_TIMEOUT = Duration.ofMinutes(3);
     private static final Executor STARTER = command -> Thread.ofPlatform().name("second-instance-start").start(command);
 
@@ -77,13 +70,7 @@ public class SecondInstance {
         allowConnections();
         int apiPort = freePort();
         port = apiPort;
-        SpringApplication application = new SpringApplicationBuilder(DataReferenceApplication.class)
-                .initializers(context -> context.getBeanFactory()
-                        .registerSingleton(WITHOUT_ACCEPTANCE_STAND, new WithoutAcceptanceStand()))
-                .application();
-        application.setListeners(application.getListeners().stream()
-                .filter(listener -> !(listener instanceof LoggingApplicationListener))
-                .toList());
+        SpringApplication application = ServiceApplication.withoutAcceptanceStand();
         CompletableFuture<ConfigurableApplicationContext> started =
                 CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER);
         launched = started;
@@ -157,25 +144,5 @@ public class SecondInstance {
         return properties.entrySet().stream()
                 .map(property -> "--" + property.getKey() + "=" + property.getValue())
                 .toArray(String[]::new);
-    }
-
-    private static final class WithoutAcceptanceStand extends TypeExcludeFilter {
-
-        private static final String STAND_PACKAGE = SecondInstance.class.getPackageName() + ".";
-
-        @Override
-        public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) {
-            return metadataReader.getClassMetadata().getClassName().startsWith(STAND_PACKAGE);
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            return other instanceof WithoutAcceptanceStand;
-        }
-
-        @Override
-        public int hashCode() {
-            return WithoutAcceptanceStand.class.hashCode();
-        }
     }
 }
