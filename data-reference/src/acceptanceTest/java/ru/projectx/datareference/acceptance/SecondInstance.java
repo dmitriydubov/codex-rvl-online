@@ -2,30 +2,19 @@ package ru.projectx.datareference.acceptance;
 
 import static org.awaitility.Awaitility.await;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.ServerSocket;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.context.TypeExcludeFilter;
-import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.type.classreading.MetadataReader;
-import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Component;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
-import ru.projectx.datareference.DataReferenceApplication;
 
 @Component
 public class SecondInstance {
@@ -33,7 +22,6 @@ public class SecondInstance {
     private static final String ROLE = "second_instance";
     private static final String PASSWORD = "second-instance";
     private static final Duration DISCONNECT_TIMEOUT = Duration.ofSeconds(30);
-    private static final String WITHOUT_ACCEPTANCE_STAND = "withoutAcceptanceStand";
     private static final Duration START_TIMEOUT = Duration.ofMinutes(3);
     private static final Executor STARTER = command -> Thread.ofPlatform().name("second-instance-start").start(command);
 
@@ -75,15 +63,9 @@ public class SecondInstance {
     public void begin() {
         jdbc.sql(CREATE_ROLE.formatted(ROLE, PASSWORD, database.getUsername())).update();
         allowConnections();
-        int apiPort = freePort();
+        int apiPort = ServiceApplication.freePort();
         port = apiPort;
-        SpringApplication application = new SpringApplicationBuilder(DataReferenceApplication.class)
-                .initializers(context -> context.getBeanFactory()
-                        .registerSingleton(WITHOUT_ACCEPTANCE_STAND, new WithoutAcceptanceStand()))
-                .application();
-        application.setListeners(application.getListeners().stream()
-                .filter(listener -> !(listener instanceof LoggingApplicationListener))
-                .toList());
+        SpringApplication application = ServiceApplication.withoutAcceptanceStand();
         CompletableFuture<ConfigurableApplicationContext> started =
                 CompletableFuture.supplyAsync(() -> application.run(arguments(apiPort)), STARTER);
         launched = started;
@@ -132,50 +114,8 @@ public class SecondInstance {
                 .join();
     }
 
-    private static int freePort() {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
-        } catch (IOException failure) {
-            throw new UncheckedIOException(failure);
-        }
-    }
-
     private String[] arguments(int apiPort) {
-        Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("spring.datasource.url", database.getJdbcUrl());
-        properties.put("spring.datasource.username", ROLE);
-        properties.put("spring.datasource.password", PASSWORD);
-        properties.put("spring.rabbitmq.host", broker.getHost());
-        properties.put("spring.rabbitmq.port", broker.getAmqpPort());
-        properties.put("spring.rabbitmq.username", broker.getAdminUsername());
-        properties.put("spring.rabbitmq.password", broker.getAdminPassword());
-        properties.put("spring.rabbitmq.ssl.enabled", false);
-        properties.put("spring.rabbitmq.listener.simple.auto-startup", true);
-        properties.put("projectx.scheduling.enabled", false);
-        properties.put("server.port", apiPort);
-        properties.put("management.server.port", 0);
-        return properties.entrySet().stream()
-                .map(property -> "--" + property.getKey() + "=" + property.getValue())
-                .toArray(String[]::new);
-    }
-
-    private static final class WithoutAcceptanceStand extends TypeExcludeFilter {
-
-        private static final String STAND_PACKAGE = SecondInstance.class.getPackageName() + ".";
-
-        @Override
-        public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) {
-            return metadataReader.getClassMetadata().getClassName().startsWith(STAND_PACKAGE);
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            return other instanceof WithoutAcceptanceStand;
-        }
-
-        @Override
-        public int hashCode() {
-            return WithoutAcceptanceStand.class.hashCode();
-        }
+        return ServiceApplication.arguments(ServiceApplication.properties(
+                new ServiceApplication.DatabaseLogin(database.getJdbcUrl(), ROLE, PASSWORD), broker, apiPort));
     }
 }
