@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
@@ -77,7 +78,7 @@ class MigrationLockDataSourceTest {
 
         dataSource(target).getConnection();
 
-        verify(tryLock).setLong(1, MigrationAdvisoryLock.KEY);
+        verify(tryLock).setLong(1, MigrationLockDataSource.MIGRATION_LOCK_KEY);
         verify(connection, never()).prepareStatement(LOCK);
     }
 
@@ -87,7 +88,7 @@ class MigrationLockDataSourceTest {
 
         dataSource(target).getConnection();
 
-        verify(lock).setLong(1, MigrationAdvisoryLock.KEY);
+        verify(lock).setLong(1, MigrationLockDataSource.MIGRATION_LOCK_KEY);
         verify(lock).execute();
     }
 
@@ -98,7 +99,7 @@ class MigrationLockDataSourceTest {
         dataSource(target).getConnection().close();
 
         InOrder order = inOrder(unlock, connection);
-        order.verify(unlock).setLong(1, MigrationAdvisoryLock.KEY);
+        order.verify(unlock).setLong(1, MigrationLockDataSource.MIGRATION_LOCK_KEY);
         order.verify(unlock).execute();
         order.verify(connection).close();
     }
@@ -145,6 +146,41 @@ class MigrationLockDataSourceTest {
         Connection locked = dataSource(target).getConnection();
 
         assertThatThrownBy(locked::createStatement).isSameAs(statementFailed);
+    }
+
+    @Test
+    void connectionForGivenLogin_isTakenUnderTheSameLock() throws SQLException {
+        when(target.getConnection("migrations", "secret")).thenReturn(connection);
+        when(tryLockResult.getBoolean(1)).thenReturn(true);
+
+        dataSource(target).getConnection("migrations", "secret").close();
+
+        verify(tryLock).setLong(1, MigrationLockDataSource.MIGRATION_LOCK_KEY);
+        verify(unlock).execute();
+    }
+
+    @Test
+    void unexpectedFailureWhileLocking_closesTheConnection() throws Exception {
+        when(tryLockResult.getBoolean(1)).thenReturn(true);
+        IllegalStateException unexpected = new IllegalStateException("неожиданный отказ");
+        when(liquibaseLock.listLocks()).thenThrow(unexpected);
+        MigrationLockDataSource dataSource = dataSource(target);
+
+        assertThatThrownBy(dataSource::getConnection).isSameAs(unexpected);
+        verify(connection).close();
+    }
+
+    @Test
+    void secondClose_doesNotTryToReleaseTheLockAgain() throws SQLException {
+        when(tryLockResult.getBoolean(1)).thenReturn(true);
+        when(connection.isClosed()).thenReturn(false, true);
+        Connection locked = dataSource(target).getConnection();
+
+        locked.close();
+        locked.close();
+
+        verify(unlock, times(1)).execute();
+        verify(connection, times(1)).close();
     }
 
     @Test

@@ -2,6 +2,7 @@ package ru.projectx.datareference.config.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import liquibase.lockservice.LockService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
 
 class StaleMigrationLockTest {
@@ -90,6 +92,29 @@ class StaleMigrationLockTest {
         staleLock.releaseIfLeft(connection);
 
         assertThat(logged.list).isEmpty();
+    }
+
+    @Test
+    void check_rollsBackWhatLiquibaseLeftOpen_andRestoresAutoCommit() throws Exception {
+        when(connection.getAutoCommit()).thenReturn(true, false);
+        when(lockService.listLocks()).thenReturn(new DatabaseChangeLogLock[0]);
+
+        staleLock.releaseIfLeft(connection);
+
+        InOrder order = inOrder(connection);
+        order.verify(connection).rollback();
+        order.verify(connection).setAutoCommit(true);
+    }
+
+    @Test
+    void connectionStillInAutoCommit_isNotRolledBack() throws Exception {
+        when(connection.getAutoCommit()).thenReturn(true);
+        when(lockService.listLocks()).thenReturn(new DatabaseChangeLogLock[0]);
+
+        staleLock.releaseIfLeft(connection);
+
+        verify(connection, never()).rollback();
+        verify(connection).setAutoCommit(true);
     }
 
     private static Logger staleLockLog() {

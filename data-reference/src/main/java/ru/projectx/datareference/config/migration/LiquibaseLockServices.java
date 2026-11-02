@@ -7,7 +7,7 @@ import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.DatabaseException;
 import liquibase.lockservice.LockService;
-import liquibase.lockservice.LockServiceFactory;
+import liquibase.lockservice.StandardLockService;
 
 final class LiquibaseLockServices {
 
@@ -18,7 +18,9 @@ final class LiquibaseLockServices {
         try {
             Database database = DatabaseFactory.getInstance()
                     .findCorrectDatabaseImplementation(new JdbcConnection(connection));
-            return LockServiceFactory.getInstance().getLockService(database);
+            StandardLockService lockService = new StandardLockService();
+            lockService.setDatabase(database);
+            return lockService;
         } catch (DatabaseException failed) {
             throw new SQLException("не удалось открыть замок миграций Liquibase", failed);
         }

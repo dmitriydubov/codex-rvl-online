@@ -26,11 +26,19 @@ public class MigrationLockDataSource extends DelegatingDataSource implements Aut
 
     @Override
     public Connection getConnection() throws SQLException {
-        Connection connection = obtainTargetDataSource().getConnection();
+        return underLock(obtainTargetDataSource().getConnection());
+    }
+
+    @Override
+    public Connection getConnection(String username, String password) throws SQLException {
+        return underLock(obtainTargetDataSource().getConnection(username, password));
+    }
+
+    private Connection underLock(Connection connection) throws SQLException {
         try {
             takeLock(connection);
             staleLock.releaseIfLeft(connection);
-        } catch (SQLException failed) {
+        } catch (SQLException | RuntimeException failed) {
             connection.close();
             throw failed;
         }

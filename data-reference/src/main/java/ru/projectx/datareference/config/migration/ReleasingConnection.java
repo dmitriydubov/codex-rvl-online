@@ -36,6 +36,9 @@ final class ReleasingConnection implements InvocationHandler {
     }
 
     private void releaseAndClose() throws SQLException {
+        if (target.isClosed()) {
+            return;
+        }
         try (Connection closing = target) {
             MigrationAdvisoryLock.release(closing);
         }

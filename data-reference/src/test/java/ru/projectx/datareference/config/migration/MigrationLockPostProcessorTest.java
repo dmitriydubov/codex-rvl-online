@@ -41,4 +41,34 @@ class MigrationLockPostProcessorTest {
 
         assertThat(postProcessor.postProcessBeforeInitialization(dataSource, "dataSource")).isSameAs(dataSource);
     }
+
+    @Test
+    void liquibaseAfterMigrations_getsBackItsOwnDataSource() {
+        DataSource migrations = mock(DataSource.class);
+        SpringLiquibase liquibase = new SpringLiquibase();
+        liquibase.setDataSource(new MigrationLockDataSource(migrations));
+
+        Object processed = postProcessor.postProcessAfterInitialization(liquibase, "liquibase");
+
+        assertThat(processed).isSameAs(liquibase);
+        assertThat(liquibase.getDataSource()).isSameAs(migrations);
+    }
+
+    @Test
+    void liquibaseWithoutMigrationLockAfterMigrations_keepsItsDataSource() {
+        DataSource migrations = mock(DataSource.class);
+        SpringLiquibase liquibase = new SpringLiquibase();
+        liquibase.setDataSource(migrations);
+
+        postProcessor.postProcessAfterInitialization(liquibase, "liquibase");
+
+        assertThat(liquibase.getDataSource()).isSameAs(migrations);
+    }
+
+    @Test
+    void otherBeansAfterInitialization_areReturnedUnchanged() {
+        DataSource dataSource = new MigrationLockDataSource(mock(DataSource.class));
+
+        assertThat(postProcessor.postProcessAfterInitialization(dataSource, "dataSource")).isSameAs(dataSource);
+    }
 }

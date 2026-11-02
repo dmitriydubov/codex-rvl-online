@@ -23,6 +23,15 @@ final class StaleMigrationLock {
     }
 
     void releaseIfLeft(Connection connection) throws SQLException {
+        boolean autoCommit = connection.getAutoCommit();
+        try {
+            releaseLeftLock(connection);
+        } finally {
+            restore(connection, autoCommit);
+        }
+    }
+
+    private void releaseLeftLock(Connection connection) throws SQLException {
         try {
             LockService lockService = lockServices.of(connection);
             DatabaseChangeLogLock[] left = lockService.listLocks();
@@ -33,6 +42,13 @@ final class StaleMigrationLock {
         } catch (LiquibaseException failed) {
             throw new SQLException("не удалось снять оставшийся замок миграций", failed);
         }
+    }
+
+    private static void restore(Connection connection, boolean autoCommit) throws SQLException {
+        if (!connection.getAutoCommit()) {
+            connection.rollback();
+        }
+        connection.setAutoCommit(autoCommit);
     }
 
     private static void report(DatabaseChangeLogLock[] released) {
