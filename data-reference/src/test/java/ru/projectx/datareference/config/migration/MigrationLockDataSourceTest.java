@@ -138,6 +138,16 @@ class MigrationLockDataSourceTest {
     }
 
     @Test
+    void failingConnectionCall_reportsTheOriginalFailureOfTheTargetConnection() throws SQLException {
+        when(tryLockResult.getBoolean(1)).thenReturn(true);
+        SQLException statementFailed = new SQLException("запрос не подготовлен");
+        when(connection.createStatement()).thenThrow(statementFailed);
+        Connection locked = dataSource(target).getConnection();
+
+        assertThatThrownBy(locked::createStatement).isSameAs(statementFailed);
+    }
+
+    @Test
     void publicConstructor_wrapsTheGivenMigrationsDataSource() {
         assertThat(new MigrationLockDataSource(target).getTargetDataSource()).isSameAs(target);
     }
