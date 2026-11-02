@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import io.cucumber.java.After;
 import io.cucumber.java.ru.Когда;
 import io.cucumber.java.ru.Тогда;
 import java.time.Duration;
+import java.util.Arrays;
 
 public class NewDatabaseInstanceSteps {
 
@@ -60,8 +62,8 @@ public class NewDatabaseInstanceSteps {
     public void releasedLockRecords(Level level, String lockedBy, String granted, int records) {
         assertThat(journal.mentioning(RELEASED_LOCK).stream()
                 .filter(event -> event.getLevel() == level)
-                .map(event -> event.getFormattedMessage())
-                .filter(message -> message.contains(lockedBy) && message.contains(granted)))
+                .map(ILoggingEvent::getArgumentArray)
+                .filter(arguments -> Arrays.equals(arguments, new Object[] {lockedBy, granted})))
                 .as("записи о снятом замке миграций").hasSize(records);
     }
 
