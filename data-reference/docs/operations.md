@@ -511,7 +511,7 @@ namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` с
   новых), `MAX_SURGE` (1), `MAX_UNAVAILABLE` (0), пауза перед остановкой `PRE_STOP_DELAY` (10 с) и
   `TERMINATION_GRACE_PERIOD` (60 с; не меньше паузы плюс 50 с) в `values.yaml` чарта. Поды обновляются по одному, каждый
   не раньше первой проверки готовности (`R_INIT_DELAY`, 60 с), поэтому выкатка двух реплик идёт несколько минут; скрипт
-  ждёт её конца (`kubectl rollout status`) 5 минут ([troubleshooting.md](troubleshooting.md), «Под не становится
+  ждёт её конца (`kubectl rollout status`) 10 минут ([troubleshooting.md](troubleshooting.md), «Под не становится
   готовым»).
 - Куча JVM на стенде — 60 % лимита памяти пода: `jvm.options` чарта (`-XX:MaxRAMPercentage=60.0
   -XX:+ExitOnOutOfMemoryError`) уходит в под переменной `JDK_JAVA_OPTIONS` через ConfigMap и перекрывает умолчание
