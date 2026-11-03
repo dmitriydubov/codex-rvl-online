@@ -5089,6 +5089,21 @@ REST.
   **PR #261 смержен 2026-10-27 (`main` cfa9d1f).** Проверка после мержа: дерево `main` совпадает с головой PR `96772ed`,
   каталог `data-reference` — с `cfd6403`, на котором прошли `gauntletFast` (2052 / 705 / 7), `mutationGate` (27/27) и
   `gherkinMutation`, поэтому контрольный прогон не повторялся; обе команды следов разработки на `main` пусты.
+- 2026-11-03, **контур: MR !3 разработчика Заявок в чарт стенда data-reference** («поиск по фамилиям не работал»): в
+  `devops/test/helm/values.yaml` добавлена `internal/v1/policies` в ingress и удалён блок `jvm`. Разбор координатора:
+  без блока `jvm` чарт не собирается (Helm 3.19.0 `helm template`: «nil pointer evaluating interface {}.options» в
+  `configmap.yaml:30`) — выкатка из `develop` контура упадёт, и пропадает куча 60 %; ingress открыл бы все ручки полисов
+  с ПДн без авторизации (Д5), а ingress-nginx пишет в журнал всю строку запроса (`$request`). На стенде (владелец,
+  `kubectl`): в `rvl-test` только `data-reference` и `hr-activity`, сетевых политик нет; у сервиса Заявок в ConfigMap
+  `hr-activity-config` уже `RVL_RESTCLIENT_DATAREFERENCE_URL: http://data-reference:8080`; из пода data-reference по
+  имени сервиса — `{"status":"UP"}` и `INSURANCE_CONTRACT_NOT_FOUND` HTTP 404 на R-04 с синтетическим договором (в образе
+  сервиса Заявок нет `wget` и `curl`). Запрос шёл из BFF, не из сервиса Заявок; разработчики Заявок и BFF выбрали
+  BFF → data-reference напрямую (владелец: «странное решение, но если хотят — окей»). Владельцу даны: шаги отката
+  MR !3 (Revert в GitLab или `git revert 25ddaa99`), Word-файлы с проверками стенда (scratchpad сессии координатора).
+  Условия для прямых вызовов из BFF: `contract_external_id` — из серверной сессии кадровика (data-reference права не
+  проверяет); BFF в кластере — адрес `http://data-reference.rvl-test.svc.cluster.local:8080`, без ingress; BFF вне
+  кластера — отдельный закрытый вход только для `/internal/v1/policies/search` (`whitelist-source-range` с адресами BFF,
+  `enable-access-log: "false"`, `https`) — задача на чарт и `operations.md` после ответа, где работает BFF.
 - 2026-11-02, **выпуск `1.0.0-rc.3`** (владелец «1) да 2) да 3) давай пока оставим rc.3»): номер по SemVer, как `rc.1`
   и `rc.2`; на стенд — вместе с проверкой Ш84 (первая выкатка переводит стенд на две реплики, вторая — та же сборка с
   другим тегом образа: выкатка без простоя). Коммит выпуска: `gradle.properties` `version=1.0.0-rc.3`,
