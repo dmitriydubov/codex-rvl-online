@@ -5104,6 +5104,13 @@ REST.
   проверяет); BFF в кластере — адрес `http://data-reference.rvl-test.svc.cluster.local:8080`, без ingress; BFF вне
   кластера — отдельный закрытый вход только для `/internal/v1/policies/search` (`whitelist-source-range` с адресами BFF,
   `enable-access-log: "false"`, `https`) — задача на чарт и `operations.md` после ответа, где работает BFF.
+  2026-11-04, по просьбе разработчика Заявок владелец сам добавил на стенде строку в ingress: копия модуля на машине стенда —
+  `/data/app/data-reference`, в её `values.yaml` — `internal/v1/policies` (весь префикс, а не только `search`, как
+  рекомендовал координатор), `sudo helm upgrade data-reference /data/app/data-reference/devops/test/helm -n rvl-test
+  --set TAG=v3` (ревизия 5; без `--reuse-values`: Helm 3.19 с ним берёт значения прошлого релиза). Через ingress
+  поиск R-04 с синтетическим договором — `INSURANCE_CONTRACT_NOT_FOUND` HTTP 404, `request_id` пришёл от ingress-nginx.
+  Открыто: сузить строку до `internal/v1/policies/search`; перенос в наш чарт отдельным закрытым Ingress до выкатки
+  `rc.3` (иначе выкатка её сотрёт) — на решении владельца; откат MR !3 в контуре.
 - 2026-11-02, **выпуск `1.0.0-rc.3`** (владелец «1) да 2) да 3) давай пока оставим rc.3»): номер по SemVer, как `rc.1`
   и `rc.2`; на стенд — вместе с проверкой Ш84 (первая выкатка переводит стенд на две реплики, вторая — та же сборка с
   другим тегом образа: выкатка без простоя). Коммит выпуска: `gradle.properties` `version=1.0.0-rc.3`,
