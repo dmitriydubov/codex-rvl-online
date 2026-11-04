@@ -5129,7 +5129,16 @@ REST.
   2026-11-04 владелец добавил правило auditd: `/etc/audit/rules.d/data-reference-stand.rules` —
   `-w /data/app/data-reference/ -p wa -k data-reference-stand`, `augenrules --load`; в журнале — `CONFIG_CHANGE
   op=add_rule key=data-reference-stand res=yes`. Смотреть: `sudo ausearch -k data-reference-stand --start this-week
-  --format text` (или `-i`).
+  --format text` (или `-i`); проверено тестовым файлом — `touch` и `rm` записаны с именем владельца.
+  Владелец 2026-11-04: «1) давай сделаем internal/v1/policies а потом поменяем после аналитик. 2) сделал реверт
+  3) после 1)». (1) Коммит координатора 4af0a623: в чарт стенда — `internal/v1/policies` (весь префикс, как на стенде;
+  сузить до `search` или закрыть отдельным Ingress — после решения аналитиков), `.helmignore` с резервными копиями
+  (Helm 3.19.0: `LoadDir` читает `.helmignore`; по умолчанию `helm create` — `*.swp *.bak *.tmp *.orig *~`; проверено
+  `helm package` — `values.yaml.bak` в пакет не попал), `openapi.yaml` (servers), `operations.md` (что открыто через
+  ingress стенда, строки поиска полисов с ФИО остаются в журнале доступа ingress-nginx), CHANGELOG «Не выпущено». Jar
+  не меняется — номер `1.0.0-rc.3` прежний. Остаточный риск, принятый владельцем до решения аналитиков: через ingress
+  стенда открыты все ручки полисов без авторизации, строки поиска с ФИО — в журнале ingress. (2) MR !3 в `develop`
+  контура откачен. (3) Выкатка `rc.3` и проверка Ш84 на стенде — после мержа PR с (1).
 - 2026-11-02, **выпуск `1.0.0-rc.3`** (владелец «1) да 2) да 3) давай пока оставим rc.3»): номер по SemVer, как `rc.1`
   и `rc.2`; на стенд — вместе с проверкой Ш84 (первая выкатка переводит стенд на две реплики, вторая — та же сборка с
   другим тегом образа: выкатка без простоя). Коммит выпуска: `gradle.properties` `version=1.0.0-rc.3`,
