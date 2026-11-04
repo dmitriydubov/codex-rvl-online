@@ -5126,6 +5126,10 @@ REST.
   После уточнения прав владелец передумал: «давай тогда не будем править доступ» — права и место копии модуля не
   меняются (`/data/app/data-reference`, владелец каталогов — разработчик Заявок). Вместо этого — смотреть, кто и что
   менял: владелец и время файлов (`find … -printf`), журнал `sudo`, при желании — правило auditd на каталог.
+  2026-11-04 владелец добавил правило auditd: `/etc/audit/rules.d/data-reference-stand.rules` —
+  `-w /data/app/data-reference/ -p wa -k data-reference-stand`, `augenrules --load`; в журнале — `CONFIG_CHANGE
+  op=add_rule key=data-reference-stand res=yes`. Смотреть: `sudo ausearch -k data-reference-stand --start this-week
+  --format text` (или `-i`).
 - 2026-11-02, **выпуск `1.0.0-rc.3`** (владелец «1) да 2) да 3) давай пока оставим rc.3»): номер по SemVer, как `rc.1`
   и `rc.2`; на стенд — вместе с проверкой Ш84 (первая выкатка переводит стенд на две реплики, вторая — та же сборка с
   другим тегом образа: выкатка без простоя). Коммит выпуска: `gradle.properties` `version=1.0.0-rc.3`,
