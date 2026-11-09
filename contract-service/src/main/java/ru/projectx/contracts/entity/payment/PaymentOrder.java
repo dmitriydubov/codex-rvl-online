@@ -121,7 +121,18 @@ public class PaymentOrder {
         this.updatedAt = now;
     }
 
-    public boolean recordCancelled(Instant now) {
+    public boolean recordCancelled(String orderId, Instant now) {
+        if (state != PaymentOrderState.CANCEL_PENDING) {
+            return false;
+        }
+        recordOrder(orderId, now);
+        return enter(PaymentOrderState.CANCEL_PENDING, PaymentOrderState.CANCELLED, now);
+    }
+
+    public boolean recordNotFound(Instant now) {
+        if (externalOrderId != null) {
+            return false;
+        }
         return enter(PaymentOrderState.CANCEL_PENDING, PaymentOrderState.CANCELLED, now);
     }
 

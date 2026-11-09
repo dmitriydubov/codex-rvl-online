@@ -109,7 +109,7 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void cancelled_alreadyClosedOrder_logsNothing() {
         PaymentOrder order = PaymentOrders.cancelPending();
-        order.recordCancelled(NOW);
+        order.recordCancelled(PaymentOrders.ORDER_ID, NOW);
         locked(order);
 
         recording.cancelled(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
@@ -129,7 +129,38 @@ class PaymentOrderCancelRecordingTest {
         assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).isEmpty();
         verify(fence).holdUntilCommit();
-        assertThat(log.at(Level.INFO)).hasSize(1);
+        assertThat(log.at(Level.INFO)).singleElement().asString()
+                .endsWith(": заказ в Ordering не найден, запись закрыта без отмены");
+    }
+
+    @Test
+    void notFound_ofPendingOrderThatGotItsOrderIdMeanwhile_keepsItForTheNextCancellationPass() {
+        PaymentOrder order = PaymentOrders.awaiting();
+        order.requestCreation(NOW);
+        order.withdraw(NOW);
+        order.recordOrder(PaymentOrders.ORDER_ID, NOW);
+        locked(order);
+
+        recording.notFound(PaymentOrders.CONTRACT);
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
+        assertThat(log.events()).singleElement().asString()
+                .doesNotContain("не найден")
+                .endsWith(": заказ получил orderId " + PaymentOrders.ORDER_ID
+                        + ", пока шёл поиск: отменится следующим проходом");
+    }
+
+    @Test
+    void notFound_ofOrderCancelledMeanwhile_logsNothing() {
+        PaymentOrder order = PaymentOrders.cancelPending();
+        order.recordCancelled(PaymentOrders.ORDER_ID, NOW);
+        locked(order);
+
+        recording.notFound(PaymentOrders.CONTRACT);
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(log.events()).isEmpty();
     }
 
     @Test

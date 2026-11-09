@@ -36,7 +36,9 @@ import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.service.cancellation.TaskCancellationService;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeaderLock;
+import ru.projectx.contracts.service.payment.cancellation.PaymentOrderCancelling;
 import ru.projectx.contracts.service.payment.order.PaymentOrderCreation;
+import ru.projectx.contracts.service.payment.order.PaymentOrderRecording;
 import ru.projectx.contracts.service.payment.order.RejectedDocumentFixes;
 import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
@@ -104,6 +106,12 @@ class PaymentOrderRaceIT {
 
     @Autowired
     private RejectedDocumentFixes rejectedFixes;
+
+    @Autowired
+    private PaymentOrderCancelling cancelling;
+
+    @Autowired
+    private PaymentOrderRecording recording;
 
     @Autowired
     private MeterRegistry meters;
@@ -224,6 +232,38 @@ class PaymentOrderRaceIT {
         assertThat(order.get("state")).isEqualTo("CANCEL_PENDING");
         assertThat(order.get("external_order_id")).isEqualTo("order-1");
         assertThat(rejectedOrders()).isEqualTo(rejectedBefore);
+    }
+
+    @Test
+    void orderIdRecordedWhileTheCancellationPassFoundNothing_keepsTheRecordAndTheNextPassCancelsTheOrder()
+            throws Exception {
+        jdbc.sql("update payment_orders set state = 'CANCEL_PENDING', creation_requested = true where contract_id = ?")
+                .param(contractId).update();
+        CountDownLatch orderIdRecorded = new CountDownLatch(1);
+        CountDownLatch commitOrderId = new CountDownLatch(1);
+        CompletableFuture<Void> creating = CompletableFuture.runAsync(() -> transaction.executeWithoutResult(status -> {
+            recording.created(contractId, "order-late");
+            orderIdRecorded.countDown();
+            awaitQuietly(commitOrderId);
+        }));
+        assertThat(orderIdRecorded.await(WAIT.toSeconds(), TimeUnit.SECONDS)).isTrue();
+
+        CompletableFuture<Integer> firstPass = CompletableFuture.supplyAsync(cancelling::cancelDue);
+        await().atMost(WAIT).until(() -> jdbc.sql(LOCK_WAITS).query(Long.class).single() > 0);
+        commitOrderId.countDown();
+        creating.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+        firstPass.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+
+        Map<String, Object> kept = orderRow();
+        assertThat(kept.get("state")).isEqualTo("CANCEL_PENDING");
+        assertThat(kept.get("external_order_id")).isEqualTo("order-late");
+        assertThat(ordering.cancelled()).isEmpty();
+
+        cancelling.cancelDue();
+
+        assertThat(orderRow().get("state")).isEqualTo("CANCELLED");
+        assertThat(ordering.cancelled()).containsExactly("order-late");
+        assertThat(fixes()).isZero();
     }
 
     private double rejectedOrders() {

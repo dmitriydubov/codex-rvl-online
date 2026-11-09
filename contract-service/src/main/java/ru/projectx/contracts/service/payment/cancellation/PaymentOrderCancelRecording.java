@@ -50,9 +50,7 @@ public class PaymentOrderCancelRecording {
     @Transactional
     public void cancelled(UUID contractId, String orderId) {
         LockedOrder locked = pending(contractId);
-        Instant now = clock.instant();
-        locked.order().recordOrder(orderId, now);
-        if (locked.order().recordCancelled(now)) {
+        if (locked.order().recordCancelled(orderId, clock.instant())) {
             PaymentOrderLog.write(log.atInfo(), locked.contract(), "заказ отменён в Ordering, orderId " + orderId);
         }
     }
@@ -60,10 +58,15 @@ public class PaymentOrderCancelRecording {
     @Transactional
     public void notFound(UUID contractId) {
         LockedOrder locked = pending(contractId);
-        if (locked.order().recordCancelled(clock.instant())) {
+        if (locked.order().recordNotFound(clock.instant())) {
             PaymentOrderLog.write(log.atInfo(), locked.contract(),
                     "заказ в Ordering не найден, запись закрыта без отмены");
+            return;
         }
+        locked.order().view().orderId()
+                .filter(orderId -> locked.order().state() == PaymentOrderState.CANCEL_PENDING)
+                .ifPresent(orderId -> PaymentOrderLog.write(log.atInfo(), locked.contract(),
+                        "заказ получил orderId " + orderId + ", пока шёл поиск: отменится следующим проходом"));
     }
 
     @Transactional

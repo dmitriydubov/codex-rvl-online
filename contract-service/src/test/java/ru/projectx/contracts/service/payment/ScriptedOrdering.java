@@ -1,20 +1,24 @@
 package ru.projectx.contracts.service.payment;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 final class ScriptedOrdering implements Ordering {
 
     private final ConcurrentMap<UUID, String> ordersByDocument = new ConcurrentHashMap<>();
     private final AtomicInteger creations = new AtomicInteger();
+    private final List<String> cancelled = new CopyOnWriteArrayList<>();
     private volatile Runnable duringCreation = () -> { };
 
     void reset() {
         ordersByDocument.clear();
         creations.set(0);
+        cancelled.clear();
         duringCreation = () -> { };
     }
 
@@ -24,6 +28,10 @@ final class ScriptedOrdering implements Ordering {
 
     int creations() {
         return creations.get();
+    }
+
+    List<String> cancelled() {
+        return List.copyOf(cancelled);
     }
 
     @Override
@@ -49,6 +57,7 @@ final class ScriptedOrdering implements Ordering {
 
             @Override
             public void cancelOrder(String orderId) {
+                cancelled.add(orderId);
                 ordersByDocument.values().remove(orderId);
             }
         };

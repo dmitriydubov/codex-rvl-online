@@ -187,7 +187,7 @@ class PaymentOrderTest {
         PaymentOrder order = opened();
         order.recordOrder(ORDER, LATER);
         order.withdraw(LATER);
-        order.recordCancelled(LATER);
+        order.recordCancelled(ORDER, LATER);
 
         order.withdraw(LATER);
 
@@ -203,15 +203,61 @@ class PaymentOrderTest {
         order.requestCancellation(LATER);
 
         assertThat(order.view().cancelRequested()).isTrue();
-        assertThat(order.recordCancelled(LATER)).isTrue();
+        assertThat(order.recordCancelled(ORDER, LATER)).isTrue();
         assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+    }
+
+    @Test
+    void recordCancelled_ofOrderFoundBySearch_keepsItsOrderId() {
+        PaymentOrder order = opened();
+        order.requestCreation(LATER);
+        order.withdraw(LATER);
+
+        assertThat(order.recordCancelled(ORDER, LATER)).isTrue();
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().orderId()).contains(ORDER);
     }
 
     @Test
     void recordCancelled_notPending_changesNothing() {
         PaymentOrder order = opened();
 
-        assertThat(order.recordCancelled(LATER)).isFalse();
+        assertThat(order.recordCancelled(ORDER, LATER)).isFalse();
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+    }
+
+    @Test
+    void recordNotFound_pendingWithoutOrderId_closesIt() {
+        PaymentOrder order = opened();
+        order.requestCreation(LATER);
+        order.withdraw(LATER);
+
+        assertThat(order.recordNotFound(LATER)).isTrue();
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().orderId()).isEmpty();
+    }
+
+    @Test
+    void recordNotFound_pendingWithOrderId_keepsItForCancellation() {
+        PaymentOrder order = opened();
+        order.requestCreation(LATER);
+        order.withdraw(LATER);
+        order.recordOrder(ORDER, LATER);
+
+        assertThat(order.recordNotFound(LATER)).isFalse();
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().orderId()).contains(ORDER);
+    }
+
+    @Test
+    void recordNotFound_notPending_changesNothing() {
+        PaymentOrder order = opened();
+
+        assertThat(order.recordNotFound(LATER)).isFalse();
 
         assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
     }
