@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.integration.ordering;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import ru.projectx.contracts.exception.OrderingOperation;
 import ru.projectx.contracts.service.integration.ordering.OrderingExchange.OrderingCall;
 import ru.projectx.contracts.service.payment.NewOrder;
@@ -54,7 +55,7 @@ final class OrderingHttpSession implements OrderingSession {
     @Override
     public void cancelOrder(String orderId) {
         OrderingCall call = call(OrderingOperation.CANCEL_ORDER);
-        calls.call(call, exchange -> exchange.post(call, ORDER_CANCEL, requests.cancel(), orderId), body -> body);
+        calls.call(call, exchange -> exchange.post(call, ORDER_CANCEL, requests.cancel(), orderId), Function.identity());
     }
 
     private OrderingCall call(OrderingOperation operation) {

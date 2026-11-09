@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,12 +28,19 @@ final class OrderingStub implements AutoCloseable {
     static final String ORDERING_PATH = "/ordering";
     static final String TOKEN_PATH = "/realms/stand/protocol/openid-connect/token";
 
-    private static final Pattern CREATED = Pattern.compile("создан (\\S+)(?: (без ответа|с обрывом))?");
+    private static final String ORDER_ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+    private static final Pattern CREATED = Pattern.compile("создан (" + ORDER_ID + ")(?: (без ответа|с обрывом))?");
     private static final Pattern HTTP = Pattern.compile("HTTP (\\d{3})");
     private static final Pattern ERROR = Pattern.compile("ошибка (\\S+) HTTP (\\d{3})");
     private static final Pattern TOKEN = Pattern.compile("токен (\\S+) на (\\d+) секунд");
     private static final Pattern CLIENT_ORDERS = Pattern.compile("/orders/([^/]+)");
     private static final Pattern ORDER_CANCEL = Pattern.compile("/orders/([^/]+)/cancel");
+    private static final String FAILURE = "ошибка \\S+ HTTP \\d{3}|HTTP [45]\\d{2}|без ответа|обрыв";
+    private static final Map<String, Pattern> KNOWN_ANSWERS = Map.of(
+            "token", Pattern.compile(TOKEN.pattern() + "|" + FAILURE),
+            "создание", Pattern.compile(CREATED.pattern() + "|" + FAILURE),
+            "поиск", Pattern.compile("найденные (?:объектом|списком)|" + FAILURE),
+            "отмена", Pattern.compile("отменён(?: без ответа)?|" + FAILURE));
     private static final long SILENCE_SECONDS = 5;
 
     record Call(String kind, String method, String path, Map<String, String> headers, JsonNode body) {
@@ -87,7 +95,12 @@ final class OrderingStub implements AutoCloseable {
     }
 
     void answer(String kind, String answers) {
-        scripts.put(kind, new StubScript(answers));
+        StubScript script = new StubScript(answers);
+        script.answers.stream().filter(answer -> !KNOWN_ANSWERS.get(kind).matcher(answer).matches()).findFirst()
+                .ifPresent(unknown -> {
+                    throw new IllegalArgumentException("стенд не знает ответа «" + unknown + "» на " + kind);
+                });
+        scripts.put(kind, script);
     }
 
     void errorText(String text) {
@@ -319,13 +332,13 @@ final class OrderingStub implements AutoCloseable {
         private int next;
 
         StubScript(String answers) {
-            this.answers = List.of(answers.split(";\\s*"));
+            this.answers = Arrays.stream(answers.split(";")).map(String::strip).toList();
         }
 
         synchronized String next() {
             String answer = answers.get(Math.min(next, answers.size() - 1));
             next++;
-            return answer.strip();
+            return answer;
         }
     }
 }

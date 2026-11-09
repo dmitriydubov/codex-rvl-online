@@ -68,7 +68,7 @@ final class OrderingExchange {
 
     private JsonNode parse(byte[] body) {
         try {
-            return body.length == 0 ? MissingNode.getInstance() : json.readTree(body);
+            return json.readTree(body);
         }
         catch (JacksonException unreadable) {
             return MissingNode.getInstance();

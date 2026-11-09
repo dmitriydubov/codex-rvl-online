@@ -100,7 +100,9 @@ public class PaymentOrder {
             return false;
         }
         this.rejectionCode = code;
-        return enter(state, PaymentOrderState.REJECTED, now);
+        this.state = PaymentOrderState.REJECTED;
+        this.updatedAt = now;
+        return true;
     }
 
     public void withdraw(Instant now) {
@@ -128,7 +130,9 @@ public class PaymentOrder {
             return false;
         }
         this.rejectionCode = code;
-        return enter(state, PaymentOrderState.CANCEL_REJECTED, now);
+        this.state = PaymentOrderState.CANCEL_REJECTED;
+        this.updatedAt = now;
+        return true;
     }
 
     public PaymentOrderState state() {
