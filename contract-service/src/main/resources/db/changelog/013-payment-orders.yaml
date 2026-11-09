@@ -1,0 +1,49 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 013-payment-orders
+      author: contract-service
+      comment: >
+        Заказ на оплату акцептованного договора КМ в сервисе управления заказами: одна запись на договор,
+        создаётся вместе с акцептом. Идентификатор записи уходит в сервис управления заказами идентификатором
+        документа, по нему заказ находится поиском, если ответ на создание потерян. Номер договора, сумма,
+        дата документа и срок жизни документа — снимок на момент акцепта, они уходят в запрос на создание.
+        Отметки «запрос на создание отправлялся» и «запрос на отмену отправлялся» говорят, что повтор
+        начинается с поиска или с запроса состояния, а не вслепую. Код отказа — только код ответа, без текста.
+      changes:
+        - sql:
+            sql: >-
+              CREATE TYPE payment_order_state AS ENUM ('AWAITING_CREATION', 'CREATED', 'REJECTED',
+              'CANCEL_PENDING', 'CANCELLED', 'CANCEL_REJECTED');
+        - createTable:
+            tableName: payment_orders
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_payment_orders, nullable: false } }
+              - column: { name: contract_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_payment_orders_contract, references: contracts(id) } }
+              - column: { name: client_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: correlation_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: contract_number, type: varchar(50), constraints: { nullable: false } }
+              - column: { name: amount, type: "numeric(15,2)", constraints: { nullable: false } }
+              - column: { name: document_date, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: document_ttl, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: state, type: payment_order_state, constraints: { nullable: false } }
+              - column: { name: external_order_id, type: varchar(100) }
+              - column: { name: rejection_code, type: varchar(100) }
+              - column: { name: creation_requested, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: cancel_requested, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: payment_orders
+            columnNames: contract_id
+            constraintName: uq_payment_orders_contract_id
+        - createIndex:
+            tableName: payment_orders
+            indexName: ix_payment_orders_state_created_at
+            columns:
+              - column: { name: state }
+              - column: { name: created_at }
+      rollback:
+        - dropTable: { tableName: payment_orders }
+        - sql:
+            sql: DROP TYPE payment_order_state;

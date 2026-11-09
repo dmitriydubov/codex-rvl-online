@@ -54,6 +54,12 @@ public class PrometheusSteps {
         counterGrew(name, "kind", kind, growth);
     }
 
+    @Тогда("счётчик Prometheus {string} с меткой operation {string} вырос за сценарий на {int}")
+    public void counterGrewByOperation(String name, String operation, int growth)
+            throws IOException, InterruptedException {
+        counterGrew(name, "operation", operation, growth);
+    }
+
     @Тогда("метрика Prometheus {string} равна {int}")
     public void gaugeEquals(String name, int expected) throws IOException, InterruptedException {
         Pattern series = Pattern.compile("^" + Pattern.quote(name) + "(?:\\{[^}]*})? (\\S+)$", Pattern.MULTILINE);
