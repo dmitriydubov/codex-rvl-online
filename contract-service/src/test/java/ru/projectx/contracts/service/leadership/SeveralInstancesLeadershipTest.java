@@ -153,6 +153,7 @@ class SeveralInstancesLeadershipTest {
             properties.put("projectx.brokers." + broker + ".listener-auto-startup", true);
         }
         properties.put("projectx.scheduling.enabled", false);
+        properties.put("projectx.payment.enabled", false);
         properties.put("management.health.brokers.enabled", false);
         properties.put("projectx.leadership.group", group);
         properties.put("projectx.leadership.heartbeat", "200ms");

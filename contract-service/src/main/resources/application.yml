@@ -129,6 +129,22 @@ projectx:
         lm-policy-requests: ${ONEC_QUEUE_LM_POLICY_REQUESTS:rvl_contracts_to_1c-usk_lm-policy-changes}
         lm-policy-issues: ${ONEC_QUEUE_LM_POLICY_ISSUES:1c-usk_to_rvl_contracts_lm-policy-changes}
 
+    marketing:
+      connection:
+        host: ${RABBITMQ_MARKETING_HOST:}
+        port: ${RABBITMQ_MARKETING_PORT:5672}
+        virtual-host: ${RABBITMQ_MARKETING_VHOST:/}
+        username: ${RABBITMQ_MARKETING_USERNAME:}
+        password: ${RABBITMQ_MARKETING_PASSWORD:}
+        connection-timeout: 10s
+        tls:
+          enabled: ${RABBITMQ_MARKETING_SSL_ENABLED:false}
+          validate-server-certificate: ${RABBITMQ_MARKETING_SSL_VALIDATE_CERTIFICATE:true}
+          verify-hostname: ${RABBITMQ_MARKETING_SSL_VERIFY_HOSTNAME:true}
+      document-fixes:
+        exchange: ${MARKETING_DOCUMENT_FIXES_EXCHANGE:}
+        routing-key: ${MARKETING_DOCUMENT_FIXES_ROUTING_KEY:}
+
   database:
     session-timeouts:
       lock-timeout: ${DB_LOCK_TIMEOUT:5s}
@@ -192,6 +208,36 @@ projectx:
     retry:
       max-retries: ${REFERENCE_MAX_RETRIES:3}
       delay: ${REFERENCE_RETRY_DELAY:1s}
+
+  payment:
+    enabled: ${PAYMENT_ENABLED:}
+
+  ordering:
+    url: ${ORDERING_URL:}
+    connect-timeout: ${ORDERING_CONNECT_TIMEOUT:2s}
+    read-timeout: ${ORDERING_READ_TIMEOUT:10s}
+    product: ${ORDERING_PRODUCT:}
+    channel: ${ORDERING_CHANNEL:}
+    cancel-reason: ${ORDERING_CANCEL_REASON:notActual}
+    retry:
+      attempts: ${ORDERING_ATTEMPTS:3}
+      delay: ${ORDERING_RETRY_DELAY:1s}
+    document:
+      zone: ${ORDERING_DOCUMENT_ZONE:Europe/Moscow}
+      ttl-before-check-in: ${ORDERING_DOCUMENT_TTL_BEFORE_CHECK_IN:1s}
+    token:
+      uri: ${ORDERING_TOKEN_URI:}
+      client-id: ${ORDERING_TOKEN_CLIENT_ID:}
+      client-secret: ${ORDERING_TOKEN_CLIENT_SECRET:}
+      connect-timeout: ${ORDERING_TOKEN_CONNECT_TIMEOUT:2s}
+      read-timeout: ${ORDERING_TOKEN_READ_TIMEOUT:5s}
+
+  payment-orders:
+    creation-interval: ${PAYMENT_ORDER_CREATION_INTERVAL:10s}
+    cancellation-interval: ${PAYMENT_ORDER_CANCELLATION_INTERVAL:1m}
+    batch-size: ${PAYMENT_ORDER_BATCH_SIZE:100}
+    awaiting-interval: ${PAYMENT_ORDER_AWAITING_INTERVAL:1m}
+    awaiting-threshold: ${PAYMENT_ORDER_AWAITING_THRESHOLD:1h}
 
   storage:
     endpoint: ${S3_ENDPOINT:}

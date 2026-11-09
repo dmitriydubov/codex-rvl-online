@@ -14,6 +14,7 @@ import org.springframework.core.annotation.AliasFor;
 @Tag("no-mutate")
 @SpringBootTest(properties = {
         "projectx.scheduling.enabled=false",
+        "projectx.payment.enabled=false",
         "management.health.brokers.enabled=false",
         "projectx.reference.url=http://reference.test:8080/internal/v1",
         "projectx.brokers.internal.connection.password=no-broker",

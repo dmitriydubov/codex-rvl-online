@@ -15,8 +15,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.InOrder;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;
@@ -32,6 +34,7 @@ import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -43,7 +46,9 @@ class IssuanceServiceTest {
     private final LmPolicyRepository policies = mock();
     private final KmContractIssuance kmContracts = mock();
     private final LmPolicyIssuance lmPolicies = mock();
-    private final IssuanceService service = new IssuanceService(contracts, policies, kmContracts, lmPolicies);
+    private final PaymentOrderWithdrawal paymentOrders = mock();
+    private final IssuanceService service =
+            new IssuanceService(contracts, policies, kmContracts, lmPolicies, paymentOrders);
 
     @Test
     void firstTask_reconcilesEachPayingOrRelativeParticipantAndSkipsInsuredWithoutPayment() {
@@ -241,6 +246,23 @@ class IssuanceServiceTest {
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
         assertThat(policy.state().cancellation()).contains(
                 new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW));
+        verifyNoInteractions(paymentOrders);
+    }
+
+    @Test
+    void contractOfParticipantMissingFromTask_withdrawsItsPaymentOrderAfterCancellation() {
+        Contract contract = contract();
+        UUID contractId = UUID.fromString("0196f0a2-0000-7000-8000-0000000000c2");
+        ReflectionTestUtils.setField(contract, "id", contractId);
+        active(List.of(contract), List.of());
+        willAnswer(withdrawal -> {
+            assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+            return null;
+        }).given(paymentOrders).contractStopped(contractId, NOW);
+
+        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        verify(paymentOrders).contractStopped(contractId, NOW);
     }
 
     @Test
@@ -268,6 +290,7 @@ class IssuanceServiceTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         assertThat(contract.state().cancellation()).map(Cancellation::comment).contains("вид документа по участнику изменён");
+        verify(paymentOrders).contractStopped(contract.id(), NOW);
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
         verifyNoInteractions(kmContracts);
     }
