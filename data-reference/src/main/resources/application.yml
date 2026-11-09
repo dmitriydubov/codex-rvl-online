@@ -40,6 +40,7 @@ spring:
     username: ${RABBITMQ_USERNAME:data_reference}
     password: ${RABBITMQ_PASSWORD}
     connection-timeout: 10s
+    channel-rpc-timeout: ${RABBITMQ_CHANNEL_RPC_TIMEOUT:30s}
     ssl:
       enabled: ${RABBITMQ_SSL_ENABLED:false}
       validate-server-certificate: ${RABBITMQ_SSL_VALIDATE_CERTIFICATE:true}
@@ -157,12 +158,14 @@ projectx:
     price:
       max-nights: 366
     read-timeout-seconds: ${API_READ_TIMEOUT_SECONDS:3}
+    max-concurrent-requests: ${API_MAX_CONCURRENT_REQUESTS:100}
 
   onec:
     ingest:
       duplicate-delivery-backoff: 5s
       storage-check-interval: 10s
       consumer-stop-timeout: 30s
+      consumer-restart-interval: 30s
     contract:
       rvl-activity-id: f3876c53-c7d8-4620-b364-9538164ba5d4
     queues:

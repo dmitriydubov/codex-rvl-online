@@ -77,7 +77,7 @@ sudo nerdctl build \
 
 echo "== Deploy to cluster =="
 helm upgrade --install "$APP" "$SCRIPT_DIR/helm" --namespace "$NAMESPACE" --set TAG="$TAG"
-kubectl -n "$NAMESPACE" rollout status deploy/"$APP" --timeout=5m
+kubectl -n "$NAMESPACE" rollout status deploy/"$APP" --timeout=10m
 
 echo
 echo "Done:"

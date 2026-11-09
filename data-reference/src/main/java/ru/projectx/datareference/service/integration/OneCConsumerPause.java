@@ -72,9 +72,13 @@ public class OneCConsumerPause {
 
     void startUnlessPaused() {
         containers.awaitStops();
+        unlessPaused(containers::startExpected);
+    }
+
+    void unlessPaused(Runnable consumersChange) {
         synchronized (lifecycle) {
             if (state == null) {
-                containers.startExpected();
+                consumersChange.run();
             }
         }
     }

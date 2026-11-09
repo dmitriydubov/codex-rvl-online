@@ -19,7 +19,7 @@ import ru.projectx.datareference.config.OneCQueueProperties;
 @TestConfiguration(proxyBeanMethods = false)
 public class RabbitTestcontainer {
 
-    private static final String IMAGE = "rabbitmq:4.1.2-alpine";
+    public static final String IMAGE = "rabbitmq:4.1.2-alpine";
 
     @Bean
     @ServiceConnection

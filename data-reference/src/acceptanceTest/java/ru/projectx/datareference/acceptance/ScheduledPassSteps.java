@@ -17,14 +17,16 @@ public class ScheduledPassSteps {
     private final CacheNotificationsDelivered notifications;
 
     public ScheduledPassSteps(ScheduledPasses scheduled, InboundBacklogSchedule backlog, OneCConsumerPause pause,
-            OneCStuckTransferSteps stuckTransfers, CacheNotificationsDelivered notifications) {
+            ConsumerRestartSteps consumerRestart, OneCStuckTransferSteps stuckTransfers,
+            CacheNotificationsDelivered notifications) {
 
         this.passes = Map.of(
                 "разбор сообщений 1С:УСК", scheduled::importOnSchedule,
                 "стирание персональных данных", scheduled::retentionOnSchedule,
                 STUCK_TRANSFER_CHECK, scheduled::stuckTransferCheckOnSchedule,
                 "снимок метрик из базы", backlog::refreshOnSchedule,
-                "проба хранилища при паузе приёма", pause::resumeIfStorageAvailable);
+                "проба хранилища при паузе приёма", pause::resumeIfStorageAvailable,
+                "запуск остановленных потребителей", consumerRestart::restartPass);
         this.stuckTransfers = stuckTransfers;
         this.notifications = notifications;
     }
