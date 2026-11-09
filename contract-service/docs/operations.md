@@ -159,6 +159,47 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 `ONEC_QUEUE_LM_POLICY_ISSUES`; на новом контуре их сверяют со списком очередей брокера. Два свойства с одним именем
 очереди или пустое имя не дают сервису запуститься.
 
+Оплата договоров КМ через сервис управления заказами (Ordering). Выключатель `PAYMENT_ENABLED` обязателен и
+умолчания не имеет: без него сервис не стартует. При `false` заказы на оплату не создаются, сервис стартует без
+настроек ниже, при старте пишет в журнал WARN «оплата выключена…», метрика `contracts_payment_disabled` равна `1`. При
+`true` обязательны адреса Ordering и сервера токенов, код продукта и канал, учётные данные клиента сервера токенов и
+подключение к брокеру маркетинга — без них сервис не стартует. Договоры, акцептованные при выключенной оплате, заказа не
+получают и после включения: оплату включают до того, как застрахованные начнут принимать оферты договоров КМ.
+
+| Переменная | Умолчание | Что задаёт |
+|---|---|---|
+| `PAYMENT_ENABLED` | — | `true` — оплата через Ordering включена, `false` — выключена |
+| `ORDERING_URL` | — | базовый адрес REST Ordering (без `/` в конце) |
+| `ORDERING_CONNECT_TIMEOUT` | `2s` | таймаут соединения с Ordering |
+| `ORDERING_READ_TIMEOUT` | `10s` | таймаут ответа Ordering на каждый вызов |
+| `ORDERING_PRODUCT` | — | код нашего продукта в Ordering (поле `product`, обменник и ключ подтверждения документов строятся из него) |
+| `ORDERING_CHANNEL` | — | код канала в Ordering (`eventDetails.channel` при создании, `channel` при отмене) |
+| `ORDERING_CANCEL_REASON` | `notActual` | причина отмены заказа (`cancelReason`); значение из перечня Ordering |
+| `ORDERING_ATTEMPTS` | `3` | сколько раз проход вызывает Ordering по одному заказу при временном отказе, считая первую попытку |
+| `ORDERING_RETRY_DELAY` | `1s` | пауза между попытками внутри прохода |
+| `ORDERING_DOCUMENT_ZONE` | `Europe/Moscow` | часовой пояс, в котором уходят дата документа и срок его жизни |
+| `ORDERING_DOCUMENT_TTL_BEFORE_CHECK_IN` | `1s` | насколько раньше начала дня заезда кончается срок жизни документа в Ordering (`ttl`; по умолчанию — 23:59:59 накануне) |
+| `ORDERING_TOKEN_URI` | — | адрес выдачи токена сервера Keycloak (`…/realms/<realm>/protocol/openid-connect/token`) |
+| `ORDERING_TOKEN_CLIENT_ID` | — | клиент сервера токенов (client credentials) |
+| `ORDERING_TOKEN_CLIENT_SECRET` | — | секрет клиента сервера токенов; в журнал не пишется |
+| `ORDERING_TOKEN_CONNECT_TIMEOUT` | `2s` | таймаут соединения с сервером токенов |
+| `ORDERING_TOKEN_READ_TIMEOUT` | `5s` | таймаут ответа сервера токенов |
+| `PAYMENT_ORDER_CREATION_INTERVAL` | `10s` | пауза между проходами создания заказов |
+| `PAYMENT_ORDER_CANCELLATION_INTERVAL` | `1m` | пауза между проходами отмены заказов |
+| `PAYMENT_ORDER_BATCH_SIZE` | `100` | сколько заказов берёт один проход |
+| `PAYMENT_ORDER_AWAITING_INTERVAL` | `1m` | как часто пересчитывается сводка договоров КМ без заказа на оплату |
+| `PAYMENT_ORDER_AWAITING_THRESHOLD` | `1h` | сколько договор КМ может ждать заказа на оплату, прежде чем попасть в сводку |
+
+Брокер маркетинга — третий брокер, только при включённой оплате: туда сервис публикует подтверждение документа заказа в
+обменник продукта. Подключение настраивается как у двух других брокеров переменными `RABBITMQ_MARKETING_HOST`,
+`RABBITMQ_MARKETING_PORT` (умолчание `5672`), `RABBITMQ_MARKETING_VHOST`, `RABBITMQ_MARKETING_USERNAME`,
+`RABBITMQ_MARKETING_PASSWORD`, `RABBITMQ_MARKETING_SSL_ENABLED`, `RABBITMQ_MARKETING_SSL_VALIDATE_CERTIFICATE`,
+`RABBITMQ_MARKETING_SSL_VERIFY_HOSTNAME`; хост, логин и пароль умолчаний не имеют. Обменник и ключ маршрутизации
+подтверждения документов — `MARKETING_DOCUMENT_FIXES_EXCHANGE` (`<продукт>.exchange`) и
+`MARKETING_DOCUMENT_FIXES_ROUTING_KEY` (`<продукт>-contract-fixed`), без умолчаний. Учётной записи сервиса на брокере
+маркетинга нужно право публикации (`write`) в обменник продукта; объявлять обменник и очереди сервис не будет — их
+заводит Ordering.
+
 Таймауты сеанса пишутся с единицами PostgreSQL (`ms`, `s`, `min`): число без единицы PostgreSQL читает как
 миллисекунды. Почему настройки такие — в [design.md](design.md), переменные с описанием — в шаблоне `.env.example`.
 
@@ -183,7 +224,7 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 Кодировку, концы строк и отступы для редактора задаёт `.editorconfig` модуля, правила кода —
 [code-style.md](code-style.md).
 
-Локально база и оба брокера поднимаются из `docker-compose.yml`, пароли — локального контура:
+Локально база и брокеры (межсервисный, 1С:УСК и маркетинга) поднимаются из `docker-compose.yml`, пароли — локального контура:
 
 ```shell
 docker compose up -d
@@ -244,6 +285,11 @@ data-reference должен быть поднят раньше: на машин�
 | `contracts_km_contracts_awaiting_oldest_seconds` | сколько секунд ждёт ответа 1С:УСК самый старый переданный договор КМ; `0` — ждущих нет. Снимок, его пересчитывает проход раз в `KM_CONTRACT_SUBMISSION_AWAITING_INTERVAL` | — (показывает, насколько всё плохо) |
 | `contracts_km_contracts_awaiting_overdue` | сколько договоров КМ ждут ответа 1С:УСК дольше `KM_CONTRACT_SUBMISSION_AWAITING_THRESHOLD`; снимок того же прохода | `> 0` дольше одного пересчёта, например `for: 5m` |
 | `contracts_reference_unavailable_total{kind}` | справочный сервис не ответил после всех повторов; `kind` — `program`, `insurance_contract`, `policy` | `increase()` за 15 минут больше числа проходов за то же время; единичный рост проход повторит сам |
+| `contracts_payment_disabled` | `1` — оплата через Ordering выключена (`PAYMENT_ENABLED=false`), `0` — включена | `== 1` на контуре, где оплата должна быть включена |
+| `contracts_ordering_failures_total{operation}` | неудавшийся вызов: `operation` — `token` (сервер токенов), `create_order`, `find_orders`, `order_state`, `cancel_order` (Ordering); считается каждый неудавшийся вызов — временный отказ, отказ по существу, отвергнутый токен | `increase()` за 15 минут больше числа попыток одного прохода (`ORDERING_ATTEMPTS`); `operation="token"` — сразу: без токена заказы не создаются |
+| `contracts_payment_orders_rejected_total` | заказ на оплату отклонён: Ordering отказал в создании по существу или подтверждение документа не доставлено (`FIXED_UNDELIVERED`); договор не меняется, заказ ждёт дежурного | любой рост |
+| `contracts_payment_order_cancel_rejected_total` | Ordering отказал в отмене заказа прекращённого договора; договор остаётся прекращённым | любой рост |
+| `contracts_km_contracts_without_order_overdue` | сколько акцептованных договоров КМ ждут создания заказа на оплату дольше `PAYMENT_ORDER_AWAITING_THRESHOLD`; снимок, его пересчитывает ведущий раз в `PAYMENT_ORDER_AWAITING_INTERVAL` (у неведущего `0`) | `> 0` дольше одного пересчёта, например `for: 5m` |
 | `contracts_attachments_stored_total` | справка 070/у впервые записана в реестр документов (повтор того же вложения не считается) | — |
 | `contracts_attachments_rejected_total{reason}` | файл справки отклонён; `reason` — `content_type` (тип не JPEG, не PNG и не PDF), `size` (пустой, больше предела справки или больше предела контейнера) | — |
 | `contracts_storage_unavailable_total` | обращение к хранилищу S3 за справкой не получило успешного ответа: загрузка справки получила 503 или проход подготовки передач не смог проверить файлы справок оплаченного договора КМ и отложил передачу до следующего прохода | больше нуля 15 минут подряд; единичный рост — сбой сети |
@@ -253,9 +299,9 @@ data-reference должен быть поднят раньше: на машин�
 
 Пулы соединений базы — метрики `hikaricp_*` с меткой `pool="application"` (основной) и `pool="leader-lock"` (блокировка
 ведущего, `DB_LEADER_POOL_SIZE` соединений). Подключения брокеров — метрики `rabbitmq_*` с меткой `name="internalBroker"`
-или `name="onecBroker"`.
+или `name="onecBroker"`, при включённой оплате — ещё `name="marketingBroker"`.
 
-Состояние базы и брокеров — компоненты `/actuator/health`: `db`, брокеры — `internalBroker` и `onecBroker`; приём из
+Состояние базы и брокеров — компоненты `/actuator/health`: `db`, брокеры — `internalBroker` и `onecBroker`, при включённой оплате — ещё `marketingBroker`; приём из
 очередей — компонент `inbox` с деталью `role` (`leader` / `standby`). У ведущего `UP` — у каждой очереди обоих брокеров из
 настроек есть потребитель, подписку которого подтвердил брокер; `DOWN` (ответ 503) с деталью `queuesWithoutConsumer`
 (имена очередей по алфавиту) — у очереди нет потребителя; `DOWN` с деталями `sqlstate`, `failure` (тип отказа), `since`,
@@ -351,6 +397,31 @@ update contracts
 Полис ЛМ в ERROR (`LM_POLICY_REQUEST_UNDELIVERED`, `LM_POLICY_REQUEST_PREPARATION_FAILED`) дежурный не возвращает: после
 устранения причины новый запрос уходит по новой записи, которую создаёт следующая задача сервиса Заявок с большей
 версией.
+
+### Возврат отклонённого заказа на оплату в работу
+
+Заказ на оплату договора КМ отклоняется, когда Ordering отказал в создании по существу (в `rejection_code` — код ошибки
+Ordering или `HTTP <код>`, если ответ без тела) или когда подтверждение документа не доставлено на брокер маркетинга
+(`FIXED_UNDELIVERED`). Договор при этом остаётся акцептованным, сервис Заявок ничего не получает, сервис сам заказ больше не
+трогает. Когда причина устранена — Ordering завёл наш продукт и канал, у брокера маркетинга есть обменник и права
+публикации ([troubleshooting.md](troubleshooting.md), «Оплата через Ordering»), — дежурный возвращает заказ одним
+запросом по идентификатору договора:
+
+```sql
+update payment_orders
+   set state = 'AWAITING_CREATION', rejection_code = null, external_order_id = null, updated_at = now()
+ where contract_id = '<contract-id>'
+   and state = 'REJECTED';
+```
+
+Ближайший проход создания берёт заказ заново с прежними `correlationId` и идентификатором документа. Запрос на создание
+уже отправлялся, поэтому проход сначала ищет заказ клиента по идентификатору документа: заказ, созданный до отказа
+подтверждения, находится, и подтверждение документа уходит заново; иначе заказ создаётся. Запрос трогает только
+отклонённый заказ — заказ в любом другом состоянии он не меняет, `update` сообщит `0` строк. Не устранённая причина снова
+отклонит заказ на ближайшем проходе. Счётчик `contracts_payment_orders_rejected_total` возврат не уменьшает.
+
+Заказ в состоянии «отмена отклонена» (`CANCEL_REJECTED`) этой процедурой не возвращают: договор уже прекращён, а заказ
+отменяют в Ordering вместе с его командой.
 
 ## Документация
 

@@ -21,6 +21,7 @@ import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.service.payment.PaymentOrderOpening;
 
 @Service
 public class ContractOfferAcceptance implements OfferAcceptances {
@@ -29,12 +30,14 @@ public class ContractOfferAcceptance implements OfferAcceptances {
 
     private final ContractRepository contracts;
     private final ContractAcceptanceRepository acceptances;
+    private final PaymentOrderOpening paymentOrders;
     private final Clock clock;
 
     public ContractOfferAcceptance(ContractRepository contracts, ContractAcceptanceRepository acceptances,
-            Clock clock) {
+            PaymentOrderOpening paymentOrders, Clock clock) {
         this.contracts = contracts;
         this.acceptances = acceptances;
+        this.paymentOrders = paymentOrders;
         this.clock = clock;
     }
 
@@ -81,6 +84,7 @@ public class ContractOfferAcceptance implements OfferAcceptances {
         ContractAcceptance acceptance =
                 acceptances.save(ContractAcceptance.record(contract.id(), AcceptanceForms.offer(request), now));
         contract.accept();
+        paymentOrders.open(contract, acceptance.offer(), now);
         log.info("договор КМ {} акцептован по версии {}, канал {}", contract.id(), currentVersion,
                 request.channel());
         return acceptance;

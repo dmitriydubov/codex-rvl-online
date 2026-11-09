@@ -28,6 +28,7 @@ import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -39,7 +40,9 @@ class IssuanceServiceIssuedRecordsTest {
     private final LmPolicyRepository policies = mock();
     private final KmContractIssuance kmContracts = mock();
     private final LmPolicyIssuance lmPolicies = mock();
-    private final IssuanceService service = new IssuanceService(contracts, policies, kmContracts, lmPolicies);
+    private final PaymentOrderWithdrawal paymentOrders = mock();
+    private final IssuanceService service =
+            new IssuanceService(contracts, policies, kmContracts, lmPolicies, paymentOrders);
     private final LmPolicy policy = Issuances.issuedPolicy("8e2d0b17-5a44-4c90-b2e3-71f0c6a45d39", Tasks.CHILD);
     private final Contract contract = Issuances.issuedContract("3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", Tasks.SPOUSE,
             "DKM-2026-000001");

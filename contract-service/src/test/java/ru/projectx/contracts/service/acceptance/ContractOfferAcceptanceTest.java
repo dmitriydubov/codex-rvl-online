@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.math.BigDecimal;
 import java.net.InetAddress;
@@ -40,6 +41,7 @@ import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.service.payment.PaymentOrderOpening;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -53,8 +55,9 @@ class ContractOfferAcceptanceTest {
 
     private final ContractRepository contracts = mock();
     private final ContractAcceptanceRepository acceptances = mock();
+    private final PaymentOrderOpening paymentOrders = mock();
     private final ContractOfferAcceptance service =
-            new ContractOfferAcceptance(contracts, acceptances, Clock.fixed(NOW, ZoneOffset.UTC));
+            new ContractOfferAcceptance(contracts, acceptances, paymentOrders, Clock.fixed(NOW, ZoneOffset.UTC));
     private final Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS,
             Tasks.SPOUSE, new BigDecimal("34000.00")), NOW.minusSeconds(60));
 
@@ -80,6 +83,7 @@ class ContractOfferAcceptanceTest {
         assertThat(saved.offer()).isEqualTo(new OfferAcceptance(1, USER, ACCEPTED_AT.toInstant(), AcceptanceChannel.WEB,
                 InetAddress.getByName("10.20.30.40"), "Mozilla/5.0 (Стенд)"));
         assertThat(saved).hasFieldOrPropertyWithValue("createdAt", NOW);
+        verify(paymentOrders).open(contract, saved.offer(), NOW);
     }
 
     @Test
@@ -99,6 +103,7 @@ class ContractOfferAcceptanceTest {
 
         assertThat(response.acceptedAt()).isEqualTo(Instant.parse("2026-02-10T07:00:00Z"));
         verify(acceptances, never()).save(any());
+        verifyNoInteractions(paymentOrders);
     }
 
     @Test

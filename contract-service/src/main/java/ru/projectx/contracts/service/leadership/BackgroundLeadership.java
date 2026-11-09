@@ -88,6 +88,7 @@ public class BackgroundLeadership implements Candidate {
     }
 
     private void lostDuringPass() {
+        leader = false;
         log.info("проход прерван: экземпляр {} больше не держит блокировку ведущего", lock.instanceId());
         stepDown();
     }

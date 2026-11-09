@@ -6,6 +6,8 @@ import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +30,7 @@ import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -41,7 +44,9 @@ class TaskCancellationServiceTest {
     private final ContractRepository contracts = mock();
     private final LmPolicyRepository policies = mock();
     private final CancellationUnknownReasons unknownReasons = mock();
-    private final TaskCancellationService service = new TaskCancellationService(contracts, policies, unknownReasons);
+    private final PaymentOrderWithdrawal paymentOrders = mock();
+    private final TaskCancellationService service =
+            new TaskCancellationService(contracts, policies, unknownReasons, paymentOrders);
 
     @Test
     void cancellation_stopsEveryContractAndPolicyOfTheRequestWithMappedReasonCommentAndMoment() {
@@ -59,6 +64,25 @@ class TaskCancellationServiceTest {
         assertThat(contract.state().entityVersion()).isEqualTo(2);
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
         assertThat(policy.state().cancellation()).contains(expected);
+    }
+
+    @Test
+    void cancelledContract_withdrawsItsPaymentOrderAfterTheContractIsCancelled() {
+        Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
+                new BigDecimal("34000.00")), NOW);
+        UUID contractId = UUID.fromString("0196f0a2-0000-7000-8000-0000000000c1");
+        ReflectionTestUtils.setField(contract, "id", contractId);
+        LmPolicy policy = LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.CHILD), NOW);
+        running(List.of(contract), List.of(policy));
+        willAnswer(withdrawal -> {
+            assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+            return null;
+        }).given(paymentOrders).contractStopped(contractId, NOW);
+
+        service.apply(new ContractTaskCancellation(Tasks.REQUEST, CANCELLED_AT, "EXPIRED", null), NOW);
+
+        verify(paymentOrders).contractStopped(contractId, NOW);
+        verifyNoMoreInteractions(paymentOrders);
     }
 
     @Test
@@ -105,6 +129,7 @@ class TaskCancellationServiceTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.ISSUED);
         assertThat(contract.state().cancellation()).isEmpty();
+        verifyNoInteractions(paymentOrders);
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.ISSUED);
         assertThat(policy.state().cancellation()).isEmpty();
         assertThat(policy.state().entityVersion()).isEqualTo(3);

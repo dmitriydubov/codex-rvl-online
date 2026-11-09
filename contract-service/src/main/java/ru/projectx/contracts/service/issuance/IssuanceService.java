@@ -20,6 +20,7 @@ import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskParticipant;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
 
 @Service
 public class IssuanceService {
@@ -33,13 +34,15 @@ public class IssuanceService {
     private final LmPolicyRepository policies;
     private final KmContractIssuance kmContracts;
     private final LmPolicyIssuance lmPolicies;
+    private final PaymentOrderWithdrawal paymentOrders;
 
     public IssuanceService(ContractRepository contracts, LmPolicyRepository policies,
-            KmContractIssuance kmContracts, LmPolicyIssuance lmPolicies) {
+            KmContractIssuance kmContracts, LmPolicyIssuance lmPolicies, PaymentOrderWithdrawal paymentOrders) {
         this.contracts = contracts;
         this.policies = policies;
         this.kmContracts = kmContracts;
         this.lmPolicies = lmPolicies;
+        this.paymentOrders = paymentOrders;
     }
 
     public List<RequestParticipant> apply(ContractTask task, Instant now) {
@@ -98,7 +101,7 @@ public class IssuanceService {
         }
     }
 
-    private static void exclude(ActiveIssuance leftover, ContractTask task, Instant now) {
+    private void exclude(ActiveIssuance leftover, ContractTask task, Instant now) {
         if (leftover.issued()) {
             IssuedRecords.keepOnExclusion(leftover, task);
             return;
@@ -106,7 +109,8 @@ public class IssuanceService {
         cancel(leftover.record(), EXCLUDED_FROM_TRIP, now);
     }
 
-    private static void cancel(IssuanceRecord record, String comment, Instant now) {
+    private void cancel(IssuanceRecord record, String comment, Instant now) {
         record.cancel(new Cancellation(CancelReason.OTHER, comment, now), now);
+        paymentOrders.contractStopped(record.id(), now);
     }
 }

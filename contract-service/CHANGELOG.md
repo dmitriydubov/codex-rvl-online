@@ -16,6 +16,19 @@
 
 ### Добавлено
 
+- Оплата договора КМ через сервис управления заказами (Ordering), часть «заказ»: по акцептованному договору КМ сервис
+  создаёт заказ на оплату и подтверждает документ сообщением в обменник продукта на брокере маркетинга. Акцепт Ordering не
+  ждёт — заказ записывается вместе с акцептом и создаётся фоновым проходом ведущего; повтор после сбоя связи сначала ищет
+  заказ, второго заказа не бывает. У вызовов Ordering и сервера токенов Keycloak (клиент OAuth 2.0 client credentials) —
+  таймауты и ограниченное число попыток; отказ Ordering по существу отклоняет заказ, не меняя договор, и виден метрикой
+  и записью ERROR, вернуть заказ в работу — процедура дежурного. Прекращение договора до выставления счёта (прекращение
+  работы по заявке, исключение участника, смена вида документа) отменяет заказ в Ordering отдельным проходом. Оплата
+  включается настройкой `PAYMENT_ENABLED`; выключенная — сервис работает как прежде и стартует без настроек Ordering.
+  Метрики `contracts_payment_disabled`, `contracts_ordering_failures_total{operation}`,
+  `contracts_payment_orders_rejected_total`, `contracts_payment_order_cancel_rejected_total`,
+  `contracts_km_contracts_without_order_overdue`; компонент здоровья и метрики подключения брокера маркетинга
+  (`marketingBroker`). Счёт, ссылка на оплату и события оплаты появятся следующей версией.
+
 - Справочник известных проблем эксплуатации `docs/troubleshooting.md`: по признаку в здоровье, метриках и журнале —
   как проверить (в том числе запросами к базе только на чтение, без персональных данных) и что делать. Разборы сбоев и
   запросы для диагностики перенесены туда из `docs/operations.md`; там остались настройки, метрики с порогами оповещений
@@ -311,6 +324,30 @@
 - IP-адрес и клиент принявшего оферту хранятся только в записи акцепта и не попадают в журнал, метрики и тексты ошибок.
 
 ### Перенос
+
+- **Переменные:** новая обязательная `PAYMENT_ENABLED` без умолчания (`true` или `false`) — без неё сервис не стартует;
+  до готовности Ordering задают `false`. При `true` обязательны `ORDERING_URL`, `ORDERING_PRODUCT`, `ORDERING_CHANNEL`,
+  `ORDERING_TOKEN_URI`, `ORDERING_TOKEN_CLIENT_ID`, `ORDERING_TOKEN_CLIENT_SECRET` (секрет — в секретах развёртывания),
+  `RABBITMQ_MARKETING_HOST`, `RABBITMQ_MARKETING_USERNAME`, `RABBITMQ_MARKETING_PASSWORD`,
+  `MARKETING_DOCUMENT_FIXES_EXCHANGE`, `MARKETING_DOCUMENT_FIXES_ROUTING_KEY`. Новые необязательные:
+  `ORDERING_CONNECT_TIMEOUT` (`2s`), `ORDERING_READ_TIMEOUT` (`10s`), `ORDERING_CANCEL_REASON` (`notActual`),
+  `ORDERING_ATTEMPTS` (`3`), `ORDERING_RETRY_DELAY` (`1s`), `ORDERING_DOCUMENT_ZONE` (`Europe/Moscow`),
+  `ORDERING_DOCUMENT_TTL_BEFORE_CHECK_IN` (`1s`), `ORDERING_TOKEN_CONNECT_TIMEOUT` (`2s`),
+  `ORDERING_TOKEN_READ_TIMEOUT` (`5s`), `PAYMENT_ORDER_CREATION_INTERVAL` (`10s`), `PAYMENT_ORDER_CANCELLATION_INTERVAL`
+  (`1m`), `PAYMENT_ORDER_BATCH_SIZE` (`100`), `PAYMENT_ORDER_AWAITING_INTERVAL` (`1m`), `PAYMENT_ORDER_AWAITING_THRESHOLD`
+  (`1h`), `RABBITMQ_MARKETING_PORT` (`5672`), `RABBITMQ_MARKETING_VHOST` (`/`), `RABBITMQ_MARKETING_SSL_ENABLED`
+  (`false`), `RABBITMQ_MARKETING_SSL_VALIDATE_CERTIFICATE` (`true`), `RABBITMQ_MARKETING_SSL_VERIFY_HOSTNAME` (`true`).
+- **Брокер маркетинга:** учётной записи сервиса нужно право публикации (`write`) в обменник продукта
+  (`MARKETING_DOCUMENT_FIXES_EXCHANGE`); обменник и очередь подтверждений заводит сервис управления заказами.
+- **Сервер токенов:** клиент сервиса (client credentials, секрет передаётся в теле запроса) с доступом к REST сервиса
+  управления заказами.
+- **Миграции:** `013` добавляет тип `payment_order_state` и таблицу `payment_orders` — заказы на оплату договоров КМ.
+- **Зависимости:** новая `org.springframework.security:spring-security-oauth2-client` (версия из BOM Spring Boot, 7.0.6;
+  приносит `spring-security-core`, `spring-security-crypto`, `spring-security-web`, `spring-security-oauth2-core` 7.0.6 и
+  `com.nimbusds:oauth2-oidc-sdk:11.26.1` с её зависимостями).
+- **Оповещение:** правила на `contracts_payment_orders_rejected_total`, `contracts_payment_order_cancel_rejected_total`,
+  `contracts_ordering_failures_total{operation}` и `contracts_km_contracts_without_order_overdue > 0` — пороги в
+  `docs/operations.md`, действия в `docs/troubleshooting.md`.
 
 - **Файлы:** код разложен по подпакетам по смыслу, поведение не менялось; у большинства классов и тестов сменился
   пакет. Каталог `src` модуля заменяется целиком, старые пути удаляются, иначе останутся дубли классов и бинов.
