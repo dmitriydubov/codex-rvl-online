@@ -49,6 +49,17 @@ class OrderingSearchResultsTest {
     }
 
     @Test
+    void orderIdLongerThanTheColumn_isNotTaken() {
+        String body = "{\"data\": {\"orderId\": \"%s\", \"orderDetails\": [{\"product\": \"rvl\", "
+                + "\"documentId\": \"" + DOCUMENT + "\"}]}}";
+
+        assertThat(OrderingSearchResults.orderId(JSON.readTree(body.formatted("o".repeat(101))), "rvl", DOCUMENT))
+                .isEmpty();
+        assertThat(OrderingSearchResults.orderId(JSON.readTree(body.formatted("o".repeat(100))), "rvl", DOCUMENT))
+                .contains("o".repeat(100));
+    }
+
+    @Test
     void ourDocumentWithoutUsableOrderId_findsNothing() {
         String blank = "{\"data\": {\"orderId\": \" \", \"orderDetails\": [{\"product\": \"rvl\", \"documentId\": \""
                 + DOCUMENT + "\"}]}}";

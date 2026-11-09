@@ -43,11 +43,13 @@ public class RejectedDocumentFixes implements RejectedOutboxMessages {
         PaymentOrderLog.withCorrelation(order.view().correlationId(), () -> reject(order.view().contractId(), now));
     }
 
-    private void reject(UUID contractId, Instant now) {
+    private boolean reject(UUID contractId, Instant now) {
         LockedOrder locked = locks.lock(contractId);
-        if (locked.order().reject(FIXED_UNDELIVERED, now)) {
+        boolean rejected = locked.order().reject(FIXED_UNDELIVERED, now);
+        if (rejected) {
             metrics.countOrderRejected();
             PaymentOrderLog.write(log.atError(), locked.contract(), "подтверждение документа не доставлено");
         }
+        return rejected;
     }
 }

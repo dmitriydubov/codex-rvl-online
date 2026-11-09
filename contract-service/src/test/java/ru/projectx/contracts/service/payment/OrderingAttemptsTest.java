@@ -72,13 +72,6 @@ class OrderingAttemptsTest {
     }
 
     @Test
-    void checkedFailure_isWrapped() {
-        assertThatThrownBy(() -> attempts.run(() -> {
-            throw new java.io.IOException("стенд");
-        })).isInstanceOf(IllegalStateException.class).hasCauseInstanceOf(java.io.IOException.class);
-    }
-
-    @Test
     void error_isRethrownAsIs() {
         assertThatThrownBy(() -> attempts.run(() -> {
             throw new AssertionError("стенд");

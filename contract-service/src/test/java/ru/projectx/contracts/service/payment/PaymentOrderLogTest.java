@@ -26,8 +26,10 @@ class PaymentOrderLogTest {
 
     @Test
     void correlationId_isInTheContextOnlyWhileTheWorkRuns() {
-        PaymentOrderLog.withCorrelation(PaymentOrders.CORRELATION,
-                () -> assertThat(MDC.get("correlationId")).isEqualTo(PaymentOrders.CORRELATION.toString()));
+        boolean result = PaymentOrderLog.withCorrelation(PaymentOrders.CORRELATION,
+                () -> PaymentOrders.CORRELATION.toString().equals(MDC.get("correlationId")));
+
+        assertThat(result).isTrue();
 
         assertThat(MDC.get("correlationId")).isNull();
     }

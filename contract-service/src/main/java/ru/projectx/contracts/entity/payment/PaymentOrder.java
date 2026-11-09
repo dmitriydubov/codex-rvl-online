@@ -113,7 +113,7 @@ public class PaymentOrder {
     }
 
     private boolean mayExistInOrdering() {
-        return externalOrderId != null || creationRequested && state == PaymentOrderState.AWAITING_CREATION;
+        return externalOrderId != null || creationRequested;
     }
 
     public void requestCancellation(Instant now) {

@@ -12,10 +12,11 @@ import ru.projectx.contracts.entity.payment.PaymentOrderView;
 import ru.projectx.contracts.service.payment.OrderingSession;
 import ru.projectx.contracts.service.payment.OrderingStep;
 import ru.projectx.contracts.service.payment.PaymentOrderPasses;
+import ru.projectx.contracts.service.payment.PaymentOrderWork;
 
 @Service
 @ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
-public class PaymentOrderCancelling {
+public class PaymentOrderCancelling implements PaymentOrderWork {
 
     static final String CANCELED = "CANCELED";
 
@@ -30,15 +31,21 @@ public class PaymentOrderCancelling {
     }
 
     public int cancelDue() {
-        return passes.eachAsLeader(PaymentOrderState.CANCEL_PENDING, this::cancel);
+        return passes.run(this);
     }
 
-    private void cancel(PaymentOrderView order) {
+    @Override
+    public PaymentOrderState state() {
+        return PaymentOrderState.CANCEL_PENDING;
+    }
+
+    @Override
+    public OrderingStep<?> step(PaymentOrderView order) {
         AtomicBoolean requested = new AtomicBoolean(order.cancelRequested());
-        passes.callOrdering(order, new OrderingStep<>("не отменён",
+        return new OrderingStep<>("не отменён",
                 session -> attempt(session, order, requested),
                 result -> record(order, result),
-                code -> recording.rejected(order.contractId(), code)));
+                code -> recording.rejected(order.contractId(), code));
     }
 
     private void record(PaymentOrderView order, CancelResult result) {

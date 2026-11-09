@@ -2,8 +2,7 @@ package ru.projectx.contracts.service.payment.order;
 
 import java.util.Optional;
 import ru.projectx.contracts.entity.payment.PaymentOrderView;
-import ru.projectx.contracts.exception.OrderingOperation;
-import ru.projectx.contracts.exception.OrderingUnavailableException;
+import ru.projectx.contracts.exception.CreationInProgressException;
 import ru.projectx.contracts.service.payment.NewOrder;
 import ru.projectx.contracts.service.payment.OrderingSession;
 
@@ -40,7 +39,7 @@ final class CreationAttempt {
         boolean ours = requested;
         requested = true;
         if (claim == CreationClaim.REPEATED && !ours) {
-            throw new OrderingUnavailableException(OrderingOperation.CREATE_ORDER, "создание начато другим проходом");
+            throw new CreationInProgressException();
         }
     }
 }

@@ -111,6 +111,8 @@ public class IssuanceService {
 
     private void cancel(IssuanceRecord record, String comment, Instant now) {
         record.cancel(new Cancellation(CancelReason.OTHER, comment, now), now);
-        paymentOrders.contractStopped(record.id(), now);
+        if (record instanceof Contract contract) {
+            paymentOrders.contractStopped(contract.id(), now);
+        }
     }
 }

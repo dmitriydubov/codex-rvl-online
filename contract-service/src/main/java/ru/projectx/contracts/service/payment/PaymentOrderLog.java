@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.payment;
 
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import org.slf4j.MDC;
 import org.slf4j.spi.LoggingEventBuilder;
 import ru.projectx.contracts.entity.contract.Contract;
@@ -19,10 +20,10 @@ public final class PaymentOrderLog {
                 reason);
     }
 
-    public static void withCorrelation(UUID correlationId, Runnable work) {
+    public static boolean withCorrelation(UUID correlationId, BooleanSupplier work) {
         MDC.put(CORRELATION_ID, correlationId.toString());
         try {
-            work.run();
+            return work.getAsBoolean();
         }
         finally {
             MDC.remove(CORRELATION_ID);

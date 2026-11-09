@@ -172,7 +172,7 @@ Spring Boot. Версия сервиса — в `gradle.properties` (`version=`)
 | `ORDERING_URL` | — | базовый адрес REST Ordering (без `/` в конце) |
 | `ORDERING_CONNECT_TIMEOUT` | `2s` | таймаут соединения с Ordering |
 | `ORDERING_READ_TIMEOUT` | `10s` | таймаут ответа Ordering на каждый вызов |
-| `ORDERING_PRODUCT` | — | код нашего продукта в Ordering (поле `product`, обменник и ключ подтверждения документов строятся из него) |
+| `ORDERING_PRODUCT` | — | код нашего продукта в Ordering (поле `product` заказа, поиска и подтверждения документа); обменник и ключ подтверждения задаются отдельно — `MARKETING_DOCUMENT_FIXES_*` |
 | `ORDERING_CHANNEL` | — | код канала в Ordering (`eventDetails.channel` при создании, `channel` при отмене) |
 | `ORDERING_CANCEL_REASON` | `notActual` | причина отмены заказа (`cancelReason`); значение из перечня Ordering |
 | `ORDERING_ATTEMPTS` | `3` | сколько раз проход вызывает Ordering по одному заказу при временном отказе, считая первую попытку |

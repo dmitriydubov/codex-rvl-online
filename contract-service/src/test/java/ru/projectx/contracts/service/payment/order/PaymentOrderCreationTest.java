@@ -28,7 +28,7 @@ import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.payment.NewOrder;
 import ru.projectx.contracts.service.payment.Ordering;
 import ru.projectx.contracts.service.payment.OrderingAttempts;
-import ru.projectx.contracts.service.payment.OrderingCalls;
+import ru.projectx.contracts.service.payment.OrderingStepRunner;
 import ru.projectx.contracts.service.payment.OrderingSession;
 import ru.projectx.contracts.service.payment.PaymentOrderPasses;
 import ru.projectx.contracts.support.CapturedLog;
@@ -49,10 +49,10 @@ class PaymentOrderCreationTest {
     private final PaymentOrderRecording recording = mock();
     private final BackgroundLeadership leadership = mock();
     private final PaymentOrderCreation creation = new PaymentOrderCreation(new PaymentOrderPasses(orders, leadership,
-            new OrderingCalls(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3))),
+            new OrderingStepRunner(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3))),
             OrderingTestProperties.passes()), recording);
 
-    private final CapturedLog log = CapturedLog.of(PaymentOrderPasses.class);
+    private final CapturedLog log = CapturedLog.of(OrderingStepRunner.class);
 
     @org.junit.jupiter.api.AfterEach
     void releaseLog() {
@@ -103,7 +103,7 @@ class PaymentOrderCreationTest {
         verify(session, times(2)).findOrder(Tasks.INSURED, PaymentOrders.ORDER);
         assertThat(log.at(ch.qos.logback.classic.Level.WARN)).containsExactly("заказ на оплату договора КМ "
                 + PaymentOrders.CONTRACT + " не создан: сервис управления заказами недоступен: create_order, нет ответа,"
-                + " заказ ждёт следующего прохода");
+                + " проход остановлен до следующего раза");
         verify(recording, never()).created(any(), any());
         verify(recording, never()).rejected(any(), any());
     }

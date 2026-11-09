@@ -151,9 +151,19 @@ class PaymentOrderTest {
     }
 
     @Test
-    void withdraw_rejectedWithoutOrder_closesItEvenAfterCreationWasSent() {
+    void withdraw_rejectedAfterCreationWasSent_waitsForCancellationBecauseTheOrderMayExist() {
         PaymentOrder order = opened();
         order.requestCreation(LATER);
+        order.reject("code", LATER);
+
+        order.withdraw(LATER);
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+    }
+
+    @Test
+    void withdraw_rejectedWithoutCreationRequest_closesIt() {
+        PaymentOrder order = opened();
         order.reject("code", LATER);
 
         order.withdraw(LATER);

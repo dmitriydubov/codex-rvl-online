@@ -27,7 +27,7 @@ import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.payment.Ordering;
 import ru.projectx.contracts.service.payment.OrderingAttempts;
-import ru.projectx.contracts.service.payment.OrderingCalls;
+import ru.projectx.contracts.service.payment.OrderingStepRunner;
 import ru.projectx.contracts.service.payment.OrderingSession;
 import ru.projectx.contracts.service.payment.PaymentOrderPasses;
 import ru.projectx.contracts.support.CapturedLog;
@@ -47,10 +47,10 @@ class PaymentOrderCancellingTest {
     private final PaymentOrderCancelRecording recording = mock();
     private final BackgroundLeadership leadership = mock();
     private final PaymentOrderCancelling cancelling = new PaymentOrderCancelling(new PaymentOrderPasses(orders, leadership,
-            new OrderingCalls(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3))),
+            new OrderingStepRunner(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3))),
             OrderingTestProperties.passes()), recording);
 
-    private final CapturedLog log = CapturedLog.of(PaymentOrderPasses.class);
+    private final CapturedLog log = CapturedLog.of(OrderingStepRunner.class);
 
     @org.junit.jupiter.api.AfterEach
     void releaseLog() {
@@ -119,7 +119,7 @@ class PaymentOrderCancellingTest {
         verify(session, times(2)).orderStatus(PaymentOrders.ORDER_ID);
         assertThat(log.at(ch.qos.logback.classic.Level.WARN)).containsExactly("заказ на оплату договора КМ "
                 + PaymentOrders.CONTRACT + " не отменён: сервис управления заказами недоступен: cancel_order, HTTP 503,"
-                + " заказ ждёт следующего прохода");
+                + " проход остановлен до следующего раза");
         verify(recording, never()).cancelled(any(), any());
         verify(recording, never()).rejected(any(), any());
     }

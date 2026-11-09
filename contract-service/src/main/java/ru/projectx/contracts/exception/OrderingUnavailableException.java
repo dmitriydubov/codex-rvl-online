@@ -16,6 +16,11 @@ public class OrderingUnavailableException extends RuntimeException {
         this.operation = operation;
     }
 
+    protected OrderingUnavailableException(String message, OrderingOperation operation) {
+        super(message);
+        this.operation = operation;
+    }
+
     public OrderingOperation operation() {
         return operation;
     }

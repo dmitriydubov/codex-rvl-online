@@ -199,6 +199,18 @@ class OrderingHttpClientTest {
     }
 
     @Test
+    void rejectedSearch_isATemporaryFailureNamingTheCode() {
+        server.ordering(OrderingTestServer.json(400,
+                "{\"status\": \"error\", \"errors\": [{\"code\": \"FindOrdersValidator.valid\"}]}"));
+
+        assertThatThrownBy(() -> client.session(CORRELATION).findOrder(CLIENT, DOCUMENT))
+                .isInstanceOfSatisfying(OrderingUnavailableException.class,
+                        unavailable -> assertThat(unavailable.operation()).isEqualTo(OrderingOperation.FIND_ORDERS))
+                .hasMessageContaining("FindOrdersValidator.valid");
+        assertThat(failures(OrderingOperation.FIND_ORDERS)).isEqualTo(1);
+    }
+
+    @Test
     void orderStatus_isReadFromTheOrderDetails() {
         server.ordering(OrderingTestServer.json(200, "{\"status\": \"success\", \"data\": {\"status\": \"CANCELED\"}}"));
 

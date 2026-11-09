@@ -4,6 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import ru.projectx.contracts.exception.OrderingOperation;
+import ru.projectx.contracts.exception.OrderingRejectedException;
+import ru.projectx.contracts.exception.OrderingUnavailableException;
 import ru.projectx.contracts.service.integration.ordering.OrderingExchange.OrderingCall;
 import ru.projectx.contracts.service.payment.NewOrder;
 import ru.projectx.contracts.service.payment.OrderingSession;
@@ -34,8 +36,14 @@ final class OrderingHttpSession implements OrderingSession {
     public Optional<String> findOrder(UUID clientId, UUID documentId) {
         OrderingCall call = call(OrderingOperation.FIND_ORDERS);
         String document = documentId.toString();
-        return calls.call(call, exchange -> exchange.post(call, CLIENT_ORDERS, requests.find(document), clientId),
-                body -> OrderingSearchResults.orderId(body, requests.product(), document));
+        try {
+            return calls.call(call, exchange -> exchange.post(call, CLIENT_ORDERS, requests.find(document), clientId),
+                    body -> OrderingSearchResults.orderId(body, requests.product(), document));
+        }
+        catch (OrderingRejectedException rejected) {
+            throw new OrderingUnavailableException(call.operation(), "поиск заказов отклонён, код " + rejected.code(),
+                    rejected);
+        }
     }
 
     @Override

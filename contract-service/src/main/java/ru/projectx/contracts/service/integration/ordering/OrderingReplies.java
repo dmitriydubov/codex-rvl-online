@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.integration.ordering;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 import ru.projectx.contracts.exception.OrderingOperation;
 import ru.projectx.contracts.exception.OrderingRejectedException;
 import ru.projectx.contracts.exception.OrderingUnavailableException;
@@ -21,6 +22,7 @@ final class OrderingReplies {
     private static final String ERROR = "error";
     private static final String ERRORS = "errors";
     private static final String CODE = "code";
+    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z0-9._:-]{1,100}");
 
     private OrderingReplies() {
     }
@@ -43,8 +45,9 @@ final class OrderingReplies {
         return Optional.of(value)
                 .filter(JsonNode::isString)
                 .map(JsonNode::asString)
-                .filter(text -> !text.isBlank())
-                .orElseThrow(() -> new OrderingUnavailableException(operation, "в ответе нет обязательного поля"));
+                .filter(text -> IDENTIFIER.matcher(text).matches())
+                .orElseThrow(() -> new OrderingUnavailableException(operation,
+                        "в ответе нет обязательного поля или оно не по формату"));
     }
 
     private static boolean temporary(OrderingReply reply) {
@@ -81,6 +84,6 @@ final class OrderingReplies {
         return Optional.of(body.path(ERRORS).path(0).path(CODE))
                 .filter(JsonNode::isString)
                 .map(JsonNode::asString)
-                .filter(code -> !code.isBlank());
+                .filter(code -> IDENTIFIER.matcher(code).matches());
     }
 }

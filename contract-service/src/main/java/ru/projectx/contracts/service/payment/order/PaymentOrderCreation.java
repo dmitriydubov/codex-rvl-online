@@ -7,10 +7,11 @@ import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.entity.payment.PaymentOrderView;
 import ru.projectx.contracts.service.payment.OrderingStep;
 import ru.projectx.contracts.service.payment.PaymentOrderPasses;
+import ru.projectx.contracts.service.payment.PaymentOrderWork;
 
 @Service
 @ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
-public class PaymentOrderCreation {
+public class PaymentOrderCreation implements PaymentOrderWork {
 
     private final PaymentOrderPasses passes;
     private final PaymentOrderRecording recording;
@@ -21,13 +22,19 @@ public class PaymentOrderCreation {
     }
 
     public int createDue() {
-        return passes.eachAsLeader(PaymentOrderState.AWAITING_CREATION, this::create);
+        return passes.run(this);
     }
 
-    private void create(PaymentOrderView order) {
+    @Override
+    public OrderingStep<?> step(PaymentOrderView order) {
         CreationAttempt attempt = new CreationAttempt(order, recording);
-        passes.callOrdering(order, new OrderingStep<>("не создан", attempt::apply,
+        return new OrderingStep<>("не создан", attempt::apply,
                 created -> created.ifPresent(orderId -> recording.created(order.contractId(), orderId)),
-                code -> recording.rejected(order.contractId(), code)));
+                code -> recording.rejected(order.contractId(), code));
+    }
+
+    @Override
+    public PaymentOrderState state() {
+        return PaymentOrderState.AWAITING_CREATION;
     }
 }

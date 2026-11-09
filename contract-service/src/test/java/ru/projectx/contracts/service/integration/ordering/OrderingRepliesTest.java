@@ -126,6 +126,32 @@ class OrderingRepliesTest {
     }
 
     @Test
+    void errorCodeOutsideTheIdentifierFormat_isReplacedWithTheHttpStatus() {
+        String longCode = "C".repeat(101);
+        assertThatThrownBy(() -> OrderingReplies.successBody(OrderingOperation.CREATE_ORDER,
+                reply(400, "{\"status\": \"error\", \"errors\": [{\"code\": \"" + longCode + "\"}]}")))
+                .isInstanceOfSatisfying(OrderingRejectedException.class,
+                        rejected -> assertThat(rejected.code()).isEqualTo("HTTP 400"));
+        assertThatThrownBy(() -> OrderingReplies.successBody(OrderingOperation.CREATE_ORDER,
+                reply(400, "{\"status\": \"error\", \"errors\": [{\"code\": \"код с пробелом\"}]}")))
+                .isInstanceOfSatisfying(OrderingRejectedException.class,
+                        rejected -> assertThat(rejected.code()).isEqualTo("HTTP 400"));
+        assertThatThrownBy(() -> OrderingReplies.successBody(OrderingOperation.CREATE_ORDER,
+                reply(400, "{\"status\": \"error\", \"errors\": [{\"code\": \"" + "C".repeat(100) + "\"}]}")))
+                .isInstanceOfSatisfying(OrderingRejectedException.class,
+                        rejected -> assertThat(rejected.code()).hasSize(100));
+    }
+
+    @Test
+    void orderIdOutsideTheIdentifierFormat_isATemporaryFailure() {
+        assertThatThrownBy(() -> OrderingReplies.requiredText(OrderingOperation.CREATE_ORDER,
+                JSON.readTree("\"" + "o".repeat(101) + "\"")))
+                .isInstanceOf(OrderingUnavailableException.class);
+        assertThat(OrderingReplies.requiredText(OrderingOperation.CREATE_ORDER,
+                JSON.readTree("\"" + "o".repeat(100) + "\""))).hasSize(100);
+    }
+
+    @Test
     void requiredText_isTheTextOrTemporaryFailure() {
         assertThat(OrderingReplies.requiredText(OrderingOperation.CREATE_ORDER, JSON.readTree("\"o-1\"")))
                 .isEqualTo("o-1");

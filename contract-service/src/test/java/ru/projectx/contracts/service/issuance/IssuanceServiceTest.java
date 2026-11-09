@@ -246,7 +246,7 @@ class IssuanceServiceTest {
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
         assertThat(policy.state().cancellation()).contains(
                 new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW));
-        verify(paymentOrders).contractStopped(policy.id(), NOW);
+        verifyNoInteractions(paymentOrders);
     }
 
     @Test
