@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.integration.ordering;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import ru.projectx.contracts.exception.OrderingOperation;
+import ru.projectx.contracts.exception.OrderingOrderFailureException;
 import ru.projectx.contracts.exception.OrderingRejectedException;
 import ru.projectx.contracts.exception.OrderingUnavailableException;
 import tools.jackson.databind.JsonNode;
@@ -45,9 +46,13 @@ final class OrderingReplies {
         return Optional.of(value)
                 .filter(JsonNode::isString)
                 .map(JsonNode::asString)
-                .filter(text -> IDENTIFIER.matcher(text).matches())
-                .orElseThrow(() -> new OrderingUnavailableException(operation,
+                .filter(OrderingReplies::identifier)
+                .orElseThrow(() -> new OrderingOrderFailureException(operation,
                         "в ответе нет обязательного поля или оно не по формату"));
+    }
+
+    static boolean identifier(String value) {
+        return IDENTIFIER.matcher(value).matches();
     }
 
     private static boolean temporary(OrderingReply reply) {
@@ -84,6 +89,6 @@ final class OrderingReplies {
         return Optional.of(body.path(ERRORS).path(0).path(CODE))
                 .filter(JsonNode::isString)
                 .map(JsonNode::asString)
-                .filter(code -> IDENTIFIER.matcher(code).matches());
+                .filter(OrderingReplies::identifier);
     }
 }

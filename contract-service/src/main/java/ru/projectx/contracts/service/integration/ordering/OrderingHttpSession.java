@@ -4,8 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import ru.projectx.contracts.exception.OrderingOperation;
+import ru.projectx.contracts.exception.OrderingOrderFailureException;
 import ru.projectx.contracts.exception.OrderingRejectedException;
-import ru.projectx.contracts.exception.OrderingUnavailableException;
 import ru.projectx.contracts.service.integration.ordering.OrderingExchange.OrderingCall;
 import ru.projectx.contracts.service.payment.NewOrder;
 import ru.projectx.contracts.service.payment.OrderingSession;
@@ -41,7 +41,7 @@ final class OrderingHttpSession implements OrderingSession {
                     body -> OrderingSearchResults.orderId(body, requests.product(), document));
         }
         catch (OrderingRejectedException rejected) {
-            throw new OrderingUnavailableException(call.operation(), "поиск заказов отклонён, код " + rejected.code(),
+            throw new OrderingOrderFailureException(call.operation(), "поиск заказов отклонён, код " + rejected.code(),
                     rejected);
         }
     }

@@ -40,16 +40,14 @@ public class RejectedDocumentFixes implements RejectedOutboxMessages {
     public void rejected(UUID aggregateId, Instant now) {
         PaymentOrder order = orders.findById(aggregateId)
                 .orElseThrow(() -> new IllegalStateException("заказа на оплату " + aggregateId + " нет"));
-        PaymentOrderLog.withCorrelation(order.view().correlationId(), () -> reject(order.view().contractId(), now));
+        PaymentOrderLog.within(order.view().correlationId(), () -> reject(order.view().contractId(), now));
     }
 
-    private boolean reject(UUID contractId, Instant now) {
+    private void reject(UUID contractId, Instant now) {
         LockedOrder locked = locks.lock(contractId);
-        boolean rejected = locked.order().reject(FIXED_UNDELIVERED, now);
-        if (rejected) {
+        if (locked.order().reject(FIXED_UNDELIVERED, now)) {
             metrics.countOrderRejected();
             PaymentOrderLog.write(log.atError(), locked.contract(), "подтверждение документа не доставлено");
         }
-        return rejected;
     }
 }

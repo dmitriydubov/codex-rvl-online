@@ -31,10 +31,14 @@ public class OrderingStepRunner {
             step.rejected().accept(rejected.code());
         }
         catch (OrderingUnavailableException unavailable) {
-            log.warn("заказ на оплату договора КМ {} {}: {}, проход остановлен до следующего раза", order.contractId(),
-                    step.notDone(), unavailable.getMessage());
-            return false;
+            log.warn("заказ на оплату договора КМ {} {}: {}, {}", order.contractId(), step.notDone(),
+                    unavailable.getMessage(), consequence(unavailable));
+            return !unavailable.serviceWide();
         }
         return true;
+    }
+
+    private static String consequence(OrderingUnavailableException unavailable) {
+        return unavailable.serviceWide() ? "проход остановлен до следующего раза" : "заказ ждёт следующего прохода";
     }
 }

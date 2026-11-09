@@ -87,6 +87,28 @@ class PaymentOrderPassesTest {
     }
 
     @Test
+    void work_goesOnToTheNextOrderWhileItsStepsAskToGoOn() {
+        OrderingStep<String> step = new OrderingStep<>("не создан", session -> "o-1", created -> { }, code -> { });
+        PaymentOrderWork work = new PaymentOrderWork() {
+            @Override
+            public PaymentOrderState state() {
+                return PaymentOrderState.AWAITING_CREATION;
+            }
+
+            @Override
+            public OrderingStep<?> step(ru.projectx.contracts.entity.payment.PaymentOrderView order) {
+                handled.add(order.id());
+                return step;
+            }
+        };
+        given(steps.run(any(), org.mockito.ArgumentMatchers.same(step))).willReturn(true);
+
+        assertThat(passes.run(work)).isEqualTo(2);
+
+        assertThat(handled).hasSize(2);
+    }
+
+    @Test
     void orderThatAsksToStop_endsThePass() {
         int count = passes.eachAsLeader(PaymentOrderState.AWAITING_CREATION, order -> {
             handled.add(order.id());

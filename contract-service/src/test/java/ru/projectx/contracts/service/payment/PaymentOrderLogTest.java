@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -31,6 +32,16 @@ class PaymentOrderLogTest {
 
         assertThat(result).isTrue();
 
+        assertThat(MDC.get("correlationId")).isNull();
+    }
+
+    @Test
+    void within_runsTheWorkWithTheCorrelationIdAndRemovesItAfter() {
+        List<String> seen = new java.util.ArrayList<>();
+
+        PaymentOrderLog.within(PaymentOrders.CORRELATION, () -> seen.add(MDC.get("correlationId")));
+
+        assertThat(seen).containsExactly(PaymentOrders.CORRELATION.toString());
         assertThat(MDC.get("correlationId")).isNull();
     }
 

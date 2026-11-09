@@ -20,6 +20,13 @@ public final class PaymentOrderLog {
                 reason);
     }
 
+    public static void within(UUID correlationId, Runnable work) {
+        withCorrelation(correlationId, () -> {
+            work.run();
+            return true;
+        });
+    }
+
     public static boolean withCorrelation(UUID correlationId, BooleanSupplier work) {
         MDC.put(CORRELATION_ID, correlationId.toString());
         try {

@@ -7,4 +7,9 @@ public class CreationInProgressException extends OrderingUnavailableException {
     public CreationInProgressException() {
         super("создание заказа начато другим проходом, заказ будет найден поиском", OrderingOperation.CREATE_ORDER);
     }
+
+    @Override
+    public boolean serviceWide() {
+        return false;
+    }
 }

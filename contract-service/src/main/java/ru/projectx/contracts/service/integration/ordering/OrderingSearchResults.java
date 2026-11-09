@@ -11,7 +11,6 @@ final class OrderingSearchResults {
     private static final String ORDER_DETAILS = "orderDetails";
     private static final String PRODUCT = "product";
     private static final String DOCUMENT_ID = "documentId";
-    private static final int MAX_ORDER_ID = 100;
 
     private OrderingSearchResults() {
     }
@@ -22,7 +21,7 @@ final class OrderingSearchResults {
                 .map(order -> order.path(ORDER_ID))
                 .filter(JsonNode::isString)
                 .map(JsonNode::asString)
-                .filter(orderId -> !orderId.isBlank() && orderId.length() <= MAX_ORDER_ID)
+                .filter(OrderingReplies::identifier)
                 .findFirst();
     }
 
