@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.entity.payment.PaymentOrder;
+import ru.projectx.contracts.entity.payment.PaymentOrderKeys;
 import ru.projectx.contracts.message.payment.PaymentOrderEvents;
 import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 import ru.projectx.contracts.service.outbox.RejectedOutboxMessages;
@@ -38,9 +38,9 @@ public class RejectedDocumentFixes implements RejectedOutboxMessages {
 
     @Override
     public void rejected(UUID aggregateId, Instant now) {
-        PaymentOrder order = orders.findById(aggregateId)
+        PaymentOrderKeys keys = orders.findKeysById(aggregateId)
                 .orElseThrow(() -> new IllegalStateException("заказа на оплату " + aggregateId + " нет"));
-        PaymentOrderLog.within(order.view().correlationId(), () -> reject(order.view().contractId(), now));
+        PaymentOrderLog.within(keys.correlationId(), () -> reject(keys.contractId(), now));
     }
 
     private void reject(UUID contractId, Instant now) {

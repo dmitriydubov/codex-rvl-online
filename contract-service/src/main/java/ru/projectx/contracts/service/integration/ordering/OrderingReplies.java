@@ -14,6 +14,8 @@ final class OrderingReplies {
 
     private static final int UNAUTHORIZED = 401;
     private static final int FORBIDDEN = 403;
+    private static final int REQUEST_TIMEOUT = 408;
+    private static final int TOO_MANY_REQUESTS = 429;
     private static final int CLIENT_ERRORS = 400;
     private static final int SERVER_ERRORS = 500;
     private static final int SUCCESS_FROM = 200;
@@ -56,7 +58,11 @@ final class OrderingReplies {
     }
 
     private static boolean temporary(OrderingReply reply) {
-        return reply.status() >= SERVER_ERRORS || tokenRefused(reply);
+        return reply.status() >= SERVER_ERRORS || tokenRefused(reply) || busy(reply);
+    }
+
+    private static boolean busy(OrderingReply reply) {
+        return reply.status() == REQUEST_TIMEOUT || reply.status() == TOO_MANY_REQUESTS;
     }
 
     private static JsonNode bodyOfSuccess(OrderingOperation operation, OrderingReply reply) {

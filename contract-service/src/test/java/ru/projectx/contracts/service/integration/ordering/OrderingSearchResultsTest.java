@@ -1,8 +1,13 @@
 package ru.projectx.contracts.service.integration.ordering;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import ru.projectx.contracts.exception.OrderingOperation;
+import ru.projectx.contracts.exception.OrderingOrderFailureException;
 import tools.jackson.databind.json.JsonMapper;
 
 class OrderingSearchResultsTest {
@@ -28,12 +33,18 @@ class OrderingSearchResultsTest {
                 JSON.readTree("{\"data\": [" + other + ", " + ORDER + "]}"), "rvl", DOCUMENT)).contains("o-1");
     }
 
-    @Test
-    void noData_orEmptyList_findsNothing() {
-        assertThat(OrderingSearchResults.orderId(JSON.readTree("{\"status\": \"success\"}"), "rvl", DOCUMENT))
-                .isEmpty();
-        assertThat(OrderingSearchResults.orderId(JSON.readTree("{\"data\": []}"), "rvl", DOCUMENT)).isEmpty();
-        assertThat(OrderingSearchResults.orderId(JSON.readTree("{\"data\": \"none\"}"), "rvl", DOCUMENT)).isEmpty();
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"status\": \"success\"}", "{\"data\": null}", "{\"data\": []}"})
+    void noData_nullData_orEmptyList_findsNothing(String body) {
+        assertThat(OrderingSearchResults.orderId(JSON.readTree(body), "rvl", DOCUMENT)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"data\": \"none\"}", "{\"data\": 5}", "{\"data\": true}"})
+    void dataNeitherObjectNorListNorNull_isAFailureOfThisOrder(String body) {
+        assertThatThrownBy(() -> OrderingSearchResults.orderId(JSON.readTree(body), "rvl", DOCUMENT))
+                .isInstanceOfSatisfying(OrderingOrderFailureException.class,
+                        failure -> assertThat(failure.operation()).isEqualTo(OrderingOperation.FIND_ORDERS));
     }
 
     @Test
@@ -53,19 +64,24 @@ class OrderingSearchResultsTest {
         String body = "{\"data\": {\"orderId\": \"%s\", \"orderDetails\": [{\"product\": \"rvl\", "
                 + "\"documentId\": \"" + DOCUMENT + "\"}]}}";
 
-        assertThat(OrderingSearchResults.orderId(JSON.readTree(body.formatted("o".repeat(101))), "rvl", DOCUMENT))
-                .isEmpty();
+        assertThatThrownBy(() -> OrderingSearchResults.orderId(JSON.readTree(body.formatted("o".repeat(101))), "rvl",
+                DOCUMENT)).isInstanceOf(OrderingOrderFailureException.class);
         assertThat(OrderingSearchResults.orderId(JSON.readTree(body.formatted("o".repeat(100))), "rvl", DOCUMENT))
                 .contains("o".repeat(100));
     }
 
     @Test
-    void ourDocumentWithoutUsableOrderId_findsNothing() {
+    void ourDocumentWithoutUsableOrderId_isAFailureOfThisOrder() {
         String blank = "{\"data\": {\"orderId\": \" \", \"orderDetails\": [{\"product\": \"rvl\", \"documentId\": \""
                 + DOCUMENT + "\"}]}}";
         String numeric = blank.replace("\" \"", "5");
 
-        assertThat(OrderingSearchResults.orderId(JSON.readTree(blank), "rvl", DOCUMENT)).isEmpty();
-        assertThat(OrderingSearchResults.orderId(JSON.readTree(numeric), "rvl", DOCUMENT)).isEmpty();
+        assertThatThrownBy(() -> OrderingSearchResults.orderId(JSON.readTree(blank), "rvl", DOCUMENT))
+                .isInstanceOfSatisfying(OrderingOrderFailureException.class,
+                        failure -> assertThat(failure.operation()).isEqualTo(OrderingOperation.FIND_ORDERS));
+        assertThatThrownBy(() -> OrderingSearchResults.orderId(JSON.readTree(numeric), "rvl", DOCUMENT))
+                .isInstanceOf(OrderingOrderFailureException.class);
+        assertThatThrownBy(() -> OrderingSearchResults.orderId(JSON.readTree(blank.replace("\"orderId\": \" \", ", "")),
+                "rvl", DOCUMENT)).isInstanceOf(OrderingOrderFailureException.class);
     }
 }

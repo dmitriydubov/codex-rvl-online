@@ -75,9 +75,9 @@ public class PaymentOrderRecording {
             PaymentOrderLog.write(log.atError(), locked.contract(), "Ordering отклонил создание заказа, код " + code);
             return;
         }
-        if (locked.order().recordCancelled(clock.instant())) {
+        if (locked.order().state() == PaymentOrderState.CANCEL_PENDING) {
             PaymentOrderLog.write(log.atInfo(), locked.contract(),
-                    "Ordering отклонил создание заказа к отмене, код " + code + ": заказа нет, запись закрыта");
+                    "Ordering отклонил создание заказа к отмене, код " + code + ": запись ждёт поиска при отмене");
         }
     }
 }

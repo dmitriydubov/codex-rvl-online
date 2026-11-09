@@ -216,6 +216,9 @@
 
 ### Изменено
 
+- Экземпляр, потерявший роль ведущего посреди фоновой работы (запись не прошла проверку роли), сразу перестаёт считать
+  себя ведущим: компонент здоровья `inbox` отвечает `role: standby` и следующие проходы не начинаются, не дожидаясь, пока
+  библиотека выбора ведущего отзовёт роль на следующем круге проверки блокировки.
 - Контейнеры слушателей очередей не стартуют вместе с сервисом: их запускает ведущий экземпляр, получив роль, и
   останавливает, потеряв её; `RABBITMQ_*_LISTENER_AUTO_STARTUP=false` оставляет брокер без потребителей и у ведущего.
   Отказ запуска контейнера (нет очереди) больше не роняет сервис: он пишется в журнал ERROR, очередь остаётся без
@@ -344,7 +347,12 @@
 - **Миграции:** `013` добавляет тип `payment_order_state` и таблицу `payment_orders` — заказы на оплату договоров КМ.
 - **Зависимости:** новая `org.springframework.security:spring-security-oauth2-client` (версия из BOM Spring Boot, 7.0.6;
   приносит `spring-security-core`, `spring-security-crypto`, `spring-security-web`, `spring-security-oauth2-core` 7.0.6 и
-  `com.nimbusds:oauth2-oidc-sdk:11.26.1` с её зависимостями).
+  `com.nimbusds:oauth2-oidc-sdk:11.26.1`, `com.nimbusds:nimbus-jose-jwt:10.4`, `com.nimbusds:content-type:2.3`,
+  `com.nimbusds:lang-tag:1.7`, `com.github.stephenc.jcip:jcip-annotations:1.0-1`, `net.minidev:json-smart:2.6.0`,
+  `net.minidev:accessors-smart:2.6.0`, `org.ow2.asm:asm:9.7.1`) — все проверить в реестре контура до установки.
+- **Порядок включения оплаты:** до `PAYMENT_ENABLED=true` проверить подключение и права учётной записи на брокере
+  маркетинга: пока к нему нет соединения, встаёт публикация всех исходящих сообщений, в том числе ответов сервису Заявок и
+  передач в 1С:УСК (`docs/operations.md`, «Переменные окружения», порядок включения оплаты).
 - **Оповещение:** правила на `contracts_payment_orders_rejected_total`, `contracts_payment_order_cancel_rejected_total`,
   `contracts_ordering_failures_total{operation}` и `contracts_km_contracts_without_order_overdue > 0` — пороги в
   `docs/operations.md`, действия в `docs/troubleshooting.md`.

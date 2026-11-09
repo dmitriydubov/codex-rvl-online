@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
+import ru.projectx.contracts.entity.payment.PaymentOrderKeys;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 import ru.projectx.contracts.service.payment.LockedOrder;
@@ -32,6 +33,7 @@ class RejectedDocumentFixesTest {
     private final PaymentOrderLocks locks = mock();
     private final OrderingMetrics metrics = mock();
     private final RejectedDocumentFixes reaction = new RejectedDocumentFixes(orders, locks, metrics);
+    private final PaymentOrderKeys keys = new PaymentOrderKeys(PaymentOrders.CONTRACT, PaymentOrders.CORRELATION);
     private CapturedLog log;
 
     @BeforeEach
@@ -52,7 +54,7 @@ class RejectedDocumentFixesTest {
     @Test
     void undeliveredFix_rejectsTheCreatedOrderWithItsCodeAndAlerts() {
         PaymentOrder order = PaymentOrders.created();
-        given(orders.findById(PaymentOrders.ORDER)).willReturn(Optional.of(order));
+        given(orders.findKeysById(PaymentOrders.ORDER)).willReturn(Optional.of(keys));
         willAnswer(lock -> {
             assertThat(MDC.get("correlationId")).isEqualTo(PaymentOrders.CORRELATION.toString());
             return new LockedOrder(PaymentOrders.acceptedContract(), order);
@@ -64,6 +66,7 @@ class RejectedDocumentFixesTest {
         assertThat(order.view().rejectionCode()).contains("FIXED_UNDELIVERED");
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
         verify(metrics).countOrderRejected();
+        verify(orders, never()).findById(PaymentOrders.ORDER);
         assertThat(log.at(Level.ERROR)).singleElement().asString()
                 .endsWith(": подтверждение документа не доставлено");
         assertThat(MDC.get("correlationId")).isNull();
@@ -72,7 +75,7 @@ class RejectedDocumentFixesTest {
     @Test
     void undeliveredFixOfWithdrawnOrder_changesNothing() {
         PaymentOrder order = PaymentOrders.cancelPending();
-        given(orders.findById(PaymentOrders.ORDER)).willReturn(Optional.of(order));
+        given(orders.findKeysById(PaymentOrders.ORDER)).willReturn(Optional.of(keys));
         given(locks.lock(PaymentOrders.CONTRACT)).willReturn(new LockedOrder(PaymentOrders.acceptedContract(), order));
 
         reaction.rejected(PaymentOrders.ORDER, NOW);
@@ -84,7 +87,7 @@ class RejectedDocumentFixesTest {
 
     @Test
     void unknownOrder_failsLoudly() {
-        given(orders.findById(PaymentOrders.ORDER)).willReturn(Optional.empty());
+        given(orders.findKeysById(PaymentOrders.ORDER)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> reaction.rejected(PaymentOrders.ORDER, NOW))
                 .isInstanceOf(IllegalStateException.class)

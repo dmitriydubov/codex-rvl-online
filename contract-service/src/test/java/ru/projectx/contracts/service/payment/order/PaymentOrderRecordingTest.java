@@ -161,7 +161,7 @@ class PaymentOrderRecordingTest {
     }
 
     @Test
-    void rejected_whileCancelPending_closesTheRecordWithoutAlert() {
+    void rejected_whileCancelPending_leavesTheRecordForTheCancellationSearchWithoutAlert() {
         PaymentOrder order = PaymentOrders.awaiting();
         order.requestCreation(NOW);
         order.withdraw(NOW);
@@ -169,10 +169,12 @@ class PaymentOrderRecordingTest {
 
         recording.rejected(PaymentOrders.CONTRACT, "C");
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().rejectionCode()).isEmpty();
         verify(metrics, never()).countOrderRejected();
         assertThat(log.at(Level.ERROR)).isEmpty();
-        assertThat(log.at(Level.INFO)).hasSize(1);
+        assertThat(log.at(Level.INFO)).singleElement().asString()
+                .endsWith(": Ordering отклонил создание заказа к отмене, код C: запись ждёт поиска при отмене");
     }
 
     @Test

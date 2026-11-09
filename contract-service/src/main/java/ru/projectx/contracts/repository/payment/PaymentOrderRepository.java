@@ -11,11 +11,16 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
+import ru.projectx.contracts.entity.payment.PaymentOrderKeys;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 
 public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, UUID> {
 
     Optional<PaymentOrder> findByContractId(UUID contractId);
+
+    @Query("select new ru.projectx.contracts.entity.payment.PaymentOrderKeys(o.contractId, o.correlationId)"
+            + " from PaymentOrder o where o.id = :id")
+    Optional<PaymentOrderKeys> findKeysById(@Param("id") UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from PaymentOrder o where o.contractId = :contractId")

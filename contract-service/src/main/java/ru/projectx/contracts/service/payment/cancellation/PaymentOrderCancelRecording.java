@@ -36,12 +36,14 @@ public class PaymentOrderCancelRecording {
     }
 
     @Transactional
-    public boolean requestCancellation(UUID contractId) {
+    public boolean requestCancellation(UUID contractId, String orderId) {
         LockedOrder locked = pending(contractId);
         if (locked.order().state() != PaymentOrderState.CANCEL_PENDING) {
             return false;
         }
-        locked.order().requestCancellation(clock.instant());
+        Instant now = clock.instant();
+        locked.order().recordOrder(orderId, now);
+        locked.order().requestCancellation(now);
         return true;
     }
 

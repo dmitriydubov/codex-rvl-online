@@ -72,7 +72,7 @@ public class PaymentOrderCancelling implements PaymentOrderWork {
         if (alreadyCancelled(session, orderId, requested)) {
             return new CancelResult.Cancelled(orderId);
         }
-        if (!recording.requestCancellation(order.contractId())) {
+        if (!recording.requestCancellation(order.contractId(), orderId)) {
             return new CancelResult.Skipped();
         }
         requested.set(true);

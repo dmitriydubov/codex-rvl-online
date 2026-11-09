@@ -61,7 +61,7 @@ class PaymentOrderCancellingTest {
     void leaderWithSession() {
         given(leadership.countAsLeader(any())).willAnswer(pass -> pass.<IntSupplier>getArgument(0).getAsInt());
         given(ordering.session(PaymentOrders.CORRELATION)).willReturn(session);
-        given(recording.requestCancellation(PaymentOrders.CONTRACT)).willReturn(true);
+        given(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).willReturn(true);
     }
 
     @Test
@@ -71,7 +71,7 @@ class PaymentOrderCancellingTest {
         assertThat(cancelling.cancelDue()).isEqualTo(1);
 
         InOrder order = inOrder(recording, session);
-        order.verify(recording).requestCancellation(PaymentOrders.CONTRACT);
+        order.verify(recording).requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
         order.verify(session).cancelOrder(PaymentOrders.ORDER_ID);
         order.verify(recording).cancelled(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
         verify(session, never()).orderStatus(any());
@@ -161,7 +161,7 @@ class PaymentOrderCancellingTest {
     @Test
     void orderNoLongerPending_isNotCancelled() {
         pending(PaymentOrders.cancelPending());
-        given(recording.requestCancellation(PaymentOrders.CONTRACT)).willReturn(false);
+        given(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).willReturn(false);
 
         cancelling.cancelDue();
 

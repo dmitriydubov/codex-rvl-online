@@ -67,12 +67,19 @@ class OrderingRepliesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {500, 502, 503, 401, 403})
-    void serverErrorsAndRefusedToken_areTemporary(int status) {
+    @ValueSource(ints = {500, 502, 503, 401, 403, 408, 429})
+    void serverErrorsRefusedTokenTimeoutAndTooManyRequests_areTemporary(int status) {
         assertThatThrownBy(() -> OrderingReplies.successBody(OrderingOperation.FIND_ORDERS, reply(status, ERROR_BODY)))
                 .isInstanceOfSatisfying(OrderingUnavailableException.class,
                         unavailable -> assertThat(unavailable.operation()).isEqualTo(OrderingOperation.FIND_ORDERS))
                 .hasMessageContaining("HTTP " + status);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {407, 409, 428, 430})
+    void clientErrorsNextToTimeoutAndTooManyRequests_areRejected(int status) {
+        assertThatThrownBy(() -> OrderingReplies.successBody(OrderingOperation.CREATE_ORDER, reply(status, ERROR_BODY)))
+                .isInstanceOf(OrderingRejectedException.class);
     }
 
     @Test

@@ -3,6 +3,7 @@ package ru.projectx.contracts.service.integration.ordering;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import ru.projectx.contracts.exception.OrderingOperation;
 import ru.projectx.contracts.exception.OrderingOrderFailureException;
 import ru.projectx.contracts.exception.OrderingRejectedException;
@@ -36,14 +37,9 @@ final class OrderingHttpSession implements OrderingSession {
     public Optional<String> findOrder(UUID clientId, UUID documentId) {
         OrderingCall call = call(OrderingOperation.FIND_ORDERS);
         String document = documentId.toString();
-        try {
-            return calls.call(call, exchange -> exchange.post(call, CLIENT_ORDERS, requests.find(document), clientId),
-                    body -> OrderingSearchResults.orderId(body, requests.product(), document));
-        }
-        catch (OrderingRejectedException rejected) {
-            throw new OrderingOrderFailureException(call.operation(), "поиск заказов отклонён, код " + rejected.code(),
-                    rejected);
-        }
+        return orderScoped(call, () -> calls.call(call,
+                exchange -> exchange.post(call, CLIENT_ORDERS, requests.find(document), clientId),
+                body -> OrderingSearchResults.orderId(body, requests.product(), document)));
     }
 
     @Override
@@ -56,14 +52,24 @@ final class OrderingHttpSession implements OrderingSession {
     @Override
     public String orderStatus(String orderId) {
         OrderingCall call = call(OrderingOperation.ORDER_STATE);
-        return calls.call(call, exchange -> exchange.get(call, ORDER, orderId),
-                body -> OrderingReplies.requiredText(call.operation(), body.path(DATA).path(STATUS)));
+        return orderScoped(call, () -> calls.call(call, exchange -> exchange.get(call, ORDER, orderId),
+                body -> OrderingReplies.requiredText(call.operation(), body.path(DATA).path(STATUS))));
     }
 
     @Override
     public void cancelOrder(String orderId) {
         OrderingCall call = call(OrderingOperation.CANCEL_ORDER);
         calls.call(call, exchange -> exchange.post(call, ORDER_CANCEL, requests.cancel(), orderId), Function.identity());
+    }
+
+    private static <T> T orderScoped(OrderingCall call, Supplier<T> request) {
+        try {
+            return request.get();
+        }
+        catch (OrderingRejectedException rejected) {
+            throw new OrderingOrderFailureException(call.operation(), "запрос отклонён, код " + rejected.code(),
+                    rejected);
+        }
     }
 
     private OrderingCall call(OrderingOperation operation) {

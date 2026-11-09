@@ -3,10 +3,13 @@ package ru.projectx.contracts.service.payment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -34,6 +37,7 @@ import ru.projectx.contracts.service.cancellation.TaskCancellationService;
 import ru.projectx.contracts.service.leadership.BackgroundLeadership;
 import ru.projectx.contracts.service.leadership.LeaderLock;
 import ru.projectx.contracts.service.payment.order.PaymentOrderCreation;
+import ru.projectx.contracts.service.payment.order.RejectedDocumentFixes;
 import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -59,6 +63,8 @@ class PaymentOrderRaceIT {
     private static final Duration WAIT = Duration.ofSeconds(20);
     private static final String ORDER_ROW = "select state::text as state, external_order_id, creation_requested"
             + " from payment_orders where contract_id = ?";
+    private static final String LOCK_WAITS = "select count(*) from pg_stat_activity"
+            + " where wait_event_type = 'Lock' and datname = current_database()";
     private static final String FIXES = "select count(*) from outbox_messages where aggregate_type = 'PAYMENT_ORDER'"
             + " and aggregate_id = (select id from payment_orders where contract_id = ?)";
 
@@ -95,6 +101,12 @@ class PaymentOrderRaceIT {
 
     @Autowired
     private BackgroundLeadership leadership;
+
+    @Autowired
+    private RejectedDocumentFixes rejectedFixes;
+
+    @Autowired
+    private MeterRegistry meters;
 
     @Autowired
     private LeaderLock lock;
@@ -183,6 +195,40 @@ class PaymentOrderRaceIT {
         assertThat(ordering.creations()).isEqualTo(1);
         assertThat(orderRow().get("state")).isEqualTo("CREATED");
         assertThat(fixes()).isEqualTo(1);
+    }
+
+    @Test
+    void undeliveredFixWaitingForTheContractWhileCancellationCommits_keepsTheOrderForCancellation() throws Exception {
+        creation.createDue();
+        UUID orderId = jdbc.sql("select id from payment_orders where contract_id = ?").param(contractId)
+                .query(UUID.class).single();
+        double rejectedBefore = rejectedOrders();
+        CountDownLatch cancellationLocked = new CountDownLatch(1);
+        CountDownLatch commitCancellation = new CountDownLatch(1);
+        CompletableFuture<Void> cancelling = CompletableFuture.runAsync(() -> transaction.executeWithoutResult(status -> {
+            cancellation.apply(new ContractTaskCancellation(request, Instant.parse("2026-02-12T11:30:00Z"),
+                    "INSURED_REFUSED", null), Instant.parse("2026-02-12T11:30:00Z"));
+            cancellationLocked.countDown();
+            awaitQuietly(commitCancellation);
+        }));
+        assertThat(cancellationLocked.await(WAIT.toSeconds(), TimeUnit.SECONDS)).isTrue();
+
+        CompletableFuture<Void> rejecting = CompletableFuture.runAsync(() -> transaction.executeWithoutResult(
+                status -> rejectedFixes.rejected(orderId, Instant.parse("2026-02-12T11:31:00Z"))));
+        await().atMost(WAIT).until(() -> jdbc.sql(LOCK_WAITS).query(Long.class).single() > 0);
+        commitCancellation.countDown();
+        cancelling.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+        rejecting.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+
+        Map<String, Object> order = orderRow();
+        assertThat(order.get("state")).isEqualTo("CANCEL_PENDING");
+        assertThat(order.get("external_order_id")).isEqualTo("order-1");
+        assertThat(rejectedOrders()).isEqualTo(rejectedBefore);
+    }
+
+    private double rejectedOrders() {
+        return Optional.ofNullable(meters.find("contracts.payment.orders.rejected").counter()).map(Counter::count)
+                .orElse(0.0);
     }
 
     private void handLeadership(String instanceId) {

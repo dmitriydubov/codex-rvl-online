@@ -49,7 +49,7 @@ class PaymentOrderCancelRecordingTest {
     void requestCancellation_ofPendingOrder_marksItAfterLockAndFence() {
         PaymentOrder order = locked(PaymentOrders.cancelPending());
 
-        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT)).isTrue();
+        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isTrue();
 
         assertThat(order.view().cancelRequested()).isTrue();
         InOrder sequence = inOrder(locks, fence);
@@ -61,9 +61,33 @@ class PaymentOrderCancelRecordingTest {
     void requestCancellation_ofNotPendingOrder_refuses() {
         PaymentOrder order = locked(PaymentOrders.created());
 
-        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT)).isFalse();
+        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isFalse();
 
         assertThat(order.view().cancelRequested()).isFalse();
+    }
+
+    @Test
+    void requestCancellation_ofOrderFoundBySearch_keepsTheFoundOrderIdBeforeTheCancelCall() {
+        PaymentOrder order = PaymentOrders.awaiting();
+        order.requestCreation(NOW);
+        order.withdraw(NOW);
+        locked(order);
+
+        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isTrue();
+
+        assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().cancelRequested()).isTrue();
+    }
+
+    @Test
+    void requestCancellation_refused_keepsNoOrderId() {
+        PaymentOrder order = PaymentOrders.awaiting();
+        locked(order);
+
+        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isFalse();
+
+        assertThat(order.view().orderId()).isEmpty();
     }
 
     @Test

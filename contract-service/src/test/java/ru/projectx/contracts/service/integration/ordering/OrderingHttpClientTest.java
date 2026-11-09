@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.payment.OrderDocument;
 import ru.projectx.contracts.exception.OrderingOperation;
+import ru.projectx.contracts.exception.OrderingOrderFailureException;
 import ru.projectx.contracts.exception.OrderingRejectedException;
 import ru.projectx.contracts.exception.OrderingUnavailableException;
 import ru.projectx.contracts.service.integration.ordering.OrderingTestServer.Received;
@@ -204,7 +205,7 @@ class OrderingHttpClientTest {
                 "{\"status\": \"error\", \"errors\": [{\"code\": \"FindOrdersValidator.valid\"}]}"));
 
         assertThatThrownBy(() -> client.session(CORRELATION).findOrder(CLIENT, DOCUMENT))
-                .isInstanceOfSatisfying(OrderingUnavailableException.class,
+                .isInstanceOfSatisfying(OrderingOrderFailureException.class,
                         unavailable -> assertThat(unavailable.operation()).isEqualTo(OrderingOperation.FIND_ORDERS))
                 .hasMessageContaining("FindOrdersValidator.valid");
         assertThat(failures(OrderingOperation.FIND_ORDERS)).isEqualTo(1);
@@ -217,6 +218,19 @@ class OrderingHttpClientTest {
         assertThat(client.session(CORRELATION).orderStatus("o-1")).isEqualTo("CANCELED");
         assertThat(server.orderingRequests().getFirst().method()).isEqualTo("GET");
         assertThat(server.orderingRequests().getFirst().path()).isEqualTo("/ordering/orders/o-1");
+    }
+
+    @Test
+    void rejectedOrderStatus_isAFailureOfThisOrderNamingTheCode() {
+        server.ordering(OrderingTestServer.json(404, "{\"status\": \"error\", \"errors\": [{\"code\": \"OrderNotFound\"}]}"));
+
+        assertThatThrownBy(() -> client.session(CORRELATION).orderStatus("o-1"))
+                .isInstanceOfSatisfying(OrderingOrderFailureException.class, failure -> {
+                    assertThat(failure.operation()).isEqualTo(OrderingOperation.ORDER_STATE);
+                    assertThat(failure.serviceWide()).isFalse();
+                })
+                .hasMessageContaining("OrderNotFound");
+        assertThat(failures(OrderingOperation.ORDER_STATE)).isEqualTo(1);
     }
 
     @Test
