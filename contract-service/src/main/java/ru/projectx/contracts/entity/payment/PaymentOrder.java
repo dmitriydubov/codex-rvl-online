@@ -109,11 +109,10 @@ public class PaymentOrder {
         if (state.withdrawn()) {
             return;
         }
-        enter(state, mayExistInOrdering() ? PaymentOrderState.CANCEL_PENDING : PaymentOrderState.CANCELLED, now);
-    }
-
-    private boolean mayExistInOrdering() {
-        return externalOrderId != null || creationRequested;
+        PaymentOrderState next = view().mayExistInOrdering()
+                ? PaymentOrderState.CANCEL_PENDING
+                : PaymentOrderState.CANCELLED;
+        enter(state, next, now);
     }
 
     public void requestCancellation(Instant now) {
@@ -122,10 +121,9 @@ public class PaymentOrder {
     }
 
     public boolean recordCancelled(String orderId, Instant now) {
-        if (state != PaymentOrderState.CANCEL_PENDING) {
-            return false;
+        if (state == PaymentOrderState.CANCEL_PENDING) {
+            recordOrder(orderId, now);
         }
-        recordOrder(orderId, now);
         return enter(PaymentOrderState.CANCEL_PENDING, PaymentOrderState.CANCELLED, now);
     }
 

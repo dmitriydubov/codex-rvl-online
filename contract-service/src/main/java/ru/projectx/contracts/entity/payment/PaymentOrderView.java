@@ -14,4 +14,8 @@ public record PaymentOrderView(
         Optional<String> rejectionCode,
         boolean creationRequested,
         boolean cancelRequested) {
+
+    public boolean mayExistInOrdering() {
+        return orderId.isPresent() || creationRequested;
+    }
 }
