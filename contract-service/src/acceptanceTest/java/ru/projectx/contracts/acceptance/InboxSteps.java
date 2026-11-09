@@ -129,9 +129,16 @@ public class InboxSteps {
 
     @Тогда("сообщения {sender} в журнале входящих в порядке приёма — {string}")
     public void entriesInOrder(MessageSender sender, String messageIds) {
-        assertThat(journal.inOrderOfReceipt()).filteredOn(entry -> sender.sends(entry.eventType()))
-                .extracting(entry -> entry.messageId().toString())
-                .containsExactlyElementsOf(list(messageIds));
+        List<String> expected = list(messageIds);
+        Awaitility.await().atMost(PATIENCE).until(() -> received(sender).size() >= expected.size());
+        assertThat(received(sender)).containsExactlyElementsOf(expected);
+    }
+
+    private List<String> received(MessageSender sender) {
+        return journal.inOrderOfReceipt().stream()
+                .filter(entry -> sender.sends(entry.eventType()))
+                .map(entry -> entry.messageId().toString())
+                .toList();
     }
 
     @Тогда("исходы сообщений {sender} в порядке приёма — {string}")

@@ -226,6 +226,20 @@ class PaymentOrderTest {
         assertThat(order.recordCancelled(ORDER, LATER)).isFalse();
 
         assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+        assertThat(order.view().orderId()).isEmpty();
+    }
+
+    @Test
+    void recordCancelled_ofRecordClosedAsNotFound_keepsItClosedWithoutOrderId() {
+        PaymentOrder order = opened();
+        order.requestCreation(LATER);
+        order.withdraw(LATER);
+        order.recordNotFound(LATER);
+
+        assertThat(order.recordCancelled(ORDER, LATER)).isFalse();
+
+        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().orderId()).isEmpty();
     }
 
     @Test

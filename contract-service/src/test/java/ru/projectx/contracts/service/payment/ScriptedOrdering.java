@@ -14,16 +14,22 @@ final class ScriptedOrdering implements Ordering {
     private final AtomicInteger creations = new AtomicInteger();
     private final List<String> cancelled = new CopyOnWriteArrayList<>();
     private volatile Runnable duringCreation = () -> { };
+    private volatile Runnable duringSearch = () -> { };
 
     void reset() {
         ordersByDocument.clear();
         creations.set(0);
         cancelled.clear();
         duringCreation = () -> { };
+        duringSearch = () -> { };
     }
 
     void duringCreation(Runnable action) {
         this.duringCreation = action;
+    }
+
+    void duringSearch(Runnable action) {
+        this.duringSearch = action;
     }
 
     int creations() {
@@ -39,7 +45,9 @@ final class ScriptedOrdering implements Ordering {
         return new OrderingSession() {
             @Override
             public Optional<String> findOrder(UUID clientId, UUID documentId) {
-                return Optional.ofNullable(ordersByDocument.get(documentId));
+                Optional<String> found = Optional.ofNullable(ordersByDocument.get(documentId));
+                duringSearch.run();
+                return found;
             }
 
             @Override

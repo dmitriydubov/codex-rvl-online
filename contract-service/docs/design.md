@@ -746,7 +746,9 @@ SQLSTATE классов 08, 40, 53 и состояний 55P03, 57014. Прав�
 **Проходы по расписанию.** Проходы обработчика входящих (`InboxScheduler`), публикатора исходящих (`OutboxScheduler`),
 подготовки запросов на выпуск полисов ЛМ (`LmPolicyRequestScheduler`), передач оплаченных договоров КМ
 (`KmContractSubmissionScheduler`), сводок полисов ЛМ и договоров КМ, ждущих ответа 1С:УСК (`LmPolicyAwaitingScheduler`,
-`KmContractAwaitingScheduler`), и стирания тел обоих журналов (`PayloadRetentionScheduler`) включает `SchedulingConfig`.
+`KmContractAwaitingScheduler`), стирания тел обоих журналов (`PayloadRetentionScheduler`), а при включённой оплате —
+создания заказов на оплату и их сводки (`PaymentOrderScheduler`) и отмены заказов (`PaymentOrderCancellingScheduler`)
+включает `SchedulingConfig`.
 Его выключатель `projectx.scheduling.enabled` нужен только тестам: в рабочем окружении его не меняют, других запусков
 проходов у сервиса нет, и с `false` встанут разбор входящих, публикация и стирание тел с персональными данными. Во всех
 тестах, поднимающих приложение, проходы выключены, и тест вызывает нужный проход сам: иначе проход по расписанию менял

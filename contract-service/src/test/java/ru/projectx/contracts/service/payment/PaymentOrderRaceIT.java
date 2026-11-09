@@ -66,7 +66,8 @@ class PaymentOrderRaceIT {
     private static final String ORDER_ROW = "select state::text as state, external_order_id, creation_requested"
             + " from payment_orders where contract_id = ?";
     private static final String LOCK_WAITS = "select count(*) from pg_stat_activity"
-            + " where wait_event_type = 'Lock' and datname = current_database()";
+            + " where wait_event_type = 'Lock' and datname = current_database()"
+            + " and application_name <> 'contract-service-leader-lock'";
     private static final String FIXES = "select count(*) from outbox_messages where aggregate_type = 'PAYMENT_ORDER'"
             + " and aggregate_id = (select id from payment_orders where contract_id = ?)";
 
@@ -235,24 +236,15 @@ class PaymentOrderRaceIT {
     }
 
     @Test
-    void orderIdRecordedWhileTheCancellationPassFoundNothing_keepsTheRecordAndTheNextPassCancelsTheOrder()
-            throws Exception {
+    void orderIdRecordedWhileTheCancellationPassFoundNothing_keepsTheRecordAndTheNextPassCancelsTheOrder() {
         jdbc.sql("update payment_orders set state = 'CANCEL_PENDING', creation_requested = true where contract_id = ?")
                 .param(contractId).update();
-        CountDownLatch orderIdRecorded = new CountDownLatch(1);
-        CountDownLatch commitOrderId = new CountDownLatch(1);
-        CompletableFuture<Void> creating = CompletableFuture.runAsync(() -> transaction.executeWithoutResult(status -> {
-            recording.created(contractId, "order-late");
-            orderIdRecorded.countDown();
-            awaitQuietly(commitOrderId);
-        }));
-        assertThat(orderIdRecorded.await(WAIT.toSeconds(), TimeUnit.SECONDS)).isTrue();
+        ordering.duringSearch(() -> {
+            ordering.duringSearch(() -> { });
+            transaction.executeWithoutResult(status -> recording.created(contractId, "order-late"));
+        });
 
-        CompletableFuture<Integer> firstPass = CompletableFuture.supplyAsync(cancelling::cancelDue);
-        await().atMost(WAIT).until(() -> jdbc.sql(LOCK_WAITS).query(Long.class).single() > 0);
-        commitOrderId.countDown();
-        creating.get(WAIT.toSeconds(), TimeUnit.SECONDS);
-        firstPass.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+        cancelling.cancelDue();
 
         Map<String, Object> kept = orderRow();
         assertThat(kept.get("state")).isEqualTo("CANCEL_PENDING");
