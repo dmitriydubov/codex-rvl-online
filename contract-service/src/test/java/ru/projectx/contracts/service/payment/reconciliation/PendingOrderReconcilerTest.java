@@ -17,6 +17,7 @@ import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.service.payment.Invoices;
 import ru.projectx.contracts.service.payment.LockedInvoice;
 import ru.projectx.contracts.service.payment.OrderingOrder;
+import ru.projectx.contracts.service.payment.invoice.CheckoutMarks;
 import ru.projectx.contracts.service.payment.invoice.InvoiceRecording;
 import ru.projectx.contracts.support.OrderingTestProperties;
 import ru.projectx.contracts.support.PaymentOrders;
@@ -30,7 +31,7 @@ class PendingOrderReconcilerTest {
     private final InvoiceRecording recording = mock();
     private final ReconciliationAlerts alerts = mock();
     private final PendingOrderReconciler pending =
-            new PendingOrderReconciler(recording, alerts, OrderingTestProperties.passes());
+            new PendingOrderReconciler(recording, alerts, new CheckoutMarks(OrderingTestProperties.passes()));
     private final Contract contract = Invoices.invoicedContract();
     private final PaymentOrder order = PaymentOrders.created();
 

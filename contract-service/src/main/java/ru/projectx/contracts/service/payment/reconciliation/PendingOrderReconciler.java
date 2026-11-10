@@ -1,16 +1,15 @@
 package ru.projectx.contracts.service.payment.reconciliation;
 
-import java.time.Duration;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
-import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.service.payment.LockedInvoice;
 import ru.projectx.contracts.service.payment.OrderingOrder;
 import ru.projectx.contracts.service.payment.OrderingStatuses;
+import ru.projectx.contracts.service.payment.invoice.CheckoutMarks;
 import ru.projectx.contracts.service.payment.invoice.InvoiceRecording;
 
 @Component
@@ -19,13 +18,12 @@ class PendingOrderReconciler implements StateReconciler {
 
     private final InvoiceRecording recording;
     private final ReconciliationAlerts alerts;
-    private final Duration abandonedAfter;
+    private final CheckoutMarks marks;
 
-    PendingOrderReconciler(InvoiceRecording recording, ReconciliationAlerts alerts,
-            PaymentOrderPassesProperties passes) {
+    PendingOrderReconciler(InvoiceRecording recording, ReconciliationAlerts alerts, CheckoutMarks marks) {
         this.recording = recording;
         this.alerts = alerts;
-        this.abandonedAfter = passes.reconciliation().threshold();
+        this.marks = marks;
     }
 
     @Override
@@ -47,6 +45,6 @@ class PendingOrderReconciler implements StateReconciler {
     }
 
     private boolean replyOverdue(InvoiceView invoice, Instant now) {
-        return invoice.state() != InvoiceState.CHECKOUT || invoice.checkoutStartedBy(now.minus(abandonedAfter));
+        return invoice.state() != InvoiceState.CHECKOUT || marks.abandoned(invoice, now);
     }
 }

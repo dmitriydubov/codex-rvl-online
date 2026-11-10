@@ -1,13 +1,11 @@
 package ru.projectx.contracts.service.payment.invoice;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.Cancellation;
@@ -26,12 +24,12 @@ public class CheckoutClaims {
 
     private final PaymentTerms terms;
     private final PaymentTermExpiry expiry;
-    private final Duration abandonedAfter;
+    private final CheckoutMarks marks;
 
-    public CheckoutClaims(PaymentTerms terms, PaymentTermExpiry expiry, PaymentOrderPassesProperties passes) {
+    public CheckoutClaims(PaymentTerms terms, PaymentTermExpiry expiry, CheckoutMarks marks) {
         this.terms = terms;
         this.expiry = expiry;
-        this.abandonedAfter = passes.reconciliation().threshold();
+        this.marks = marks;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -67,10 +65,6 @@ public class CheckoutClaims {
     }
 
     private boolean claimable(InvoiceView invoice, Instant now) {
-        return invoice.state() == InvoiceState.READY || abandoned(invoice, now);
-    }
-
-    private boolean abandoned(InvoiceView invoice, Instant now) {
-        return invoice.state() == InvoiceState.CHECKOUT && invoice.checkoutStartedBy(now.minus(abandonedAfter));
+        return invoice.state() == InvoiceState.READY || marks.abandoned(invoice, now);
     }
 }

@@ -36,7 +36,7 @@ class CheckoutClaimsTest {
 
     private final PaymentTermExpiry expiry = mock();
     private final CheckoutClaims claims = new CheckoutClaims(new PaymentTerms(OrderingTestProperties.passes()), expiry,
-            OrderingTestProperties.passes());
+            new CheckoutMarks(OrderingTestProperties.passes()));
     private final Contract contract = PaymentOrders.acceptedContract();
     private final PaymentOrder order = PaymentOrders.created();
 
