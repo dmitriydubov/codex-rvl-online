@@ -49,12 +49,12 @@ public class ContractStops {
             return;
         }
         contract.cancel(cancellation, now);
-        if (paid(contract, invoice)) {
+        if (contract.progress().paidAt().isPresent()) {
             metrics.countPaidCancelled();
             PaymentOrderLog.write(log.atInfo(), contract, PAID_STOPPED);
             return;
         }
-        order.ifPresent(stopped -> stopped.withdraw(now));
+        order.filter(stopped -> !paid(invoice)).ifPresent(stopped -> stopped.withdraw(now));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -78,8 +78,7 @@ public class ContractStops {
                 && invoice.map(OrderInvoice::view).filter(InvoiceView::awaitsPayment).isPresent();
     }
 
-    private static boolean paid(Contract contract, Optional<OrderInvoice> invoice) {
-        return contract.progress().paidAt().isPresent()
-                || invoice.map(OrderInvoice::view).filter(view -> view.state() == InvoiceState.PAID).isPresent();
+    private static boolean paid(Optional<OrderInvoice> invoice) {
+        return invoice.map(OrderInvoice::view).filter(view -> view.state() == InvoiceState.PAID).isPresent();
     }
 }

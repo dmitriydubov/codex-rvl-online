@@ -181,7 +181,7 @@ class ContractStopsTest {
     }
 
     @Test
-    void stop_ofContractInErrorWhoseInvoiceIsPaid_countsTheRefundByTheInvoiceAlone() {
+    void stop_ofContractPaidAfterItsCancellation_cancelsItWithoutCountingTheRefundAgainAndLeavesThePaidOrderAlone() {
         Contract contract = Invoices.invoicedContract();
         contract.markError(IssueErrors.kmContractPaidAfterCancellation(), Invoices.STARTED);
         PaymentOrder order = found(PaymentOrders.created());
@@ -190,10 +190,25 @@ class ContractStopsTest {
         stops.stop(contract, CANCELLATION, NOW);
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+        assertThat(contract.state().cancellation()).contains(CANCELLATION);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
+        verify(metrics, never()).countPaidCancelled();
+        assertThat(log.events()).isEmpty();
+    }
+
+    @Test
+    void stop_ofPaidContractWhoseInvoiceIsNotMarkedPaid_countsTheRefundByTheMomentOfPaymentAndLeavesTheOrderAlone() {
+        Contract contract = Invoices.invoicedContract();
+        contract.markPaid(Invoices.STARTED, Invoices.STARTED);
+        PaymentOrder order = found(PaymentOrders.created());
+        found(Invoices.issued());
+
+        stops.stop(contract, CANCELLATION, NOW);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
         verify(metrics).countPaidCancelled();
         assertThat(log.at(Level.INFO)).hasSize(1);
-        assertThat(log.at(Level.WARN)).isEmpty();
     }
 
     @Test
