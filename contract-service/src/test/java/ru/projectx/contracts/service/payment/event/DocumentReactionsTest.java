@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.payment.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -84,10 +85,11 @@ class DocumentReactionsTest {
     }
 
     @Test
-    void pendingPayment_forInvoiceInCheckout_recordsTheLostReply() {
+    void pendingPayment_forInvoiceInCheckout_recordsThatPaymentIsAwaitedWithoutReportingALostReply() {
         assertThat(pending.react(target(PaymentOrders.created(), Invoices.inCheckout()), EVENT, NOW)).isEmpty();
 
-        verify(recording).replyLost(PaymentOrders.CONTRACT);
+        verify(recording).paymentAwaited(PaymentOrders.CONTRACT);
+        verify(recording, never()).replyLost(PaymentOrders.CONTRACT);
     }
 
     @Test

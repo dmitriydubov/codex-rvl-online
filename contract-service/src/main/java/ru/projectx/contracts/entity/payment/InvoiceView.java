@@ -23,4 +23,8 @@ public record InvoiceView(
     public boolean cancellationDeferred() {
         return deferredCancellation.isPresent();
     }
+
+    public boolean checkoutStartedBy(Instant moment) {
+        return term.map(InvoiceTerm::startedAt).filter(started -> !started.isAfter(moment)).isPresent();
+    }
 }

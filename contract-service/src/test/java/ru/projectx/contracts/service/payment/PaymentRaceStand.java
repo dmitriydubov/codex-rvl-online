@@ -50,8 +50,9 @@ final class PaymentRaceStand {
     private static final String ORDER_ROW = "select id, state::text as state, external_order_id, payer_email"
             + " from payment_orders where contract_id = ?";
     private static final String INVOICE_ROW = "select state::text as state, checkout_started_at, payment_deadline,"
-            + " invoice_id, payment_url, paid_at, deferred_cancel_reason::text as deferred_cancel_reason,"
-            + " deferred_cancelled_at from payment_invoices where contract_id = ?";
+            + " invoice_id, payment_url, paid_at, reply_lost_reported,"
+            + " deferred_cancel_reason::text as deferred_cancel_reason, deferred_cancelled_at"
+            + " from payment_invoices where contract_id = ?";
 
     @TestConfiguration(proxyBeanMethods = false)
     static class Scripted {
@@ -115,6 +116,12 @@ final class PaymentRaceStand {
     void makeInvoiceStale(UUID contractId) {
         assertThat(jdbc.sql("update payment_invoices set updated_at = updated_at - interval '1 hour'"
                 + " where contract_id = ?").param(contractId).update()).isEqualTo(1);
+    }
+
+    void makeCheckoutAbandoned(UUID contractId) {
+        assertThat(jdbc.sql("update payment_invoices set checkout_started_at = checkout_started_at - interval '1 hour',"
+                + " updated_at = updated_at - interval '1 hour' where contract_id = ?").param(contractId).update())
+                .isEqualTo(1);
     }
 
     Map<String, Object> contract(UUID contractId) {

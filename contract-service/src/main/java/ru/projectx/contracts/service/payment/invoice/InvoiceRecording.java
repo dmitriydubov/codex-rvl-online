@@ -69,12 +69,26 @@ public class InvoiceRecording {
     }
 
     @Transactional
+    public void paymentAwaited(UUID contractId) {
+        LockedInvoice locked = locks.lockInvoice(contractId);
+        fence.holdUntilCommit();
+        Instant now = clock.instant();
+        if (locked.invoice().pass(InvoiceTransition.PAYMENT_AWAITED, now)) {
+            invoiced(locked, now);
+        }
+    }
+
+    @Transactional
     public void replyLost(UUID contractId) {
         LockedInvoice locked = locks.lockInvoice(contractId);
         fence.holdUntilCommit();
         Instant now = clock.instant();
         if (locked.invoice().pass(InvoiceTransition.REPLY_LOST, now)) {
             invoiced(locked, now);
+            alerts.replyLost(locked.contract());
+            return;
+        }
+        if (locked.invoice().pass(InvoiceTransition.REPLY_LOSS_REPORTED, now)) {
             alerts.replyLost(locked.contract());
         }
     }

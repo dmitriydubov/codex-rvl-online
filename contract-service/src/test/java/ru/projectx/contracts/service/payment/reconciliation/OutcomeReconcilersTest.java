@@ -9,17 +9,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import ru.projectx.contracts.entity.contract.Contract;
-import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.service.payment.Invoices;
 import ru.projectx.contracts.service.payment.LockedInvoice;
 import ru.projectx.contracts.service.payment.OrderingEvent;
 import ru.projectx.contracts.service.payment.OrderingOrder;
-import ru.projectx.contracts.service.payment.invoice.InvoiceRecording;
 import ru.projectx.contracts.service.payment.invoice.PaymentOutcomes;
 import ru.projectx.contracts.support.PaymentOrders;
 
@@ -28,10 +24,8 @@ class OutcomeReconcilersTest {
     private static final Instant NOW = Instant.parse("2026-02-11T10:20:00Z");
     private static final Instant MOMENT = Instant.parse("2026-02-11T10:00:00.250Z");
 
-    private final InvoiceRecording recording = mock();
     private final PaymentOutcomes outcomes = mock();
     private final ReconciliationAlerts alerts = mock();
-    private final PendingOrderReconciler pending = new PendingOrderReconciler(recording, alerts);
     private final StateReconciler paid = new OutcomeReconcilers().paidOrderReconciler(outcomes, alerts);
     private final StateReconciler overdue = new OutcomeReconcilers().overdueOrderReconciler(outcomes, alerts);
     private final Contract contract = Invoices.invoicedContract();
@@ -45,41 +39,8 @@ class OutcomeReconcilersTest {
 
     @Test
     void reconcilers_nameTheOrderingStatusesTheyApply() {
-        assertThat(pending.status()).isEqualTo("PENDING_PAYMENT");
         assertThat(paid.status()).isEqualTo("PAID");
         assertThat(overdue.status()).isEqualTo("PAYMENT_OVERDUE");
-    }
-
-    @Test
-    void pendingOrderWhoseInvoiceIsStillInCheckout_meansTheReplyWasLost() {
-        LockedInvoice inCheckout = new LockedInvoice(contract, order, Invoices.inCheckout());
-
-        assertThat(pending.reconcile(inCheckout, order("PENDING_PAYMENT"), NOW)).isEqualTo(Followup.NONE);
-
-        verify(recording).replyLost(PaymentOrders.CONTRACT);
-        verifyNoInteractions(alerts);
-    }
-
-    @ParameterizedTest
-    @EnumSource(names = {"ISSUED", "PAYMENT_ERROR"})
-    void pendingOrderWhoseInvoiceAwaitsPayment_onlyWaits(InvoiceState state) {
-        LockedInvoice awaiting = new LockedInvoice(contract, order, Invoices.in(state));
-
-        assertThat(pending.reconcile(awaiting, order("PENDING_PAYMENT"), NOW)).isEqualTo(Followup.NONE);
-
-        verifyNoInteractions(recording, alerts);
-    }
-
-    @ParameterizedTest
-    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"CHECKOUT", "ISSUED", "PAYMENT_ERROR"})
-    void pendingOrderWhoseInvoiceDoesNotAwaitPayment_isAnUnexpectedState(InvoiceState state) {
-        OrderInvoice invoice = Invoices.in(state);
-
-        assertThat(pending.reconcile(new LockedInvoice(contract, order, invoice), order("PENDING_PAYMENT"), NOW))
-                .isEqualTo(Followup.NONE);
-
-        verify(alerts).unexpectedState(contract, invoice.view(), "PENDING_PAYMENT");
-        verifyNoInteractions(recording);
     }
 
     @Test

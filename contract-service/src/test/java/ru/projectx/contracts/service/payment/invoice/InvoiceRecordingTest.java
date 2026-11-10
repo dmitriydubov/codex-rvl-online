@@ -140,9 +140,9 @@ class InvoiceRecordingTest {
     }
 
     @Test
-    void issued_afterTheEventAdmittedTheReplyLost_recordsTheLateLinkAndTellsRequests() {
+    void issued_afterTheEventSaidPaymentIsAwaited_recordsTheLateLinkAndTellsRequests() {
         OrderInvoice invoice = locked(Invoices.inCheckout());
-        recording.replyLost(PaymentOrders.CONTRACT);
+        recording.paymentAwaited(PaymentOrders.CONTRACT);
 
         recording.issued(PaymentOrders.CONTRACT, Invoices.LINK);
 
@@ -210,37 +210,6 @@ class InvoiceRecordingTest {
         assertThat(invoice.view().state()).isEqualTo(InvoiceState.CHECKOUT);
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
         verifyNoInteractions(statuses);
-    }
-
-    @Test
-    void replyLost_issuesTheInvoiceWithoutLinkAlertsAndTellsRequestsNothing() {
-        OrderInvoice invoice = locked(Invoices.inCheckout());
-
-        recording.replyLost(PaymentOrders.CONTRACT);
-
-        assertThat(invoice.view().state()).isEqualTo(InvoiceState.ISSUED);
-        assertThat(invoice.view().link()).isEmpty();
-        assertThat(Invoices.updatedAt(invoice)).isEqualTo(NOW);
-        assertThat(order.view().payer()).isEmpty();
-        assertThat(contract.status()).isEqualTo(ContractStatus.INVOICE_ISSUED);
-        InOrder sequence = inOrder(locks, fence, alerts);
-        sequence.verify(locks).lockInvoice(PaymentOrders.CONTRACT);
-        sequence.verify(fence).holdUntilCommit();
-        sequence.verify(alerts).replyLost(contract);
-        verifyNoInteractions(statuses);
-    }
-
-    @Test
-    void replyLost_forInvoiceThatLeftCheckout_changesNothing() {
-        OrderInvoice invoice = locked(Invoices.ready());
-
-        recording.replyLost(PaymentOrders.CONTRACT);
-
-        assertThat(invoice.view().state()).isEqualTo(InvoiceState.READY);
-        assertThat(order.view().payer()).contains(PaymentOrders.PAYER);
-        assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
-        verify(fence).holdUntilCommit();
-        verifyNoInteractions(alerts);
     }
 
     @Test

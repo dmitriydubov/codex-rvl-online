@@ -29,7 +29,7 @@ class PendingPaymentReaction implements OrderEventReaction {
     public Optional<Ignored> react(EventTarget target, OrderEvent event, Instant now) {
         Optional<InvoiceState> invoice = target.invoice().map(OrderInvoice::view).map(view -> view.state());
         if (invoice.filter(InvoiceState.CHECKOUT::equals).isPresent()) {
-            recording.replyLost(target.locked().contract().id());
+            recording.paymentAwaited(target.locked().contract().id());
             return Optional.empty();
         }
         if (invoice.filter(InvoiceState.ISSUED::equals).isPresent()) {

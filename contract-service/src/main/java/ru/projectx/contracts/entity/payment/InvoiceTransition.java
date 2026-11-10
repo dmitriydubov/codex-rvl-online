@@ -9,7 +9,9 @@ public enum InvoiceTransition {
     REMINDERS_EXHAUSTED(EnumSet.of(InvoiceState.AWAITING_DOCUMENT), InvoiceState.DOCUMENT_UNCONFIRMED),
     DOCUMENT_RESENT(EnumSet.of(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED),
             InvoiceState.AWAITING_DOCUMENT),
+    PAYMENT_AWAITED(EnumSet.of(InvoiceState.CHECKOUT), InvoiceState.ISSUED),
     REPLY_LOST(EnumSet.of(InvoiceState.CHECKOUT), InvoiceState.ISSUED),
+    REPLY_LOSS_REPORTED(EnumSet.of(InvoiceState.ISSUED), InvoiceState.ISSUED),
     PAYMENT_FAILED(EnumSet.of(InvoiceState.ISSUED), InvoiceState.PAYMENT_ERROR),
     PAYMENT_OVERDUE(EnumSet.of(InvoiceState.CHECKOUT, InvoiceState.ISSUED, InvoiceState.PAYMENT_ERROR),
             InvoiceState.OVERDUE);
@@ -30,7 +32,11 @@ public enum InvoiceTransition {
         return to;
     }
 
-    boolean restartsReminders() {
-        return this == DOCUMENT_RESENT;
+    int remindersAfter(int reminders) {
+        return this == DOCUMENT_RESENT ? 0 : reminders;
+    }
+
+    boolean reportsLostReply() {
+        return this == REPLY_LOST || this == REPLY_LOSS_REPORTED;
     }
 }

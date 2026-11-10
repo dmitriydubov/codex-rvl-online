@@ -63,6 +63,9 @@ public class OrderInvoice {
     @Column(name = "payment_url")
     private String paymentUrl;
 
+    @Column(nullable = false)
+    private boolean replyLostReported;
+
     @Nullable
     @Column(name = "paid_at")
     private Instant paidAt;
@@ -109,13 +112,19 @@ public class OrderInvoice {
     }
 
     public boolean pass(InvoiceTransition transition, Instant now) {
+        if (isRefused(transition)) {
+            return false;
+        }
         if (!enter(transition.from(), transition.to(), now)) {
             return false;
         }
-        if (transition.restartsReminders()) {
-            this.fixRepeats = 0;
-        }
+        this.fixRepeats = transition.remindersAfter(fixRepeats);
+        this.replyLostReported |= transition.reportsLostReply();
         return true;
+    }
+
+    private boolean isRefused(InvoiceTransition transition) {
+        return transition.reportsLostReply() && (replyLostReported || paymentUrl != null);
     }
 
     public boolean start(Instant deadline, Instant now) {

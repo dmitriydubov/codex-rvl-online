@@ -40,4 +40,30 @@ class InvoiceViewTest {
     void invoiceWithoutDeferredCancellation_saysSo() {
         assertThat(view(InvoiceState.ISSUED, Optional.empty()).cancellationDeferred()).isFalse();
     }
+
+    private static InvoiceView startedAt(Instant started) {
+        return new InvoiceView(ID, ID, InvoiceState.CHECKOUT, 0,
+                Optional.of(new InvoiceTerm(started, started.plusSeconds(259_200))), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    @Test
+    void checkoutStartedBeforeOrExactlyAtTheMoment_wasStartedByIt() {
+        Instant moment = Instant.parse("2026-02-10T07:20:00Z");
+
+        assertThat(startedAt(moment.minusMillis(1)).checkoutStartedBy(moment)).isTrue();
+        assertThat(startedAt(moment).checkoutStartedBy(moment)).isTrue();
+    }
+
+    @Test
+    void checkoutStartedAfterTheMoment_wasNotStartedByIt() {
+        Instant moment = Instant.parse("2026-02-10T07:20:00Z");
+
+        assertThat(startedAt(moment.plusMillis(1)).checkoutStartedBy(moment)).isFalse();
+    }
+
+    @Test
+    void invoiceWhoseCheckoutNeverStarted_wasNotStartedByAnyMoment() {
+        assertThat(view(InvoiceState.READY, Optional.empty()).checkoutStartedBy(Instant.MAX)).isFalse();
+    }
 }

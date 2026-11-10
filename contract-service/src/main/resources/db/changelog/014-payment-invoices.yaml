@@ -21,7 +21,8 @@ databaseChangeLog:
         Запись счёта заводится вместе с номером заказа: одна на заказ. Она ведёт подтверждение документа
         (число повторов подтверждения), отметку «счёт начат» — её ставят до вызова выставления счёта,
         с неё договор считается договором со счётом, — срок оплаты, идентификатор счёта и ссылку на оплату,
-        момент оплаты и код отказа в счёте. Отложенное прекращение — причина, комментарий и момент
+        момент оплаты, код отказа в счёте и отметку «о потерянном ответе на выставление счёта оповещено» — по ней
+        оповещение даётся один раз на заказ. Отложенное прекращение — причина, комментарий и момент
         прекращения договора со счётом: они применяются, когда сервис управления заказами сообщит о
         просрочке оплаты.
       changes:
@@ -47,6 +48,7 @@ databaseChangeLog:
               - column: { name: payment_url, type: text }
               - column: { name: paid_at, type: timestamptz }
               - column: { name: rejection_code, type: varchar(100) }
+              - column: { name: reply_lost_reported, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
               - column: { name: deferred_cancel_reason, type: contract_cancel_reason }
               - column: { name: deferred_cancel_comment, type: text }
               - column: { name: deferred_cancelled_at, type: timestamptz }

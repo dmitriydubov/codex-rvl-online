@@ -12,7 +12,6 @@ import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.payment.InvoiceState;
-import ru.projectx.contracts.entity.payment.InvoiceTerm;
 import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.entity.payment.PayerEmail;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
@@ -72,8 +71,6 @@ public class CheckoutClaims {
     }
 
     private boolean abandoned(InvoiceView invoice, Instant now) {
-        Instant startedBefore = now.minus(abandonedAfter);
-        return invoice.state() == InvoiceState.CHECKOUT
-                && invoice.term().map(InvoiceTerm::startedAt).filter(started -> !started.isAfter(startedBefore)).isPresent();
+        return invoice.state() == InvoiceState.CHECKOUT && invoice.checkoutStartedBy(now.minus(abandonedAfter));
     }
 }

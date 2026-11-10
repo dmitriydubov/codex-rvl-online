@@ -121,11 +121,17 @@ class PaymentInvoiceRaceIT {
     @Test
     void pendingPaymentCommittedBeforeTheCheckoutReplyIsRecorded_stillGetsTheLinkAndRequestsGetTheReply() {
         long messagesBefore = stand.statusMessages(request);
+        double alertsBefore = alerts("checkout_reply_lost");
         ordering.duringCheckout(
                 () -> assertThat(stand.orderingEvent(contractId, "pendingPayment", PAID_AT)).isEmpty());
 
-        issuing.issueDue();
+        try (PaymentErrorLog log = new PaymentErrorLog()) {
+            issuing.issueDue();
 
+            assertThat(log.errors()).isEmpty();
+        }
+
+        assertThat(alerts("checkout_reply_lost")).isEqualTo(alertsBefore);
         Map<String, Object> invoice = stand.invoice(contractId);
         assertThat(invoice.get("state")).isEqualTo("ISSUED");
         assertThat(invoice.get("invoice_id")).isEqualTo("invoice-1");
@@ -184,7 +190,7 @@ class PaymentInvoiceRaceIT {
         issuing.issueDue();
         assertThat(ordering.checkouts()).isEqualTo(1);
 
-        stand.makeInvoiceStale(contractId);
+        stand.makeCheckoutAbandoned(contractId);
         reconciliation.reconcileDue();
 
         Map<String, Object> admitted = stand.invoice(contractId);
