@@ -1,9 +1,5 @@
 package ru.projectx.contracts.service.payment.invoice;
 
-import ru.projectx.contracts.entity.payment.InvoiceView;
-import ru.projectx.contracts.entity.payment.InvoiceTerm;
-import ru.projectx.contracts.entity.payment.InvoiceState;
-import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -11,9 +7,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.Cancellation;
+import ru.projectx.contracts.entity.payment.InvoiceState;
+import ru.projectx.contracts.entity.payment.InvoiceTerm;
+import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.entity.payment.PayerEmail;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.entity.payment.PaymentOrderView;

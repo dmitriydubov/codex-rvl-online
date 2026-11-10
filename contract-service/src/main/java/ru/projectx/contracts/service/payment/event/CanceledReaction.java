@@ -1,12 +1,12 @@
 package ru.projectx.contracts.service.payment.event;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.Optional;
-import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.stereotype.Component;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.message.payment.PaymentOrderEvents;
 import ru.projectx.contracts.service.payment.PaymentAlert;
 import ru.projectx.contracts.service.payment.PaymentMetrics;

@@ -10,9 +10,9 @@ import static org.mockito.Mockito.verify;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -37,8 +37,8 @@ class FreshInvoicesImplTest {
         given(entityManager.createQuery(BY_CONTRACT, OrderInvoice.class)).willReturn(query);
         given(query.setParameter("contractId", CONTRACT)).willReturn(ofContract);
         given(query.setParameter("contractId", OTHER_CONTRACT)).willReturn(ofOtherContract);
-        given(ofContract.getResultStream()).willAnswer(invocation -> Stream.of(invoice));
-        given(ofOtherContract.getResultStream()).willAnswer(invocation -> Stream.empty());
+        given(ofContract.getResultList()).willReturn(List.of(invoice));
+        given(ofOtherContract.getResultList()).willReturn(List.of());
     }
 
     @Test
@@ -47,7 +47,7 @@ class FreshInvoicesImplTest {
 
         assertThat(found).containsSame(invoice);
         InOrder order = inOrder(ofContract, entityManager);
-        order.verify(ofContract).getResultStream();
+        order.verify(ofContract).getResultList();
         order.verify(entityManager).refresh(invoice);
     }
 
@@ -55,15 +55,15 @@ class FreshInvoicesImplTest {
     void contractWithoutInvoice_givesNothingAndNothingIsReadAfresh() {
         assertThat(invoices.findFreshByContractId(OTHER_CONTRACT)).isEmpty();
 
-        verify(ofOtherContract).getResultStream();
-        verify(ofContract, never()).getResultStream();
+        verify(ofOtherContract).getResultList();
+        verify(ofContract, never()).getResultList();
         verify(entityManager, never()).refresh(any());
     }
 
     @Test
     void firstRecordOfTheQuery_isTheOneReadAfresh() {
         OrderInvoice another = Invoices.ready(CONTRACT);
-        given(ofContract.getResultStream()).willAnswer(invocation -> Stream.of(invoice, another));
+        given(ofContract.getResultList()).willReturn(List.of(invoice, another));
 
         assertThat(invoices.findFreshByContractId(CONTRACT)).containsSame(invoice);
 

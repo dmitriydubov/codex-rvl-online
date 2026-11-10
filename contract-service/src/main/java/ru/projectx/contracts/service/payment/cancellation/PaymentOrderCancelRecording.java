@@ -1,6 +1,5 @@
 package ru.projectx.contracts.service.payment.cancellation;
 
-import ru.projectx.contracts.entity.payment.OrderRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -10,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.payment.LockedOrder;

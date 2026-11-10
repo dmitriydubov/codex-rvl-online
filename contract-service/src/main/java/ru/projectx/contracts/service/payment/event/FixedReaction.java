@@ -1,10 +1,10 @@
 package ru.projectx.contracts.service.payment.event;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.message.payment.PaymentOrderEvents;

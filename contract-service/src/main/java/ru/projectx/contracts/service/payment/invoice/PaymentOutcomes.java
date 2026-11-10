@@ -1,14 +1,14 @@
 package ru.projectx.contracts.service.payment.invoice;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;

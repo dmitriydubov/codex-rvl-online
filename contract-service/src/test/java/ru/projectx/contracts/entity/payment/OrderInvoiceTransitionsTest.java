@@ -81,6 +81,38 @@ class OrderInvoiceTransitionsTest {
         assertPassed(InvoiceTransition.DOCUMENT_RESENT, state, InvoiceState.AWAITING_DOCUMENT);
     }
 
+    @Test
+    void documentResent_startsTheConfirmationRepeatsAnew() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.AWAITING_DOCUMENT);
+        invoice.repeatFix(OPENED);
+        invoice.repeatFix(OPENED);
+
+        invoice.pass(InvoiceTransition.DOCUMENT_RESENT, LATER);
+
+        assertThat(invoice.view().fixRepeats()).isZero();
+    }
+
+    @Test
+    void otherTransitions_keepTheConfirmationRepeats() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.AWAITING_DOCUMENT);
+        invoice.repeatFix(OPENED);
+
+        invoice.pass(InvoiceTransition.REMINDERS_EXHAUSTED, LATER);
+
+        assertThat(invoice.view().fixRepeats()).isEqualTo(1);
+    }
+
+    @Test
+    void refusedDocumentResent_keepsTheConfirmationRepeats() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.AWAITING_DOCUMENT);
+        invoice.repeatFix(OPENED);
+        ReflectionTestUtils.setField(invoice, "state", InvoiceState.READY);
+
+        invoice.pass(InvoiceTransition.DOCUMENT_RESENT, LATER);
+
+        assertThat(invoice.view().fixRepeats()).isEqualTo(1);
+    }
+
     @ParameterizedTest
     @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"AWAITING_DOCUMENT", "DOCUMENT_UNCONFIRMED"})
     void documentResent_isRefusedOnceTheDocumentWasConfirmed(InvoiceState state) {

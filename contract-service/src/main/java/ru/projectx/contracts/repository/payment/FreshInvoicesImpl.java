@@ -20,7 +20,8 @@ class FreshInvoicesImpl implements FreshInvoices {
     public Optional<OrderInvoice> findFreshByContractId(UUID contractId) {
         Optional<OrderInvoice> invoice = entityManager.createQuery(BY_CONTRACT, OrderInvoice.class)
                 .setParameter(CONTRACT_ID, contractId)
-                .getResultStream()
+                .getResultList()
+                .stream()
                 .findFirst();
         invoice.ifPresent(entityManager::refresh);
         return invoice;

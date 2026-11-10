@@ -109,7 +109,13 @@ public class OrderInvoice {
     }
 
     public boolean pass(InvoiceTransition transition, Instant now) {
-        return enter(transition.from(), transition.to(), now);
+        if (!enter(transition.from(), transition.to(), now)) {
+            return false;
+        }
+        if (transition.restartsReminders()) {
+            this.fixRepeats = 0;
+        }
+        return true;
     }
 
     public boolean start(Instant deadline, Instant now) {

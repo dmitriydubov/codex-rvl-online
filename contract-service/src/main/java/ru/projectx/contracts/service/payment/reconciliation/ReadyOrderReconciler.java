@@ -1,9 +1,9 @@
 package ru.projectx.contracts.service.payment.reconciliation;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
-import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.service.payment.LockedInvoice;

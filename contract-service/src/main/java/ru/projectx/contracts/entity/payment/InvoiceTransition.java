@@ -29,4 +29,8 @@ public enum InvoiceTransition {
     InvoiceState to() {
         return to;
     }
+
+    boolean restartsReminders() {
+        return this == DOCUMENT_RESENT;
+    }
 }
