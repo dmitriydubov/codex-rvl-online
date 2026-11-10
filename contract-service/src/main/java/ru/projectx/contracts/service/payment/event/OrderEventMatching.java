@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.payment.event;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -9,6 +11,7 @@ import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 import ru.projectx.contracts.service.payment.IgnoredEvent;
 
 @Component
+@ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 class OrderEventMatching {
 
     static final String NO_EVENT_TYPE = "в событии нет eventType";

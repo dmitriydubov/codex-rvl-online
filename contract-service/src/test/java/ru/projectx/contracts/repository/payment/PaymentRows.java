@@ -10,6 +10,7 @@ import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.payment.OrderDocument;
 import ru.projectx.contracts.entity.payment.OrderDraft;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PayerEmail;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
@@ -43,14 +44,17 @@ final class PaymentRows {
     }
 
     PaymentOrder order(Instant createdAt, Instant boundary, Consumer<PaymentOrder> state) {
+        return orderOf(new PayerEmail(PAYER), createdAt, boundary, state);
+    }
+
+    PaymentOrder orderOf(PayerEmail payer, Instant createdAt, Instant boundary, Consumer<PaymentOrder> state) {
         numbered++;
         String number = "DKM-2026-%06d".formatted(numbered);
         return transaction.execute(status -> {
             Contract contract = contracts.save(Contract.open(new ContractDraft(number, Issuances.TERMS,
                     UUID.randomUUID(), new BigDecimal("34000.00")), createdAt));
             PaymentOrder order = PaymentOrder.open(new OrderDraft(contract.id(), Tasks.INSURED,
-                    new OrderDocument(number, new BigDecimal("34000.00"), createdAt, boundary), new PayerEmail(PAYER)),
-                    createdAt);
+                    new OrderDocument(number, new BigDecimal("34000.00"), createdAt, boundary), payer), createdAt);
             state.accept(order);
             return orders.save(order);
         });
@@ -58,7 +62,7 @@ final class PaymentRows {
 
     PaymentOrder created(Instant createdAt, String orderId) {
         return order(createdAt, BOUNDARY, order -> {
-            order.markRequested(createdAt);
+            order.markRequested(OrderRequest.CREATION, createdAt);
             order.recordOrder(orderId, createdAt);
         });
     }

@@ -7,6 +7,8 @@ public enum InvoiceTransition {
     DOCUMENT_CONFIRMED(EnumSet.of(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED),
             InvoiceState.READY),
     REMINDERS_EXHAUSTED(EnumSet.of(InvoiceState.AWAITING_DOCUMENT), InvoiceState.DOCUMENT_UNCONFIRMED),
+    DOCUMENT_RESENT(EnumSet.of(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED),
+            InvoiceState.AWAITING_DOCUMENT),
     REPLY_LOST(EnumSet.of(InvoiceState.CHECKOUT), InvoiceState.ISSUED),
     PAYMENT_FAILED(EnumSet.of(InvoiceState.ISSUED), InvoiceState.PAYMENT_ERROR),
     PAYMENT_OVERDUE(EnumSet.of(InvoiceState.CHECKOUT, InvoiceState.ISSUED, InvoiceState.PAYMENT_ERROR),

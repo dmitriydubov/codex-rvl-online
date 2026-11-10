@@ -8,6 +8,7 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.payment.OrderDocument;
 import ru.projectx.contracts.entity.payment.OrderDraft;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PayerEmail;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 
@@ -41,7 +42,7 @@ public final class PaymentOrders {
 
     public static PaymentOrder created() {
         PaymentOrder order = awaiting();
-        order.markRequested(Issuances.OPENED);
+        order.markRequested(OrderRequest.CREATION, Issuances.OPENED);
         order.recordOrder(ORDER_ID, Issuances.OPENED);
         return order;
     }

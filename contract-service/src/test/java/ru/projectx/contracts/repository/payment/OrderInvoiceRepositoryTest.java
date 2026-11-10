@@ -26,6 +26,7 @@ import ru.projectx.contracts.entity.payment.InvoiceTerm;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
@@ -154,6 +155,44 @@ class OrderInvoiceRepositoryTest {
     }
 
     @Test
+    void freshRead_seesARowChangedPastThePersistenceContextWhileThePlainReadKeepsTheLoadedState() {
+        PaymentOrder order = rows.created(NOW, "o-1");
+        UUID contractId = order.view().contractId();
+        rows.invoice(order, NOW, invoice -> { });
+
+        List<InvoiceView> views = transaction.execute(status -> {
+            InvoiceView loaded = invoices.findByContractId(contractId).orElseThrow().view();
+            jdbc.sql("update payment_invoices set state = 'READY'::payment_invoice_state, fix_repeats = 2"
+                    + " where contract_id = :contract").param("contract", contractId).update();
+            InvoiceView readAgain = invoices.findByContractId(contractId).orElseThrow().view();
+            InvoiceView fresh = invoices.findFreshByContractId(contractId).orElseThrow().view();
+            return List.of(loaded, readAgain, fresh);
+        });
+
+        assertThat(views.get(0)).returns(InvoiceState.AWAITING_DOCUMENT, InvoiceView::state)
+                .returns(0, InvoiceView::fixRepeats);
+        assertThat(views.get(1)).isEqualTo(views.get(0));
+        assertThat(views.get(2)).returns(InvoiceState.READY, InvoiceView::state).returns(2, InvoiceView::fixRepeats);
+    }
+
+    @Test
+    void freshRead_givesTheManagedRecordOfTheContractOrNothing() {
+        PaymentOrder order = rows.created(NOW, "o-1");
+        rows.invoice(order, NOW, invoice -> { });
+
+        Boolean sameRecord = transaction.execute(status -> {
+            OrderInvoice loaded = invoices.findByContractId(order.view().contractId()).orElseThrow();
+            return invoices.findFreshByContractId(order.view().contractId()).orElseThrow() == loaded;
+        });
+
+        Optional<OrderInvoice> ofUnknownContract = transaction.execute(status ->
+                invoices.findFreshByContractId(UUID.fromString("00000000-0000-4000-8000-000000000001")));
+
+        assertThat(sameRecord).isTrue();
+        assertThat(ofUnknownContract).isEmpty();
+    }
+
+    @Test
     void secondInvoiceOfTheSameOrder_isRefusedByTheDatabase() {
         PaymentOrder order = rows.created(NOW, "o-1");
         rows.invoice(order, NOW, invoice -> { });
@@ -161,6 +200,30 @@ class OrderInvoiceRepositoryTest {
         assertThatThrownBy(() -> rows.invoice(order, NOW, invoice -> { }))
                 .isInstanceOf(DataIntegrityViolationException.class)
                 .hasMessageContaining("uq_payment_invoices_");
+    }
+
+    @Test
+    void secondInvoiceOfAnOrder_isRefusedByTheOrderEvenUnderAnotherContract() {
+        PaymentOrder order = rows.created(NOW, "o-1");
+        PaymentOrder another = rows.created(NOW, "o-2");
+        rows.invoice(order, NOW, invoice -> { });
+        OrderInvoice second = OrderInvoice.open(order.view().id(), another.view().contractId(), NOW);
+
+        assertThatThrownBy(() -> transaction.execute(status -> invoices.save(second)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("uq_payment_invoices_order_id");
+    }
+
+    @Test
+    void secondInvoiceOfAContract_isRefusedByTheContractEvenUnderAnotherOrder() {
+        PaymentOrder order = rows.created(NOW, "o-1");
+        PaymentOrder another = rows.created(NOW, "o-2");
+        rows.invoice(order, NOW, invoice -> { });
+        OrderInvoice second = OrderInvoice.open(another.view().id(), order.view().contractId(), NOW);
+
+        assertThatThrownBy(() -> transaction.execute(status -> invoices.save(second)))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("uq_payment_invoices_contract_id");
     }
 
     @Test
@@ -176,7 +239,7 @@ class OrderInvoiceRepositoryTest {
             invoice.start(Invoices.DEADLINE, NOW);
         });
         rows.invoice(rows.order(NOW, PaymentRows.BOUNDARY, order -> {
-            order.markRequested(NOW);
+            order.markRequested(OrderRequest.CREATION, NOW);
             order.recordOrder("o-5", NOW);
             order.withdraw(NOW);
         }), NOW.minusSeconds(10), invoice -> { });

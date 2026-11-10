@@ -1,7 +1,6 @@
 package ru.projectx.contracts.service.payment.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
-import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.service.payment.IgnoredEvent;
 import ru.projectx.contracts.service.payment.Invoices;
 import ru.projectx.contracts.service.payment.LockedInvoice;
@@ -28,7 +26,6 @@ class PaymentReactionsTest {
     private static final Instant UPDATED = Instant.parse("2026-02-11T10:00:00.250Z");
 
     private final PaymentOutcomes outcomes = mock();
-    private final PaidReaction paid = new PaidReaction(outcomes);
     private final PaymentErrorReaction paymentError = new PaymentErrorReaction(outcomes);
     private final PaymentOverdueReaction overdue = new PaymentOverdueReaction(outcomes);
     private final Contract contract = Invoices.invoicedContract();
@@ -45,43 +42,8 @@ class PaymentReactionsTest {
 
     @Test
     void reactions_nameTheEventTypesOfOrdering() {
-        assertThat(paid.eventType()).isEqualTo("paid");
         assertThat(paymentError.eventType()).isEqualTo("paymentError");
         assertThat(overdue.eventType()).isEqualTo("paymentOverdue");
-    }
-
-    @Test
-    void paid_appliesThePaymentAtTheMomentOfTheEvent() {
-        given(outcomes.paid(locked, UPDATED, NOW)).willReturn(true);
-
-        assertThat(paid.react(invoiced, event("paid", Optional.of(UPDATED)), NOW)).isEmpty();
-
-        verify(outcomes).paid(locked, UPDATED, NOW);
-    }
-
-    @Test
-    void paid_thatThePaymentOutcomeRefuses_isOutOfOrder() {
-        given(outcomes.paid(locked, UPDATED, NOW)).willReturn(false);
-
-        assertThat(paid.react(invoiced, event("paid", Optional.of(UPDATED)), NOW)).contains(
-                new Ignored(IgnoredEvent.OUT_OF_ORDER, "событие paid не по порядку: заказ ждёт оплаты"));
-    }
-
-    @Test
-    void paid_forOrderWithoutInvoice_isOutOfOrder() {
-        assertThat(paid.react(withoutInvoice, event("paid", Optional.of(UPDATED)), NOW))
-                .contains(new Ignored(IgnoredEvent.OUT_OF_ORDER, "событие paid не по порядку: заказ создан"));
-
-        verifyNoInteractions(outcomes);
-    }
-
-    @Test
-    void paid_withoutTheMomentOfTheChange_violatesTheContractAndAppliesNothing() {
-        assertThatThrownBy(() -> paid.react(invoiced, event("paid", Optional.empty()), NOW))
-                .isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля updated");
-
-        verifyNoInteractions(outcomes);
     }
 
     @Test

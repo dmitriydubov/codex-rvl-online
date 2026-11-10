@@ -20,9 +20,11 @@ import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
+import ru.projectx.contracts.dto.PayerEmailFormat;
 import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PayerEmail;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderKeys;
@@ -87,6 +89,17 @@ class PaymentOrderRepositoryTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void longestPayerAddressTheAcceptanceAllows_isStoredInFull() {
+        String domain = "@stand.example.test";
+        PayerEmail longest = new PayerEmail("p".repeat(PayerEmailFormat.MAX_LENGTH - domain.length()) + domain);
+
+        PaymentOrder order = rows.orderOf(longest, NOW, PaymentRows.BOUNDARY, opened -> { });
+
+        assertThat(longest.address()).hasSize(254);
+        assertThat(orders.findById(order.view().id()).orElseThrow().view().payer()).contains(longest);
+    }
+
     @ParameterizedTest
     @EnumSource(PaymentOrderState.class)
     void everyOrderState_isAValueOfTheDatabaseType(PaymentOrderState state) {
@@ -114,7 +127,7 @@ class PaymentOrderRepositoryTest {
         PaymentOrder earlier = rows.created(NOW, "o-2");
         PaymentOrder awaitingDocument = rows.created(NOW.minusSeconds(5), "o-3");
         PaymentOrder withdrawn = rows.order(NOW.minusSeconds(9), PaymentRows.BOUNDARY, order -> {
-            order.markRequested(NOW);
+            order.markRequested(OrderRequest.CREATION, NOW);
             order.recordOrder("o-4", NOW);
             order.withdraw(NOW);
         });
@@ -268,7 +281,7 @@ class PaymentOrderRepositoryTest {
     }
 
     private static void created(PaymentOrder order) {
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.recordOrder("o-" + UUID.randomUUID(), NOW);
     }
 

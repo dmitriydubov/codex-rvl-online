@@ -53,7 +53,7 @@ class OrderEventApplicationTest {
         given(orders.findKeysByExternalOrderId(PaymentOrders.ORDER_ID))
                 .willReturn(Optional.of(new PaymentOrderKeys(PaymentOrders.CONTRACT, PaymentOrders.CORRELATION)));
         given(locks.lock(PaymentOrders.CONTRACT)).willReturn(new LockedOrder(contract, order));
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
     }
 
     private static OrderEvent event(String type, EventDocument document) {
@@ -97,7 +97,7 @@ class OrderEventApplicationTest {
 
     @Test
     void orderWithoutInvoice_isHandedToTheReactionWithoutIt() {
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
         given(fixed.react(any(), any(), any())).willReturn(Optional.empty());
 
         application.apply(event("fixed", OURS), NOW);
@@ -113,6 +113,12 @@ class OrderEventApplicationTest {
 
         verify(paid, never()).react(any(), any(), any());
         verify(fixed, never()).react(any(), any(), any());
+    }
+
+    @Test
+    void eventWhoseTypeIsNotAPlainIdentifier_isNotApplicableWithoutTheTypeInTheText() {
+        assertThat(application.apply(event("оплата insured@example.test", OURS), NOW)).contains(
+                new Ignored(IgnoredEvent.NOT_APPLICABLE, "событие с типом не по формату заказ не меняет"));
     }
 
     @Test

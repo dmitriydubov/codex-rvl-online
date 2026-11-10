@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import ru.projectx.contracts.entity.payment.OrderRequest;
+import ru.projectx.contracts.entity.payment.OrderRequests;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
@@ -69,7 +71,7 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void requestCancellation_ofOrderFoundBySearch_keepsTheFoundOrderIdBeforeTheCancelCall() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         locked(order);
 
@@ -78,6 +80,18 @@ class PaymentOrderCancelRecordingTest {
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
         assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         assertThat(order.view().cancelRequested()).isTrue();
+    }
+
+    @Test
+    void requestCancellation_marksOnlyTheCancellationRequest() {
+        PaymentOrder order = PaymentOrders.awaiting();
+        order.recordOrder(PaymentOrders.ORDER_ID, NOW);
+        order.withdraw(NOW);
+        locked(order);
+
+        assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isTrue();
+
+        assertThat(order.view().requests()).isEqualTo(new OrderRequests(false, true));
     }
 
     @Test
@@ -93,7 +107,7 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void cancelled_closesThePendingOrderKeepingTheFoundOrderId() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         locked(order);
 
@@ -120,7 +134,7 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void notFound_closesThePendingOrderWithoutOrderId() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         locked(order);
 
@@ -136,7 +150,7 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void notFound_ofPendingOrderThatGotItsOrderIdMeanwhile_keepsItForTheNextCancellationPass() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         order.recordOrder(PaymentOrders.ORDER_ID, NOW);
         locked(order);

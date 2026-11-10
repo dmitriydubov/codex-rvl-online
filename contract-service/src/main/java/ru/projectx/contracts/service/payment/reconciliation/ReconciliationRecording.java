@@ -37,13 +37,14 @@ public class ReconciliationRecording {
     private final LeadershipFence fence;
     private final Clock clock;
 
-    ReconciliationRecording(PaymentOrderLocks locks, OrderInvoiceRepository invoices, ReconciliationTools tools,
-            List<StateReconciler> reconcilers, LeadershipFence fence, Clock clock) {
+    ReconciliationRecording(PaymentOrderLocks locks, OrderInvoiceRepository invoices, PaymentTerms terms,
+            PaymentTermExpiry expiry, ReconciliationAlerts alerts, List<StateReconciler> reconcilers,
+            LeadershipFence fence, Clock clock) {
         this.locks = locks;
         this.invoices = invoices;
-        this.terms = tools.terms();
-        this.expiry = tools.expiry();
-        this.alerts = tools.alerts();
+        this.terms = terms;
+        this.expiry = expiry;
+        this.alerts = alerts;
         this.reconcilers = reconcilers.stream()
                 .collect(Collectors.toUnmodifiableMap(StateReconciler::status, Function.identity()));
         this.fence = fence;
@@ -55,7 +56,7 @@ public class ReconciliationRecording {
         LockedOrder locked = locks.lock(contractId);
         fence.holdUntilCommit();
         Instant now = clock.instant();
-        boolean invoiced = invoices.findByContractId(contractId)
+        boolean invoiced = invoices.findFreshByContractId(contractId)
                 .map(OrderInvoice::view)
                 .filter(invoice -> invoice.state().invoiced())
                 .isPresent();

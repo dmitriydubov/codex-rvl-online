@@ -83,8 +83,8 @@ public class PaymentOrder {
         return new PaymentOrder(draft, now);
     }
 
-    public void markRequested(Instant now) {
-        if (state == PaymentOrderState.CANCEL_PENDING) {
+    public void markRequested(OrderRequest request, Instant now) {
+        if (request == OrderRequest.CANCELLATION) {
             this.cancelRequested = true;
         }
         else {

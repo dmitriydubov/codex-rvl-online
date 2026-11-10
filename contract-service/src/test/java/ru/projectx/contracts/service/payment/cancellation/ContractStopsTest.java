@@ -59,13 +59,13 @@ class ContractStopsTest {
     }
 
     private OrderInvoice found(OrderInvoice invoice) {
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
         return invoice;
     }
 
     private void noRecords() {
         given(orders.findLockedByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
     }
 
     @ParameterizedTest
@@ -125,7 +125,7 @@ class ContractStopsTest {
     void stop_ofContractWithOrderButWithoutInvoice_cancelsAtOnceAndClosesTheOrder() {
         Contract contract = PaymentOrders.acceptedContract();
         PaymentOrder order = found(PaymentOrders.awaiting());
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
 
         stops.stop(contract, CANCELLATION, NOW);
 
@@ -144,7 +144,7 @@ class ContractStopsTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         assertThat(contract.state().cancellation()).contains(CANCELLATION);
-        verify(invoices, never()).findByContractId(any());
+        verify(invoices, never()).findFreshByContractId(any());
         verifyNoInteractions(metrics);
     }
 
@@ -175,7 +175,7 @@ class ContractStopsTest {
         assertThat(contract.state().cancellation()).contains(CANCELLATION);
         assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
         verify(metrics).countPaidCancelled();
-        assertThat(log.at(Level.WARN)).containsExactly(Invoices.logLine(
+        assertThat(log.at(Level.INFO)).containsExactly(Invoices.logLine(
                 "работа по оплаченному договору прекращена: заказ не отменяется, деньги возвращают"));
         assertThat(log.events()).hasSize(1);
     }
@@ -192,7 +192,8 @@ class ContractStopsTest {
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
         verify(metrics).countPaidCancelled();
-        assertThat(log.at(Level.WARN)).hasSize(1);
+        assertThat(log.at(Level.INFO)).hasSize(1);
+        assertThat(log.at(Level.WARN)).isEmpty();
     }
 
     @Test
@@ -205,7 +206,8 @@ class ContractStopsTest {
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         verify(metrics).countPaidCancelled();
-        assertThat(log.at(Level.WARN)).hasSize(1);
+        assertThat(log.at(Level.INFO)).hasSize(1);
+        assertThat(log.at(Level.WARN)).isEmpty();
     }
 
     @Test
@@ -232,7 +234,7 @@ class ContractStopsTest {
 
         org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(orders, invoices);
         sequence.verify(orders).findLockedByContractId(PaymentOrders.CONTRACT);
-        sequence.verify(invoices).findByContractId(PaymentOrders.CONTRACT);
+        sequence.verify(invoices).findFreshByContractId(PaymentOrders.CONTRACT);
     }
 
     @Test
@@ -247,7 +249,7 @@ class ContractStopsTest {
     @Test
     void resume_ofContractWithOrderButWithoutInvoice_changesNothing() {
         PaymentOrder order = found(PaymentOrders.awaiting());
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
 
         stops.resume(PaymentOrders.acceptedContract(), NOW);
 

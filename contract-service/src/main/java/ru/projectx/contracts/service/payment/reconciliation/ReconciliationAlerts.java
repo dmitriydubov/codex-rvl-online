@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.payment.reconciliation;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -10,6 +12,7 @@ import ru.projectx.contracts.service.payment.PaymentMetrics;
 import ru.projectx.contracts.service.payment.PaymentOrderLog;
 
 @Component
+@ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 class ReconciliationAlerts {
 
     static final String DOCUMENT_NOT_FIXED = "Ordering не подтвердил документ после повторов подтверждения";

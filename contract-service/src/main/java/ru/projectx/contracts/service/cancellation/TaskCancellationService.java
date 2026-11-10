@@ -42,16 +42,26 @@ public class TaskCancellationService {
         List<Contract> runningContracts =
                 contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_CONTRACTS);
         contracts.lockFresh(runningContracts);
-        runningContracts.stream()
-                .filter(contract -> !UNTOUCHED_CONTRACTS.contains(contract.status()))
-                .toList()
-                .forEach(contract -> contractStops.stop(contract, outcome, now));
+        for (Contract contract : runningContracts) {
+            stopUnlessFinished(contract, outcome, now);
+        }
         List<LmPolicy> runningPolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_POLICIES);
         policies.lockFresh(runningPolicies);
-        runningPolicies.stream()
-                .filter(policy -> !UNTOUCHED_POLICIES.contains(policy.status()))
-                .toList()
-                .forEach(policy -> policy.cancel(outcome, now));
+        for (LmPolicy policy : runningPolicies) {
+            cancelUnlessFinished(policy, outcome, now);
+        }
+    }
+
+    private void stopUnlessFinished(Contract contract, Cancellation outcome, Instant now) {
+        if (!UNTOUCHED_CONTRACTS.contains(contract.status())) {
+            contractStops.stop(contract, outcome, now);
+        }
+    }
+
+    private static void cancelUnlessFinished(LmPolicy policy, Cancellation outcome, Instant now) {
+        if (!UNTOUCHED_POLICIES.contains(policy.status())) {
+            policy.cancel(outcome, now);
+        }
     }
 }

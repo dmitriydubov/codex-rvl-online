@@ -38,7 +38,8 @@ class PayerEmailFormatTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"insured@example.test", "second.payer@example.test", "payer+lk_2026@mail.example.test",
-        "p@e.t", "o'neil-1@stand-1.example.test"})
+        "p@e.t", "o'neil-1@stand-1.example.test", "insured@mail.example.test", "insured@example.c0m",
+        "insured@1example.test", "insured@192.0.2.test", "insured@example.t-1"})
     void ordinaryAsciiAddressWithDottedDomain_isAccepted(String address) {
         assertThat(violationsOf(address)).isEmpty();
     }
@@ -52,7 +53,8 @@ class PayerEmailFormatTest {
     @ValueSource(strings = {"", " ", "insured.example.test", "insured@", "@example.test", "insured @example.test",
         "insured@exam ple.test", "страхователь@example.test", "insured@пример.тест", "insured@localhost",
         "\"insured\"@example.test", "insured@[192.0.2.1]", "insured@example..test", "insured@-example.test",
-        "insured@example-.test", "insured@example.test.", "insured@@example.test", "42"})
+        "insured@example-.test", "insured@example.test.", "insured@@example.test", "42", "insured@192.0.2.1",
+        "insured@example.123", "insured@example.1com", "insured@example.-com", "insured@example.com-"})
     void addressOutOfFormat_isOneViolationOfTheEmailFieldWithoutTheAddressInItsText(String address) {
         Set<ConstraintViolation<AcceptanceRequest>> violations = violationsOf(address);
 

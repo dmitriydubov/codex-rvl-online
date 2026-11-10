@@ -12,7 +12,7 @@ import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 
-public interface OrderInvoiceRepository extends JpaRepository<OrderInvoice, UUID> {
+public interface OrderInvoiceRepository extends JpaRepository<OrderInvoice, UUID>, FreshInvoices {
 
     Optional<OrderInvoice> findByContractId(UUID contractId);
 

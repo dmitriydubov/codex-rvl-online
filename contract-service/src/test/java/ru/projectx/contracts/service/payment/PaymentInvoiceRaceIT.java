@@ -10,6 +10,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,6 +139,33 @@ class PaymentInvoiceRaceIT {
     }
 
     @Test
+    void staleReadyInvoiceTakenByThePassAndByReconciliationAtOnce_isCheckedOutOnce() throws Exception {
+        stand.makeInvoiceStale(contractId);
+        ordering.orderIs(orderId(), new OrderingOrder(OrderingStatuses.READY_TO_PAYMENT, List.of()));
+        CountDownLatch passInCheckout = new CountDownLatch(1);
+        CountDownLatch reconciled = new CountDownLatch(1);
+        AtomicReference<CompletableFuture<Integer>> pass = new AtomicReference<>();
+        ordering.duringCheckout(() -> {
+            passInCheckout.countDown();
+            awaitQuietly(reconciled);
+        });
+        ordering.duringStateRequest(() -> {
+            pass.set(CompletableFuture.supplyAsync(issuing::issueDue));
+            awaitQuietly(passInCheckout);
+        });
+
+        reconciliation.reconcileDue();
+        reconciled.countDown();
+        pass.get().get(PaymentRaceStand.WAIT.toSeconds(), TimeUnit.SECONDS);
+
+        assertThat(ordering.checkouts()).isEqualTo(1);
+        Map<String, Object> invoice = stand.invoice(contractId);
+        assertThat(invoice.get("state")).isEqualTo("ISSUED");
+        assertThat(invoice.get("payment_url")).isEqualTo(ScriptedOrdering.PAYMENT_URL + "invoice-1");
+        assertThat(stand.contract(contractId).get("status")).isEqualTo("INVOICE_ISSUED");
+    }
+
+    @Test
     void leadershipLostBetweenTheCheckoutAndItsRecord_rollsTheRecordBackAndReconciliationAdmitsTheLostReply() {
         double alertsBefore = alerts("checkout_reply_lost");
         ordering.duringCheckout(() -> stand.handLeadershipTo("stand-other-instance"));
@@ -230,6 +261,15 @@ class PaymentInvoiceRaceIT {
     private double alerts(String reason) {
         return Optional.ofNullable(meters.find("contracts.payment.reconciliation.alerts").tag("reason", reason)
                 .counter()).map(Counter::count).orElse(0.0);
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(PaymentRaceStand.WAIT.toSeconds(), TimeUnit.SECONDS);
+        }
+        catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static Instant moment(Object column) {

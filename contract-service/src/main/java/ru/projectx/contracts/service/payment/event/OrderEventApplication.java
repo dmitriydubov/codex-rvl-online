@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.payment.event;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import ru.projectx.contracts.service.payment.PaymentOrderLocks;
 import ru.projectx.contracts.service.payment.PaymentOrderLog;
 
 @Service
+@ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 public class OrderEventApplication {
 
     private final OrderEventMatching matching;
@@ -55,7 +58,7 @@ public class OrderEventApplication {
         if (mismatch.isPresent()) {
             return mismatch;
         }
-        EventTarget target = new EventTarget(locked, invoices.findByContractId(order.contractId()));
+        EventTarget target = new EventTarget(locked, invoices.findFreshByContractId(order.contractId()));
         String type = event.type().orElseThrow();
         return Optional.ofNullable(reactions.get(type))
                 .map(reaction -> reaction.react(target, event, now))

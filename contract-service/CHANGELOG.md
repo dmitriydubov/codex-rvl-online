@@ -393,7 +393,9 @@
   управления заказами.
 - **Миграции:** `013` добавляет тип `payment_order_state` и таблицу `payment_orders` — заказы на оплату договоров КМ;
   `014` добавляет значение `EXPIRED` в `payment_order_state`, столбец `payment_orders.payer_email`, тип
-  `payment_invoice_state` и таблицу `payment_invoices` — счета по заказам.
+  `payment_invoice_state` и таблицу `payment_invoices` — счета по заказам. Откат `014` значение `EXPIRED` из
+  перечисления не убирает (PostgreSQL не удаляет значения перечислений): перед возвратом к прежней версии заказы в
+  этом состоянии переводят в `CANCELLED` — прежняя версия значения `EXPIRED` не знает.
 - **Удалённые классы:** `service/payment/cancellation/PaymentOrderWithdrawal` (его работу выполняет `ContractStops` в
   том же пакете) и его тест `PaymentOrderWithdrawalTest` — при переносе старые файлы удалить.
 - **Зависимости:** новая `org.springframework.security:spring-security-oauth2-client` (версия из BOM Spring Boot, 7.0.6;

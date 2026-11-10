@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.payment.invoice;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import ru.projectx.contracts.service.status.IssuanceSnapshot;
 import ru.projectx.contracts.service.status.RequestStatusPublication;
 
 @Service
+@ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 public class PaymentOutcomes {
 
     static final String PAID = "договор оплачен";
@@ -53,6 +56,7 @@ public class PaymentOutcomes {
         if (!locked.invoice().pass(InvoiceTransition.PAYMENT_OVERDUE, now)) {
             return false;
         }
+        locked.order().forgetPayer(now);
         Cancellation cancellation = locked.invoice().liftDeferredCancellation(now)
                 .orElseGet(() -> new Cancellation(CancelReason.EXPIRED, null, moment));
         if (locked.contract().status().awaitsPayment()) {

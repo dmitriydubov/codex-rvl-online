@@ -62,7 +62,7 @@ class PaymentOrderTest {
     @Test
     void recordOrder_whileCancelPending_keepsItPendingWithoutConfirmation() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordOrder(ORDER, LATER)).isFalse();
@@ -125,7 +125,7 @@ class PaymentOrderTest {
     @Test
     void withdraw_afterCreationWasSent_waitsForCancellation() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
 
         order.withdraw(LATER);
 
@@ -145,7 +145,7 @@ class PaymentOrderTest {
     @Test
     void withdraw_rejectedAfterCreationWasSent_waitsForCancellationBecauseTheOrderMayExist() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.reject("code", LATER);
 
         order.withdraw(LATER);
@@ -192,7 +192,7 @@ class PaymentOrderTest {
         order.recordOrder(ORDER, LATER);
         order.withdraw(LATER);
 
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CANCELLATION, LATER);
 
         assertThat(order.view().cancelRequested()).isTrue();
         assertThat(order.view().creationRequested()).isFalse();
@@ -203,7 +203,7 @@ class PaymentOrderTest {
     @Test
     void recordCancelled_ofOrderFoundBySearch_keepsItsOrderId() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordCancelled(ORDER, LATER)).isTrue();
@@ -225,7 +225,7 @@ class PaymentOrderTest {
     @Test
     void recordCancelled_ofRecordClosedAsNotFound_keepsItClosedWithoutOrderId() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
         order.recordNotFound(LATER);
 
@@ -238,7 +238,7 @@ class PaymentOrderTest {
     @Test
     void recordNotFound_pendingWithoutOrderId_closesIt() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordNotFound(LATER)).isTrue();
@@ -250,7 +250,7 @@ class PaymentOrderTest {
     @Test
     void recordNotFound_pendingWithOrderId_keepsItForCancellation() {
         PaymentOrder order = opened();
-        order.markRequested(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
         order.recordOrder(ORDER, LATER);
 

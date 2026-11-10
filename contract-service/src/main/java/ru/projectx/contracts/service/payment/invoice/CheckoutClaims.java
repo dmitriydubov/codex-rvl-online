@@ -1,5 +1,10 @@
 package ru.projectx.contracts.service.payment.invoice;
 
+import ru.projectx.contracts.entity.payment.InvoiceView;
+import ru.projectx.contracts.entity.payment.InvoiceTerm;
+import ru.projectx.contracts.entity.payment.InvoiceState;
+import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -22,15 +27,17 @@ public class CheckoutClaims {
 
     private final PaymentTerms terms;
     private final PaymentTermExpiry expiry;
+    private final Duration abandonedAfter;
 
-    public CheckoutClaims(PaymentTerms terms, PaymentTermExpiry expiry) {
+    public CheckoutClaims(PaymentTerms terms, PaymentTermExpiry expiry, PaymentOrderPassesProperties passes) {
         this.terms = terms;
         this.expiry = expiry;
+        this.abandonedAfter = passes.reconciliation().threshold();
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<CheckoutRequest> claim(LockedInvoice locked, Instant now) {
-        if (!awaitsCheckout(locked)) {
+        if (!awaitsCheckout(locked, now)) {
             return Optional.empty();
         }
         Optional<Cancellation> deferred = locked.invoice().liftDeferredCancellation(now);
@@ -54,9 +61,19 @@ public class CheckoutClaims {
                 new NewOrder(order.clientId(), order.id(), order.document()), deadline.get(), payer));
     }
 
-    private static boolean awaitsCheckout(LockedInvoice locked) {
+    private boolean awaitsCheckout(LockedInvoice locked, Instant now) {
         return locked.order().view().state() == PaymentOrderState.CREATED
                 && locked.contract().status() == ContractStatus.ACCEPTED
-                && locked.invoice().view().state().awaitsCheckout();
+                && claimable(locked.invoice().view(), now);
+    }
+
+    private boolean claimable(InvoiceView invoice, Instant now) {
+        return invoice.state() == InvoiceState.READY || abandoned(invoice, now);
+    }
+
+    private boolean abandoned(InvoiceView invoice, Instant now) {
+        Instant startedBefore = now.minus(abandonedAfter);
+        return invoice.state() == InvoiceState.CHECKOUT
+                && invoice.term().map(InvoiceTerm::startedAt).filter(started -> !started.isAfter(startedBefore)).isPresent();
     }
 }

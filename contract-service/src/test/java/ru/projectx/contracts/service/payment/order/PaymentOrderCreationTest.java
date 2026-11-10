@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.exception.OrderingOperation;
@@ -117,7 +118,7 @@ class PaymentOrderCreationTest {
     @Test
     void orderWhoseCreationWasSentEarlier_startsWithSearch() {
         PaymentOrder sent = PaymentOrders.awaiting();
-        sent.markRequested(PaymentOrders.DOCUMENT.documentDate());
+        sent.markRequested(OrderRequest.CREATION, PaymentOrders.DOCUMENT.documentDate());
         awaiting(sent);
         given(session.findOrder(Tasks.INSURED, PaymentOrders.ORDER)).willReturn(Optional.empty());
         given(session.createOrder(NEW_ORDER)).willReturn(PaymentOrders.ORDER_ID);

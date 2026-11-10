@@ -38,28 +38,6 @@ class PaymentOrderPayerTest {
     }
 
     @Test
-    void markRequested_ofAwaitingOrder_marksOnlyTheCreationRequest() {
-        PaymentOrder order = opened();
-
-        order.markRequested(LATER);
-
-        assertThat(order.view().requests()).isEqualTo(new OrderRequests(true, false));
-        assertThat(updatedAt(order)).isEqualTo(LATER);
-    }
-
-    @Test
-    void markRequested_ofOrderWaitingForCancellation_marksOnlyTheCancellationRequest() {
-        PaymentOrder order = opened();
-        order.recordOrder(ORDER, OPENED);
-        order.withdraw(OPENED);
-
-        order.markRequested(LATER);
-
-        assertThat(order.view().requests()).isEqualTo(new OrderRequests(false, true));
-        assertThat(updatedAt(order)).isEqualTo(LATER);
-    }
-
-    @Test
     void expire_ofAwaitingOrderNeverSentToOrdering_closesItByTermAndErasesTheAddress() {
         PaymentOrder order = opened();
 
@@ -73,7 +51,7 @@ class PaymentOrderPayerTest {
     @Test
     void expire_ofOrderWhoseCreationWasSent_refusesBecauseTheOrderMayExistInOrdering() {
         PaymentOrder order = opened();
-        order.markRequested(OPENED);
+        order.markRequested(OrderRequest.CREATION, OPENED);
 
         assertThat(order.expire(LATER)).isFalse();
 

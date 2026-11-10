@@ -42,7 +42,7 @@ public class ContractStops {
     @Transactional(propagation = Propagation.MANDATORY)
     public void stop(Contract contract, Cancellation cancellation, Instant now) {
         Optional<PaymentOrder> order = orders.findLockedByContractId(contract.id());
-        Optional<OrderInvoice> invoice = order.flatMap(locked -> invoices.findByContractId(contract.id()));
+        Optional<OrderInvoice> invoice = order.flatMap(locked -> invoices.findFreshByContractId(contract.id()));
         if (awaitsPayment(contract, invoice)) {
             invoice.orElseThrow().deferCancellation(cancellation, now);
             PaymentOrderLog.write(log.atInfo(), contract, DEFERRED);
@@ -51,7 +51,7 @@ public class ContractStops {
         contract.cancel(cancellation, now);
         if (paid(contract, invoice)) {
             metrics.countPaidCancelled();
-            PaymentOrderLog.write(log.atWarn(), contract, PAID_STOPPED);
+            PaymentOrderLog.write(log.atInfo(), contract, PAID_STOPPED);
             return;
         }
         order.ifPresent(stopped -> stopped.withdraw(now));
@@ -60,7 +60,7 @@ public class ContractStops {
     @Transactional(propagation = Propagation.MANDATORY)
     public void resume(Contract contract, Instant now) {
         if (orders.findLockedByContractId(contract.id()).isPresent()) {
-            invoices.findByContractId(contract.id()).ifPresent(invoice -> invoice.liftDeferredCancellation(now));
+            invoices.findFreshByContractId(contract.id()).ifPresent(invoice -> invoice.liftDeferredCancellation(now));
         }
     }
 

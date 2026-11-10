@@ -88,7 +88,8 @@ class ContractAcceptanceEmailTest {
     @ParameterizedTest
     @ValueSource(strings = {"\"\"", "42", "\"insured.example.test\"", "\"insured@\"", "\"insured @example.test\"",
         "\"страхователь@example.test\"", "\"insured@пример.тест\"", "\"insured@localhost\"",
-        "\"\\\"insured\\\"@example.test\"", "\"insured@[192.0.2.1]\""})
+        "\"\\\"insured\\\"@example.test\"", "\"insured@[192.0.2.1]\"", "\"insured@192.0.2.1\"",
+        "\"insured@example.1com\""})
     void addressOutOfFormat_isValidationErrorWithOneViolationOfTheEmailField(String email) throws Exception {
         accept(withEmail(email))
                 .andExpect(status().isBadRequest())

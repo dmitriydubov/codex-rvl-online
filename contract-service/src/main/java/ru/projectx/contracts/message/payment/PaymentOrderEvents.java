@@ -14,9 +14,11 @@ public final class PaymentOrderEvents {
     public static final String ORDER_EVENTS_TOPIC = "ordering.order.events";
     public static final String ORDER_ID = "orderId";
     public static final String UPDATED = "updated";
+    public static final String PENDING_PAYMENT = "pendingPayment";
     public static final String PAID = "paid";
     public static final String PAYMENT_ERROR = "paymentError";
     public static final String PAYMENT_OVERDUE = "paymentOverdue";
+    public static final String CANCELED = "canceled";
 
     private PaymentOrderEvents() {
     }

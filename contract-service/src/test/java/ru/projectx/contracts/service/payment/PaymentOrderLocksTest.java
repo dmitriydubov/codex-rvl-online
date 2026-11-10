@@ -69,7 +69,7 @@ class PaymentOrderLocksTest {
         OrderInvoice invoice = OrderInvoice.open(PaymentOrders.ORDER, PaymentOrders.CONTRACT, Issuances.OPENED);
         given(contracts.findLockedById(PaymentOrders.CONTRACT)).willReturn(Optional.of(contract));
         given(orders.findLockedByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(order));
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(invoice));
 
         LockedInvoice locked = locks.lockInvoice(PaymentOrders.CONTRACT);
 
@@ -77,14 +77,14 @@ class PaymentOrderLocksTest {
         InOrder sequence = inOrder(contracts, orders, invoices);
         sequence.verify(contracts).findLockedById(PaymentOrders.CONTRACT);
         sequence.verify(orders).findLockedByContractId(PaymentOrders.CONTRACT);
-        sequence.verify(invoices).findByContractId(PaymentOrders.CONTRACT);
+        sequence.verify(invoices).findFreshByContractId(PaymentOrders.CONTRACT);
     }
 
     @Test
     void orderWithoutInvoice_failsTheInvoiceLock() {
         given(contracts.findLockedById(PaymentOrders.CONTRACT)).willReturn(Optional.of(PaymentOrders.acceptedContract()));
         given(orders.findLockedByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(PaymentOrders.created()));
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> locks.lockInvoice(PaymentOrders.CONTRACT))
                 .isInstanceOf(IllegalStateException.class)

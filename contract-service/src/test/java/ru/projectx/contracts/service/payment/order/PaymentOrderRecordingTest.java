@@ -1,6 +1,7 @@
 package ru.projectx.contracts.service.payment.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
@@ -17,6 +18,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.assertj.core.api.Assertions;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -24,11 +27,14 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
+import ru.projectx.contracts.entity.payment.OrderRequest;
+import ru.projectx.contracts.entity.payment.OrderRequests;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.repository.payment.OrderInvoiceRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.leadership.LeadershipLostException;
+import ru.projectx.contracts.service.payment.Invoices;
 import ru.projectx.contracts.service.payment.LockedOrder;
 import ru.projectx.contracts.service.payment.OrderingMetrics;
 import ru.projectx.contracts.service.payment.PaymentOrderLocks;
@@ -67,14 +73,14 @@ class PaymentOrderRecordingTest {
 
         assertThat(recording.requestCreation(PaymentOrders.CONTRACT)).isEqualTo(CreationClaim.FIRST);
 
-        assertThat(order.view().creationRequested()).isTrue();
+        assertThat(order.view().requests()).isEqualTo(new OrderRequests(true, false));
         verify(fence).holdUntilCommit();
     }
 
     @Test
     void requestCreation_ofAlreadyRequestedOrder_saysItIsARepeat() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         locked(order);
 
         assertThat(recording.requestCreation(PaymentOrders.CONTRACT)).isEqualTo(CreationClaim.REPEATED);
@@ -106,6 +112,7 @@ class PaymentOrderRecordingTest {
         InOrder sequence = inOrder(locks, fence, invoices, fixes);
         sequence.verify(locks).lock(PaymentOrders.CONTRACT);
         sequence.verify(fence).holdUntilCommit();
+        sequence.verify(invoices).findFreshByContractId(PaymentOrders.CONTRACT);
         sequence.verify(invoices).save(opened.capture());
         sequence.verify(fixes).record(contract, order, NOW);
         assertThat(opened.getValue().view()).isEqualTo(new InvoiceView(PaymentOrders.ORDER, PaymentOrders.CONTRACT,
@@ -116,10 +123,29 @@ class PaymentOrderRecordingTest {
                 + "заказ создан в Ordering, orderId " + PaymentOrders.ORDER_ID);
     }
 
+    @ParameterizedTest
+    @EnumSource(names = {"AWAITING_DOCUMENT", "DOCUMENT_UNCONFIRMED"})
+    void created_forOrderReturnedToWorkWithItsInvoice_reusesTheInvoiceAndJournalsTheDocumentFixAgain(
+            InvoiceState state) {
+        PaymentOrder order = locked(PaymentOrders.awaiting());
+        OrderInvoice known = Invoices.in(state);
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(known));
+
+        recording.created(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
+
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
+        assertThat(known.view().state()).isEqualTo(InvoiceState.AWAITING_DOCUMENT);
+        assertThat(Invoices.updatedAt(known)).isEqualTo(NOW);
+        verify(invoices, never()).save(any());
+        verify(fixes).record(contract, order, NOW);
+        assertThat(log.at(Level.INFO)).singleElement().asString()
+                .endsWith(": заказ создан в Ordering, orderId " + PaymentOrders.ORDER_ID);
+    }
+
     @Test
     void created_whileCancelPending_keepsTheOrderIdWithoutDocumentFix() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         locked(order);
 
@@ -173,7 +199,7 @@ class PaymentOrderRecordingTest {
     @Test
     void rejected_whileCancelPending_leavesTheRecordForTheCancellationSearchWithoutAlert() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         locked(order);
 

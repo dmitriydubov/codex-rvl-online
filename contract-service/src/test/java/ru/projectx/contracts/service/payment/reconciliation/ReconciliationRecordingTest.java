@@ -57,10 +57,8 @@ class ReconciliationRecordingTest {
     void recordingWithTwoReconcilers() {
         given(paid.status()).willReturn("PAID");
         given(overdue.status()).willReturn("PAYMENT_OVERDUE");
-        ReconciliationTools tools =
-                new ReconciliationTools(new PaymentTerms(OrderingTestProperties.passes()), expiry, alerts);
-        recording = new ReconciliationRecording(locks, invoices, tools, List.of(paid, overdue), fence,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+        recording = new ReconciliationRecording(locks, invoices, new PaymentTerms(OrderingTestProperties.passes()),
+                expiry, alerts, List.of(paid, overdue), fence, Clock.fixed(NOW, ZoneOffset.UTC));
         given(locks.lockInvoice(PaymentOrders.CONTRACT)).willReturn(new LockedInvoice(contract, order, invoice));
     }
 

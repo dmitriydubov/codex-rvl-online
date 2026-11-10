@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import ch.qos.logback.classic.Level;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Clock;
@@ -44,6 +45,7 @@ import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.service.payment.OrderOpening;
 import ru.projectx.contracts.service.payment.PaymentOrderOpening;
+import ru.projectx.contracts.support.CapturedLog;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -89,6 +91,18 @@ class ContractOfferAcceptanceTest {
                 InetAddress.getByName("10.20.30.40"), "Mozilla/5.0 (Стенд)"));
         assertThat(saved).hasFieldOrPropertyWithValue("createdAt", NOW);
         verify(paymentOrder).open(contract, saved.offer(), NOW);
+    }
+
+    @Test
+    void firstAcceptance_isJournaledWithTheContractTheAcceptedVersionAndTheChannel() {
+        contract.advanceVersion(NOW);
+
+        try (CapturedLog log = CapturedLog.of(ContractOfferAcceptance.class)) {
+            service.accept(CONTRACT, request(2, null));
+
+            assertThat(log.at(Level.INFO))
+                    .containsExactly("договор КМ " + CONTRACT + " акцептован по версии 2, канал WEB");
+        }
     }
 
     @Test

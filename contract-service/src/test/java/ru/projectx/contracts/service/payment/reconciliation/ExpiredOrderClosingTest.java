@@ -45,14 +45,13 @@ class ExpiredOrderClosingTest {
     private final PaymentOrder order = PaymentOrders.created();
 
     private ReconciliationRecording recordingAt(Instant now) {
-        ReconciliationTools tools = new ReconciliationTools(new PaymentTerms(OrderingTestProperties.passes()), expiry,
-                mock(ReconciliationAlerts.class));
         given(locks.lock(PaymentOrders.CONTRACT)).willReturn(new LockedOrder(contract, order));
-        return new ReconciliationRecording(locks, invoices, tools, List.of(), fence, Clock.fixed(now, ZoneOffset.UTC));
+        return new ReconciliationRecording(locks, invoices, new PaymentTerms(OrderingTestProperties.passes()), expiry,
+                mock(ReconciliationAlerts.class), List.of(), fence, Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private void invoiceIn(InvoiceState state) {
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(Invoices.in(state)));
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.of(Invoices.in(state)));
     }
 
     @ParameterizedTest
@@ -70,7 +69,7 @@ class ExpiredOrderClosingTest {
 
     @Test
     void orderPastTheBoundaryWithoutInvoiceRecord_isClosedByTerm() {
-        given(invoices.findByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
+        given(invoices.findFreshByContractId(PaymentOrders.CONTRACT)).willReturn(Optional.empty());
 
         recordingAt(PAST_BOUNDARY).closeExpired(PaymentOrders.CONTRACT);
 

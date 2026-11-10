@@ -48,6 +48,10 @@ class PaymentOrderRaceIT {
     private static final String LOCK_WAITS = "select count(*) from pg_stat_activity"
             + " where wait_event_type = 'Lock' and datname = current_database()"
             + " and application_name <> 'contract-service-leader-lock'";
+    private static final String RETURN_REJECTED_ORDER_TO_WORK = "update payment_orders"
+            + " set state = 'AWAITING_CREATION', rejection_code = null, external_order_id = null, updated_at = now()"
+            + " where contract_id = ? and state = 'REJECTED'"
+            + " and contract_id in (select id from contracts where status = 'ACCEPTED')";
     private static final String FIXES = "select count(*) from outbox_messages where aggregate_type = 'PAYMENT_ORDER'"
             + " and aggregate_id = (select id from payment_orders where contract_id = ?)";
 
@@ -204,6 +208,27 @@ class PaymentOrderRaceIT {
         assertThat(order.get("state")).isEqualTo("CANCEL_PENDING");
         assertThat(order.get("external_order_id")).isEqualTo("order-1");
         assertThat(rejectedOrders()).isEqualTo(rejectedBefore);
+    }
+
+    @Test
+    void rejectedOrderReturnedToWorkByTheOperator_keepsItsSingleInvoiceAndGetsTheDocumentFixAgain() {
+        creation.createDue();
+        UUID orderId = jdbc.sql("select id from payment_orders where contract_id = ?").param(contractId)
+                .query(UUID.class).single();
+        transaction.executeWithoutResult(
+                status -> rejectedFixes.rejected(orderId, Instant.parse("2026-02-12T11:31:00Z")));
+        assertThat(orderRow().get("state")).isEqualTo("REJECTED");
+        assertThat(jdbc.sql(RETURN_REJECTED_ORDER_TO_WORK).param(contractId).update()).isEqualTo(1);
+
+        creation.createDue();
+
+        Map<String, Object> order = orderRow();
+        assertThat(order.get("state")).isEqualTo("CREATED");
+        assertThat(order.get("external_order_id")).isEqualTo("order-1");
+        assertThat(jdbc.sql("select state::text from payment_invoices where contract_id = ?").param(contractId)
+                .query(String.class).list()).containsExactly("AWAITING_DOCUMENT");
+        assertThat(fixes()).isEqualTo(2);
+        assertThat(ordering.creations()).isEqualTo(1);
     }
 
     @Test

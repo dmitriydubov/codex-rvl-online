@@ -16,6 +16,7 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.service.payment.Invoices;
@@ -81,7 +82,7 @@ class PaymentTermExpiryTest {
     @Test
     void orderWhoseCreationWasSent_isLeftForCancellationInOrdering() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.markRequested(NOW.minusSeconds(60));
+        order.markRequested(OrderRequest.CREATION, NOW.minusSeconds(60));
 
         expiry.close(new LockedOrder(contract, order), PaymentTermExpiry.BEFORE_ORDER, NOW);
 

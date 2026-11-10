@@ -137,6 +137,33 @@ class TaskCancellationServiceTest {
     }
 
     @Test
+    void finishedRecordsAmongRunningOnes_areLeftAndTheRunningOnesAfterThemAreStillStopped() {
+        Contract issuedMeanwhile = contract();
+        Contract running = Contract.open(new ContractDraft("DKM-2026-000002", Issuances.TERMS, Tasks.INSURED,
+                new BigDecimal("12500.00")), NOW);
+        LmPolicy issuedPolicy = LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.CHILD), NOW);
+        LmPolicy runningPolicy = LmPolicy.open(new LmPolicyDraft(Issuances.TERMS, Tasks.SPOUSE), NOW);
+        running(List.of(issuedMeanwhile, running), List.of(issuedPolicy, runningPolicy));
+        willAnswer(lock -> {
+            ReflectionTestUtils.setField(issuedMeanwhile, "status", ContractStatus.ISSUED);
+            return null;
+        }).given(contracts).lockFresh(List.of(issuedMeanwhile, running));
+        willAnswer(lock -> {
+            issuedPolicy.submit(NOW);
+            issuedPolicy.markIssued(ISSUED, NOW);
+            return null;
+        }).given(policies).lockFresh(List.of(issuedPolicy, runningPolicy));
+
+        service.apply(new ContractTaskCancellation(Tasks.REQUEST, CANCELLED_AT, "EXPIRED", null), NOW);
+
+        verify(contractStops).stop(running, new Cancellation(CancelReason.EXPIRED, null, CANCELLED_AT), NOW);
+        verifyNoMoreInteractions(contractStops);
+        assertThat(issuedPolicy.status()).isEqualTo(LmPolicyStatus.ISSUED);
+        assertThat(issuedPolicy.state().cancellation()).isEmpty();
+        assertThat(runningPolicy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
+    }
+
+    @Test
     void contractCancelledByTheTimeItIsLocked_isNotStoppedAgain() {
         Contract contract = contract();
         running(List.of(contract), List.of());

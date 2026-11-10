@@ -1,19 +1,22 @@
 package ru.projectx.contracts.service.payment.event;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import ru.projectx.contracts.config.payment.PaymentSwitch;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.projectx.contracts.message.payment.PaymentOrderEvents;
 import ru.projectx.contracts.service.payment.PaymentAlert;
 import ru.projectx.contracts.service.payment.PaymentMetrics;
 import ru.projectx.contracts.service.payment.PaymentOrderLog;
 
 @Component
+@ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 class CanceledReaction implements OrderEventReaction {
 
     static final String UNEXPECTED = "Ordering отменил заказ без запроса Договоров";
-    static final String EVENT_TYPE = "canceled";
     private static final Logger log = LoggerFactory.getLogger(CanceledReaction.class);
 
     private final PaymentMetrics metrics;
@@ -24,7 +27,7 @@ class CanceledReaction implements OrderEventReaction {
 
     @Override
     public String eventType() {
-        return EVENT_TYPE;
+        return PaymentOrderEvents.CANCELED;
     }
 
     @Override

@@ -43,13 +43,14 @@ public class PaymentReconciliation {
     private final Duration grace;
     private final Clock clock;
 
-    public PaymentReconciliation(PaymentOrderPasses passes, PaymentOrderRepository orders, OrderingCalls calls,
-            ReconciliationRecording recording, PaymentOrderPassesProperties properties, Clock clock) {
+    public PaymentReconciliation(PaymentOrderPasses passes, PaymentOrderRepository orders, Ordering ordering,
+            OrderingAttempts attempts, InvoiceIssuing issuing, ReconciliationRecording recording,
+            PaymentOrderPassesProperties properties, Clock clock) {
         this.passes = passes;
         this.orders = orders;
-        this.ordering = calls.ordering();
-        this.attempts = calls.attempts();
-        this.issuing = calls.issuing();
+        this.ordering = ordering;
+        this.attempts = attempts;
+        this.issuing = issuing;
         this.recording = recording;
         this.threshold = properties.reconciliation().threshold();
         this.grace = properties.reconciliation().paymentGrace();

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.issuance.CancelReason;
@@ -178,10 +179,25 @@ class PaymentOutcomesTest {
         assertThat(contract.state().cancellation())
                 .contains(new Cancellation(CancelReason.EXPIRED, null, Invoices.DEADLINE));
         assertThat(contract.state().updatedAt()).isEqualTo(NOW);
+        assertThat(order.view().payer()).isEmpty();
         verify(statuses).afterRecordChange(before, NOW);
         verifyNoInteractions(metrics);
         assertThat(log.at(Level.INFO)).containsExactly(Invoices.logLine("срок оплаты счёта истёк"));
         assertThat(log.events()).hasSize(1);
+    }
+
+    @Test
+    void overdue_ofInvoiceStillInCheckout_cancelsTheAcceptedContractAndErasesThePayerAddress() {
+        Contract contract = PaymentOrders.acceptedContract();
+        OrderInvoice invoice = Invoices.inCheckout();
+        assertThat(order.view().payer()).contains(PaymentOrders.PAYER);
+
+        assertThat(outcomes.overdue(locked(contract, invoice), Invoices.DEADLINE, NOW)).isTrue();
+
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.OVERDUE);
+        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+        assertThat(order.view().payer()).isEmpty();
+        assertThat(ReflectionTestUtils.getField(order, "updatedAt")).isEqualTo(NOW);
     }
 
     @Test
@@ -221,6 +237,7 @@ class PaymentOutcomesTest {
 
         assertThat(invoice.view().state()).isEqualTo(state);
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
+        assertThat(order.view().payer()).contains(PaymentOrders.PAYER);
         verify(statuses, never()).afterRecordChange(any(), any());
         assertThat(log.events()).isEmpty();
     }

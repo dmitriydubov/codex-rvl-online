@@ -38,7 +38,7 @@ public class PaymentOrderLocks {
     @Transactional(propagation = Propagation.MANDATORY)
     public LockedInvoice lockInvoice(UUID contractId) {
         LockedOrder locked = lock(contractId);
-        OrderInvoice invoice = invoices.findByContractId(contractId)
+        OrderInvoice invoice = invoices.findFreshByContractId(contractId)
                 .orElseThrow(() -> new IllegalStateException(
                         "у заказа на оплату договора КМ " + contractId + " нет счёта"));
         return new LockedInvoice(locked.contract(), locked.order(), invoice);

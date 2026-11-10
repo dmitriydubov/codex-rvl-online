@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.payment.cancellation;
 
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
@@ -43,7 +44,7 @@ public class PaymentOrderCancelRecording {
         }
         Instant now = clock.instant();
         locked.order().recordOrder(orderId, now);
-        locked.order().markRequested(now);
+        locked.order().markRequested(OrderRequest.CANCELLATION, now);
         return true;
     }
 

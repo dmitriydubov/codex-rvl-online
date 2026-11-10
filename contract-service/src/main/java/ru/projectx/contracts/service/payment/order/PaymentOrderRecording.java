@@ -9,7 +9,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
+import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.entity.payment.OrderInvoice;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.repository.payment.OrderInvoiceRepository;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
@@ -53,7 +55,7 @@ public class PaymentOrderRecording {
         }
         fence.holdUntilCommit();
         CreationClaim claim = locked.order().view().creationRequested() ? CreationClaim.REPEATED : CreationClaim.FIRST;
-        locked.order().markRequested(clock.instant());
+        locked.order().markRequested(OrderRequest.CREATION, clock.instant());
         return claim;
     }
 
@@ -63,13 +65,20 @@ public class PaymentOrderRecording {
         fence.holdUntilCommit();
         Instant now = clock.instant();
         if (locked.order().recordOrder(orderId, now)) {
-            invoices.save(OrderInvoice.open(locked.order().view().id(), contractId, now));
+            openInvoice(locked, now);
             fixes.record(locked.contract(), locked.order(), now);
             PaymentOrderLog.write(log.atInfo(), locked.contract(), "заказ создан в Ordering, orderId " + orderId);
             return;
         }
         PaymentOrderLog.write(log.atInfo(), locked.contract(),
                 "Ordering вернул orderId " + orderId + " по заказу в состоянии " + locked.order().view().state());
+    }
+
+    private void openInvoice(LockedOrder locked, Instant now) {
+        UUID contractId = locked.contract().id();
+        invoices.findFreshByContractId(contractId).ifPresentOrElse(
+                known -> known.pass(InvoiceTransition.DOCUMENT_RESENT, now),
+                () -> invoices.save(OrderInvoice.open(locked.order().view().id(), contractId, now)));
     }
 
     @Transactional

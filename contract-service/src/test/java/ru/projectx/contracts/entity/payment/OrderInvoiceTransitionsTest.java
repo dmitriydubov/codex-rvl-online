@@ -75,6 +75,18 @@ class OrderInvoiceTransitionsTest {
         assertRefused(InvoiceTransition.REMINDERS_EXHAUSTED, state);
     }
 
+    @ParameterizedTest
+    @EnumSource(names = {"AWAITING_DOCUMENT", "DOCUMENT_UNCONFIRMED"})
+    void documentResent_returnsTheInvoiceToAwaitingTheDocument(InvoiceState state) {
+        assertPassed(InvoiceTransition.DOCUMENT_RESENT, state, InvoiceState.AWAITING_DOCUMENT);
+    }
+
+    @ParameterizedTest
+    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"AWAITING_DOCUMENT", "DOCUMENT_UNCONFIRMED"})
+    void documentResent_isRefusedOnceTheDocumentWasConfirmed(InvoiceState state) {
+        assertRefused(InvoiceTransition.DOCUMENT_RESENT, state);
+    }
+
     @Test
     void replyLost_issuesTheInvoiceInCheckout() {
         assertPassed(InvoiceTransition.REPLY_LOST, InvoiceState.CHECKOUT, InvoiceState.ISSUED);
@@ -148,6 +160,9 @@ class OrderInvoiceTransitionsTest {
                 .containsExactlyInAnyOrder(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED);
         assertThat(InvoiceTransition.DOCUMENT_CONFIRMED.to()).isEqualTo(InvoiceState.READY);
         assertThat(InvoiceTransition.REMINDERS_EXHAUSTED.to()).isEqualTo(InvoiceState.DOCUMENT_UNCONFIRMED);
+        assertThat(InvoiceTransition.DOCUMENT_RESENT.from())
+                .containsExactlyInAnyOrder(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED);
+        assertThat(InvoiceTransition.DOCUMENT_RESENT.to()).isEqualTo(InvoiceState.AWAITING_DOCUMENT);
         assertThat(InvoiceTransition.REPLY_LOST.from()).containsExactly(InvoiceState.CHECKOUT);
         assertThat(InvoiceTransition.REPLY_LOST.to()).isEqualTo(InvoiceState.ISSUED);
         assertThat(InvoiceTransition.PAYMENT_FAILED.to()).isEqualTo(InvoiceState.PAYMENT_ERROR);

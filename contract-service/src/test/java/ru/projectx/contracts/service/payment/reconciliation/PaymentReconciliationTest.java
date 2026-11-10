@@ -61,8 +61,8 @@ class PaymentReconciliationTest {
     private final ReconciliationRecording recording = mock();
     private final OrderingStepRunner steps = mock();
     private final PaymentReconciliation reconciliation = new PaymentReconciliation(
-            new PaymentOrderPasses(orders, leadership, steps, OrderingTestProperties.passes()), orders,
-            new OrderingCalls(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3)), issuing), recording,
+            new PaymentOrderPasses(orders, leadership, steps, OrderingTestProperties.passes()), orders, ordering,
+            new OrderingAttempts(OrderingTestProperties.attempts(3)), issuing, recording,
             OrderingTestProperties.passes(), Clock.fixed(NOW, ZoneOffset.UTC));
     private final CapturedLog log = CapturedLog.of(PaymentReconciliation.class);
 

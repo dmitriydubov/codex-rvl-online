@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.payment.event;
 
+import ru.projectx.contracts.message.payment.PaymentOrderEvents;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
@@ -13,8 +14,6 @@ import ru.projectx.contracts.service.payment.invoice.InvoiceRecording;
 @ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 class PendingPaymentReaction implements OrderEventReaction {
 
-    static final String EVENT_TYPE = "pendingPayment";
-
     private final InvoiceRecording recording;
 
     PendingPaymentReaction(InvoiceRecording recording) {
@@ -23,7 +22,7 @@ class PendingPaymentReaction implements OrderEventReaction {
 
     @Override
     public String eventType() {
-        return EVENT_TYPE;
+        return PaymentOrderEvents.PENDING_PAYMENT;
     }
 
     @Override

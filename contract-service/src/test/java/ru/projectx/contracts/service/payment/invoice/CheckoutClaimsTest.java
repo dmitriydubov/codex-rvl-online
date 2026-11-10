@@ -32,9 +32,11 @@ class CheckoutClaimsTest {
     private static final Instant NOW = Instant.parse("2026-02-10T07:30:00Z");
     private static final Instant BY_TERM = Instant.parse("2026-02-13T07:30:00Z");
     private static final Instant BOUNDARY = PaymentOrders.DOCUMENT.documentTtl();
+    private static final Instant ABANDONED = Invoices.STARTED.plus(OrderingTestProperties.RECONCILIATION_THRESHOLD);
 
     private final PaymentTermExpiry expiry = mock();
-    private final CheckoutClaims claims = new CheckoutClaims(new PaymentTerms(OrderingTestProperties.passes()), expiry);
+    private final CheckoutClaims claims = new CheckoutClaims(new PaymentTerms(OrderingTestProperties.passes()), expiry,
+            OrderingTestProperties.passes());
     private final Contract contract = PaymentOrders.acceptedContract();
     private final PaymentOrder order = PaymentOrders.created();
 
@@ -58,13 +60,38 @@ class CheckoutClaimsTest {
     }
 
     @Test
-    void invoiceWhoseCheckoutWasStartedEarlier_isClaimedAgainWithTheTermFromTheNewMoment() {
+    void checkoutStartedExactlyTheReconciliationThresholdAgo_isAbandonedAndClaimedAgainFromTheNewMoment() {
         OrderInvoice invoice = Invoices.inCheckout();
 
-        Optional<CheckoutRequest> request = claim(invoice, NOW);
+        Optional<CheckoutRequest> request = claim(invoice, ABANDONED);
 
-        assertThat(request).map(CheckoutRequest::paymentDeadline).contains(BY_TERM);
-        assertThat(invoice.view().term()).contains(new InvoiceTerm(NOW, BY_TERM));
+        Instant deadline = ABANDONED.plus(OrderingTestProperties.PAYMENT_TERM);
+        assertThat(request).map(CheckoutRequest::paymentDeadline).contains(deadline);
+        assertThat(invoice.view().term()).contains(new InvoiceTerm(ABANDONED, deadline));
+    }
+
+    @Test
+    void checkoutStartedAMillisecondLessThanTheThresholdAgo_isStillInFlightAndNotClaimed() {
+        OrderInvoice invoice = Invoices.inCheckout();
+
+        assertThat(claim(invoice, ABANDONED.minusMillis(1))).isEmpty();
+
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.CHECKOUT);
+        assertThat(invoice.view().term()).contains(new InvoiceTerm(Invoices.STARTED, Invoices.DEADLINE));
+        assertThat(order.view().payer()).contains(PaymentOrders.PAYER);
+        verifyNoInteractions(expiry);
+    }
+
+    @Test
+    void checkoutInFlightWithDeferredCancellation_keepsTheCancellationDeferred() {
+        OrderInvoice invoice = Invoices.inCheckout();
+        invoice.deferCancellation(Invoices.REFUSED, Invoices.STARTED);
+
+        assertThat(claim(invoice, NOW)).isEmpty();
+
+        assertThat(invoice.view().deferredCancellation()).contains(Invoices.REFUSED);
+        assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
     }
 
     @Test
@@ -80,11 +107,11 @@ class CheckoutClaimsTest {
 
     @ParameterizedTest
     @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"READY", "CHECKOUT"})
-    void invoiceThatDoesNotAwaitCheckout_isNotClaimed(InvoiceState state) {
+    void invoiceThatDoesNotAwaitCheckout_isNotClaimedHoweverLongAgoItsCheckoutStarted(InvoiceState state) {
         OrderInvoice invoice = Invoices.in(state);
         InvoiceView before = invoice.view();
 
-        assertThat(claim(invoice, NOW)).isEmpty();
+        assertThat(claim(invoice, ABANDONED.plusSeconds(3600))).isEmpty();
 
         assertThat(invoice.view()).isEqualTo(before);
         verifyNoInteractions(expiry);
@@ -115,11 +142,11 @@ class CheckoutClaimsTest {
     }
 
     @Test
-    void deferredCancellation_isAppliedInsteadOfTheRepeatedCheckout() {
+    void deferredCancellation_isAppliedInsteadOfTheRepeatedCheckoutOfAnAbandonedOne() {
         OrderInvoice invoice = Invoices.inCheckout();
         invoice.deferCancellation(Invoices.REFUSED, Invoices.STARTED);
 
-        assertThat(claim(invoice, NOW)).isEmpty();
+        assertThat(claim(invoice, ABANDONED)).isEmpty();
 
         assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
         assertThat(contract.state().cancellation()).contains(Invoices.REFUSED);
