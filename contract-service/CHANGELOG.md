@@ -333,7 +333,8 @@
 ### Перенос
 
 - **Переменные:** новая обязательная `PAYMENT_ENABLED` без умолчания (`true` или `false`) — без неё сервис не стартует;
-  до готовности Ordering задают `false`. При `true` обязательны `ORDERING_URL`, `ORDERING_PRODUCT`, `ORDERING_CHANNEL`,
+  задают `false`, пока не установлена версия со счётом и событиями оплаты: в этой их нет, и оплатить заказ нельзя. При
+  `true` обязательны `ORDERING_URL`, `ORDERING_PRODUCT`, `ORDERING_CHANNEL`,
   `ORDERING_TOKEN_URI`, `ORDERING_TOKEN_CLIENT_ID`, `ORDERING_TOKEN_CLIENT_SECRET` (секрет — в секретах развёртывания),
   `RABBITMQ_MARKETING_HOST`, `RABBITMQ_MARKETING_USERNAME`, `RABBITMQ_MARKETING_PASSWORD`,
   `MARKETING_DOCUMENT_FIXES_EXCHANGE`, `MARKETING_DOCUMENT_FIXES_ROUTING_KEY`. Новые необязательные:

@@ -7,7 +7,8 @@
 Где смотреть:
 
 - `/actuator/health` на порту актуатора (`MANAGEMENT_PORT`, 8081): компоненты `db`, `internalBroker` (межсервисный
-  брокер), `onecBroker` (брокер 1С:УСК), при включённой оплате — `marketingBroker` (брокер маркетинга) и `inbox` (приём из очередей, деталь `role` — `leader` или `standby`);
+  брокер), `onecBroker` (брокер 1С:УСК), `inbox` (приём из очередей, деталь `role` — `leader` или `standby`), при
+  включённой оплате — ещё `marketingBroker` (брокер маркетинга);
 - `/actuator/prometheus` на порту актуатора: метрики и пороги оповещений — в [operations.md](operations.md), «Метрики и
   оповещения»;
 - журнал: при умолчании `LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs` каждая запись сервиса — объект JSON (формат ECS), поля
@@ -445,8 +446,8 @@ select state, count(*), min(created_at) as oldest
 
 `contracts_payment_disabled` = 1, при старте WARN «оплата выключена: заказы на оплату договоров КМ не создаются…»: задано
 `PAYMENT_ENABLED=false`. Договоры КМ акцептуются, но заказов на оплату не получают — и после включения оплаты тоже.
-Включают оплату перезапуском с `PAYMENT_ENABLED=true` и настройками из [operations.md](operations.md), «Переменные
-окружения».
+Включают оплату — не раньше версии со счётом и событиями оплаты — перезапуском с `PAYMENT_ENABLED=true` и настройками
+из [operations.md](operations.md), «Переменные окружения».
 
 ### Ordering или сервер токенов недоступен
 
