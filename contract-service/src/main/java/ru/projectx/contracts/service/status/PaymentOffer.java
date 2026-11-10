@@ -13,17 +13,17 @@ public record PaymentOffer(boolean cancellationDeferred, Optional<String> link, 
     private static final PaymentOffer NONE = new PaymentOffer(false, Optional.empty(), Optional.empty());
 
     static PaymentOffer of(IssuanceStatus status, Optional<InvoiceView> invoice) {
-        return invoice.map(known -> of(status, known)).orElse(NONE);
+        return invoice.flatMap(known -> offered(status, known)).orElse(NONE);
     }
 
-    private static PaymentOffer of(IssuanceStatus status, InvoiceView invoice) {
+    private static Optional<PaymentOffer> offered(IssuanceStatus status, InvoiceView invoice) {
         if (invoice.cancellationDeferred()) {
-            return new PaymentOffer(true, Optional.empty(), Optional.empty());
+            return Optional.of(new PaymentOffer(true, Optional.empty(), Optional.empty()));
         }
         if (status != ContractStatus.INVOICE_ISSUED) {
-            return NONE;
+            return Optional.empty();
         }
-        return new PaymentOffer(false, invoice.link().map(InvoiceLink::paymentUrl),
-                invoice.term().map(InvoiceTerm::deadline));
+        return Optional.of(new PaymentOffer(false, invoice.link().map(InvoiceLink::paymentUrl),
+                invoice.term().map(InvoiceTerm::deadline)));
     }
 }
