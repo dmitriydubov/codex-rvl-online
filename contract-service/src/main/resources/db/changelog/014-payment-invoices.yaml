@@ -1,0 +1,73 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 014-payment-order-expired-state
+      author: contract-service
+      comment: >
+        Состояние заказа на оплату «срок истёк»: к моменту создания заказа граница накануне заезда уже прошла,
+        заказ в сервисе управления заказами не создаётся. Значение добавляется отдельным набором изменений:
+        новое значение перечисления PostgreSQL нельзя использовать в той же транзакции, где его добавили.
+      changes:
+        - sql:
+            sql: ALTER TYPE payment_order_state ADD VALUE IF NOT EXISTS 'EXPIRED';
+      rollback: []
+
+  - changeSet:
+      id: 014-payment-invoices
+      author: contract-service
+      comment: >
+        Адрес электронной почты плательщика у заказа на оплату и счёт по заказу. Адрес приходит в акцепте,
+        нужен только для выставления счёта и стирается, как только счёт выставлен или договор прекращён.
+        Запись счёта заводится вместе с номером заказа: одна на заказ. Она ведёт подтверждение документа
+        (число повторов подтверждения), отметку «счёт начат» — её ставят до вызова выставления счёта,
+        с неё договор считается договором со счётом, — срок оплаты, идентификатор счёта и ссылку на оплату,
+        момент оплаты и код отказа в счёте. Отложенное прекращение — причина, комментарий и момент
+        прекращения договора со счётом: они применяются, когда сервис управления заказами сообщит о
+        просрочке оплаты.
+      changes:
+        - addColumn:
+            tableName: payment_orders
+            columns:
+              - column: { name: payer_email, type: varchar(254) }
+        - sql:
+            sql: >-
+              CREATE TYPE payment_invoice_state AS ENUM ('AWAITING_DOCUMENT', 'DOCUMENT_UNCONFIRMED', 'READY',
+              'CHECKOUT', 'ISSUED', 'REJECTED', 'PAYMENT_ERROR', 'PAID', 'OVERDUE');
+        - createTable:
+            tableName: payment_invoices
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, primaryKeyName: pk_payment_invoices, nullable: false } }
+              - column: { name: payment_order_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_payment_invoices_order, references: payment_orders(id) } }
+              - column: { name: contract_id, type: uuid, constraints: { nullable: false, foreignKeyName: fk_payment_invoices_contract, references: contracts(id) } }
+              - column: { name: state, type: payment_invoice_state, constraints: { nullable: false } }
+              - column: { name: fix_repeats, type: int, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: checkout_started_at, type: timestamptz }
+              - column: { name: payment_deadline, type: timestamptz }
+              - column: { name: invoice_id, type: varchar(100) }
+              - column: { name: payment_url, type: text }
+              - column: { name: paid_at, type: timestamptz }
+              - column: { name: rejection_code, type: varchar(100) }
+              - column: { name: deferred_cancel_reason, type: contract_cancel_reason }
+              - column: { name: deferred_cancel_comment, type: text }
+              - column: { name: deferred_cancelled_at, type: timestamptz }
+              - column: { name: created_at, type: timestamptz, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamptz, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: payment_invoices
+            columnNames: payment_order_id
+            constraintName: uq_payment_invoices_order_id
+        - addUniqueConstraint:
+            tableName: payment_invoices
+            columnNames: contract_id
+            constraintName: uq_payment_invoices_contract_id
+        - createIndex:
+            tableName: payment_invoices
+            indexName: ix_payment_invoices_state_updated_at
+            columns:
+              - column: { name: state }
+              - column: { name: updated_at }
+      rollback:
+        - dropTable: { tableName: payment_invoices }
+        - sql:
+            sql: DROP TYPE payment_invoice_state;
+        - dropColumn: { tableName: payment_orders, columnName: payer_email }

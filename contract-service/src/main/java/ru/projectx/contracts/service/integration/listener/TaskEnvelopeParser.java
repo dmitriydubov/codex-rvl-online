@@ -5,12 +5,11 @@ import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
 import ru.projectx.contracts.service.Guids;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
-public class TaskEnvelopeParser {
+public class TaskEnvelopeParser implements InboxEnvelopes {
 
     private static final String META = "meta";
     private static final String MESSAGE_ID = "message_id";
@@ -27,21 +26,13 @@ public class TaskEnvelopeParser {
         this.json = json;
     }
 
+    @Override
     public TaskEnvelope parse(byte[] body) {
-        JsonNode root = root(body);
+        JsonNode root = EnvelopeBodies.read(json, body);
         JsonNode meta = root.path(META);
         InboxReceipt receipt = new InboxReceipt(uuid(meta, MESSAGE_ID), uuid(meta, CORRELATION_ID),
                 bounded(meta, TOPIC, TOPIC_MAX_LENGTH), bounded(meta, EVENT_TYPE, EVENT_TYPE_MAX_LENGTH), version(meta));
-        return UnstorableText.present(root) ? new TaskEnvelope.Unstorable(receipt) : new TaskEnvelope.Storable(receipt);
-    }
-
-    private JsonNode root(byte[] body) {
-        try {
-            return json.readTree(body);
-        }
-        catch (JacksonException unreadable) {
-            throw InboxEnvelopeException.unreadableBody(unreadable);
-        }
+        return EnvelopeBodies.envelope(root, receipt);
     }
 
     private static UUID uuid(JsonNode meta, String field) {

@@ -1,0 +1,43 @@
+package ru.projectx.contracts.entity.payment;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import ru.projectx.contracts.entity.issuance.CancelReason;
+import ru.projectx.contracts.entity.issuance.Cancellation;
+
+class InvoiceViewTest {
+
+    private static final UUID ID = UUID.fromString("0196f0a2-0000-7000-8000-000000000011");
+
+    private static InvoiceView view(InvoiceState state, Optional<Cancellation> deferred) {
+        return new InvoiceView(ID, ID, state, 0, Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), deferred);
+    }
+
+    @Test
+    void issuedInvoice_awaitsPayment() {
+        assertThat(view(InvoiceState.ISSUED, Optional.empty()).awaitsPayment()).isTrue();
+    }
+
+    @Test
+    void paidInvoice_doesNotAwaitPayment() {
+        assertThat(view(InvoiceState.PAID, Optional.empty()).awaitsPayment()).isFalse();
+    }
+
+    @Test
+    void invoiceWithDeferredCancellation_saysSo() {
+        Cancellation cancellation =
+                new Cancellation(CancelReason.REQUEST_CANCELLED, null, Instant.parse("2026-02-12T11:30:00Z"));
+
+        assertThat(view(InvoiceState.ISSUED, Optional.of(cancellation)).cancellationDeferred()).isTrue();
+    }
+
+    @Test
+    void invoiceWithoutDeferredCancellation_saysSo() {
+        assertThat(view(InvoiceState.ISSUED, Optional.empty()).cancellationDeferred()).isFalse();
+    }
+}

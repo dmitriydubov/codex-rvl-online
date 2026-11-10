@@ -1,9 +1,13 @@
 package ru.projectx.contracts.service.integration.broker;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
@@ -35,5 +39,12 @@ public class OutboundRoutes {
 
     Optional<OutboundRoute> of(String eventType) {
         return Optional.ofNullable(byEventType.get(eventType));
+    }
+
+    Collection<Set<String>> eventTypesByBroker() {
+        Map<RabbitTemplate, Set<String>> byTemplate = new IdentityHashMap<>();
+        byEventType.forEach((eventType, route) ->
+                byTemplate.computeIfAbsent(route.template(), template -> new TreeSet<>()).add(eventType));
+        return List.copyOf(byTemplate.values());
     }
 }

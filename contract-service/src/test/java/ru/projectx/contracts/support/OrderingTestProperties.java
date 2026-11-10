@@ -8,6 +8,11 @@ import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 public final class OrderingTestProperties {
 
     public static final int BATCH = 7;
+    public static final Duration PAYMENT_TERM = Duration.ofHours(72);
+    public static final Duration MIN_PAYMENT_TERM = Duration.ofHours(1);
+    public static final Duration RECONCILIATION_THRESHOLD = Duration.ofMinutes(15);
+    public static final Duration PAYMENT_GRACE = Duration.ofHours(1);
+    public static final int FIX_REPEATS = 2;
 
     private OrderingTestProperties() {
     }
@@ -22,6 +27,16 @@ public final class OrderingTestProperties {
 
     public static PaymentOrderPassesProperties passes() {
         return new PaymentOrderPassesProperties(Duration.ofSeconds(10), Duration.ofMinutes(1), BATCH,
-                Duration.ofMinutes(1), Duration.ofHours(1));
+                Duration.ofMinutes(1), Duration.ofHours(1), invoices(), reconciliation());
+    }
+
+    public static PaymentOrderPassesProperties.Invoices invoices() {
+        return new PaymentOrderPassesProperties.Invoices(Duration.ofSeconds(10), PAYMENT_TERM, MIN_PAYMENT_TERM,
+                Duration.ofMinutes(30));
+    }
+
+    public static PaymentOrderPassesProperties.Reconciliation reconciliation() {
+        return new PaymentOrderPassesProperties.Reconciliation(Duration.ofMinutes(1), RECONCILIATION_THRESHOLD,
+                PAYMENT_GRACE, FIX_REPEATS, Duration.ofMinutes(1));
     }
 }

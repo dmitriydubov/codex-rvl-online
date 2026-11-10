@@ -95,7 +95,7 @@ class PaymentOrderCancellingTest {
     @Test
     void cancellationSentEarlierAndOrderStillNew_isCancelledAgain() {
         PaymentOrder order = PaymentOrders.cancelPending();
-        order.requestCancellation(NOW);
+        order.markRequested(NOW);
         pending(order);
         given(session.orderStatus(PaymentOrders.ORDER_ID)).willReturn("NEW");
 
@@ -181,7 +181,7 @@ class PaymentOrderCancellingTest {
 
     private static PaymentOrder sentWithoutAnswer() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(NOW);
         order.withdraw(NOW);
         return order;
     }

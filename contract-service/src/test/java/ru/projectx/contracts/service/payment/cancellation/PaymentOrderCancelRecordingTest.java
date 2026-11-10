@@ -69,14 +69,14 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void requestCancellation_ofOrderFoundBySearch_keepsTheFoundOrderIdBeforeTheCancelCall() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(NOW);
         order.withdraw(NOW);
         locked(order);
 
         assertThat(recording.requestCancellation(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID)).isTrue();
 
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         assertThat(order.view().cancelRequested()).isTrue();
     }
 
@@ -93,13 +93,13 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void cancelled_closesThePendingOrderKeepingTheFoundOrderId() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(NOW);
         order.withdraw(NOW);
         locked(order);
 
         recording.cancelled(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
         verify(fence).holdUntilCommit();
         assertThat(log.at(Level.INFO)).singleElement().asString()
@@ -120,13 +120,13 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void notFound_closesThePendingOrderWithoutOrderId() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(NOW);
         order.withdraw(NOW);
         locked(order);
 
         recording.notFound(PaymentOrders.CONTRACT);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).isEmpty();
         verify(fence).holdUntilCommit();
         assertThat(log.at(Level.INFO)).singleElement().asString()
@@ -136,14 +136,14 @@ class PaymentOrderCancelRecordingTest {
     @Test
     void notFound_ofPendingOrderThatGotItsOrderIdMeanwhile_keepsItForTheNextCancellationPass() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(NOW);
         order.withdraw(NOW);
         order.recordOrder(PaymentOrders.ORDER_ID, NOW);
         locked(order);
 
         recording.notFound(PaymentOrders.CONTRACT);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
         assertThat(log.events()).singleElement().asString()
                 .doesNotContain("не найден")
@@ -159,7 +159,7 @@ class PaymentOrderCancelRecordingTest {
 
         recording.notFound(PaymentOrders.CONTRACT);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(log.events()).isEmpty();
     }
 
@@ -180,7 +180,7 @@ class PaymentOrderCancelRecordingTest {
 
         recording.rejected(PaymentOrders.CONTRACT, "CancelOrderValidatorService.valid");
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_REJECTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_REJECTED);
         verify(metrics).countCancellationRejected();
         verify(fence).holdUntilCommit();
         assertThat(log.at(Level.ERROR)).singleElement().asString()
@@ -193,7 +193,7 @@ class PaymentOrderCancelRecordingTest {
 
         recording.rejected(PaymentOrders.CONTRACT, "C");
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CREATED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
         verify(metrics, never()).countCancellationRejected();
         assertThat(log.events()).isEmpty();
     }

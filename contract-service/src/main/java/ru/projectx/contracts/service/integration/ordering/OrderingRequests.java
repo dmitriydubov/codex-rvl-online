@@ -4,6 +4,7 @@ import java.math.RoundingMode;
 import java.time.ZoneId;
 import ru.projectx.contracts.config.payment.OrderingProperties;
 import ru.projectx.contracts.entity.payment.OrderDocument;
+import ru.projectx.contracts.service.payment.CheckoutRequest;
 import ru.projectx.contracts.service.payment.NewOrder;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -11,6 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 final class OrderingRequests {
 
     private static final String DOCUMENT_TYPE = "contract";
+    private static final String PAYMENT_TYPE = "internetAcquiring";
     private static final int MONEY_SCALE = 2;
 
     private final JsonMapper json;
@@ -36,6 +38,15 @@ final class OrderingRequests {
         body.put("clientId", order.clientId().toString());
         body.putArray("orderDetails").add(document(order));
         body.putObject("eventDetails").put("channel", channel);
+        return body;
+    }
+
+    ObjectNode checkout(CheckoutRequest request) {
+        ObjectNode body = create(request.order());
+        body.putObject("payment")
+                .put("paymentType", PAYMENT_TYPE)
+                .put("paymentTtl", OrderingDates.format(request.paymentDeadline(), zone))
+                .put("email", request.payer().address());
         return body;
     }
 

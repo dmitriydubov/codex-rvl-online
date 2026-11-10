@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import ru.projectx.contracts.config.broker.BrokerConnectionProperties;
@@ -61,6 +62,36 @@ class OutboundRoutesTest {
         assertThatThrownBy(() -> routesWith(List.of(duplicate)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ContractStatusChanged");
+    }
+
+    @Test
+    void eventTypes_areGroupedByTheBrokerThatCarriesThem() {
+        assertThat(routes.eventTypesByBroker()).containsExactlyInAnyOrder(Set.of("ContractStatusChanged"),
+                Set.of("KmContractSubmitted", "LmPolicyRequested"));
+    }
+
+    @Test
+    void additionalRouteOnItsOwnBroker_makesAGroupOfItsOwn() {
+        OutboundRoutes withFixes = routesWith(List.of(new AdditionalRoute("PaymentOrderFixed",
+                new OutboundRoute(mock(RabbitTemplate.class), "rvl.exchange", "rvl-contract-fixed"))));
+
+        assertThat(withFixes.eventTypesByBroker()).containsExactlyInAnyOrder(Set.of("ContractStatusChanged"),
+                Set.of("KmContractSubmitted", "LmPolicyRequested"), Set.of("PaymentOrderFixed"));
+    }
+
+    @Test
+    void additionalRouteOnAKnownBroker_joinsThatBrokersGroup() {
+        OutboundRoutes withFixes = routesWith(List.of(new AdditionalRoute("PaymentOrderFixed",
+                new OutboundRoute(internalTemplate, "rvl.exchange", "rvl-contract-fixed"))));
+
+        assertThat(withFixes.eventTypesByBroker()).containsExactlyInAnyOrder(
+                Set.of("ContractStatusChanged", "PaymentOrderFixed"), Set.of("KmContractSubmitted", "LmPolicyRequested"));
+    }
+
+    @Test
+    void groups_cannotBeChangedByTheCaller() {
+        assertThatThrownBy(() -> routes.eventTypesByBroker().add(Set.of("ContractTaskUpserted")))
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     private OutboundRoutes routesWith(List<AdditionalRoute> additional) {

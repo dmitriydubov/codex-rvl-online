@@ -2,6 +2,7 @@ package ru.projectx.contracts.service;
 
 import org.slf4j.MDC;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
+import ru.projectx.contracts.message.payment.PaymentOrderEvents;
 
 public final class InboxLogContext {
 
@@ -18,7 +19,9 @@ public final class InboxLogContext {
 
     public static <E extends Exception> void run(InboxReceipt receipt, Action<E> action) throws E {
         MDC.put(MESSAGE_ID, receipt.messageId().toString());
-        MDC.put(INDIVIDUAL_REQUEST_ID, receipt.correlationId().toString());
+        if (!PaymentOrderEvents.ORDER_EVENT.equals(receipt.eventType())) {
+            MDC.put(INDIVIDUAL_REQUEST_ID, receipt.correlationId().toString());
+        }
         MDC.put(RequestIds.MDC_KEY, receipt.messageId().toString());
         try {
             action.run();

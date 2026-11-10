@@ -1,14 +1,18 @@
 package ru.projectx.contracts.service.integration.listener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.amqp.core.MessageListener;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerEndpoint;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistrar;
@@ -22,7 +26,7 @@ class InboxQueueEndpointsTest {
     private final SimpleRabbitListenerContainerFactory internalFactory = new SimpleRabbitListenerContainerFactory();
     private final SimpleRabbitListenerContainerFactory onecFactory = new SimpleRabbitListenerContainerFactory();
     private final InboxQueueEndpoints endpoints = new InboxQueueEndpoints(listener, internalFactory, internal(),
-            onecFactory, onec());
+            onecFactory, onec(), List.of());
 
     @Test
     void taskQueue_isRegisteredOnTheInternalBrokerFactoryWithTheListener() {
@@ -53,6 +57,41 @@ class InboxQueueEndpointsTest {
         assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getMessageListener)
                 .containsOnly(listener);
         assertThat(endpoint.getAllValues()).extracting(SimpleRabbitListenerEndpoint::getAutoStartup).containsOnly(false);
+    }
+
+    @Test
+    void additionalEndpoint_isRegisteredOnItsOwnFactoryWithItsOwnListenerBesideTheContourQueues() {
+        SimpleRabbitListenerContainerFactory marketingFactory = new SimpleRabbitListenerContainerFactory();
+        MessageListener orderEventListener = mock();
+        InboxQueueEndpoints withOrderEvents = new InboxQueueEndpoints(listener, internalFactory, internal(), onecFactory,
+                onec(), List.of(new AdditionalInboxEndpoint("order.event.rvl.topic", marketingFactory,
+                        orderEventListener)));
+        RabbitListenerEndpointRegistrar registrar = mock();
+
+        withOrderEvents.configureRabbitListeners(registrar);
+
+        ArgumentCaptor<SimpleRabbitListenerEndpoint> endpoint = ArgumentCaptor.captor();
+        verify(registrar).registerEndpoint(endpoint.capture(), same(marketingFactory));
+        assertThat(endpoint.getValue().getId()).isEqualTo("order.event.rvl.topic");
+        assertThat(endpoint.getValue().getQueueNames()).containsExactly("order.event.rvl.topic");
+        assertThat(endpoint.getValue().getMessageListener()).isSameAs(orderEventListener);
+        assertThat(endpoint.getValue().getAutoStartup()).as("контейнеры запускает роль ведущего").isFalse();
+        verify(registrar).registerEndpoint(any(), same(internalFactory));
+        verify(registrar, times(2)).registerEndpoint(any(), same(onecFactory));
+    }
+
+    @Test
+    void additionalEndpointsGivenAtTheStart_areNotAffectedByLaterChangesOfTheirList() {
+        List<AdditionalInboxEndpoint> additional = new ArrayList<>();
+        InboxQueueEndpoints fixed = new InboxQueueEndpoints(listener, internalFactory, internal(), onecFactory, onec(),
+                additional);
+        additional.add(new AdditionalInboxEndpoint("order.event.rvl.topic",
+                new SimpleRabbitListenerContainerFactory(), mock(MessageListener.class)));
+        RabbitListenerEndpointRegistrar registrar = mock();
+
+        fixed.configureRabbitListeners(registrar);
+
+        verify(registrar, times(3)).registerEndpoint(any(), any());
     }
 
     private static InternalBrokerProperties internal() {

@@ -25,6 +25,10 @@ final class KmContractStates {
                 .anyMatch(KmContractStates::undrafted);
     }
 
+    static KmContractState shown(ContractStatus status, PaymentOffer offer) {
+        return offer.cancellationDeferred() ? KmContractState.CANCELLED : of(status);
+    }
+
     static KmContractState of(ContractStatus status) {
         return switch (status) {
             case NEW -> throw new IllegalStateException("договор КМ без проекта в ответ сервису Заявок не попадает");

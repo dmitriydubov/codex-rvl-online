@@ -75,4 +75,57 @@ class RequestIssuanceTest {
 
         assertThat(new RequestIssuance(List.of(), List.of(issued, another)).policyOf(Tasks.CHILD)).contains(issued);
     }
+
+    @Test
+    void contractWithDeferredCancellation_holdsItsParticipantAsAContractAndIsALeftoverUntilForgotten() {
+        RequestIssuance waiting = new RequestIssuance(List.of(), List.of(policy), List.of(contract));
+
+        assertThat(waiting.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+        assertThat(waiting.contractOf(Tasks.SPOUSE)).contains(contract);
+        assertThat(waiting.policyOf(Tasks.SPOUSE)).isEmpty();
+        assertThat(waiting.leftovers()).containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy),
+                new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+
+        waiting.forget(Tasks.SPOUSE);
+
+        assertThat(waiting.of(Tasks.SPOUSE)).isEmpty();
+        assertThat(waiting.contractOf(Tasks.SPOUSE)).isEmpty();
+        assertThat(waiting.leftovers()).containsExactly(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", policy));
+    }
+
+    @Test
+    void policyOpenedBesideAContractWithDeferredCancellation_isTheActiveRecordWhileTheContractStaysKnown() {
+        LmPolicy spousePolicy = Issuances.policy("9f3e1c28-6b55-4da1-93f4-82a1d7b56e40", Tasks.SPOUSE);
+
+        RequestIssuance waiting = new RequestIssuance(List.of(), List.of(spousePolicy), List.of(contract));
+
+        assertThat(waiting.of(Tasks.SPOUSE))
+                .contains(new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", spousePolicy));
+        assertThat(waiting.policyOf(Tasks.SPOUSE)).contains(spousePolicy);
+        assertThat(waiting.contractOf(Tasks.SPOUSE)).contains(contract);
+        assertThat(waiting.leftovers()).containsExactly(
+                new ActiveIssuance(DocumentKind.LM_POLICY, "полис ЛМ", spousePolicy),
+                new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+    }
+
+    @Test
+    void runningContract_isPreferredToOneWithDeferredCancellationOfTheSameParticipant() {
+        Contract waitingContract = Issuances.contract("3f1a2b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b", Tasks.SPOUSE,
+                "DKM-2026-000002");
+
+        RequestIssuance mixed = new RequestIssuance(List.of(contract), List.of(), List.of(waitingContract));
+
+        assertThat(mixed.contractOf(Tasks.SPOUSE)).contains(contract);
+        assertThat(mixed.of(Tasks.SPOUSE)).contains(new ActiveIssuance(DocumentKind.KM_CONTRACT, "договор КМ", contract));
+    }
+
+    @Test
+    void contractWithDeferredCancellation_doesNotHoldAnotherParticipant() {
+        RequestIssuance waiting = new RequestIssuance(List.of(), List.of(), List.of(contract));
+
+        assertThat(waiting.of(Tasks.CHILD)).isEmpty();
+        assertThat(waiting.contractOf(Tasks.CHILD)).isEmpty();
+        waiting.forget(Tasks.CHILD);
+        assertThat(waiting.contractOf(Tasks.SPOUSE)).contains(contract);
+    }
 }

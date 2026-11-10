@@ -173,7 +173,7 @@ class ContractTest {
     void accept_turnsContractReadyForAcceptanceIntoAcceptedWithoutNewVersion() {
         contract.offerDraft();
 
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
         assertThat(contract.state().entityVersion()).isEqualTo(1);
@@ -183,7 +183,7 @@ class ContractTest {
 
     @Test
     void accept_isRefusedOutsideReadyForAcceptanceAndChangesNothing() {
-        assertThatThrownBy(() -> contract.accept()).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> contract.advance(ContractStep.OFFER_ACCEPTED)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("NEW");
 
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
@@ -208,7 +208,7 @@ class ContractTest {
     @Test
     void markPaid_turnsAcceptedContractIntoPaidWithTheMomentOfPaymentAndNextVersion() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         contract.markPaid(PAID_AT, LATER);
 
@@ -320,7 +320,7 @@ class ContractTest {
 
     private void paid() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(PAID_AT, LATER);
     }
 

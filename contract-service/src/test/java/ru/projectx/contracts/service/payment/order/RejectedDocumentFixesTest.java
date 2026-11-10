@@ -62,7 +62,7 @@ class RejectedDocumentFixesTest {
 
         reaction.rejected(PaymentOrders.ORDER, NOW);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.REJECTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.REJECTED);
         assertThat(order.view().rejectionCode()).contains("FIXED_UNDELIVERED");
         assertThat(order.view().orderId()).contains(PaymentOrders.ORDER_ID);
         verify(metrics).countOrderRejected();
@@ -80,7 +80,7 @@ class RejectedDocumentFixesTest {
 
         reaction.rejected(PaymentOrders.ORDER, NOW);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         verify(metrics, never()).countOrderRejected();
         assertThat(log.events()).isEmpty();
     }

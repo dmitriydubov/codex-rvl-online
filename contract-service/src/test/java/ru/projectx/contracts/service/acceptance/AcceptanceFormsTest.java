@@ -43,6 +43,6 @@ class AcceptanceFormsTest {
 
     private static AcceptanceRequest request(String ipAddress, String userAgent) {
         return new AcceptanceRequest(2, USER, OffsetDateTime.parse("2026-02-10T07:04:30Z"), AcceptanceChannel.MOBILE,
-                ipAddress, userAgent);
+                ipAddress, userAgent, "insured@example.test");
     }
 }

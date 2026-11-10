@@ -38,12 +38,12 @@ public class PaymentOrderCancelRecording {
     @Transactional
     public boolean requestCancellation(UUID contractId, String orderId) {
         LockedOrder locked = pending(contractId);
-        if (locked.order().state() != PaymentOrderState.CANCEL_PENDING) {
+        if (locked.order().view().state() != PaymentOrderState.CANCEL_PENDING) {
             return false;
         }
         Instant now = clock.instant();
         locked.order().recordOrder(orderId, now);
-        locked.order().requestCancellation(now);
+        locked.order().markRequested(now);
         return true;
     }
 
@@ -64,7 +64,7 @@ public class PaymentOrderCancelRecording {
             return;
         }
         locked.order().view().orderId()
-                .filter(orderId -> locked.order().state() == PaymentOrderState.CANCEL_PENDING)
+                .filter(orderId -> locked.order().view().state() == PaymentOrderState.CANCEL_PENDING)
                 .ifPresent(orderId -> PaymentOrderLog.write(log.atInfo(), locked.contract(),
                         "заказ получил orderId " + orderId + ", пока шёл поиск: отменится следующим проходом"));
     }

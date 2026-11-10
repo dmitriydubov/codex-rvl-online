@@ -18,15 +18,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.contracts.entity.contract.AcceptanceChannel;
 import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.OfferAcceptance;
 import ru.projectx.contracts.entity.issuance.IssuanceTerms;
@@ -40,26 +36,10 @@ import ru.projectx.contracts.service.payment.cancellation.PaymentOrderCancelling
 import ru.projectx.contracts.service.payment.order.PaymentOrderCreation;
 import ru.projectx.contracts.service.payment.order.PaymentOrderRecording;
 import ru.projectx.contracts.service.payment.order.RejectedDocumentFixes;
-import ru.projectx.contracts.support.IntegrationTest;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
-@IntegrationTest
-@TestPropertySource(properties = {
-        "projectx.payment.enabled=true",
-        "projectx.ordering.url=http://ordering.test",
-        "projectx.ordering.product=rvl",
-        "projectx.ordering.channel=rvl-lk",
-        "projectx.ordering.retry.delay=0s",
-        "projectx.ordering.token.uri=http://keycloak.test/token",
-        "projectx.ordering.token.client-id=contracts-test",
-        "projectx.ordering.token.client-secret=no-keycloak",
-        "projectx.brokers.marketing.connection.host=marketing.test",
-        "projectx.brokers.marketing.connection.username=contracts-test",
-        "projectx.brokers.marketing.connection.password=no-broker",
-        "projectx.brokers.marketing.document-fixes.exchange=rvl.exchange",
-        "projectx.brokers.marketing.document-fixes.routing-key=rvl-contract-fixed"})
-@Import(PaymentOrderRaceIT.Scripted.class)
+@PaymentRaceTest
 class PaymentOrderRaceIT {
 
     private static final Duration WAIT = Duration.ofSeconds(20);
@@ -70,16 +50,6 @@ class PaymentOrderRaceIT {
             + " and application_name <> 'contract-service-leader-lock'";
     private static final String FIXES = "select count(*) from outbox_messages where aggregate_type = 'PAYMENT_ORDER'"
             + " and aggregate_id = (select id from payment_orders where contract_id = ?)";
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class Scripted {
-
-        @Bean
-        @Primary
-        ScriptedOrdering scriptedOrdering() {
-            return new ScriptedOrdering();
-        }
-    }
 
     @Autowired
     private ScriptedOrdering ordering;
@@ -133,10 +103,10 @@ class PaymentOrderRaceIT {
             Contract contract = Contract.open(new ContractDraft("DKM-PAY-" + request.toString().substring(0, 8), terms,
                     Tasks.SPOUSE, new BigDecimal("34000.00")), Issuances.OPENED);
             contract.offerDraft();
-            contract.accept();
+            contract.advance(ContractStep.OFFER_ACCEPTED);
             Contract saved = contracts.saveAndFlush(contract);
-            openings.open(saved, new OfferAcceptance(1, Tasks.INSURED, Issuances.OPENED, AcceptanceChannel.WEB, null,
-                    null), Issuances.OPENED);
+            openings.forPayer("insured@example.test").open(saved, new OfferAcceptance(1, Tasks.INSURED,
+                    Issuances.OPENED, AcceptanceChannel.WEB, null, null), Issuances.OPENED);
             return saved.id();
         });
     }
@@ -144,6 +114,7 @@ class PaymentOrderRaceIT {
     @AfterEach
     void removeRecords() {
         jdbc.sql("delete from outbox_messages where aggregate_type = 'PAYMENT_ORDER'").update();
+        jdbc.sql("delete from payment_invoices where contract_id = ?").param(contractId).update();
         jdbc.sql("delete from payment_orders where contract_id = ?").param(contractId).update();
         contracts.deleteById(contractId);
     }

@@ -54,7 +54,9 @@ import ru.projectx.contracts.service.leadership.LeaderLockConnections;
         "projectx.ordering.token.read-timeout=1s",
         "projectx.brokers.marketing.connection.tls.enabled=false",
         "projectx.brokers.marketing.document-fixes.exchange=rvl.exchange",
-        "projectx.brokers.marketing.document-fixes.routing-key=rvl-contract-fixed"})
+        "projectx.brokers.marketing.document-fixes.routing-key=rvl-contract-fixed",
+        "projectx.brokers.marketing.listener-auto-startup=true",
+        "projectx.brokers.marketing.order-events.queue=order.event.rvl.topic"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 
@@ -86,8 +88,8 @@ public class CucumberSpringConfiguration {
         }
 
         @Bean
-        OrderingStub orderingStub() throws IOException {
-            return new OrderingStub();
+        OrderingStub orderingStub(StandClock clock) throws IOException {
+            return new OrderingStub(clock);
         }
 
         @Bean
@@ -182,6 +184,12 @@ public class CucumberSpringConfiguration {
                 MarketingBrokerProperties broker) {
             return new DocumentFixQueue(connections, broker.documentFixes().exchange(),
                     broker.documentFixes().routingKey());
+        }
+
+        @Bean
+        OrderEventQueue orderEventQueue(@MarketingBroker ConnectionFactory connections,
+                MarketingBrokerProperties broker) {
+            return new OrderEventQueue(connections, broker.orderEvents().queue());
         }
 
         @Bean

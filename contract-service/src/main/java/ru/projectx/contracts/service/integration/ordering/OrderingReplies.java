@@ -25,6 +25,7 @@ final class OrderingReplies {
     private static final String ERROR = "error";
     private static final String ERRORS = "errors";
     private static final String CODE = "code";
+    private static final Pattern HTTP_URL = Pattern.compile("https?://[\\x21-\\x7E]{1,2000}");
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z0-9._:-]{1,100}");
 
     private OrderingReplies() {
@@ -51,6 +52,15 @@ final class OrderingReplies {
                 .filter(OrderingReplies::identifier)
                 .orElseThrow(() -> new OrderingOrderFailureException(operation,
                         "в ответе нет обязательного поля или оно не по формату"));
+    }
+
+    static String requiredUrl(OrderingOperation operation, JsonNode value) {
+        return Optional.of(value)
+                .filter(JsonNode::isString)
+                .map(JsonNode::asString)
+                .filter(url -> HTTP_URL.matcher(url).matches())
+                .orElseThrow(() -> new OrderingOrderFailureException(operation,
+                        "в ответе нет ссылки или она не по формату"));
     }
 
     static boolean identifier(String value) {
