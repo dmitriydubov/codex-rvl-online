@@ -211,33 +211,4 @@ class InvoiceRecordingTest {
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
         verifyNoInteractions(statuses);
     }
-
-    @Test
-    void rejected_marksTheInvoiceWithTheCodeKeepsTheContractAndThePayerAndAlerts() {
-        OrderInvoice invoice = locked(Invoices.inCheckout());
-
-        recording.rejected(PaymentOrders.CONTRACT, "CheckoutValidatorService.valid");
-
-        assertThat(invoice.view().state()).isEqualTo(InvoiceState.REJECTED);
-        assertThat(invoice.view().rejectionCode()).contains("CheckoutValidatorService.valid");
-        assertThat(Invoices.updatedAt(invoice)).isEqualTo(NOW);
-        assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
-        assertThat(order.view().payer()).contains(PaymentOrders.PAYER);
-        InOrder sequence = inOrder(fence, alerts);
-        sequence.verify(fence).holdUntilCommit();
-        sequence.verify(alerts).invoiceRejected(contract, "CheckoutValidatorService.valid");
-        verifyNoInteractions(statuses);
-    }
-
-    @Test
-    void rejected_forInvoiceThatLeftCheckout_changesNothing() {
-        OrderInvoice invoice = locked(Invoices.issued());
-
-        recording.rejected(PaymentOrders.CONTRACT, "code");
-
-        assertThat(invoice.view().state()).isEqualTo(InvoiceState.ISSUED);
-        assertThat(invoice.view().rejectionCode()).isEmpty();
-        verify(fence).holdUntilCommit();
-        verifyNoInteractions(alerts);
-    }
 }

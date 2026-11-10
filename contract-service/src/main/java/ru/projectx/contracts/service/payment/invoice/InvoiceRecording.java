@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.contract.ContractStep;
+import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.payment.InvoiceLink;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
@@ -26,6 +27,7 @@ import ru.projectx.contracts.service.status.RequestStatusPublication;
 @ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 public class InvoiceRecording {
 
+    static final String DEFERRED_STOP_APPLIED = "счёт отклонён, отложенное прекращение договора применено";
     private static final Logger log = LoggerFactory.getLogger(InvoiceRecording.class);
 
     private final PaymentOrderLocks locks;
@@ -97,9 +99,18 @@ public class InvoiceRecording {
     public void rejected(UUID contractId, String code) {
         LockedInvoice locked = locks.lockInvoice(contractId);
         fence.holdUntilCommit();
-        if (locked.invoice().reject(code, clock.instant())) {
-            alerts.invoiceRejected(locked.contract(), code);
+        Instant now = clock.instant();
+        if (!locked.invoice().reject(code, now)) {
+            return;
         }
+        alerts.invoiceRejected(locked.contract(), code);
+        locked.invoice().liftDeferredCancellation(now).ifPresent(deferred -> stop(locked, deferred, now));
+    }
+
+    private static void stop(LockedInvoice locked, Cancellation deferred, Instant now) {
+        locked.contract().cancel(deferred, now);
+        locked.order().withdraw(now);
+        PaymentOrderLog.write(log.atInfo(), locked.contract(), DEFERRED_STOP_APPLIED);
     }
 
     private static void invoiced(LockedInvoice locked, Instant now) {

@@ -50,7 +50,7 @@ final class PaymentRaceStand {
     private static final String ORDER_ROW = "select id, state::text as state, external_order_id, payer_email"
             + " from payment_orders where contract_id = ?";
     private static final String INVOICE_ROW = "select state::text as state, checkout_started_at, payment_deadline,"
-            + " invoice_id, payment_url, paid_at, reply_lost_reported,"
+            + " invoice_id, payment_url, paid_at, rejection_code, reply_lost_reported,"
             + " deferred_cancel_reason::text as deferred_cancel_reason, deferred_cancelled_at"
             + " from payment_invoices where contract_id = ?";
 
@@ -174,7 +174,8 @@ final class PaymentRaceStand {
     void remove(UUID request) {
         String ofRequest = " in (select id from contracts where individual_request_id = :request)";
         jdbc.sql("delete from outbox_messages where aggregate_id = :request or aggregate_id in"
-                + " (select id from payment_orders where contract_id" + ofRequest + ")").param("request", request).update();
+                + " (select id from payment_orders where contract_id" + ofRequest + ")").param("request", request)
+                .update();
         jdbc.sql("delete from payment_invoices where contract_id" + ofRequest).param("request", request).update();
         jdbc.sql("delete from payment_orders where contract_id" + ofRequest).param("request", request).update();
         jdbc.sql("delete from contract_persons where contract_id" + ofRequest).param("request", request).update();
