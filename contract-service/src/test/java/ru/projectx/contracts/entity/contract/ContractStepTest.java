@@ -33,14 +33,24 @@ class ContractStepTest {
 
     @Test
     void offerAcceptance_leadsFromDraftReadyToAccepted() {
-        assertThat(ContractStep.OFFER_ACCEPTED.from()).isEqualTo(ContractStatus.DRAFT_READY);
-        assertThat(ContractStep.OFFER_ACCEPTED.to()).isEqualTo(ContractStatus.ACCEPTED);
+        assertThat(ContractStep.OFFER_ACCEPTED.after(ContractStatus.DRAFT_READY, CONTRACT))
+                .isEqualTo(ContractStatus.ACCEPTED);
     }
 
     @Test
     void invoiceIssue_leadsFromAcceptedToInvoiceIssued() {
-        assertThat(ContractStep.INVOICE_ISSUED.from()).isEqualTo(ContractStatus.ACCEPTED);
-        assertThat(ContractStep.INVOICE_ISSUED.to()).isEqualTo(ContractStatus.INVOICE_ISSUED);
+        assertThat(ContractStep.INVOICE_ISSUED.after(ContractStatus.ACCEPTED, CONTRACT))
+                .isEqualTo(ContractStatus.INVOICE_ISSUED);
+    }
+
+    @Test
+    void offerAcceptance_turnsTheContractReadyForAcceptanceIntoAcceptedWithoutNewVersion() {
+        ReflectionTestUtils.setField(contract, "status", ContractStatus.DRAFT_READY);
+
+        contract.advance(ContractStep.OFFER_ACCEPTED);
+
+        assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
+        assertThat(contract.state().entityVersion()).isEqualTo(1);
     }
 
     @Test

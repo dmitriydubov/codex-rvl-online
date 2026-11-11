@@ -1,5 +1,7 @@
 package ru.projectx.contracts.entity.contract;
 
+import java.util.UUID;
+
 public enum ContractStep {
     OFFER_ACCEPTED(ContractStatus.DRAFT_READY, ContractStatus.ACCEPTED),
     INVOICE_ISSUED(ContractStatus.ACCEPTED, ContractStatus.INVOICE_ISSUED);
@@ -12,11 +14,7 @@ public enum ContractStep {
         this.to = to;
     }
 
-    ContractStatus from() {
-        return from;
-    }
-
-    ContractStatus to() {
-        return to;
+    ContractStatus after(ContractStatus current, UUID contractId) {
+        return current.next(from, to, contractId);
     }
 }

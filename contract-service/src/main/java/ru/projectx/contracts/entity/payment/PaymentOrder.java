@@ -84,12 +84,9 @@ public class PaymentOrder {
     }
 
     public void markRequested(OrderRequest request, Instant now) {
-        if (request == OrderRequest.CANCELLATION) {
-            this.cancelRequested = true;
-        }
-        else {
-            this.creationRequested = true;
-        }
+        OrderRequests sent = request.after(new OrderRequests(creationRequested, cancelRequested));
+        this.creationRequested = sent.creation();
+        this.cancelRequested = sent.cancellation();
         this.updatedAt = now;
     }
 
