@@ -397,8 +397,9 @@ ru.projectx.contracts
 │   ├── inbox/         — журнал входящих, приём, карантин
 │   ├── outbox/        — журнал исходящих
 │   └── payment/       — заказ на оплату договора КМ (`PaymentOrder`, `PaymentOrderState`, документ `OrderDocument`,
-│                        адрес плательщика `PayerEmail`) и счёт по заказу (`OrderInvoice`, `InvoiceState`, переходы
-│                        `InvoiceTransition`, срок и ссылка `InvoiceTerm`, `InvoiceLink`)
+│                        адрес плательщика `PayerEmail`, запросы в Ordering `OrderRequest`) и счёт по заказу
+│                        (`OrderInvoice`, `InvoiceState`, переходы `InvoiceTransition` с отметкой `InvoiceMark` и
+│                        положением счёта `InvoiceProgress`, срок и ссылка `InvoiceTerm`, `InvoiceLink`)
 ├── exception/         — исключения домена, плоский: полные имена классов уходят в журнал и `error_message` (`docs/design.md`)
 ├── repository/        — Spring Data JPA; в корне — блокировка записей заявки (`IssuanceRepositoryLocking` и фрагмент
 │   │                    `…Impl` рядом) и общий `UskRecordRepository`
@@ -417,7 +418,7 @@ ru.projectx.contracts
 │                        собирает `DocumentFixMessages` в `service/payment/order`, события разбирает
 │                        `service/payment/event`
 ├── service/           — бизнес-логика; в корне — только общее для подпакетов (`ScheduledPasses`, `InboxLogContext`,
-│   │                    `IssueErrors`, `FlagGauges`, `RequestIds`, `Guids`, `Enums`)
+│   │                    `InboxCorrelation`, `IssueErrors`, `FlagGauges`, `RequestIds`, `Guids`, `Enums`)
 │   ├── issuance/      — выпуск по задаче: разбор состава, договоры КМ, полисы ЛМ, снимок сторон, оплаченные договоры
 │   ├── cancellation/  — прекращение работы по заявке
 │   ├── database/      — классы отказов и таймауты базы (`TemporaryFailures`, `SqlStates`, `DatabaseTimeoutsCheck`)
@@ -641,11 +642,12 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 только через именованные переходы (например, у договора — `offerDraft`, `revise`, `advance`, `markPaid`, `submit`,
 `markIssued`, `cancel`; у заказа на оплату — `markRequested`, `recordOrder`, `reject`, `withdraw`, `expire`,
 `forgetPayer`, `recordCancelled`, `rejectCancellation`; у счёта — `start`, `issue`, `reject`, `pay`, `pass`,
-`deferCancellation`, `liftDeferredCancellation`) — сеттеров нет ни одного. Переход-параметр (`advance(ContractStep)`,
-`markRequested(OrderRequest)`, `pass(InvoiceTransition)`) — вынужденный долг предела 12 методов у `Contract`,
-`PaymentOrder` и `OrderInvoice` (план, раздел 4.3), а не образец. По той же причине **не
+`deferCancellation`, `liftDeferredCancellation`) — сеттеров нет ни одного. По той же причине **не
 `@CreationTimestamp`/`@UpdateTimestamp`**: везде, где нужно «сейчас», инъецируется `java.time.Clock` — им тесты
-управляют временем без `Thread.sleep`.
+управляют временем без `Thread.sleep`. Переход без своих данных — объект со своим правилом, а сущность только применяет
+его ответ: переход счёта (`pass(InvoiceTransition)`) и шаг договора (`advance(ContractStep)`) знают, из каких состояний
+они ведут и куда, запрос заказа (`markRequested(OrderRequest)`) — какие отметки будут стоять. Ветки по виду перехода в
+сущности нет, новый переход — новая константа (`docs/design.md`).
 
 ### Надёжность и исключения
 
@@ -663,8 +665,10 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 - Ловим конкретные типы. `catch (Exception e)` — только на верхней границе слушателя, планировщика и внешнего клиента, и
   там оно обязано классифицировать, а не подавлять. Никаких `e.printStackTrace()` и пустых `catch {}`.
 - Исключение несёт контекст: `message_id`, заявка, договор. На время обработки сообщения и запроса контекст лежит в MDC
-  (идентификаторы заявки, договора, сообщения, `requestId`, у проходов оплаты — `correlationId` заказа на оплату);
-  журнал пишется в структурном формате ECS
+  (идентификаторы заявки, договора, сообщения, `requestId`, у проходов оплаты — `correlationId` заказа на оплату).
+  `correlation_id` входящего сообщения идёт в MDC идентификатором заявки, кроме видов, у которых это не заявка: их
+  перечисляет `InboxCorrelation` (сейчас — события Ordering). Новый такой вид добавляется туда, иначе его ключ попадёт в
+  журнал как заявка. Журнал пишется в структурном формате ECS
   (`logging.structured.format.console: ecs`), и все ключи MDC уходят в запись целиком — поэтому в MDC только
   идентификаторы, никаких персональных данных. Исключение к записи журнала не прикладывается: пишется тип отказа и
   SQLSTATE.
