@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.payment;
 
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import org.slf4j.MDC;
 import org.slf4j.spi.LoggingEventBuilder;
 import ru.projectx.contracts.entity.contract.Contract;
@@ -24,6 +25,16 @@ public final class PaymentOrderLog {
         MDC.put(CORRELATION_ID, correlationId.toString());
         try {
             work.run();
+        }
+        finally {
+            MDC.remove(CORRELATION_ID);
+        }
+    }
+
+    public static <T> T supply(UUID correlationId, Supplier<T> work) {
+        MDC.put(CORRELATION_ID, correlationId.toString());
+        try {
+            return work.get();
         }
         finally {
             MDC.remove(CORRELATION_ID);

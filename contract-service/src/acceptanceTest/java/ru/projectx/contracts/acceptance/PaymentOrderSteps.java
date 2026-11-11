@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +30,19 @@ public class PaymentOrderSteps {
 
     private static final Set<String> SETTINGS = Set.of("продукт", "канал", "причина отмены", "обменник подтверждений",
             "ключ подтверждения", "клиент сервера токенов", "попыток вызова");
-    private static final Set<String> ORDER_FIELDS = Set.of("состояние", "orderId", "clientId", "код отказа");
+    private static final Map<String, String> ORDER_COLUMNS = Map.ofEntries(
+            Map.entry("orderId", "external_order_id"),
+            Map.entry("clientId", "client_id"),
+            Map.entry("код отказа", "rejection_code"),
+            Map.entry("e-mail", "payer_email"),
+            Map.entry("счёт начат", "checkout_started_at"),
+            Map.entry("invoiceId", "invoice_id"),
+            Map.entry("ссылка на оплату", "payment_url"),
+            Map.entry("срок оплаты", "payment_deadline"),
+            Map.entry("момент оплаты", "paid_at"),
+            Map.entry("повторов подтверждения", "fix_repeats"));
+    private static final Set<String> ORDER_MOMENTS = Set.of("счёт начат", "срок оплаты", "момент оплаты");
+    private static final String STATE = "состояние";
     private static final String NONE = "нет";
     private static final Path OPERATIONS = Path.of("docs", "operations.md");
     private static final String RETURN_SECTION = "### Возврат отклонённого заказа на оплату в работу";
@@ -124,15 +137,26 @@ public class PaymentOrderSteps {
 
     @Тогда("заказ на оплату договора КМ участника {string} заявки {string}:")
     public void orderIs(String participant, String request, Map<String, String> expected) {
-        StepTables.onlyKnown(expected, ORDER_FIELDS);
         Map<String, String> order = orders.single(participant, request);
-        Map<String, String> actual = Map.of(
-                "состояние", PaymentOrderRecords.state(order),
-                "orderId", orNone(order.get("external_order_id")),
-                "clientId", order.get("client_id"),
-                "код отказа", orNone(order.get("rejection_code")));
-        expected.forEach((field, value) -> assertThat(actual.get(field))
-                .as("поле «%s» заказа на оплату договора КМ участника %s", field, participant).isEqualTo(value));
+        expected.forEach((field, value) -> assertThat(actual(order, field))
+                .as("поле «%s» заказа на оплату договора КМ участника %s", field, participant)
+                .isEqualTo(comparable(field, value)));
+    }
+
+    private static String actual(Map<String, String> order, String field) {
+        if (STATE.equals(field)) {
+            return PaymentOrderRecords.state(order);
+        }
+        String column = Optional.ofNullable(ORDER_COLUMNS.get(field))
+                .orElseThrow(() -> new IllegalArgumentException("шаг не знает строки заказа на оплату «" + field + "»"));
+        return orNone(order.get(column));
+    }
+
+    private static String comparable(String field, String expected) {
+        if (NONE.equals(expected) || !ORDER_MOMENTS.contains(field)) {
+            return expected;
+        }
+        return OffsetDateTime.parse(expected).toInstant().toString();
     }
 
     @Тогда("заказов на оплату у договора КМ участника {string} заявки {string} — {int}")
@@ -167,9 +191,13 @@ public class PaymentOrderSteps {
     public void errorTextNotKept(String text) {
         assertThat(text).isNotBlank();
         assertThat(journal.mentioning(text)).as("записи журнала с текстом ошибки Ordering").isEmpty();
-        List<String> stored = jdbc.sql("select concat_ws('|', external_order_id, rejection_code, contract_number)"
-                + " from payment_orders").query(String.class).list();
-        assertThat(stored).as("поля заказов на оплату").noneMatch(value -> value.contains(text));
+        List<String> stored = jdbc.sql("""
+                select concat_ws('|', o.external_order_id, o.rejection_code, o.contract_number, i.rejection_code,
+                                 i.invoice_id, i.payment_url)
+                  from payment_orders o
+                  left join payment_invoices i on i.payment_order_id = o.id
+                """).query(String.class).list();
+        assertThat(stored).as("поля заказов на оплату и счетов").isNotEmpty().noneMatch(value -> value.contains(text));
     }
 
     @Когда("дежурный возвращает заказ на оплату договора КМ участника {string} заявки {string} в работу по процедуре ручного возврата")

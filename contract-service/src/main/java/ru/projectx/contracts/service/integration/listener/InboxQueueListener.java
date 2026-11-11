@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 import ru.projectx.contracts.exception.InboxEnvelopeException;
@@ -20,17 +21,27 @@ public class InboxQueueListener implements ChannelAwareMessageListener {
 
     private static final Logger log = LoggerFactory.getLogger(InboxQueueListener.class);
 
-    private final TaskEnvelopeParser envelopes;
+    private final InboxEnvelopes envelopes;
     private final InboxReceiver receiver;
     private final InboxStorageFailures failures;
     private final InboxMetrics metrics;
 
+    @Autowired
     public InboxQueueListener(TaskEnvelopeParser envelopes, InboxReceiver receiver, InboxStorageFailures failures,
+            InboxMetrics metrics) {
+        this((InboxEnvelopes) envelopes, receiver, failures, metrics);
+    }
+
+    private InboxQueueListener(InboxEnvelopes envelopes, InboxReceiver receiver, InboxStorageFailures failures,
             InboxMetrics metrics) {
         this.envelopes = envelopes;
         this.receiver = receiver;
         this.failures = failures;
         this.metrics = metrics;
+    }
+
+    public InboxQueueListener reading(InboxEnvelopes otherEnvelopes) {
+        return new InboxQueueListener(otherEnvelopes, receiver, failures, metrics);
     }
 
     @Override

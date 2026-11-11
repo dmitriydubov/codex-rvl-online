@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.payment;
 
+import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +10,7 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.config.payment.PaymentOrderPassesProperties;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
+import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.entity.payment.PaymentOrderView;
@@ -41,12 +44,20 @@ public class PaymentOrderPasses {
     }
 
     public int eachAsLeader(PaymentOrderState state, Predicate<PaymentOrderView> work) {
-        return leadership.countAsLeader(() -> each(state, work));
+        return leadership.countAsLeader(() -> each(orders.findByStateOrderByCreatedAtAscIdAsc(state, batch), work));
     }
 
-    private int each(PaymentOrderState state, Predicate<PaymentOrderView> work) {
+    public int eachWithInvoice(PaymentOrderState state, InvoiceState invoice, Predicate<PaymentOrderView> work) {
+        return leadership.countAsLeader(() -> each(orders.findWithInvoiceIn(state, invoice, batch), work));
+    }
+
+    public int eachOf(Function<Limit, List<PaymentOrder>> due, Predicate<PaymentOrderView> work) {
+        return leadership.countAsLeader(() -> each(due.apply(batch), work));
+    }
+
+    private static int each(List<PaymentOrder> due, Predicate<PaymentOrderView> work) {
         int handled = 0;
-        for (PaymentOrder order : orders.findByStateOrderByCreatedAtAscIdAsc(state, batch)) {
+        for (PaymentOrder order : due) {
             handled++;
             if (!handle(order.view(), work)) {
                 break;

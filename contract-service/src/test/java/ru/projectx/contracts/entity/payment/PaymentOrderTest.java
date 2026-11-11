@@ -19,7 +19,8 @@ class PaymentOrderTest {
             Instant.parse("2026-02-10T07:04:58Z"), Instant.parse("2026-04-09T20:59:59Z"));
 
     private static PaymentOrder opened() {
-        return PaymentOrder.open(CONTRACT, CLIENT, DOCUMENT, OPENED);
+        return PaymentOrder.open(new OrderDraft(CONTRACT, CLIENT, DOCUMENT, new PayerEmail("insured@example.test")),
+                OPENED);
     }
 
     @Test
@@ -38,21 +39,12 @@ class PaymentOrderTest {
     }
 
     @Test
-    void requestCreation_marksThatCreationWasSent() {
-        PaymentOrder order = opened();
-
-        order.requestCreation(LATER);
-
-        assertThat(order.view().creationRequested()).isTrue();
-    }
-
-    @Test
     void recordOrder_onAwaitingOrder_createsItAndAsksToConfirmTheDocument() {
         PaymentOrder order = opened();
 
         assertThat(order.recordOrder(ORDER, LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CREATED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
         assertThat(order.view().orderId()).contains(ORDER);
     }
 
@@ -64,18 +56,18 @@ class PaymentOrderTest {
         assertThat(order.recordOrder("another", LATER)).isFalse();
 
         assertThat(order.view().orderId()).contains(ORDER);
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CREATED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CREATED);
     }
 
     @Test
     void recordOrder_whileCancelPending_keepsItPendingWithoutConfirmation() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordOrder(ORDER, LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         assertThat(order.view().orderId()).contains(ORDER);
     }
 
@@ -86,7 +78,7 @@ class PaymentOrderTest {
 
         assertThat(order.recordOrder(ORDER, LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
     }
 
     @Test
@@ -95,7 +87,7 @@ class PaymentOrderTest {
 
         assertThat(order.reject("CreateOrderValidatorService.valid", LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.REJECTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.REJECTED);
         assertThat(order.view().rejectionCode()).contains("CreateOrderValidatorService.valid");
     }
 
@@ -106,7 +98,7 @@ class PaymentOrderTest {
 
         assertThat(order.reject("FIXED_UNDELIVERED", LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.REJECTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.REJECTED);
         assertThat(order.view().orderId()).contains(ORDER);
     }
 
@@ -117,7 +109,7 @@ class PaymentOrderTest {
 
         assertThat(order.reject("code", LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().rejectionCode()).isEmpty();
     }
 
@@ -127,17 +119,17 @@ class PaymentOrderTest {
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
     }
 
     @Test
     void withdraw_afterCreationWasSent_waitsForCancellation() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
     }
 
     @Test
@@ -147,18 +139,18 @@ class PaymentOrderTest {
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
     }
 
     @Test
     void withdraw_rejectedAfterCreationWasSent_waitsForCancellationBecauseTheOrderMayExist() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.reject("code", LATER);
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
     }
 
     @Test
@@ -168,7 +160,7 @@ class PaymentOrderTest {
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
     }
 
     @Test
@@ -179,7 +171,7 @@ class PaymentOrderTest {
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
     }
 
     @Test
@@ -191,7 +183,7 @@ class PaymentOrderTest {
 
         order.withdraw(LATER);
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
     }
 
     @Test
@@ -200,22 +192,23 @@ class PaymentOrderTest {
         order.recordOrder(ORDER, LATER);
         order.withdraw(LATER);
 
-        order.requestCancellation(LATER);
+        order.markRequested(OrderRequest.CANCELLATION, LATER);
 
         assertThat(order.view().cancelRequested()).isTrue();
+        assertThat(order.view().creationRequested()).isFalse();
         assertThat(order.recordCancelled(ORDER, LATER)).isTrue();
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
     }
 
     @Test
     void recordCancelled_ofOrderFoundBySearch_keepsItsOrderId() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordCancelled(ORDER, LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).contains(ORDER);
     }
 
@@ -225,45 +218,45 @@ class PaymentOrderTest {
 
         assertThat(order.recordCancelled(ORDER, LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
         assertThat(order.view().orderId()).isEmpty();
     }
 
     @Test
     void recordCancelled_ofRecordClosedAsNotFound_keepsItClosedWithoutOrderId() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
         order.recordNotFound(LATER);
 
         assertThat(order.recordCancelled(ORDER, LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).isEmpty();
     }
 
     @Test
     void recordNotFound_pendingWithoutOrderId_closesIt() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
 
         assertThat(order.recordNotFound(LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCELLED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCELLED);
         assertThat(order.view().orderId()).isEmpty();
     }
 
     @Test
     void recordNotFound_pendingWithOrderId_keepsItForCancellation() {
         PaymentOrder order = opened();
-        order.requestCreation(LATER);
+        order.markRequested(OrderRequest.CREATION, LATER);
         order.withdraw(LATER);
         order.recordOrder(ORDER, LATER);
 
         assertThat(order.recordNotFound(LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_PENDING);
         assertThat(order.view().orderId()).contains(ORDER);
     }
 
@@ -273,7 +266,7 @@ class PaymentOrderTest {
 
         assertThat(order.recordNotFound(LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
     }
 
     @Test
@@ -284,7 +277,7 @@ class PaymentOrderTest {
 
         assertThat(order.rejectCancellation("CancelOrderValidatorService.valid", LATER)).isTrue();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.CANCEL_REJECTED);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.CANCEL_REJECTED);
         assertThat(order.view().rejectionCode()).isEqualTo(Optional.of("CancelOrderValidatorService.valid"));
     }
 
@@ -294,17 +287,7 @@ class PaymentOrderTest {
 
         assertThat(order.rejectCancellation("code", LATER)).isFalse();
 
-        assertThat(order.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+        assertThat(order.view().state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
         assertThat(order.view().rejectionCode()).isEmpty();
-    }
-
-    @Test
-    void withdrawnStates_areTheCancellationOnes() {
-        assertThat(PaymentOrderState.CANCEL_PENDING.withdrawn()).isTrue();
-        assertThat(PaymentOrderState.CANCELLED.withdrawn()).isTrue();
-        assertThat(PaymentOrderState.CANCEL_REJECTED.withdrawn()).isTrue();
-        assertThat(PaymentOrderState.AWAITING_CREATION.withdrawn()).isFalse();
-        assertThat(PaymentOrderState.CREATED.withdrawn()).isFalse();
-        assertThat(PaymentOrderState.REJECTED.withdrawn()).isFalse();
     }
 }

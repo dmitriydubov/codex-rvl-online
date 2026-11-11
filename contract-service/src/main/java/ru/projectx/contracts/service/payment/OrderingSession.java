@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.payment;
 
 import java.util.Optional;
 import java.util.UUID;
+import ru.projectx.contracts.entity.payment.InvoiceLink;
 
 public interface OrderingSession {
 
@@ -12,4 +13,8 @@ public interface OrderingSession {
     String orderStatus(String orderId);
 
     void cancelOrder(String orderId);
+
+    InvoiceLink checkout(CheckoutRequest request);
+
+    OrderingOrder order(String orderId);
 }

@@ -3,11 +3,9 @@ package ru.projectx.contracts.acceptance;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +18,6 @@ import java.util.regex.Pattern;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 final class OrderingStub implements AutoCloseable {
@@ -35,35 +32,43 @@ final class OrderingStub implements AutoCloseable {
     private static final Pattern TOKEN = Pattern.compile("токен (\\S+) на (\\d+) секунд");
     private static final Pattern CLIENT_ORDERS = Pattern.compile("/orders/([^/]+)");
     private static final Pattern ORDER_CANCEL = Pattern.compile("/orders/([^/]+)/cancel");
+    private static final Pattern ORDER_CHECKOUT = Pattern.compile("/orders/([^/]+)/checkout");
+    private static final Pattern INVOICE =
+            Pattern.compile("счёт (" + ORDER_ID + ") со ссылкой (\\S+)(?: (без ответа|с обрывом))?");
+    private static final String STATE = "состояние";
+    private static final String CHECKOUT = "счёт";
+    private static final Map<Pattern, String> ORDER_ACTIONS = Map.of(
+            Pattern.compile("/orders"), "создание",
+            ORDER_CHECKOUT, CHECKOUT,
+            ORDER_CANCEL, "отмена");
     private static final String FAILURE = "ошибка \\S+ HTTP \\d{3}|HTTP [45]\\d{2}|без ответа|обрыв";
     private static final Map<String, Pattern> KNOWN_ANSWERS = Map.of(
             "token", Pattern.compile(TOKEN.pattern() + "|" + FAILURE),
             "создание", Pattern.compile(CREATED.pattern() + "|" + FAILURE),
             "поиск", Pattern.compile("найденные (?:объектом|списком)|" + FAILURE),
-            "отмена", Pattern.compile("отменён(?: без ответа)?|" + FAILURE));
+            "отмена", Pattern.compile("отменён(?: без ответа)?|" + FAILURE),
+            CHECKOUT, Pattern.compile(INVOICE.pattern() + "|" + FAILURE),
+            STATE, Pattern.compile(STATE + "|" + FAILURE));
     private static final long SILENCE_SECONDS = 5;
 
     record Call(String kind, String method, String path, Map<String, String> headers, JsonNode body) {
-    }
-
-    record Order(String orderId, String clientId, String documentId, String status) {
-
-        Order cancelled() {
-            return new Order(orderId, clientId, documentId, "CANCELED");
-        }
     }
 
     private final JsonMapper json = JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
     private final HttpServer server;
     private final List<Call> calls = new CopyOnWriteArrayList<>();
     private final List<Map<String, String>> tokenRequests = new CopyOnWriteArrayList<>();
-    private final Map<String, Order> orders = new ConcurrentHashMap<>();
+    private final Map<String, StubOrder> orders = new ConcurrentHashMap<>();
     private final Map<String, StubScript> scripts = new ConcurrentHashMap<>();
+    private final StubOrderViews views = new StubOrderViews(json);
+    private final Clock clock;
     private volatile String errorText = "текст ошибки стенда";
     private volatile Runnable beforeCreatedAnswer = () -> { };
+    private volatile Runnable beforeInvoiceAnswer = () -> { };
     private volatile CountDownLatch silence = new CountDownLatch(1);
 
-    OrderingStub() throws IOException {
+    OrderingStub(Clock clock) throws IOException {
+        this.clock = clock;
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext(ORDERING_PATH, this::ordering);
         server.createContext(TOKEN_PATH, this::token);
@@ -92,14 +97,20 @@ final class OrderingStub implements AutoCloseable {
         scripts.put("создание", new StubScript("HTTP 503"));
         scripts.put("поиск", new StubScript("найденные объектом"));
         scripts.put("отмена", new StubScript("отменён"));
+        resetInvoicing();
+    }
+
+    void resetInvoicing() {
+        beforeInvoiceAnswer = () -> { };
+        scripts.put(CHECKOUT, new StubScript("HTTP 503"));
+        scripts.put(STATE, new StubScript(STATE));
     }
 
     void answer(String kind, String answers) {
         StubScript script = new StubScript(answers);
-        script.answers.stream().filter(answer -> !KNOWN_ANSWERS.get(kind).matcher(answer).matches()).findFirst()
-                .ifPresent(unknown -> {
-                    throw new IllegalArgumentException("стенд не знает ответа «" + unknown + "» на " + kind);
-                });
+        script.firstUnknown(KNOWN_ANSWERS.get(kind)).ifPresent(unknown -> {
+            throw new IllegalArgumentException("стенд не знает ответа «" + unknown + "» на " + kind);
+        });
         scripts.put(kind, script);
     }
 
@@ -110,6 +121,15 @@ final class OrderingStub implements AutoCloseable {
     void createThenAnswerAfter(String orderId, Runnable action) {
         beforeCreatedAnswer = action;
         answer("создание", "создан " + orderId);
+    }
+
+    void invoiceThenAnswerAfter(String invoiceId, String paymentUrl, Runnable action) {
+        beforeInvoiceAnswer = action;
+        answer(CHECKOUT, "счёт " + invoiceId + " со ссылкой " + paymentUrl);
+    }
+
+    StubOrderViews views() {
+        return views;
     }
 
     List<Call> calls() {
@@ -124,7 +144,14 @@ final class OrderingStub implements AutoCloseable {
         return orders.values().stream().filter(order -> order.clientId().equals(clientId)).count();
     }
 
-    Optional<Order> order(String orderId) {
+    StubOrder onlyOrder() {
+        if (orders.size() != 1) {
+            throw new IllegalStateException("шагу нужен единственный заказ заглушки Ordering, их " + orders.size());
+        }
+        return orders.values().iterator().next();
+    }
+
+    Optional<StubOrder> order(String orderId) {
         return Optional.ofNullable(orders.get(orderId));
     }
 
@@ -135,11 +162,11 @@ final class OrderingStub implements AutoCloseable {
     }
 
     private void token(HttpExchange exchange) throws IOException {
-        tokenRequests.add(form(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+        tokenRequests.add(StubHttp.form(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
         String answer = scripts.get("token").next();
         Matcher token = TOKEN.matcher(answer);
         if (token.matches()) {
-            send(exchange, 200, "{\"access_token\": \"" + token.group(1) + "\", \"token_type\": \"Bearer\", "
+            StubHttp.send(exchange, 200, "{\"access_token\": \"" + token.group(1) + "\", \"token_type\": \"Bearer\", "
                     + "\"expires_in\": " + token.group(2) + "}");
             return;
         }
@@ -151,24 +178,26 @@ final class OrderingStub implements AutoCloseable {
         byte[] raw = exchange.getRequestBody().readAllBytes();
         JsonNode body = raw.length == 0 ? json.missingNode() : json.readTree(raw);
         String kind = kind(exchange.getRequestMethod(), path);
-        calls.add(new Call(kind, exchange.getRequestMethod(), path, headers(exchange), body));
+        calls.add(new Call(kind, exchange.getRequestMethod(), path, StubHttp.headers(exchange), body));
         switch (kind) {
             case "создание" -> create(exchange, body);
             case "поиск" -> find(exchange, path, body);
-            case "состояние" -> state(exchange, path);
+            case STATE -> state(exchange, path);
             case "отмена" -> cancel(exchange, path);
-            default -> send(exchange, 404, "{}");
+            case CHECKOUT -> checkout(exchange, path);
+            default -> StubHttp.send(exchange, 404, "{}");
         }
     }
 
     private static String kind(String method, String path) {
         if ("GET".equals(method)) {
-            return "состояние";
+            return STATE;
         }
-        if ("/orders".equals(path)) {
-            return "создание";
-        }
-        return ORDER_CANCEL.matcher(path).matches() ? "отмена" : "поиск";
+        return ORDER_ACTIONS.entrySet().stream()
+                .filter(action -> action.getKey().matcher(path).matches())
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse("поиск");
     }
 
     private void create(HttpExchange exchange, JsonNode body) throws IOException {
@@ -179,15 +208,14 @@ final class OrderingStub implements AutoCloseable {
             return;
         }
         String orderId = created.group(1);
-        orders.put(orderId, new Order(orderId, body.path("clientId").asString(""),
-                body.path("orderDetails").path(0).path("documentId").asString(""), "NEW"));
+        orders.put(orderId, new StubOrder(orderId, body, clock.instant()));
         if (created.group(2) != null) {
             failOrSilence(exchange, "с обрывом".equals(created.group(2)) ? "обрыв" : "без ответа");
             return;
         }
         beforeCreatedAnswer.run();
         beforeCreatedAnswer = () -> { };
-        send(exchange, 200, "{\"status\": \"success\", \"orderId\": \"" + orderId + "\"}");
+        StubHttp.send(exchange, 200, "{\"status\": \"success\", \"orderId\": \"" + orderId + "\"}");
     }
 
     private void find(HttpExchange exchange, String path, JsonNode body) throws IOException {
@@ -199,30 +227,26 @@ final class OrderingStub implements AutoCloseable {
         Matcher client = CLIENT_ORDERS.matcher(path);
         String clientId = client.matches() ? client.group(1) : "";
         String documentId = body.path("orderDetails").path("documentId").asString("");
-        List<ObjectNode> found = new ArrayList<>();
-        orders.values().stream()
+        List<StubOrder> found = orders.values().stream()
                 .filter(order -> order.clientId().equals(clientId) && order.documentId().equals(documentId))
-                .forEach(order -> found.add(orderNode(order)));
-        ObjectNode response = json.createObjectNode().put("status", "success");
-        if (answer.endsWith("списком")) {
-            ArrayNode list = response.putArray("data");
-            found.forEach(list::add);
-        }
-        else if (!found.isEmpty()) {
-            response.set("data", found.getFirst());
-        }
-        send(exchange, 200, json.writeValueAsString(response));
+                .toList();
+        StubHttp.send(exchange, 200, json.writeValueAsString(views.searchResult(found, answer.endsWith("списком"))));
     }
 
     private void state(HttpExchange exchange, String path) throws IOException {
-        Optional<Order> order = order(path.substring("/orders/".length()));
+        String answer = scripts.get(STATE).next();
+        if (!STATE.equals(answer)) {
+            failOrSilence(exchange, answer);
+            return;
+        }
+        Optional<StubOrder> order = order(path.substring("/orders/".length()));
         if (order.isEmpty()) {
-            send(exchange, 200, error("OrderDataService.getOrderById.getOrderData"));
+            StubHttp.send(exchange, 200, error("OrderDataService.getOrderById.getOrderData"));
             return;
         }
         ObjectNode response = json.createObjectNode().put("status", "success");
-        response.set("data", orderNode(order.get()));
-        send(exchange, 200, json.writeValueAsString(response));
+        response.set("data", views.state(order.get()));
+        StubHttp.send(exchange, 200, json.writeValueAsString(response));
     }
 
     private void cancel(HttpExchange exchange, String path) throws IOException {
@@ -232,35 +256,44 @@ final class OrderingStub implements AutoCloseable {
             failOrSilence(exchange, answer);
             return;
         }
-        orders.computeIfPresent(orderId, (id, order) -> order.cancelled());
+        order(orderId).ifPresent(order -> order.enter(StubOrder.CANCELED));
         if ("отменён без ответа".equals(answer)) {
             failOrSilence(exchange, "без ответа");
             return;
         }
-        send(exchange, 200, "{\"status\": \"success\"}");
+        StubHttp.send(exchange, 200, "{\"status\": \"success\"}");
     }
 
-    private ObjectNode orderNode(Order order) {
-        ObjectNode node = json.createObjectNode()
-                .put("clientId", order.clientId())
-                .put("orderId", order.orderId())
-                .put("status", order.status());
-        node.putArray("orderDetails").addObject()
-                .put("product", "rvl")
-                .put("documentType", "contract")
-                .put("documentId", order.documentId())
-                .put("status", order.status());
-        return node;
+    private void checkout(HttpExchange exchange, String path) throws IOException {
+        String answer = scripts.get(CHECKOUT).next();
+        Matcher invoice = INVOICE.matcher(answer);
+        if (!invoice.matches()) {
+            failOrSilence(exchange, answer);
+            return;
+        }
+        order(ORDER_CHECKOUT.matcher(path).replaceAll("$1")).ifPresent(order -> order.invoice(invoice.group(1)));
+        if (invoice.group(3) != null) {
+            failOrSilence(exchange, "с обрывом".equals(invoice.group(3)) ? "обрыв" : "без ответа");
+            return;
+        }
+        beforeInvoiceAnswer.run();
+        beforeInvoiceAnswer = () -> { };
+        ObjectNode response = json.createObjectNode()
+                .put("status", "success")
+                .put("invoiceId", invoice.group(1))
+                .put("paymentUrl", invoice.group(2))
+                .put("paymentShortUrl", invoice.group(2) + "/s");
+        StubHttp.send(exchange, 200, json.writeValueAsString(response));
     }
 
     private void failOrSilence(HttpExchange exchange, String answer) throws IOException {
         Matcher error = ERROR.matcher(answer);
         Matcher http = HTTP.matcher(answer);
         if (error.matches()) {
-            send(exchange, Integer.parseInt(error.group(2)), error(error.group(1)));
+            StubHttp.send(exchange, Integer.parseInt(error.group(2)), error(error.group(1)));
         }
         else if (http.matches()) {
-            sendEmpty(exchange, Integer.parseInt(http.group(1)));
+            StubHttp.sendEmpty(exchange, Integer.parseInt(http.group(1)));
         }
         else if ("без ответа".equals(answer)) {
             awaitSilence();
@@ -290,55 +323,6 @@ final class OrderingStub implements AutoCloseable {
         }
         catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private static Map<String, String> headers(HttpExchange exchange) {
-        Map<String, String> headers = new ConcurrentHashMap<>();
-        exchange.getRequestHeaders().forEach((name, values) -> headers.put(name.toLowerCase(java.util.Locale.ROOT),
-                values.getFirst()));
-        return headers;
-    }
-
-    private static Map<String, String> form(String body) {
-        Map<String, String> fields = new ConcurrentHashMap<>();
-        for (String pair : body.split("&")) {
-            String[] parts = pair.split("=", 2);
-            if (parts.length == 2) {
-                fields.put(java.net.URLDecoder.decode(parts[0], StandardCharsets.UTF_8),
-                        java.net.URLDecoder.decode(parts[1], StandardCharsets.UTF_8));
-            }
-        }
-        return fields;
-    }
-
-    private static void send(HttpExchange exchange, int status, String body) throws IOException {
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(status, bytes.length);
-        try (OutputStream out = exchange.getResponseBody()) {
-            out.write(bytes);
-        }
-    }
-
-    private static void sendEmpty(HttpExchange exchange, int status) throws IOException {
-        exchange.sendResponseHeaders(status, -1);
-        exchange.close();
-    }
-
-    static final class StubScript {
-
-        private final List<String> answers;
-        private int next;
-
-        StubScript(String answers) {
-            this.answers = Arrays.stream(answers.split(";")).map(String::strip).toList();
-        }
-
-        synchronized String next() {
-            String answer = answers.get(Math.min(next, answers.size() - 1));
-            next++;
-            return answer;
         }
     }
 }

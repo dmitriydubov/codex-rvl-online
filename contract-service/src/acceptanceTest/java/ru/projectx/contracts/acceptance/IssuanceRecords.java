@@ -42,6 +42,12 @@ public class IssuanceRecords {
              order by contract_persons.role
             """;
 
+    private static final String DEFERRED_CANCELLATION = """
+            select deferred_cancel_reason::text as reason, deferred_cancelled_at as cancelled_at
+              from payment_invoices
+             where contract_id = :contract and deferred_cancel_reason is not null
+            """;
+
     private final JdbcClient jdbc;
 
     public IssuanceRecords(JdbcClient jdbc) {
@@ -68,6 +74,16 @@ public class IssuanceRecords {
     List<Record> of(String participantId, String requestId) {
         return jdbc.sql(RECORDS).param("request", UUID.fromString(requestId))
                 .param("participant", UUID.fromString(participantId)).query(this::record).list();
+    }
+
+    record DeferredCancellation(String reason, Instant cancelledAt) {
+    }
+
+    Optional<DeferredCancellation> deferredCancellationOf(UUID contractId) {
+        return jdbc.sql(DEFERRED_CANCELLATION).param("contract", contractId)
+                .query((row, index) -> new DeferredCancellation(row.getString("reason"),
+                        row.getObject("cancelled_at", OffsetDateTime.class).toInstant()))
+                .optional();
     }
 
     List<Person> personsOf(UUID owner) {

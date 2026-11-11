@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.message.task.ContractTask;
@@ -107,7 +108,7 @@ class KmContractPaidErrorIssuanceTest {
         Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.SPOUSE,
                 new BigDecimal("34000.00")), NOW);
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(PAID_AT, NOW);
         contract.markError(UNDELIVERED, NOW);
         return contract;

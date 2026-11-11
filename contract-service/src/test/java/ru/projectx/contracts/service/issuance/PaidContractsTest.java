@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.support.Issuances;
@@ -55,7 +56,7 @@ class PaidContractsTest {
 
     private void paid() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(PAID_AT, NOW);
     }
 }

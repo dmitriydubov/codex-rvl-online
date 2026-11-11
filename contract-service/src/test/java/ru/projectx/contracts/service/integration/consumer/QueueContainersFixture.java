@@ -39,12 +39,17 @@ final class QueueContainersFixture {
     }
 
     static InboxQueues queues(boolean internalConsumers, boolean onecConsumers) {
+        return queues(internalConsumers, onecConsumers, List.of());
+    }
+
+    static InboxQueues queues(boolean internalConsumers, boolean onecConsumers, List<AdditionalInboxQueue> additional) {
         return new InboxQueues(
                 new InternalBrokerProperties(connection(), internalConsumers,
                         new InternalBrokerProperties.Queues(TASKS, "rvl_contracts_to_rvl_requests_status-changes")),
                 new OneCBrokerProperties(connection(), onecConsumers, new OneCBrokerProperties.Queues(
                         "rvl_contracts_to_1c-usk_km-contract-changes", KM_RESULTS,
-                        "rvl_contracts_to_1c-usk_lm-policy-changes", LM_RESULTS)));
+                        "rvl_contracts_to_1c-usk_lm-policy-changes", LM_RESULTS)),
+                additional);
     }
 
     static InboxProperties propertiesStoppingWithin(Duration stopTimeout) {

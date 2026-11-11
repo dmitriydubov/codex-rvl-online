@@ -1,10 +1,8 @@
 package ru.projectx.contracts.service.payment;
 
-import java.time.Instant;
-import ru.projectx.contracts.entity.contract.Contract;
-import ru.projectx.contracts.entity.contract.OfferAcceptance;
+import org.jspecify.annotations.Nullable;
 
 public interface PaymentOrderOpening {
 
-    void open(Contract contract, OfferAcceptance offer, Instant now);
+    OrderOpening forPayer(@Nullable String email);
 }

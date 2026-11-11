@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.data.domain.Limit;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.exception.OrderingOperation;
@@ -95,7 +96,7 @@ class PaymentOrderCancellingTest {
     @Test
     void cancellationSentEarlierAndOrderStillNew_isCancelledAgain() {
         PaymentOrder order = PaymentOrders.cancelPending();
-        order.requestCancellation(NOW);
+        order.markRequested(OrderRequest.CANCELLATION, NOW);
         pending(order);
         given(session.orderStatus(PaymentOrders.ORDER_ID)).willReturn("NEW");
 
@@ -181,7 +182,7 @@ class PaymentOrderCancellingTest {
 
     private static PaymentOrder sentWithoutAnswer() {
         PaymentOrder order = PaymentOrders.awaiting();
-        order.requestCreation(NOW);
+        order.markRequested(OrderRequest.CREATION, NOW);
         order.withdraw(NOW);
         return order;
     }

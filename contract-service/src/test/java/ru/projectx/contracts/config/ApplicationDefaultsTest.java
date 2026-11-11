@@ -137,7 +137,7 @@ class ApplicationDefaultsTest {
 
     @Test
     void schedulerPool_hasAThreadPerScheduledPass() {
-        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("8");
+        assertThat(application.getProperty("spring.task.scheduling.pool.size")).asString().isEqualTo("16");
     }
 
     @Test

@@ -10,17 +10,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.dto.AcceptanceRequest;
 import ru.projectx.contracts.dto.AcceptanceResponse;
-import ru.projectx.contracts.dto.DocumentState;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.contract.ContractStatus;
-import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.exception.ContractBusyException;
 import ru.projectx.contracts.exception.ContractNotFoundException;
 import ru.projectx.contracts.exception.ContractStateException;
-import ru.projectx.contracts.exception.DocumentVersionMismatchException;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.service.payment.OrderOpening;
 import ru.projectx.contracts.service.payment.PaymentOrderOpening;
 
 @Service
@@ -44,12 +43,13 @@ public class ContractOfferAcceptance implements OfferAcceptances {
     @Override
     @Transactional
     public AcceptanceResponse accept(UUID contractId, AcceptanceRequest request) {
+        OrderOpening paymentOrder = paymentOrders.forPayer(request.email());
         Contract contract = locked(contractId);
         ensureAcceptable(contract);
         ContractAcceptance acceptance = acceptances.findByContractId(contractId)
                 .map(previous -> repeated(previous, request))
-                .orElseGet(() -> first(contract, request));
-        return new AcceptanceResponse(contractId, DocumentState.ACCEPTED, acceptance.offer().acceptedAt());
+                .orElseGet(() -> first(contract, request, paymentOrder));
+        return AcceptanceResponse.accepted(contractId, acceptance.offer().acceptedAt());
     }
 
     private Contract locked(UUID contractId) {
@@ -68,23 +68,17 @@ public class ContractOfferAcceptance implements OfferAcceptances {
     }
 
     private static ContractAcceptance repeated(ContractAcceptance previous, AcceptanceRequest request) {
-        int acceptedVersion = previous.offer().contractVersion();
-        if (acceptedVersion != request.contractVersion()) {
-            throw new ContractAlreadyAcceptedException(previous.contractId(), acceptedVersion);
-        }
+        OfferVersions.ensureAccepted(previous, request.contractVersion());
         return previous;
     }
 
-    private ContractAcceptance first(Contract contract, AcceptanceRequest request) {
-        int currentVersion = contract.state().entityVersion();
-        if (currentVersion != request.contractVersion()) {
-            throw new DocumentVersionMismatchException(contract.id(), currentVersion);
-        }
+    private ContractAcceptance first(Contract contract, AcceptanceRequest request, OrderOpening paymentOrder) {
+        int currentVersion = OfferVersions.current(contract, request.contractVersion());
         Instant now = clock.instant();
         ContractAcceptance acceptance =
                 acceptances.save(ContractAcceptance.record(contract.id(), AcceptanceForms.offer(request), now));
-        contract.accept();
-        paymentOrders.open(contract, acceptance.offer(), now);
+        contract.advance(ContractStep.OFFER_ACCEPTED);
+        paymentOrder.open(contract, acceptance.offer(), now);
         log.info("договор КМ {} акцептован по версии {}, канал {}", contract.id(), currentVersion,
                 request.channel());
         return acceptance;

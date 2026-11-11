@@ -3,6 +3,8 @@ package ru.projectx.contracts.service.status;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -39,6 +41,24 @@ class KmContractStatesTest {
     void onlyDraftReady_isReportedOnEntry(ContractStatus status) {
         assertThat(KmContractStates.reportedOnEntry(status)).isFalse();
         assertThat(KmContractStates.reportedOnEntry(ContractStatus.DRAFT_READY)).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ContractStatus.class, names = {"ACCEPTED", "INVOICE_ISSUED"})
+    void contractWithDeferredCancellation_isShownAsCancelled(ContractStatus status) {
+        assertThat(KmContractStates.shown(status, new PaymentOffer(true, Optional.empty(), Optional.empty())))
+                .isEqualTo(KmContractState.CANCELLED);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ACCEPTED, DRAFTED", "INVOICE_ISSUED, DRAFTED", "ISSUED, ISSUED", "CANCELLED, CANCELLED"})
+    void contractWithoutDeferredCancellation_isShownByItsOwnStatus(ContractStatus status, KmContractState expected) {
+        PaymentOffer linked = new PaymentOffer(false, Optional.of("https://pay.example.test/pay/7c1e5a90"),
+                Optional.of(Instant.parse("2026-02-13T07:05:00Z")));
+
+        assertThat(KmContractStates.shown(status, linked)).isEqualTo(expected);
+        assertThat(KmContractStates.shown(status, new PaymentOffer(false, Optional.empty(), Optional.empty())))
+                .isEqualTo(expected);
     }
 
     @Test

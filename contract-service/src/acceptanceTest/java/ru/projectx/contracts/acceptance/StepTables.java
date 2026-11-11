@@ -23,6 +23,10 @@ final class StepTables {
                 .orElseThrow(() -> new IllegalArgumentException("в таблице шага нет строки «" + key + "»"));
     }
 
+    static Optional<String> cellOrBlank(Map<String, String> table, String key) {
+        return table.containsKey(key) ? Optional.of(Optional.ofNullable(table.get(key)).orElse("")) : Optional.empty();
+    }
+
     static Optional<String> cell(Map<String, String> table, String key) {
         return Optional.ofNullable(table.get(key)).filter(value -> !value.isBlank());
     }

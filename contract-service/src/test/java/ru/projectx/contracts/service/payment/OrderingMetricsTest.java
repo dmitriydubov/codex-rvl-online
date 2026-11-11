@@ -40,5 +40,6 @@ class OrderingMetricsTest {
         assertThat(OrderingOperation.FIND_ORDERS.tag()).isEqualTo("find_orders");
         assertThat(OrderingOperation.ORDER_STATE.tag()).isEqualTo("order_state");
         assertThat(OrderingOperation.CANCEL_ORDER.tag()).isEqualTo("cancel_order");
+        assertThat(OrderingOperation.CHECKOUT.tag()).isEqualTo("checkout");
     }
 }

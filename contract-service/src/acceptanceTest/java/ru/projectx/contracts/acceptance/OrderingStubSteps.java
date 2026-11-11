@@ -96,7 +96,7 @@ public class OrderingStubSteps {
     @Тогда("заказ {string} в Ordering — в статусе {string}")
     public void orderStatus(String orderId, String status) {
         assertThat(stub.order(orderId)).as("заказ %s в Ordering", orderId)
-                .map(OrderingStub.Order::status).contains(status);
+                .map(StubOrder::status).contains(status);
     }
 
     private String resolved(String field, String value) {

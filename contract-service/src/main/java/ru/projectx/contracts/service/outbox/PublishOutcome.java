@@ -10,6 +10,10 @@ public sealed interface PublishOutcome {
         return false;
     }
 
+    default boolean stopsPublishing() {
+        return false;
+    }
+
     sealed interface Attempted extends PublishOutcome {
     }
 
@@ -57,6 +61,11 @@ public sealed interface PublishOutcome {
 
         @Override
         public boolean endsPass() {
+            return true;
+        }
+
+        @Override
+        public boolean stopsPublishing() {
             return true;
         }
     }

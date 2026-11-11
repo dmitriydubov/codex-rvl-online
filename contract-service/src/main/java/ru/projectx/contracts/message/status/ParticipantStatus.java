@@ -17,12 +17,13 @@ public record ParticipantStatus(
         @Nullable UUID policyId,
         @Nullable String policyNumber,
         PaymentStatus paymentStatus,
+        @Nullable String paymentUrl,
         List<StatusDocument> documents,
         @Nullable String errorCode,
         @Nullable String errorMessage) {
 
     public static ParticipantStatus nothingIssued(UUID id) {
         return new ParticipantStatus(id, IssuedDocumentKind.NONE, null, KmContractState.NOT_REQUIRED, null, null, null,
-                null, null, PaymentStatus.NOT_REQUIRED, List.of(), null, null);
+                null, null, PaymentStatus.NOT_REQUIRED, null, List.of(), null, null);
     }
 }

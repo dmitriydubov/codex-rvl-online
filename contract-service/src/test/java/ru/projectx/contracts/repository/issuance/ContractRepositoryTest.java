@@ -24,6 +24,7 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.party.ContractPerson;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.party.Gender;
 import ru.projectx.contracts.entity.party.IdentityDocument;
 import ru.projectx.contracts.entity.party.IdentityDocumentType;
@@ -138,7 +139,7 @@ class ContractRepositoryTest {
         Contract running = contract(SPOUSE, "DKM-2026-000001");
         Contract paidFailed = contract(CHILD, "DKM-2026-000002");
         paidFailed.offerDraft();
-        paidFailed.accept();
+        paidFailed.advance(ContractStep.OFFER_ACCEPTED);
         paidFailed.markPaid(NOW, NOW);
         paidFailed.markError(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "договор КМ не передан в 1С:УСК"), NOW);
         Contract unpaidFailed = contract(SPOUSE, "DKM-2026-000003");
@@ -245,7 +246,7 @@ class ContractRepositoryTest {
         Contract contract = Contract.open(new ContractDraft(number, TERMS, participant, new BigDecimal("34000.00")),
                 opened);
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(opened, opened);
         return contract;
     }

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.CannotAcquireLockException;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
@@ -34,7 +35,7 @@ class ContractPaymentsTest {
     @Test
     void markPaid_locksTheAcceptedContractAndRecordsTheMomentOfPaymentWithTheNextVersion() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         given(contracts.findLockedById(CONTRACT_ID)).willReturn(Optional.of(contract));
 
         payments.markPaid(CONTRACT_ID, PAID_AT);

@@ -22,17 +22,17 @@ public class ServiceLogSteps {
     private final InboxJournal inbox;
     private final PublishedMessages published;
     private final TaskMessages messages;
-    private final TaskQueue queue;
+    private final StandQueues queues;
     private final OutboxRecords outbox;
     private final IssuanceRecords records;
 
     public ServiceLogSteps(ServiceJournal journal, InboxJournal inbox, PublishedMessages published,
-            TaskMessages messages, TaskQueue queue, OutboxRecords outbox, IssuanceRecords records) {
+            TaskMessages messages, StandQueues queues, OutboxRecords outbox, IssuanceRecords records) {
         this.journal = journal;
         this.inbox = inbox;
         this.published = published;
         this.messages = messages;
-        this.queue = queue;
+        this.queues = queues;
         this.outbox = outbox;
         this.records = records;
     }
@@ -68,7 +68,7 @@ public class ServiceLogSteps {
 
     @Тогда("в журнале Договоров есть запись уровня ERROR о потерянном сообщении очереди {string} с причиной {string}")
     public void lossLogged(String queueName, String reason) {
-        String queue = this.queue.called(queueName).name();
+        String queue = queues.called(queueName).name();
         List<ILoggingEvent> matching = journal.events().stream()
                 .filter(event -> event.getLevel() == Level.ERROR)
                 .filter(event -> event.getFormattedMessage()
