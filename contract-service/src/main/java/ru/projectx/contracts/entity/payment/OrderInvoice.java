@@ -63,7 +63,7 @@ public class OrderInvoice {
     @Column(name = "payment_url")
     private String paymentUrl;
 
-    @Column(nullable = false)
+    @Column(name = "reply_lost_reported", nullable = false)
     private boolean replyLostReported;
 
     @Nullable
@@ -112,19 +112,15 @@ public class OrderInvoice {
     }
 
     public boolean pass(InvoiceTransition transition, Instant now) {
-        if (isRefused(transition)) {
-            return false;
-        }
-        if (!enter(transition.from(), transition.to(), now)) {
-            return false;
-        }
-        this.fixRepeats = transition.remindersAfter(fixRepeats);
-        this.replyLostReported |= transition.reportsLostReply();
-        return true;
-    }
-
-    private boolean isRefused(InvoiceTransition transition) {
-        return transition.reportsLostReply() && (replyLostReported || paymentUrl != null);
+        Optional<InvoiceProgress> next = transition.after(
+                new InvoiceProgress(state, fixRepeats, replyLostReported, paymentUrl != null));
+        next.ifPresent(progress -> {
+            this.state = progress.state();
+            this.fixRepeats = progress.fixRepeats();
+            this.replyLostReported = progress.lostReplyReported();
+            this.updatedAt = now;
+        });
+        return next.isPresent();
     }
 
     public boolean start(Instant deadline, Instant now) {
@@ -137,17 +133,13 @@ public class OrderInvoice {
     }
 
     public boolean issue(InvoiceLink link, Instant now) {
-        if (!enter(IN_CHECKOUT, InvoiceState.ISSUED, now) && !isLinkMissing()) {
+        if (!enter(IN_CHECKOUT, InvoiceState.ISSUED, now) && !view().lacksPaymentLink()) {
             return false;
         }
         this.invoiceId = link.invoiceId();
         this.paymentUrl = link.paymentUrl();
         this.updatedAt = now;
         return true;
-    }
-
-    private boolean isLinkMissing() {
-        return paymentUrl == null && (state == InvoiceState.ISSUED || state == InvoiceState.PAYMENT_ERROR);
     }
 
     public boolean reject(String code, Instant now) {
