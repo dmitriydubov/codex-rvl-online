@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 
@@ -39,6 +41,30 @@ class InvoiceViewTest {
     @Test
     void invoiceWithoutDeferredCancellation_saysSo() {
         assertThat(view(InvoiceState.ISSUED, Optional.empty()).cancellationDeferred()).isFalse();
+    }
+
+    private static InvoiceView linked(InvoiceState state) {
+        return new InvoiceView(ID, ID, state, 0, Optional.empty(),
+                Optional.of(new InvoiceLink("inv-0001", "https://pay.example.test/inv-0001")), Optional.empty(),
+                Optional.empty(), Optional.empty());
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"CHECKOUT", "ISSUED", "PAYMENT_ERROR"})
+    void invoiceThatAwaitsPaymentWithoutLink_lacksThePaymentLink(InvoiceState state) {
+        assertThat(view(state, Optional.empty()).lacksPaymentLink()).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"ISSUED", "PAYMENT_ERROR"})
+    void invoiceThatHasItsLink_doesNotLackIt(InvoiceState state) {
+        assertThat(linked(state).lacksPaymentLink()).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"CHECKOUT", "ISSUED", "PAYMENT_ERROR"})
+    void invoiceThatDoesNotAwaitPayment_lacksNoPaymentLink(InvoiceState state) {
+        assertThat(view(state, Optional.empty()).lacksPaymentLink()).isFalse();
     }
 
     private static InvoiceView startedAt(Instant started) {

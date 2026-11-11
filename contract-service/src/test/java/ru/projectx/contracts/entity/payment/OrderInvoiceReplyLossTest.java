@@ -103,6 +103,63 @@ class OrderInvoiceReplyLossTest {
         assertThat(updatedAt(invoice)).isEqualTo(OPENED);
     }
 
+    private static OrderInvoice failedWithoutLink() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.CHECKOUT);
+        invoice.pass(InvoiceTransition.PAYMENT_AWAITED, OPENED);
+        invoice.pass(InvoiceTransition.PAYMENT_FAILED, OPENED);
+        return invoice;
+    }
+
+    @Test
+    void lostReplyOfInvoiceWhosePaymentFailed_isReportedExactlyOnceAndTheInvoiceKeepsItsState() {
+        OrderInvoice invoice = failedWithoutLink();
+
+        assertThat(invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, LATER)).isTrue();
+        assertThat(invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, LATEST)).isFalse();
+
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        assertThat(invoice.view().link()).isEmpty();
+        assertThat(reported(invoice)).isEqualTo(true);
+        assertThat(updatedAt(invoice)).isEqualTo(LATER);
+    }
+
+    @Test
+    void lostReplyReportedBeforeThePaymentFailed_isNotReportedAgainAfterIt() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.CHECKOUT);
+        invoice.pass(InvoiceTransition.PAYMENT_AWAITED, OPENED);
+        invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED, OPENED);
+        invoice.pass(InvoiceTransition.PAYMENT_FAILED, OPENED);
+
+        assertThat(invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, LATER)).isFalse();
+
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        assertThat(updatedAt(invoice)).isEqualTo(OPENED);
+    }
+
+    @Test
+    void lostReplyOfFailedPaymentWhoseInvoiceHasItsLink_isNotReported() {
+        OrderInvoice invoice = invoiceIn(InvoiceState.CHECKOUT);
+        invoice.issue(LINK, OPENED);
+        invoice.pass(InvoiceTransition.PAYMENT_FAILED, OPENED);
+
+        assertThat(invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, LATER)).isFalse();
+
+        assertThat(reported(invoice)).isEqualTo(false);
+        assertThat(updatedAt(invoice)).isEqualTo(OPENED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = "PAYMENT_ERROR")
+    void lostReplyAfterFailure_isReportedOnlyForInvoiceInPaymentError(InvoiceState state) {
+        OrderInvoice invoice = invoiceIn(state);
+
+        assertThat(invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, LATER)).isFalse();
+
+        assertThat(invoice.view().state()).isEqualTo(state);
+        assertThat(reported(invoice)).isEqualTo(false);
+        assertThat(updatedAt(invoice)).isEqualTo(OPENED);
+    }
+
     @Test
     void lateLinkAfterTheReportedLoss_isAcceptedAndClosesTheReportForGood() {
         OrderInvoice invoice = invoiceIn(InvoiceState.CHECKOUT);
@@ -130,13 +187,14 @@ class OrderInvoiceReplyLossTest {
     }
 
     @ParameterizedTest
-    @EnumSource(names = {"REPLY_LOST", "REPLY_LOSS_REPORTED"})
+    @EnumSource(names = {"REPLY_LOST", "REPLY_LOSS_REPORTED", "REPLY_LOSS_REPORTED_AFTER_FAILURE"})
     void transitionsOfTheLostReply_reportIt(InvoiceTransition transition) {
         assertThat(transition.reportsLostReply()).isTrue();
     }
 
     @ParameterizedTest
-    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"REPLY_LOST", "REPLY_LOSS_REPORTED"})
+    @EnumSource(mode = EnumSource.Mode.EXCLUDE,
+            names = {"REPLY_LOST", "REPLY_LOSS_REPORTED", "REPLY_LOSS_REPORTED_AFTER_FAILURE"})
     void otherTransitions_reportNoLostReply(InvoiceTransition transition) {
         assertThat(transition.reportsLostReply()).isFalse();
     }
@@ -154,5 +212,8 @@ class OrderInvoiceReplyLossTest {
         assertThat(InvoiceTransition.PAYMENT_AWAITED.to()).isEqualTo(InvoiceState.ISSUED);
         assertThat(InvoiceTransition.REPLY_LOSS_REPORTED.from()).containsExactly(InvoiceState.ISSUED);
         assertThat(InvoiceTransition.REPLY_LOSS_REPORTED.to()).isEqualTo(InvoiceState.ISSUED);
+        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE.from())
+                .containsExactly(InvoiceState.PAYMENT_ERROR);
+        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE.to()).isEqualTo(InvoiceState.PAYMENT_ERROR);
     }
 }

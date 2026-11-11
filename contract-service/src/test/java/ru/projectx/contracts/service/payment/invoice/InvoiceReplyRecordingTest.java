@@ -162,15 +162,31 @@ class InvoiceReplyRecordingTest {
     }
 
     @Test
-    void replyLost_ofInvoiceInPaymentErrorWithoutLink_alertsNobody() {
-        OrderInvoice invoice = Invoices.inCheckout();
-        invoice.pass(InvoiceTransition.PAYMENT_AWAITED, Invoices.STARTED);
+    void replyLost_ofInvoiceInPaymentErrorWithoutLink_onlyAlertsAndOnlyOnce() {
+        OrderInvoice invoice = locked(Invoices.inCheckout());
+        recording.paymentAwaited(PaymentOrders.CONTRACT);
         invoice.pass(InvoiceTransition.PAYMENT_FAILED, Invoices.STARTED);
-        locked(invoice);
+
+        recording.replyLost(PaymentOrders.CONTRACT);
+        recording.replyLost(PaymentOrders.CONTRACT);
+
+        verify(alerts, times(1)).replyLost(contract);
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        assertThat(invoice.view().link()).isEmpty();
+        assertThat(Invoices.updatedAt(invoice)).isEqualTo(NOW);
+        assertThat(contract.status()).isEqualTo(ContractStatus.INVOICE_ISSUED);
+        verifyNoInteractions(statuses);
+    }
+
+    @Test
+    void replyLost_ofInvoiceInPaymentErrorThatHasItsLink_alertsNobody() {
+        OrderInvoice invoice = locked(Invoices.in(InvoiceState.PAYMENT_ERROR));
 
         recording.replyLost(PaymentOrders.CONTRACT);
 
         assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        assertThat(invoice.view().link()).contains(Invoices.LINK);
+        assertThat(Invoices.updatedAt(invoice)).isEqualTo(Invoices.STARTED);
         verifyNoInteractions(alerts);
     }
 

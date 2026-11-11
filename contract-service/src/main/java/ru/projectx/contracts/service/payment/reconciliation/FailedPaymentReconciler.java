@@ -39,7 +39,7 @@ class FailedPaymentReconciler implements StateReconciler {
 
     @Override
     public Followup reconcile(LockedInvoice locked, OrderingOrder order, Instant now) {
-        if (locked.invoice().view().state() == InvoiceState.CHECKOUT) {
+        if (locked.invoice().view().lacksPaymentLink()) {
             recording.replyLost(locked.invoice().view().contractId());
         }
         outcomes.paymentFailed(locked, now);

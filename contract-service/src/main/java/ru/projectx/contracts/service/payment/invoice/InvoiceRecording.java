@@ -15,6 +15,7 @@ import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.payment.InvoiceLink;
 import ru.projectx.contracts.entity.payment.InvoiceTransition;
+import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.payment.CheckoutRequest;
 import ru.projectx.contracts.service.payment.LockedInvoice;
@@ -90,9 +91,14 @@ public class InvoiceRecording {
             alerts.replyLost(locked.contract());
             return;
         }
-        if (locked.invoice().pass(InvoiceTransition.REPLY_LOSS_REPORTED, now)) {
+        if (reportLoss(locked.invoice(), now)) {
             alerts.replyLost(locked.contract());
         }
+    }
+
+    private static boolean reportLoss(OrderInvoice invoice, Instant now) {
+        return invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED, now)
+                || invoice.pass(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE, now);
     }
 
     @Transactional

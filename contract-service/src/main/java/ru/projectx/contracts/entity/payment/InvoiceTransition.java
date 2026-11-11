@@ -12,6 +12,7 @@ public enum InvoiceTransition {
     PAYMENT_AWAITED(EnumSet.of(InvoiceState.CHECKOUT), InvoiceState.ISSUED),
     REPLY_LOST(EnumSet.of(InvoiceState.CHECKOUT), InvoiceState.ISSUED),
     REPLY_LOSS_REPORTED(EnumSet.of(InvoiceState.ISSUED), InvoiceState.ISSUED),
+    REPLY_LOSS_REPORTED_AFTER_FAILURE(EnumSet.of(InvoiceState.PAYMENT_ERROR), InvoiceState.PAYMENT_ERROR),
     PAYMENT_FAILED(EnumSet.of(InvoiceState.ISSUED), InvoiceState.PAYMENT_ERROR),
     PAYMENT_OVERDUE(EnumSet.of(InvoiceState.CHECKOUT, InvoiceState.ISSUED, InvoiceState.PAYMENT_ERROR),
             InvoiceState.OVERDUE);
@@ -37,6 +38,6 @@ public enum InvoiceTransition {
     }
 
     boolean reportsLostReply() {
-        return this == REPLY_LOST || this == REPLY_LOSS_REPORTED;
+        return this == REPLY_LOST || this == REPLY_LOSS_REPORTED || this == REPLY_LOSS_REPORTED_AFTER_FAILURE;
     }
 }
