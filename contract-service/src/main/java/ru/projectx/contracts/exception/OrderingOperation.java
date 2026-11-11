@@ -5,7 +5,8 @@ public enum OrderingOperation {
     CREATE_ORDER("create_order"),
     FIND_ORDERS("find_orders"),
     ORDER_STATE("order_state"),
-    CANCEL_ORDER("cancel_order");
+    CANCEL_ORDER("cancel_order"),
+    CHECKOUT("checkout");
 
     private final String tag;
 

@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.integration.broker;
 
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -29,6 +30,13 @@ public class MarketingBrokerConfig {
     @MarketingBroker
     public RabbitTemplate marketingBrokerTemplate(@MarketingBroker ConnectionFactory connectionFactory) {
         return BrokerTemplates.create(connectionFactory);
+    }
+
+    @Bean
+    @MarketingBroker
+    public SimpleRabbitListenerContainerFactory marketingBrokerListenerContainerFactory(
+            @MarketingBroker ConnectionFactory connectionFactory) {
+        return BrokerListenerContainerFactories.create(MARKETING, connectionFactory);
     }
 
     @Bean

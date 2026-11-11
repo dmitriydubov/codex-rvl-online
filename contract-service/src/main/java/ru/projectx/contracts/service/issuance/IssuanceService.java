@@ -20,7 +20,7 @@ import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.task.TaskParticipant;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
-import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
+import ru.projectx.contracts.service.payment.cancellation.ContractStops;
 
 @Service
 public class IssuanceService {
@@ -34,15 +34,15 @@ public class IssuanceService {
     private final LmPolicyRepository policies;
     private final KmContractIssuance kmContracts;
     private final LmPolicyIssuance lmPolicies;
-    private final PaymentOrderWithdrawal paymentOrders;
+    private final ContractStops contractStops;
 
     public IssuanceService(ContractRepository contracts, LmPolicyRepository policies,
-            KmContractIssuance kmContracts, LmPolicyIssuance lmPolicies, PaymentOrderWithdrawal paymentOrders) {
+            KmContractIssuance kmContracts, LmPolicyIssuance lmPolicies, ContractStops contractStops) {
         this.contracts = contracts;
         this.policies = policies;
         this.kmContracts = kmContracts;
         this.lmPolicies = lmPolicies;
-        this.paymentOrders = paymentOrders;
+        this.contractStops = contractStops;
     }
 
     public List<RequestParticipant> apply(ContractTask task, Instant now) {
@@ -65,7 +65,11 @@ public class IssuanceService {
         List<LmPolicy> activePolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, STOPPED_POLICIES);
         policies.lockFresh(activePolicies);
-        return new RequestIssuance(stillHeld(activeContracts), stillActive(activePolicies));
+        List<Contract> held = stillHeld(activeContracts);
+        Set<UUID> deferred = contractStops.deferred(held.stream().map(Contract::id).toList());
+        return new RequestIssuance(held.stream().filter(contract -> !deferred.contains(contract.id())).toList(),
+                stillActive(activePolicies),
+                held.stream().filter(contract -> deferred.contains(contract.id())).toList());
     }
 
     private static List<Contract> stillHeld(List<Contract> locked) {
@@ -95,10 +99,15 @@ public class IssuanceService {
     private void issue(DocumentKind kind, Issue issue, RequestIssuance current, Instant now) {
         UUID participantId = issue.participant().id();
         switch (kind) {
-            case KM_CONTRACT -> kmContracts.reconcile(issue, current.contractOf(participantId), now);
+            case KM_CONTRACT -> keepKmContract(issue, current.contractOf(participantId), now);
             case LM_POLICY -> lmPolicies.reconcile(issue, current.policyOf(participantId), now);
             default -> { }
         }
+    }
+
+    private void keepKmContract(Issue issue, Optional<Contract> existing, Instant now) {
+        kmContracts.reconcile(issue, existing, now);
+        existing.ifPresent(contract -> contractStops.resume(contract, now));
     }
 
     private void exclude(ActiveIssuance leftover, ContractTask task, Instant now) {
@@ -110,9 +119,11 @@ public class IssuanceService {
     }
 
     private void cancel(IssuanceRecord record, String comment, Instant now) {
-        record.cancel(new Cancellation(CancelReason.OTHER, comment, now), now);
+        Cancellation cancellation = new Cancellation(CancelReason.OTHER, comment, now);
         if (record instanceof Contract contract) {
-            paymentOrders.contractStopped(contract.id(), now);
+            contractStops.stop(contract, cancellation, now);
+            return;
         }
+        record.cancel(cancellation, now);
     }
 }

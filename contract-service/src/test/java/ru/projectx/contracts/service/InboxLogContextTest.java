@@ -33,6 +33,26 @@ class InboxLogContextTest {
     }
 
     @Test
+    void run_forAnOrderEventKeepsTheDocumentIdentifierOutOfTheRequestKeyButSetsTheMessageKeys() {
+        InboxReceipt orderEvent = new InboxReceipt(UUID.fromString("d1a0c001-5e2f-4a3b-8c4d-000000000001"),
+                UUID.fromString("0196f0a2-0000-7000-8000-000000000011"), "ordering.order.events", "PaymentOrderEvent", 0);
+        AtomicReference<String> messageId = new AtomicReference<>();
+        AtomicReference<String> requestId = new AtomicReference<>();
+        AtomicReference<String> traceId = new AtomicReference<>();
+
+        InboxLogContext.run(orderEvent, () -> {
+            messageId.set(MDC.get(InboxLogContext.MESSAGE_ID));
+            requestId.set(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID));
+            traceId.set(RequestIds.current());
+        });
+
+        assertThat(messageId.get()).isEqualTo("d1a0c001-5e2f-4a3b-8c4d-000000000001");
+        assertThat(requestId.get()).isNull();
+        assertThat(traceId.get()).isEqualTo("d1a0c001-5e2f-4a3b-8c4d-000000000001");
+        assertThat(MDC.get(InboxLogContext.MESSAGE_ID)).isNull();
+    }
+
+    @Test
     void run_makesTheMessageIdTheRequestIdOfCallsToTheReferenceService() {
         AtomicReference<String> requestId = new AtomicReference<>();
 

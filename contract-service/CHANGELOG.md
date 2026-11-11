@@ -16,7 +16,30 @@
 
 ### Добавлено
 
-- Оплата договора КМ через сервис управления заказами (Ordering), часть «заказ»: по акцептованному договору КМ сервис
+- Оплата договора КМ через сервис управления заказами (Ordering), счёт и события оплаты. Акцепт оферты принимает адрес
+  электронной почты плательщика (поле `email`, при включённой оплате обязательно; адрес не по формату — отказ 400 по
+  полю `email`); адрес хранится только до счёта и в журнал не попадает. Когда Ordering подтверждает документ, сервис
+  выставляет счёт со сроком оплаты (`PAYMENT_TERM`, не дальше границы накануне заезда) и отдаёт ссылку на оплату и срок
+  сервису Заявок: в ответе о состоянии выпуска — `payment_status = PENDING` и `payment_url`, в состоянии пакета —
+  `payment.payment_url` и `payment.expires_at`. Об оплате, ошибке оплаты и просрочке сервис узнаёт из событий Ordering в
+  очереди продукта на брокере маркетинга: оплаченный договор уходит в 1С:УСК, просроченный прекращается с причиной
+  «истёк срок оплаты», ошибка оплаты итогом не считается. Повторные, чужие и пришедшие не по порядку события
+  записываются и пропускаются с причиной. Прекращение договора с выставленным счётом сервис показывает сразу, а
+  применяет по событию о просрочке; оплата после прекращения переводит договор в ошибку
+  `KM_CONTRACT_PAID_AFTER_CANCELLATION` с оповещением, деньги возвращает дежурный. Заказ не создаётся и счёт не
+  выставляется, если до границы накануне заезда не осталось времени на оплату: договор прекращается сам. Сверка по
+  расписанию запрашивает у Ordering состояние заказов без итога, применяет его и оповещает о том, что сама исправить не
+  может. Метрики `contracts_payment_term_expired_total`, `contracts_payment_errors_total`,
+  `contracts_km_contracts_paid_after_cancellation_total`, `contracts_km_contracts_paid_cancelled_total`,
+  `contracts_payment_events_ignored_total{reason}`, `contracts_payment_reconciliation_alerts_total{reason}`,
+  `contracts_km_contracts_without_invoice_overdue`, `contracts_km_invoices_without_outcome_overdue`; у
+  `contracts_ordering_failures_total` — новое значение `operation="checkout"`.
+- Процедуры дежурного (`docs/operations.md`): «Возврат заказа с отклонённым счётом в работу», «Стирание адреса
+  плательщика у заказа с отклонённым счётом», «Возврат денег за оплату после прекращения договора», порядок включения и
+  выключения оплаты; «Возврат договора КМ, не переданного в 1С:УСК, в оплаченные» теперь возвращает и оплаченный договор,
+  остановленный отказом справочника (запись не найдена или в архиве). Разборы оповещений оплаты —
+  `docs/troubleshooting.md`, «Оплата через Ordering».
+- Оплата договора КМ через сервис управления заказами (Ordering), заказ: по акцептованному договору КМ сервис
   создаёт заказ на оплату и подтверждает документ сообщением в обменник продукта на брокере маркетинга. Акцепт Ordering не
   ждёт — заказ записывается вместе с акцептом и создаётся фоновым проходом ведущего; повтор после сбоя связи сначала ищет
   заказ, второго заказа не бывает. У вызовов Ordering и сервера токенов Keycloak (клиент OAuth 2.0 client credentials) —
@@ -27,7 +50,7 @@
   Метрики `contracts_payment_disabled`, `contracts_ordering_failures_total{operation}`,
   `contracts_payment_orders_rejected_total`, `contracts_payment_order_cancel_rejected_total`,
   `contracts_km_contracts_without_order_overdue`; компонент здоровья и метрики подключения брокера маркетинга
-  (`marketingBroker`). Счёт, ссылка на оплату и события оплаты появятся следующей версией.
+  (`marketingBroker`).
 - Процедуры дежурного для заказов на оплату (`docs/operations.md`): «Возврат отклонённого заказа на оплату в работу» и
   «Закрытие заказа к отмене, которого нет в Ordering» — для записи «к отмене» без номера заказа, когда Ordering раз за
   разом отклоняет поиск: после сверки с командой Ordering запись закрывают либо записывают ей номер заказа, и проход
@@ -220,6 +243,16 @@
 
 ### Изменено
 
+- Публикация исходящих сообщений идёт отдельно по каждому брокеру: недоступный брокер или неподтверждённое сообщение
+  останавливают только сообщения этого брокера. Раньше проход был один на все брокеры, и подтверждение документа, ждущее
+  брокер маркетинга, держало ответы сервису Заявок и передачи в 1С:УСК.
+- Пул планировщика расширен до шестнадцати потоков (`spring.task.scheduling.pool.size`): он не меньше числа задач по
+  расписанию (с оплатой их пятнадцать), и медленный вызов сервиса управления заказами не задерживает другие проходы и
+  пробу базы.
+- Переход договора КМ в «акцептован» и «счёт выставлен» — один метод `Contract.advance` с шагом (`ContractStep`) вместо
+  `Contract.accept`; отметки запросов заказа — `PaymentOrder.markRequested` вместо `requestCreation` и
+  `requestCancellation`.
+
 - Экземпляр, потерявший роль ведущего посреди фоновой работы (запись не прошла проверку роли), сразу перестаёт считать
   себя ведущим: компонент здоровья `inbox` отвечает `role: standby` и следующие проходы не начинаются, не дожидаясь, пока
   библиотека выбора ведущего отзовёт роль на следующем круге проверки блокировки.
@@ -332,12 +365,16 @@
 
 ### Перенос
 
-- **Переменные:** новая обязательная `PAYMENT_ENABLED` без умолчания (`true` или `false`) — без неё сервис не стартует;
-  задают `false`, пока не установлена версия со счётом и событиями оплаты: в этой их нет, и оплатить заказ нельзя. При
-  `true` обязательны `ORDERING_URL`, `ORDERING_PRODUCT`, `ORDERING_CHANNEL`,
+- **Переменные:** новая обязательная `PAYMENT_ENABLED` без умолчания (`true` или `false`) — без неё сервис не стартует.
+  При `true` обязательны `ORDERING_URL`, `ORDERING_PRODUCT`, `ORDERING_CHANNEL`,
   `ORDERING_TOKEN_URI`, `ORDERING_TOKEN_CLIENT_ID`, `ORDERING_TOKEN_CLIENT_SECRET` (секрет — в секретах развёртывания),
   `RABBITMQ_MARKETING_HOST`, `RABBITMQ_MARKETING_USERNAME`, `RABBITMQ_MARKETING_PASSWORD`,
-  `MARKETING_DOCUMENT_FIXES_EXCHANGE`, `MARKETING_DOCUMENT_FIXES_ROUTING_KEY`. Новые необязательные:
+  `MARKETING_DOCUMENT_FIXES_EXCHANGE`, `MARKETING_DOCUMENT_FIXES_ROUTING_KEY`, `MARKETING_ORDER_EVENTS_QUEUE` (очередь
+  событий заказов продукта, `order.event.<продукт>.topic`). Новые необязательные: `PAYMENT_INVOICE_CHECKOUT_INTERVAL`
+  (`10s`), `PAYMENT_TERM` (`72h`), `PAYMENT_MIN_TERM` (`1h`), `PAYMENT_INVOICE_AWAITING_THRESHOLD` (`30m`),
+  `PAYMENT_RECONCILIATION_INTERVAL` (`1m`), `PAYMENT_RECONCILIATION_THRESHOLD` (`15m`), `PAYMENT_OVERDUE_GRACE` (`1h`),
+  `PAYMENT_DOCUMENT_FIX_REPEATS` (`2`), `PAYMENT_SUMMARY_INTERVAL` (`1m`), `RABBITMQ_MARKETING_LISTENER_AUTO_STARTUP`
+  (`true`),
   `ORDERING_CONNECT_TIMEOUT` (`2s`), `ORDERING_READ_TIMEOUT` (`10s`), `ORDERING_CANCEL_REASON` (`notActual`),
   `ORDERING_ATTEMPTS` (`3`), `ORDERING_RETRY_DELAY` (`1s`), `ORDERING_DOCUMENT_ZONE` (`Europe/Moscow`),
   `ORDERING_DOCUMENT_TTL_BEFORE_CHECK_IN` (`1s`), `ORDERING_TOKEN_CONNECT_TIMEOUT` (`2s`),
@@ -345,21 +382,34 @@
   (`1m`), `PAYMENT_ORDER_BATCH_SIZE` (`100`), `PAYMENT_ORDER_AWAITING_INTERVAL` (`1m`), `PAYMENT_ORDER_AWAITING_THRESHOLD`
   (`1h`), `RABBITMQ_MARKETING_PORT` (`5672`), `RABBITMQ_MARKETING_VHOST` (`/`), `RABBITMQ_MARKETING_SSL_ENABLED`
   (`false`), `RABBITMQ_MARKETING_SSL_VALIDATE_CERTIFICATE` (`true`), `RABBITMQ_MARKETING_SSL_VERIFY_HOSTNAME` (`true`).
-- **Брокер маркетинга:** учётной записи сервиса нужно право публикации (`write`) в обменник продукта
-  (`MARKETING_DOCUMENT_FIXES_EXCHANGE`); обменник и очередь подтверждений заводит сервис управления заказами.
+- **Брокер маркетинга:** учётной записи сервиса нужны право публикации (`write`) в обменник продукта
+  (`MARKETING_DOCUMENT_FIXES_EXCHANGE`) и право чтения (`read`) очереди событий заказов продукта
+  (`MARKETING_ORDER_EVENTS_QUEUE`); обменник и очереди заводит сервис управления заказами. Без очереди её потребитель не
+  запускается, компонент здоровья `inbox` — `DOWN`.
+- **Сервис Заявок:** акцепт оферты должен передавать поле `email` — без него при включённой оплате акцепт отклоняется
+  (400 по полю `email`); в ответе о состоянии выпуска появляется поле `payment_url`, в состоянии пакета —
+  `payment.payment_url` и `payment.expires_at`.
 - **Сервер токенов:** клиент сервиса (client credentials, секрет передаётся в теле запроса) с доступом к REST сервиса
   управления заказами.
-- **Миграции:** `013` добавляет тип `payment_order_state` и таблицу `payment_orders` — заказы на оплату договоров КМ.
+- **Миграции:** `013` добавляет тип `payment_order_state` и таблицу `payment_orders` — заказы на оплату договоров КМ;
+  `014` добавляет значение `EXPIRED` в `payment_order_state`, столбец `payment_orders.payer_email`, тип
+  `payment_invoice_state` и таблицу `payment_invoices` — счета по заказам. Откат `014` значение `EXPIRED` из
+  перечисления не убирает (PostgreSQL не удаляет значения перечислений): перед возвратом к прежней версии заказы в
+  этом состоянии переводят в `CANCELLED` — прежняя версия значения `EXPIRED` не знает.
+- **Удалённые классы:** `service/payment/cancellation/PaymentOrderWithdrawal` (его работу выполняет `ContractStops` в
+  том же пакете) и его тест `PaymentOrderWithdrawalTest` — при переносе старые файлы удалить.
 - **Зависимости:** новая `org.springframework.security:spring-security-oauth2-client` (версия из BOM Spring Boot, 7.0.6;
   приносит `spring-security-core`, `spring-security-crypto`, `spring-security-web`, `spring-security-oauth2-core` 7.0.6 и
   `com.nimbusds:oauth2-oidc-sdk:11.26.1`, `com.nimbusds:nimbus-jose-jwt:10.4`, `com.nimbusds:content-type:2.3`,
   `com.nimbusds:lang-tag:1.7`, `com.github.stephenc.jcip:jcip-annotations:1.0-1`, `net.minidev:json-smart:2.6.0`,
   `net.minidev:accessors-smart:2.6.0`, `org.ow2.asm:asm:9.7.1`) — все проверить в реестре контура до установки.
-- **Порядок включения оплаты:** до `PAYMENT_ENABLED=true` проверить подключение и права учётной записи на брокере
-  маркетинга: пока к нему нет соединения, встаёт публикация всех исходящих сообщений, в том числе ответов сервису Заявок и
-  передач в 1С:УСК (`docs/operations.md`, «Переменные окружения», порядок включения оплаты).
+- **Порядок включения и выключения оплаты:** до `PAYMENT_ENABLED=true` проверить подключение и права учётной записи на
+  брокере маркетинга; выключать оплату нельзя, пока есть счета без итога (`docs/operations.md`, «Переменные окружения»).
 - **Оповещение:** правила на `contracts_payment_orders_rejected_total`, `contracts_payment_order_cancel_rejected_total`,
-  `contracts_ordering_failures_total{operation}` и `contracts_km_contracts_without_order_overdue > 0` — пороги в
+  `contracts_ordering_failures_total{operation}`, `contracts_km_contracts_without_order_overdue > 0`,
+  `contracts_km_contracts_without_invoice_overdue > 0`, `contracts_km_invoices_without_outcome_overdue > 0`,
+  `contracts_payment_reconciliation_alerts_total{reason}`, `contracts_km_contracts_paid_after_cancellation_total` (срочно),
+  `contracts_km_contracts_paid_cancelled_total` и `contracts_payment_events_ignored_total{reason}` — пороги в
   `docs/operations.md`, действия в `docs/troubleshooting.md`.
 
 - **Файлы:** код разложен по подпакетам по смыслу, поведение не менялось; у большинства классов и тестов сменился

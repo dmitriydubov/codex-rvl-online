@@ -12,7 +12,7 @@ spring:
   task:
     scheduling:
       pool:
-        size: 8
+        size: 16
 
   jackson:
     property-naming-strategy: SNAKE_CASE
@@ -130,6 +130,7 @@ projectx:
         lm-policy-issues: ${ONEC_QUEUE_LM_POLICY_ISSUES:1c-usk_to_rvl_contracts_lm-policy-changes}
 
     marketing:
+      listener-auto-startup: ${RABBITMQ_MARKETING_LISTENER_AUTO_STARTUP:true}
       connection:
         host: ${RABBITMQ_MARKETING_HOST:}
         port: ${RABBITMQ_MARKETING_PORT:5672}
@@ -144,6 +145,8 @@ projectx:
       document-fixes:
         exchange: ${MARKETING_DOCUMENT_FIXES_EXCHANGE:}
         routing-key: ${MARKETING_DOCUMENT_FIXES_ROUTING_KEY:}
+      order-events:
+        queue: ${MARKETING_ORDER_EVENTS_QUEUE:}
 
   database:
     session-timeouts:
@@ -238,6 +241,17 @@ projectx:
     batch-size: ${PAYMENT_ORDER_BATCH_SIZE:100}
     awaiting-interval: ${PAYMENT_ORDER_AWAITING_INTERVAL:1m}
     awaiting-threshold: ${PAYMENT_ORDER_AWAITING_THRESHOLD:1h}
+    invoices:
+      checkout-interval: ${PAYMENT_INVOICE_CHECKOUT_INTERVAL:10s}
+      payment-term: ${PAYMENT_TERM:72h}
+      min-payment-term: ${PAYMENT_MIN_TERM:1h}
+      awaiting-threshold: ${PAYMENT_INVOICE_AWAITING_THRESHOLD:30m}
+    reconciliation:
+      interval: ${PAYMENT_RECONCILIATION_INTERVAL:1m}
+      threshold: ${PAYMENT_RECONCILIATION_THRESHOLD:15m}
+      payment-grace: ${PAYMENT_OVERDUE_GRACE:1h}
+      fix-repeats: ${PAYMENT_DOCUMENT_FIX_REPEATS:2}
+      summary-interval: ${PAYMENT_SUMMARY_INTERVAL:1m}
 
   storage:
     endpoint: ${S3_ENDPOINT:}

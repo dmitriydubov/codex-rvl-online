@@ -1,7 +1,6 @@
 package ru.projectx.contracts.service.cancellation;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -9,14 +8,12 @@ import org.springframework.stereotype.Service;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractStatus;
-import ru.projectx.contracts.entity.issuance.IssuanceRecord;
-import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
-import ru.projectx.contracts.service.payment.cancellation.PaymentOrderWithdrawal;
+import ru.projectx.contracts.service.payment.cancellation.ContractStops;
 
 @Service
 public class TaskCancellationService {
@@ -27,14 +24,14 @@ public class TaskCancellationService {
     private final ContractRepository contracts;
     private final LmPolicyRepository policies;
     private final CancellationUnknownReasons unknownReasons;
-    private final PaymentOrderWithdrawal paymentOrders;
+    private final ContractStops contractStops;
 
     public TaskCancellationService(ContractRepository contracts, LmPolicyRepository policies,
-            CancellationUnknownReasons unknownReasons, PaymentOrderWithdrawal paymentOrders) {
+            CancellationUnknownReasons unknownReasons, ContractStops contractStops) {
         this.contracts = contracts;
         this.policies = policies;
         this.unknownReasons = unknownReasons;
-        this.paymentOrders = paymentOrders;
+        this.contractStops = contractStops;
     }
 
     public void apply(ContractTaskCancellation cancellation, Instant now) {
@@ -45,24 +42,26 @@ public class TaskCancellationService {
         List<Contract> runningContracts =
                 contracts.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_CONTRACTS);
         contracts.lockFresh(runningContracts);
-        for (IssuanceRecord cancelled : cancelUnlessUntouched(runningContracts, UNTOUCHED_CONTRACTS, outcome, now)) {
-            paymentOrders.contractStopped(cancelled.id(), now);
+        for (Contract contract : runningContracts) {
+            stopUnlessFinished(contract, outcome, now);
         }
         List<LmPolicy> runningPolicies =
                 policies.findByRequestIndividualRequestIdAndStatusNotIn(individualRequestId, UNTOUCHED_POLICIES);
         policies.lockFresh(runningPolicies);
-        cancelUnlessUntouched(runningPolicies, UNTOUCHED_POLICIES, outcome, now);
+        for (LmPolicy policy : runningPolicies) {
+            cancelUnlessFinished(policy, outcome, now);
+        }
     }
 
-    private static List<IssuanceRecord> cancelUnlessUntouched(List<? extends IssuanceRecord> locked,
-            Set<? extends IssuanceStatus> untouched, Cancellation outcome, Instant now) {
-        List<IssuanceRecord> cancelled = new ArrayList<>();
-        for (IssuanceRecord record : locked) {
-            if (!untouched.contains(record.status())) {
-                record.cancel(outcome, now);
-                cancelled.add(record);
-            }
+    private void stopUnlessFinished(Contract contract, Cancellation outcome, Instant now) {
+        if (!UNTOUCHED_CONTRACTS.contains(contract.status())) {
+            contractStops.stop(contract, outcome, now);
         }
-        return cancelled;
+    }
+
+    private static void cancelUnlessFinished(LmPolicy policy, Cancellation outcome, Instant now) {
+        if (!UNTOUCHED_POLICIES.contains(policy.status())) {
+            policy.cancel(outcome, now);
+        }
     }
 }

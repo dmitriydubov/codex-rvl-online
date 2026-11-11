@@ -10,6 +10,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntSupplier;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.exception.OrderingOperation;
@@ -31,6 +36,7 @@ import ru.projectx.contracts.service.payment.OrderingAttempts;
 import ru.projectx.contracts.service.payment.OrderingStepRunner;
 import ru.projectx.contracts.service.payment.OrderingSession;
 import ru.projectx.contracts.service.payment.PaymentOrderPasses;
+import ru.projectx.contracts.service.payment.invoice.PaymentTerms;
 import ru.projectx.contracts.support.CapturedLog;
 import ru.projectx.contracts.support.OrderingTestProperties;
 import ru.projectx.contracts.support.PaymentOrders;
@@ -42,15 +48,16 @@ class PaymentOrderCreationTest {
             new NewOrder(Tasks.INSURED, PaymentOrders.ORDER, PaymentOrders.DOCUMENT);
     private static final OrderingUnavailableException TIMEOUT =
             new OrderingUnavailableException(OrderingOperation.CREATE_ORDER, "нет ответа");
+    private static final Instant BOUNDARY = PaymentOrders.DOCUMENT.documentTtl();
 
     private final PaymentOrderRepository orders = mock();
     private final Ordering ordering = mock();
     private final OrderingSession session = mock();
     private final PaymentOrderRecording recording = mock();
     private final BackgroundLeadership leadership = mock();
-    private final PaymentOrderCreation creation = new PaymentOrderCreation(new PaymentOrderPasses(orders, leadership,
-            new OrderingStepRunner(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3))),
-            OrderingTestProperties.passes()), recording);
+    private final OrderingStepRunner steps =
+            new OrderingStepRunner(ordering, new OrderingAttempts(OrderingTestProperties.attempts(3)));
+    private final PaymentOrderCreation creation = creationAt(BOUNDARY.minus(Duration.ofDays(30)));
 
     private final CapturedLog log = CapturedLog.of(OrderingStepRunner.class);
 
@@ -111,7 +118,7 @@ class PaymentOrderCreationTest {
     @Test
     void orderWhoseCreationWasSentEarlier_startsWithSearch() {
         PaymentOrder sent = PaymentOrders.awaiting();
-        sent.requestCreation(PaymentOrders.DOCUMENT.documentDate());
+        sent.markRequested(OrderRequest.CREATION, PaymentOrders.DOCUMENT.documentDate());
         awaiting(sent);
         given(session.findOrder(Tasks.INSURED, PaymentOrders.ORDER)).willReturn(Optional.empty());
         given(session.createOrder(NEW_ORDER)).willReturn(PaymentOrders.ORDER_ID);
@@ -204,8 +211,72 @@ class PaymentOrderCreationTest {
         verifyNoInteractions(orders, ordering, recording);
     }
 
-    private void awaiting(PaymentOrder order) {
+    @Test
+    void orderPastTheBoundaryBeforeCheckIn_isClosedWithoutCallingOrderingOrTheTokenServer() {
+        PaymentOrderCreation late = creationAt(BOUNDARY.plusNanos(1));
+
+        assertThat(late.createDue()).isEqualTo(1);
+
+        verify(recording).expired(PaymentOrders.CONTRACT);
+        verify(recording, never()).requestCreation(any());
+        verifyNoInteractions(ordering, session);
+    }
+
+    @Test
+    void orderClosedByTheBoundary_doesNotStopThePass() {
+        awaiting(PaymentOrders.awaiting(), PaymentOrders.awaiting());
+        PaymentOrderCreation late = creationAt(BOUNDARY.plusSeconds(1));
+
+        assertThat(late.createDue()).isEqualTo(2);
+
+        verify(recording, times(2)).expired(PaymentOrders.CONTRACT);
+    }
+
+    @Test
+    void orderExactlyOnTheBoundary_isStillCreated() {
+        given(session.createOrder(NEW_ORDER)).willReturn(PaymentOrders.ORDER_ID);
+        PaymentOrderCreation onTheBoundary = creationAt(BOUNDARY);
+
+        onTheBoundary.createDue();
+
+        verify(recording, never()).expired(any());
+        verify(recording).created(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
+    }
+
+    @Test
+    void createdOrder_letsThePassGoOnToTheNextOne() {
+        awaiting(PaymentOrders.awaiting(), PaymentOrders.awaiting());
+        given(session.createOrder(NEW_ORDER)).willReturn(PaymentOrders.ORDER_ID);
+
+        assertThat(creation.createDue()).isEqualTo(2);
+
+        verify(recording, times(2)).created(PaymentOrders.CONTRACT, PaymentOrders.ORDER_ID);
+    }
+
+    @Test
+    void orderingUnavailableForAllAttempts_stopsThePassBeforeTheNextOrder() {
+        awaiting(PaymentOrders.awaiting(), PaymentOrders.awaiting());
+        given(session.createOrder(NEW_ORDER)).willThrow(TIMEOUT);
+        given(session.findOrder(Tasks.INSURED, PaymentOrders.ORDER)).willReturn(Optional.empty());
+
+        assertThat(creation.createDue()).isEqualTo(1);
+
+        verify(session, times(3)).createOrder(NEW_ORDER);
+    }
+
+    @Test
+    void creationPass_takesTheOrdersAwaitingCreation() {
+        assertThat(creation.state()).isEqualTo(PaymentOrderState.AWAITING_CREATION);
+    }
+
+    private PaymentOrderCreation creationAt(Instant now) {
+        PaymentOrderPasses passes = new PaymentOrderPasses(orders, leadership, steps, OrderingTestProperties.passes());
+        return new PaymentOrderCreation(passes, recording, steps, new PaymentTerms(OrderingTestProperties.passes()),
+                Clock.fixed(now, ZoneOffset.UTC));
+    }
+
+    private void awaiting(PaymentOrder... due) {
         given(orders.findByStateOrderByCreatedAtAscIdAsc(PaymentOrderState.AWAITING_CREATION, Limit.of(7)))
-                .willReturn(List.of(order));
+                .willReturn(List.of(due));
     }
 }

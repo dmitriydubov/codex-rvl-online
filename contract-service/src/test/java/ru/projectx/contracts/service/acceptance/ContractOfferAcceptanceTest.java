@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import ch.qos.logback.classic.Level;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.time.Clock;
@@ -32,6 +33,7 @@ import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.contract.OfferAcceptance;
 import ru.projectx.contracts.exception.AcceptanceRefusal;
 import ru.projectx.contracts.exception.ContractAlreadyAcceptedException;
@@ -41,7 +43,9 @@ import ru.projectx.contracts.exception.ContractStateException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
 import ru.projectx.contracts.repository.issuance.ContractAcceptanceRepository;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.service.payment.OrderOpening;
 import ru.projectx.contracts.service.payment.PaymentOrderOpening;
+import ru.projectx.contracts.support.CapturedLog;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -50,12 +54,14 @@ class ContractOfferAcceptanceTest {
     private static final Instant NOW = Instant.parse("2026-02-10T07:05:00Z");
     private static final UUID CONTRACT = UUID.fromString("3f77b1c8-2a55-4c19-9e30-6b8d2f0a71c4");
     private static final UUID USER = UUID.fromString("b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45");
+    private static final String EMAIL = "insured@example.test";
     private static final OffsetDateTime ACCEPTED_AT = OffsetDateTime.of(2026, 2, 10, 10, 4, 58, 0,
             ZoneOffset.ofHours(3));
 
     private final ContractRepository contracts = mock();
     private final ContractAcceptanceRepository acceptances = mock();
     private final PaymentOrderOpening paymentOrders = mock();
+    private final OrderOpening paymentOrder = mock();
     private final ContractOfferAcceptance service =
             new ContractOfferAcceptance(contracts, acceptances, paymentOrders, Clock.fixed(NOW, ZoneOffset.UTC));
     private final Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS,
@@ -68,6 +74,7 @@ class ContractOfferAcceptanceTest {
         given(contracts.findLockedById(CONTRACT)).willReturn(Optional.of(contract));
         given(acceptances.findByContractId(CONTRACT)).willReturn(Optional.empty());
         given(acceptances.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+        given(paymentOrders.forPayer(EMAIL)).willReturn(paymentOrder);
     }
 
     @Test
@@ -83,7 +90,19 @@ class ContractOfferAcceptanceTest {
         assertThat(saved.offer()).isEqualTo(new OfferAcceptance(1, USER, ACCEPTED_AT.toInstant(), AcceptanceChannel.WEB,
                 InetAddress.getByName("10.20.30.40"), "Mozilla/5.0 (Стенд)"));
         assertThat(saved).hasFieldOrPropertyWithValue("createdAt", NOW);
-        verify(paymentOrders).open(contract, saved.offer(), NOW);
+        verify(paymentOrder).open(contract, saved.offer(), NOW);
+    }
+
+    @Test
+    void firstAcceptance_isJournaledWithTheContractTheAcceptedVersionAndTheChannel() {
+        contract.advanceVersion(NOW);
+
+        try (CapturedLog log = CapturedLog.of(ContractOfferAcceptance.class)) {
+            service.accept(CONTRACT, request(2, null));
+
+            assertThat(log.at(Level.INFO))
+                    .containsExactly("договор КМ " + CONTRACT + " акцептован по версии 2, канал WEB");
+        }
     }
 
     @Test
@@ -97,20 +116,20 @@ class ContractOfferAcceptanceTest {
     void repeatedAcceptanceOfTheSameVersion_answersThePreviousRecord() {
         ContractAcceptance previous = ContractAcceptance.record(CONTRACT, offer(1), NOW.minusSeconds(300));
         given(acceptances.findByContractId(CONTRACT)).willReturn(Optional.of(previous));
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         AcceptanceResponse response = service.accept(CONTRACT, request(1, "10.20.30.41"));
 
         assertThat(response.acceptedAt()).isEqualTo(Instant.parse("2026-02-10T07:00:00Z"));
         verify(acceptances, never()).save(any());
-        verifyNoInteractions(paymentOrders);
+        verifyNoInteractions(paymentOrder);
     }
 
     @Test
     void acceptanceOfAnotherVersionAfterAcceptance_isAlreadyAccepted() {
         given(acceptances.findByContractId(CONTRACT))
                 .willReturn(Optional.of(ContractAcceptance.record(CONTRACT, offer(2), NOW)));
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         assertThatThrownBy(() -> service.accept(CONTRACT, request(1, null)))
                 .isInstanceOf(ContractAlreadyAcceptedException.class).hasMessageContaining("версии 2");
@@ -165,7 +184,8 @@ class ContractOfferAcceptanceTest {
     }
 
     private static AcceptanceRequest request(int version, String ipAddress) {
-        return new AcceptanceRequest(version, USER, ACCEPTED_AT, AcceptanceChannel.WEB, ipAddress, "Mozilla/5.0 (Стенд)");
+        return new AcceptanceRequest(version, USER, ACCEPTED_AT, AcceptanceChannel.WEB, ipAddress, "Mozilla/5.0 (Стенд)",
+                EMAIL);
     }
 
     private static OfferAcceptance offer(int version) {

@@ -18,6 +18,16 @@ class PublishOutcomeTest {
     }
 
     @Test
+    void onlyAnInterruptedWait_stopsPublishingToEveryBroker() {
+        assertThat(new PublishOutcome.Delivered().stopsPublishing()).isFalse();
+        assertThat(new PublishOutcome.Refused("возврат").stopsPublishing()).isFalse();
+        assertThat(new PublishOutcome.Rejected("nack").stopsPublishing()).isFalse();
+        assertThat(new PublishOutcome.Unconfirmed(Duration.ofSeconds(10)).stopsPublishing()).isFalse();
+        assertThat(new PublishOutcome.NotSent("недоступен").stopsPublishing()).isFalse();
+        assertThat(new PublishOutcome.Interrupted().stopsPublishing()).isTrue();
+    }
+
+    @Test
     void onlyAMessageTheBrokerReceived_countsAsAnAttempt() {
         assertThat(new PublishOutcome.Delivered()).isInstanceOf(PublishOutcome.Attempted.class);
         assertThat(new PublishOutcome.Refused("возврат")).isInstanceOf(PublishOutcome.Attempted.class);

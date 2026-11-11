@@ -12,10 +12,18 @@ public record PaymentOrderView(
         PaymentOrderState state,
         Optional<String> orderId,
         Optional<String> rejectionCode,
-        boolean creationRequested,
-        boolean cancelRequested) {
+        OrderRequests requests,
+        Optional<PayerEmail> payer) {
+
+    public boolean creationRequested() {
+        return requests.creation();
+    }
+
+    public boolean cancelRequested() {
+        return requests.cancellation();
+    }
 
     public boolean mayExistInOrdering() {
-        return orderId.isPresent() || creationRequested;
+        return orderId.isPresent() || requests.creation();
     }
 }

@@ -73,8 +73,8 @@ public class Contract extends IssuanceRecord {
         }
     }
 
-    public void accept() {
-        this.status = status.next(ContractStatus.DRAFT_READY, ContractStatus.ACCEPTED, id());
+    public void advance(ContractStep step) {
+        this.status = status.next(step.from(), step.to(), id());
     }
 
     public void markPaid(Instant paidAt, Instant now) {

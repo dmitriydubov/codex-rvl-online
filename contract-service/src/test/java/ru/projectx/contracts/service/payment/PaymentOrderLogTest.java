@@ -46,6 +46,23 @@ class PaymentOrderLogTest {
     }
 
     @Test
+    void supply_returnsTheResultOfTheWorkRunWithTheCorrelationIdAndRemovesItAfter() {
+        String seen = PaymentOrderLog.supply(PaymentOrders.CORRELATION, () -> MDC.get("correlationId"));
+
+        assertThat(seen).isEqualTo(PaymentOrders.CORRELATION.toString());
+        assertThat(MDC.get("correlationId")).isNull();
+    }
+
+    @Test
+    void supply_removesTheCorrelationIdEvenWhenTheWorkFails() {
+        assertThatThrownBy(() -> PaymentOrderLog.supply(PaymentOrders.CORRELATION, () -> {
+            throw new IllegalStateException("стенд");
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(MDC.get("correlationId")).isNull();
+    }
+
+    @Test
     void correlationId_isRemovedEvenWhenTheWorkFails() {
         assertThatThrownBy(() -> PaymentOrderLog.withCorrelation(PaymentOrders.CORRELATION, () -> {
             throw new IllegalStateException("стенд");

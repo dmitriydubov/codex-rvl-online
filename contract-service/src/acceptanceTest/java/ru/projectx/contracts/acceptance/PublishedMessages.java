@@ -17,6 +17,7 @@ public class PublishedMessages {
     private final Map<String, byte[]> byMessageId = new HashMap<>();
     private final Map<String, List<String>> queuedByAlias = new HashMap<>();
     private final Map<String, Integer> returnedByAlias = new HashMap<>();
+    private final Map<String, String> repeatedSincePass = new HashMap<>();
     private byte @Nullable [] defectiveEnvelope;
     private byte @Nullable [] defectiveEnvelopeSource;
 
@@ -24,8 +25,20 @@ public class PublishedMessages {
         byMessageId.putIfAbsent(messageId, body);
     }
 
+    Map<String, String> repeatedSincePass() {
+        return Map.copyOf(repeatedSincePass);
+    }
+
+    void passDone() {
+        repeatedSincePass.clear();
+    }
+
     void rememberQueued(String queueAlias, String messageId) {
-        queuedByAlias.computeIfAbsent(queueAlias, alias -> new ArrayList<>()).add(messageId);
+        List<String> queued = queuedByAlias.computeIfAbsent(queueAlias, alias -> new ArrayList<>());
+        if (queued.contains(messageId)) {
+            repeatedSincePass.put(messageId, queueAlias);
+        }
+        queued.add(messageId);
     }
 
     void rememberReturned(String queueAlias) {

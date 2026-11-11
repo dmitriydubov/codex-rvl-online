@@ -12,12 +12,14 @@ import ru.projectx.contracts.dto.ErrorResponse;
 import ru.projectx.contracts.exception.AcceptanceRefusal;
 import ru.projectx.contracts.exception.AcceptanceRefusedException;
 import ru.projectx.contracts.exception.DocumentVersionMismatchException;
+import ru.projectx.contracts.exception.PayerEmailRequiredException;
 
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AcceptanceErrorAdvice {
 
     static final String CONTRACT_VERSION_FIELD = "contract_version";
+    static final String EMAIL_FIELD = "email";
     static final String CURRENT_VERSION = "актуальная версия договора — ";
 
     private static final Map<AcceptanceRefusal, Answer> ANSWERS = new EnumMap<>(Map.of(
@@ -40,6 +42,11 @@ public class AcceptanceErrorAdvice {
     public ResponseEntity<ErrorResponse> versionMismatch(DocumentVersionMismatchException mismatch) {
         return ApiErrors.conflictOnField("DOCUMENT_VERSION_MISMATCH", "акцептуется не актуальная версия договора КМ",
                 CONTRACT_VERSION_FIELD, CURRENT_VERSION + mismatch.currentVersion());
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ErrorResponse> payerEmailMissing(PayerEmailRequiredException missing) {
+        return ApiErrors.invalidField(EMAIL_FIELD, RequestFormatAdvice.MISSING);
     }
 
     private record Answer(HttpStatus status, String code, String message) {

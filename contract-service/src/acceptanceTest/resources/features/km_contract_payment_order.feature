@@ -191,6 +191,7 @@
     Когда сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     Тогда Договоры ответили на акцепт <код>:
@@ -205,6 +206,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:09:30+03:00            |
       | channel          | MOBILE                               |
     Тогда Договоры ответили на акцепт <код>:
@@ -237,6 +239,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "<участник>" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | <accepted_at>                        |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "создан <orderId>"
@@ -307,6 +310,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "<ответ на создание>"
@@ -347,6 +351,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e01; создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e02"
@@ -355,6 +360,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "6778e8c2-985a-4d54-9bd3-0f6403b104d6" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:05:30+03:00            |
       | channel          | WEB                                  |
     И Договоры создают заказы на оплату
@@ -384,6 +390,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "HTTP <отказ токена>; создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e01"
@@ -415,6 +422,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e01"
@@ -451,6 +459,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering создаёт заказ "0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e01" и отвечает только после того, как другой экземпляр Договоров перехватил роль ведущего
@@ -485,6 +494,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     Когда на часах Договоров прошёл порог ожидания заказа на оплату
@@ -518,6 +528,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Ordering отвечает на создание заказа: "создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e01; создан 0196f0a2-5b1c-7d3e-9f40-1a2b3c4d5e02"
@@ -526,6 +537,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "6778e8c2-985a-4d54-9bd3-0f6403b104d6" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:05:30+03:00            |
       | channel          | WEB                                  |
     И Договоры создают заказы на оплату

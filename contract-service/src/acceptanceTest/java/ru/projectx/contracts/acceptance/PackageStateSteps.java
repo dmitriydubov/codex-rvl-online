@@ -26,7 +26,7 @@ public class PackageStateSteps {
     private static final String NONE = "нет";
     private static final String NESTED = ".";
     private static final Set<String> AMOUNTS = Set.of("premium_amount", "payment.amount");
-    private static final Set<String> MOMENTS = Set.of("acceptance.accepted_at");
+    private static final Set<String> MOMENTS = Set.of("acceptance.accepted_at", "payment.expires_at");
     private static final String LM_POLICY_KIND = "LM_POLICY";
     private static final String DOCUMENT_SEPARATOR = "; ";
 

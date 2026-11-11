@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.config.payment.PaymentSwitch;
+import ru.projectx.contracts.entity.payment.OrderRequest;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.service.leadership.LeadershipFence;
 import ru.projectx.contracts.service.payment.LockedOrder;
@@ -38,12 +39,12 @@ public class PaymentOrderCancelRecording {
     @Transactional
     public boolean requestCancellation(UUID contractId, String orderId) {
         LockedOrder locked = pending(contractId);
-        if (locked.order().state() != PaymentOrderState.CANCEL_PENDING) {
+        if (locked.order().view().state() != PaymentOrderState.CANCEL_PENDING) {
             return false;
         }
         Instant now = clock.instant();
         locked.order().recordOrder(orderId, now);
-        locked.order().requestCancellation(now);
+        locked.order().markRequested(OrderRequest.CANCELLATION, now);
         return true;
     }
 
@@ -64,7 +65,7 @@ public class PaymentOrderCancelRecording {
             return;
         }
         locked.order().view().orderId()
-                .filter(orderId -> locked.order().state() == PaymentOrderState.CANCEL_PENDING)
+                .filter(orderId -> locked.order().view().state() == PaymentOrderState.CANCEL_PENDING)
                 .ifPresent(orderId -> PaymentOrderLog.write(log.atInfo(), locked.contract(),
                         "заказ получил orderId " + orderId + ", пока шёл поиск: отменится следующим проходом"));
     }

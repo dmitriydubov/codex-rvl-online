@@ -55,6 +55,10 @@ public class PaymentOrder {
     @Column(name = "cancel_requested", nullable = false)
     private boolean cancelRequested;
 
+    @Nullable
+    @Column(name = "payer_email")
+    private String payerEmail;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -64,22 +68,28 @@ public class PaymentOrder {
     protected PaymentOrder() {
     }
 
-    private PaymentOrder(UUID contractId, UUID clientId, OrderDocument document, Instant now) {
-        this.contractId = contractId;
-        this.clientId = clientId;
+    private PaymentOrder(OrderDraft draft, Instant now) {
+        this.contractId = draft.contractId();
+        this.clientId = draft.clientId();
         this.correlationId = UUID.randomUUID();
-        this.document = document;
+        this.document = draft.document();
+        this.payerEmail = draft.payer().address();
         this.state = PaymentOrderState.AWAITING_CREATION;
         this.createdAt = now;
         this.updatedAt = now;
     }
 
-    public static PaymentOrder open(UUID contractId, UUID clientId, OrderDocument document, Instant now) {
-        return new PaymentOrder(contractId, clientId, document, now);
+    public static PaymentOrder open(OrderDraft draft, Instant now) {
+        return new PaymentOrder(draft, now);
     }
 
-    public void requestCreation(Instant now) {
-        this.creationRequested = true;
+    public void markRequested(OrderRequest request, Instant now) {
+        if (request == OrderRequest.CANCELLATION) {
+            this.cancelRequested = true;
+        }
+        else {
+            this.creationRequested = true;
+        }
         this.updatedAt = now;
     }
 
@@ -112,12 +122,23 @@ public class PaymentOrder {
         PaymentOrderState next = view().mayExistInOrdering()
                 ? PaymentOrderState.CANCEL_PENDING
                 : PaymentOrderState.CANCELLED;
+        this.payerEmail = null;
         enter(state, next, now);
     }
 
-    public void requestCancellation(Instant now) {
-        this.cancelRequested = true;
-        this.updatedAt = now;
+    public boolean expire(Instant now) {
+        if (creationRequested || !enter(PaymentOrderState.AWAITING_CREATION, PaymentOrderState.EXPIRED, now)) {
+            return false;
+        }
+        this.payerEmail = null;
+        return true;
+    }
+
+    public void forgetPayer(Instant now) {
+        if (payerEmail != null) {
+            this.payerEmail = null;
+            this.updatedAt = now;
+        }
     }
 
     public boolean recordCancelled(String orderId, Instant now) {
@@ -144,14 +165,10 @@ public class PaymentOrder {
         return true;
     }
 
-    public PaymentOrderState state() {
-        return state;
-    }
-
     public PaymentOrderView view() {
         return new PaymentOrderView(id, contractId, clientId, correlationId, document, state,
-                Optional.ofNullable(externalOrderId), Optional.ofNullable(rejectionCode), creationRequested,
-                cancelRequested);
+                Optional.ofNullable(externalOrderId), Optional.ofNullable(rejectionCode),
+                new OrderRequests(creationRequested, cancelRequested), Optional.ofNullable(payerEmail).map(PayerEmail::new));
     }
 
     private boolean enter(PaymentOrderState from, PaymentOrderState to, Instant now) {

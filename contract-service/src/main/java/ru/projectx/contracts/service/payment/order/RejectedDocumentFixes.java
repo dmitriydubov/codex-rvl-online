@@ -5,8 +5,10 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrderKeys;
 import ru.projectx.contracts.message.payment.PaymentOrderEvents;
+import ru.projectx.contracts.repository.payment.OrderInvoiceRepository;
 import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 import ru.projectx.contracts.service.outbox.RejectedOutboxMessages;
 import ru.projectx.contracts.service.payment.LockedOrder;
@@ -18,16 +20,20 @@ import ru.projectx.contracts.service.payment.PaymentOrderLog;
 public class RejectedDocumentFixes implements RejectedOutboxMessages {
 
     static final String FIXED_UNDELIVERED = "FIXED_UNDELIVERED";
+    static final String ALREADY_CONFIRMED = "повторное подтверждение документа не доставлено, документ уже подтверждён";
 
     private static final Logger log = LoggerFactory.getLogger(RejectedDocumentFixes.class);
 
     private final PaymentOrderRepository orders;
     private final PaymentOrderLocks locks;
+    private final OrderInvoiceRepository invoices;
     private final OrderingMetrics metrics;
 
-    public RejectedDocumentFixes(PaymentOrderRepository orders, PaymentOrderLocks locks, OrderingMetrics metrics) {
+    public RejectedDocumentFixes(PaymentOrderRepository orders, PaymentOrderLocks locks,
+            OrderInvoiceRepository invoices, OrderingMetrics metrics) {
         this.orders = orders;
         this.locks = locks;
+        this.invoices = invoices;
         this.metrics = metrics;
     }
 
@@ -45,9 +51,20 @@ public class RejectedDocumentFixes implements RejectedOutboxMessages {
 
     private void reject(UUID contractId, Instant now) {
         LockedOrder locked = locks.lock(contractId);
+        if (documentConfirmed(contractId)) {
+            PaymentOrderLog.write(log.atInfo(), locked.contract(), ALREADY_CONFIRMED);
+            return;
+        }
         if (locked.order().reject(FIXED_UNDELIVERED, now)) {
             metrics.countOrderRejected();
             PaymentOrderLog.write(log.atError(), locked.contract(), "подтверждение документа не доставлено");
         }
+    }
+
+    private boolean documentConfirmed(UUID contractId) {
+        return invoices.findFreshByContractId(contractId)
+                .map(OrderInvoice::view)
+                .filter(invoice -> !invoice.state().awaitsConfirmation())
+                .isPresent();
     }
 }

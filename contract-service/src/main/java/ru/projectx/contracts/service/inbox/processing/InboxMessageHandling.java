@@ -80,9 +80,10 @@ public class InboxMessageHandling {
         if (message.status() != InboxStatus.NEW) {
             return;
         }
-        work.apply(clock.instant());
+        Optional<String> skipped = work.applyOrSkip(clock.instant());
         fence.holdUntilCommit();
-        message.markProcessed(clock.instant());
+        skipped.ifPresentOrElse(reason -> message.markSkipped(reason, clock.instant()),
+                () -> message.markProcessed(clock.instant()));
     }
 
     private InboxMessage load(UUID id) {

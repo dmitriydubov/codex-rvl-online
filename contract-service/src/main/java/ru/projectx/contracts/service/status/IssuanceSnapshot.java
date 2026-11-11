@@ -1,11 +1,9 @@
 package ru.projectx.contracts.service.status;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -15,6 +13,7 @@ import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
+import ru.projectx.contracts.entity.payment.InvoiceView;
 import ru.projectx.contracts.message.status.RequestStatus;
 
 public final class IssuanceSnapshot {
@@ -31,26 +30,33 @@ public final class IssuanceSnapshot {
     private final Map<UUID, Contract> latestContracts;
     private final Map<UUID, LmPolicy> latestPolicies;
     private final Map<UUID, List<PrintedForm>> formsByOwner;
+    private final Map<UUID, InvoiceView> invoicesByContract;
 
     public IssuanceSnapshot(UUID individualRequestId, boolean cancelled, List<RequestParticipant> composition,
             List<Contract> contracts, List<LmPolicy> policies, List<PrintedForm> forms) {
+        this(individualRequestId, cancelled, composition, contracts, policies, forms, List.of());
+    }
+
+    public IssuanceSnapshot(UUID individualRequestId, boolean cancelled, List<RequestParticipant> composition,
+            List<Contract> contracts, List<LmPolicy> policies, List<PrintedForm> forms, List<InvoiceView> invoices) {
         this.individualRequestId = individualRequestId;
         this.cancelled = cancelled;
         this.composition = List.copyOf(composition);
-        this.records = Stream.concat(contracts.stream(), policies.stream()).map(RecordOutcome::of).toList();
+        this.invoicesByContract = invoices.stream()
+                .collect(Collectors.toUnmodifiableMap(InvoiceView::contractId, Function.identity()));
+        this.records = Stream.concat(
+                contracts.stream().map(contract -> RecordOutcome.of(contract,
+                        Optional.ofNullable(invoicesByContract.get(contract.id())))),
+                policies.stream().map(RecordOutcome::of)).toList();
         this.byRecord = records.stream()
                 .collect(Collectors.toUnmodifiableMap(RecordOutcome::recordId, Function.identity()));
-        this.latestByParticipant = latestBy(records, RecordOutcome::participantId, RecordOutcome::recordId);
-        this.latestContracts = latestBy(contracts, IssuanceRecord::participantId, IssuanceRecord::id);
-        this.latestPolicies = latestBy(policies, IssuanceRecord::participantId, IssuanceRecord::id);
+        this.latestByParticipant =
+                ParticipantRecords.latestBy(records, RecordOutcome::participantId, RecordOutcome::recordId);
+        this.latestContracts = ParticipantRecords.latestBy(contracts, IssuanceRecord::participantId, IssuanceRecord::id);
+        this.latestPolicies = ParticipantRecords.latestBy(policies, IssuanceRecord::participantId, IssuanceRecord::id);
         this.formsByOwner = forms.stream()
                 .filter(form -> form.contractId().or(form::lmPolicyId).isPresent())
                 .collect(Collectors.groupingBy(form -> form.contractId().or(form::lmPolicyId).orElseThrow()));
-    }
-
-    private static <T> Map<UUID, T> latestBy(List<T> items, Function<T, UUID> participant, Function<T, UUID> order) {
-        return items.stream().collect(Collectors.toUnmodifiableMap(participant, Function.identity(),
-                BinaryOperator.maxBy(Comparator.comparing(order))));
     }
 
     public UUID individualRequestId() {
@@ -74,12 +80,20 @@ public final class IssuanceSnapshot {
                 latestByParticipant.get(record.participantId())));
     }
 
+    boolean resumed(RecordOutcome record) {
+        return record.resumedSince(byRecord.get(record.recordId()));
+    }
+
+    public PaymentOffer paymentOf(Contract contract) {
+        return PaymentOffer.of(contract.status(), Optional.ofNullable(invoicesByContract.get(contract.id())));
+    }
+
     public Contract contractOf(UUID participantId) {
-        return latest(latestContracts, participantId, KM_CONTRACT);
+        return ParticipantRecords.latest(latestContracts, participantId, KM_CONTRACT);
     }
 
     public LmPolicy policyOf(UUID participantId) {
-        return latest(latestPolicies, participantId, LM_POLICY);
+        return ParticipantRecords.latest(latestPolicies, participantId, LM_POLICY);
     }
 
     public List<PrintedForm> formsOf(IssuanceRecord record) {
@@ -90,14 +104,11 @@ public final class IssuanceSnapshot {
         UUID participantId = participant.participantId();
         return switch (participant.kind()) {
             case NONE -> Optional.empty();
-            case KM_CONTRACT -> Optional.of(latest(latestByParticipant, participantId, KM_CONTRACT).status());
-            case LM_POLICY -> Optional.of(latest(latestByParticipant, participantId, LM_POLICY).status());
+            case KM_CONTRACT ->
+                    Optional.of(ParticipantRecords.latest(latestByParticipant, participantId, KM_CONTRACT).status());
+            case LM_POLICY ->
+                    Optional.of(ParticipantRecords.latest(latestByParticipant, participantId, LM_POLICY).status());
         };
-    }
-
-    private static <V> V latest(Map<UUID, V> byParticipant, UUID participantId, String record) {
-        return Optional.ofNullable(byParticipant.get(participantId))
-                .orElseThrow(() -> new IllegalStateException("у участника " + participantId + " нет " + record));
     }
 
     public RequestStatus requestStatus() {

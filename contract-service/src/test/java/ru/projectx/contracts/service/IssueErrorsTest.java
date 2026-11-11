@@ -40,6 +40,12 @@ class IssueErrorsTest {
     }
 
     @Test
+    void paymentAfterCancellation_isNamedByItsOwnCodeAndWhatHappened() {
+        assertThat(IssueErrors.kmContractPaidAfterCancellation()).isEqualTo(new IssueError(
+                "KM_CONTRACT_PAID_AFTER_CANCELLATION", "оплата поступила после прекращения работы по договору"));
+    }
+
+    @Test
     void kmContractSubmissionErrors_areTheUndeliveredAndTheNotPreparedSubmission() {
         assertThat(IssueErrors.kmContractSubmission()).isEqualTo(new IssuanceErrors(
                 IssueErrors.kmContractSubmissionUndelivered(), IssueErrors.kmContractSubmissionPreparationFailed()));
