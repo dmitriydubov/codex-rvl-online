@@ -327,6 +327,10 @@ tasks.register('archTest', Test) {
     classpath = sourceSets.archTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty 'gauntlet.architecture', configFile('architecture.properties').absolutePath
+    // the test reads the policy by its path, so Gradle would see only the path: the file itself is an input, or a
+    // narrowed policy would leave the task up to date and green
+    inputs.file(configFile('architecture.properties')).withPropertyName('architecturePolicy')
+            .withPathSensitivity(PathSensitivity.NONE)
     testLogging { events 'failed'; exceptionFormat = 'full'; showStandardStreams = true }
     jacoco { enabled = false }
     mustRunAfter 'test'
