@@ -7,6 +7,7 @@ runs guard.py / stop_gate.py against it the way Claude Code does (JSON on stdin,
 Gradle is stubbed with a fake ./gradlew that exits with the code found in a marker file, so the
 Stop-gate logic is exercised without a JVM.
 """
+import importlib.util
 import json
 import os
 import re
@@ -623,10 +624,10 @@ def multi_module_stop_tests(repo):
     check("fixed adapter -> green", r.returncode == 0, r.stderr)
 
 
-def test_inputs_stop_tests(repo, key, document, session):
-    """A file the tests read outside their source sets (acceptance.inputs, test.inputs) is code for the gate; any other
-    document is not. The setting is per module (gauntlet/config/<module>/gauntlet.properties) or, for a build at the
-    root, in the common file."""
+def test_inputs_stop_tests(repo, settings, session):
+    """Files the tests read outside their source sets (acceptance.inputs, test.inputs; settings = (key, document) pairs,
+    one or both keys for the same build) are code for the gate; any other document is not. The settings are per module
+    (gauntlet/config/<module>/gauntlet.properties) or, for a build at the root, in the common file."""
     def stop():
         event = {"session_id": session, "cwd": repo, "hook_event_name": "Stop", "stop_hook_active": False}
         return run_hook(repo, "stop_gate.py", event, args=("--task", "gauntletFast", "--max-attempts", "3", "--timeout", "60"))
@@ -638,67 +639,102 @@ def test_inputs_stop_tests(repo, key, document, session):
         except OSError:
             return ""
 
+    def fresh_logs():
+        for prefix in [M] + others:
+            shutil.rmtree(os.path.join(repo, prefix + "build"), ignore_errors=True)
+
+    keys = "+".join(key for key, _ in settings)
     others = [m + "/" for m in MODULES[1:]]
     sh(repo, "git", "stash", "-u", "-q")             # leftovers of the previous scenario
     git(repo, "checkout", "-q", "main")
     git(repo, "checkout", "-q", "-b", "claude/feature-docs-" + session)
+    lines = "".join(f"{key}={document}\n" for key, document in settings)
     if MODULES:
-        write(repo, "gauntlet/config/" + MODULES[0] + "/gauntlet.properties", f"{key}={document}\n")
+        write(repo, "gauntlet/config/" + MODULES[0] + "/gauntlet.properties", lines)
     else:
         with open(os.path.join(repo, "gauntlet/config/gauntlet.properties"), "a") as f:
-            f.write(f"{key}={document}\n")
+            f.write(lines)
     for prefix in [M] + others:
-        write(repo, prefix + document, "# Document the tests read\n")
+        for _, document in settings:
+            write(repo, prefix + document, "# Document the tests read\n")
     write(repo, M + "docs/design.md", "# Design\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "documents and test inputs")
-    for prefix in [M] + others:
-        shutil.rmtree(os.path.join(repo, prefix + "build"), ignore_errors=True)
+    fresh_logs()
     run_hook(repo, "stop_gate.py", {"session_id": session, "cwd": repo, "hook_event_name": "SessionStart"},
              args=("--record-start",))
     write(repo, M + "docs/design.md", "# Design\nchanged\n")
     r = stop()
-    check(f"{key}: another document changed -> no run", r.returncode == 0 and "fake gradle" not in log_of(M),
+    check(f"{keys}: another document changed -> no run", r.returncode == 0 and "fake gradle" not in log_of(M),
           r.stderr + log_of(M))
-    write(repo, M + document, "# Document the tests read\nchanged\n")
-    r = stop()
-    check(f"{key}: {document} changed -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
-          r.stderr + log_of(M))
-    shutil.rmtree(os.path.join(repo, M + "build"), ignore_errors=True)
-    os.remove(os.path.join(repo, M + document))
-    r = stop()
-    check(f"{key}: {document} deleted -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
-          r.stderr + log_of(M))
-    for prefix in others:
-        write(repo, prefix + document, "# Document the tests read\nchanged\n")
+    for key, document in settings:
+        fresh_logs()
+        write(repo, M + document, "# Document the tests read\nchanged\n")
         r = stop()
-        check(f"{key}: the same file in a module without the setting -> no run there",
+        check(f"{keys}: {document} ({key}) changed -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
+              r.stderr + log_of(M))
+    for key, document in settings:
+        fresh_logs()
+        os.remove(os.path.join(repo, M + document))
+        r = stop()
+        check(f"{keys}: {document} ({key}) deleted -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
+              r.stderr + log_of(M))
+    for prefix in others:
+        fresh_logs()
+        for _, document in settings:
+            write(repo, prefix + document, "# Document the tests read\nchanged\n")
+        r = stop()
+        check(f"{keys}: the same files in a module without the settings -> no run there",
               r.returncode == 0 and "fake gradle" not in log_of(prefix), r.stderr + log_of(prefix))
 
 
+def hook_inputs(root):
+    """The test inputs the Stop hook watches in the repository at root (paths from the root), computed by the hook's own
+    code - the same parser and the same overlay of the common settings as the hook uses."""
+    spec = importlib.util.spec_from_file_location("stop_gate_under_test", os.path.join(HOOKS, "stop_gate.py"))
+    hook = importlib.util.module_from_spec(spec)
+    writes_bytecode, sys.dont_write_bytecode = sys.dont_write_bytecode, True    # no __pycache__ in the kit
+    cwd = os.getcwd()
+    try:
+        spec.loader.exec_module(hook)
+        os.chdir(root)
+        hook.configure_module()
+        return list(hook.INPUTS)
+    finally:
+        os.chdir(cwd)
+        sys.dont_write_bytecode = writes_bytecode
+
+
 def workflow_paths_tests():
-    """In the repository the kit is installed in: every file a module's tests read outside the source sets
-    (acceptance.inputs, test.inputs) is listed by name at the end of the CI `paths` filter, after the '!' patterns - so
-    that no exclusion of documents, today's or a later one, makes CI skip a change to it."""
-    workflow = os.path.join(os.path.dirname(KIT), ".github", "workflows", "gauntlet.yml")
+    """In the repository the kit is installed in: every file the tests read outside the source sets (acceptance.inputs,
+    test.inputs - exactly the list the Stop hook watches) is listed by name at the end of the CI `paths` filter, after
+    the '!' patterns, so that no exclusion of documents, today's or a later one, makes CI skip a change to it."""
+    root = os.path.dirname(KIT)
+    workflow = os.path.join(root, ".github", "workflows", "gauntlet.yml")
     if not os.path.isfile(workflow):
         return
     with open(workflow) as f:
         block = f.read().split("paths:", 1)[-1].split("workflow_dispatch", 1)[0]
-    patterns = re.findall(r"^\s+-\s+'([^']+)'", block, re.M)
+    patterns = [m.group(2) for m in re.finditer(r"^\s+-\s+(['\"])(.+?)\1", block, re.M)]
+    check("CI paths: every item is a quoted pattern", len(re.findall(r"^\s+-\s+\S", block, re.M)) == len(patterns),
+          block)
     negatives = [i for i, p in enumerate(patterns) if p.startswith("!")]
     tail = patterns[(negatives[-1] + 1) if negatives else 0:]
-    config = os.path.join(KIT, "config")
-    for module in sorted(os.listdir(config)):
-        props = os.path.join(config, module, "gauntlet.properties")
-        if not os.path.isfile(props):
+    for path in hook_inputs(root):
+        check(f"CI paths list {path} after the '!' patterns", path in tail, str(patterns))
+
+
+def properties_format_tests():
+    """gauntlet.gradle reads the settings with java.util.Properties, the hooks only one-line key=value: every setting
+    line of the kit's gauntlet.properties files has that form, so Gradle and the hooks read the same values."""
+    for folder, _, files in sorted(os.walk(os.path.join(KIT, "config"))):
+        if "gauntlet.properties" not in files:
             continue
-        with open(props) as f:
-            values = [line.split("=", 1)[1] for line in f
-                      if line.strip().startswith(("acceptance.inputs=", "test.inputs="))]
-        for entry in [e.strip() for v in values for e in v.split(",") if e.strip()]:
-            check(f"CI paths list {module}/{entry} after the '!' patterns", f"{module}/{entry}" in tail,
-                  str(patterns))
+        path = os.path.join(folder, "gauntlet.properties")
+        with open(path, encoding="utf-8") as f:
+            settings = [line.strip() for line in f if line.strip() and not line.lstrip().startswith(("#", "!"))]
+        odd = [line for line in settings if not re.match(r"^[^=:\s]+=", line) or line.endswith("\\")]
+        check(f"{os.path.relpath(path, KIT)}: every setting is one key=value line", not odd, str(odd))
 
 
 def run_session_start(repo, gradle_home, remote=True):
@@ -1002,13 +1038,16 @@ def main():
             stop_tests(repo)
             if len(MODULES) > 1:
                 multi_module_stop_tests(repo)
-            test_inputs_stop_tests(repo, "acceptance.inputs", "docs/operations.md", "s5")
-            test_inputs_stop_tests(repo, "test.inputs", "docs/openapi.yaml", "s6")
+            test_inputs_stop_tests(repo, [("acceptance.inputs", "docs/operations.md")], "s5")
+            test_inputs_stop_tests(repo, [("test.inputs", "docs/openapi.yaml")], "s6")
+            test_inputs_stop_tests(repo, [("acceptance.inputs", "docs/operations.md"),
+                                          ("test.inputs", "docs/openapi.yaml")], "s7")
         finally:
             shutil.rmtree(os.path.dirname(repo), ignore_errors=True)
         stale_base_tests()
         frozen_commit_tests()
     workflow_paths_tests()
+    properties_format_tests()
     for f in failures:
         print("FAIL", f)
     print(f"{passed} passed, {len(failures)} failed")
