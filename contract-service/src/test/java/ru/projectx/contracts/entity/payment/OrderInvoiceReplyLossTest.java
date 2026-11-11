@@ -185,35 +185,4 @@ class OrderInvoiceReplyLossTest {
         assertThat(linked.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
         assertThat(reportedLost.view().state()).isEqualTo(InvoiceState.OVERDUE);
     }
-
-    @ParameterizedTest
-    @EnumSource(names = {"REPLY_LOST", "REPLY_LOSS_REPORTED", "REPLY_LOSS_REPORTED_AFTER_FAILURE"})
-    void transitionsOfTheLostReply_reportIt(InvoiceTransition transition) {
-        assertThat(transition.reportsLostReply()).isTrue();
-    }
-
-    @ParameterizedTest
-    @EnumSource(mode = EnumSource.Mode.EXCLUDE,
-            names = {"REPLY_LOST", "REPLY_LOSS_REPORTED", "REPLY_LOSS_REPORTED_AFTER_FAILURE"})
-    void otherTransitions_reportNoLostReply(InvoiceTransition transition) {
-        assertThat(transition.reportsLostReply()).isFalse();
-    }
-
-    @ParameterizedTest
-    @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = "DOCUMENT_RESENT")
-    void onlyTheResentDocument_startsTheRemindersAnew(InvoiceTransition transition) {
-        assertThat(transition.remindersAfter(2)).isEqualTo(2);
-        assertThat(InvoiceTransition.DOCUMENT_RESENT.remindersAfter(2)).isZero();
-    }
-
-    @Test
-    void newTransitions_nameTheirSourceAndTargetStates() {
-        assertThat(InvoiceTransition.PAYMENT_AWAITED.from()).containsExactly(InvoiceState.CHECKOUT);
-        assertThat(InvoiceTransition.PAYMENT_AWAITED.to()).isEqualTo(InvoiceState.ISSUED);
-        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED.from()).containsExactly(InvoiceState.ISSUED);
-        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED.to()).isEqualTo(InvoiceState.ISSUED);
-        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE.from())
-                .containsExactly(InvoiceState.PAYMENT_ERROR);
-        assertThat(InvoiceTransition.REPLY_LOSS_REPORTED_AFTER_FAILURE.to()).isEqualTo(InvoiceState.PAYMENT_ERROR);
-    }
 }

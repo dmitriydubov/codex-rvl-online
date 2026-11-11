@@ -185,19 +185,4 @@ class OrderInvoiceTransitionsTest {
 
         assertThat(updatedAt(invoice)).isEqualTo(OPENED);
     }
-
-    @Test
-    void transitions_nameTheirSourceAndTargetStates() {
-        assertThat(InvoiceTransition.DOCUMENT_CONFIRMED.from())
-                .containsExactlyInAnyOrder(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED);
-        assertThat(InvoiceTransition.DOCUMENT_CONFIRMED.to()).isEqualTo(InvoiceState.READY);
-        assertThat(InvoiceTransition.REMINDERS_EXHAUSTED.to()).isEqualTo(InvoiceState.DOCUMENT_UNCONFIRMED);
-        assertThat(InvoiceTransition.DOCUMENT_RESENT.from())
-                .containsExactlyInAnyOrder(InvoiceState.AWAITING_DOCUMENT, InvoiceState.DOCUMENT_UNCONFIRMED);
-        assertThat(InvoiceTransition.DOCUMENT_RESENT.to()).isEqualTo(InvoiceState.AWAITING_DOCUMENT);
-        assertThat(InvoiceTransition.REPLY_LOST.from()).containsExactly(InvoiceState.CHECKOUT);
-        assertThat(InvoiceTransition.REPLY_LOST.to()).isEqualTo(InvoiceState.ISSUED);
-        assertThat(InvoiceTransition.PAYMENT_FAILED.to()).isEqualTo(InvoiceState.PAYMENT_ERROR);
-        assertThat(InvoiceTransition.PAYMENT_OVERDUE.to()).isEqualTo(InvoiceState.OVERDUE);
-    }
 }

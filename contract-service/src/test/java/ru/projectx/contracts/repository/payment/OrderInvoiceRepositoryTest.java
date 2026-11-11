@@ -69,12 +69,16 @@ class OrderInvoiceRepositoryTest {
         rows.deleteAll();
     }
 
+    private Optional<OrderInvoice> invoiceOf(UUID contractId) {
+        return invoices.findByContractIdIn(List.of(contractId)).stream().findFirst();
+    }
+
     @Test
     void newInvoice_isStoredAwaitingTheDocumentWithoutTermLinkPaymentOrDeferredCancellation() {
         PaymentOrder order = rows.created(NOW, "o-1");
         rows.invoice(order, NOW, invoice -> { });
 
-        assertThat(invoices.findByContractId(order.view().contractId())).map(OrderInvoice::view)
+        assertThat(invoiceOf(order.view().contractId())).map(OrderInvoice::view)
                 .contains(new InvoiceView(order.view().id(), order.view().contractId(),
                         InvoiceState.AWAITING_DOCUMENT, 0, Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty()));
@@ -94,7 +98,7 @@ class OrderInvoiceRepositoryTest {
             invoice.deferCancellation(DEFERRED, NOW);
         });
 
-        InvoiceView found = invoices.findByContractId(order.view().contractId()).orElseThrow().view();
+        InvoiceView found = invoiceOf(order.view().contractId()).orElseThrow().view();
 
         assertThat(found).isEqualTo(new InvoiceView(order.view().id(), order.view().contractId(), InvoiceState.ISSUED,
                 2, Optional.of(new InvoiceTerm(Invoices.CHECKOUT_STARTED, Invoices.DEADLINE)),
@@ -118,10 +122,10 @@ class OrderInvoiceRepositoryTest {
             invoice.reject("CheckoutValidatorService.valid", NOW);
         });
 
-        assertThat(invoices.findByContractId(paid.view().contractId()).orElseThrow().view())
+        assertThat(invoiceOf(paid.view().contractId()).orElseThrow().view())
                 .returns(InvoiceState.PAID, InvoiceView::state)
                 .returns(Optional.of(PAID_AT), InvoiceView::paidAt);
-        assertThat(invoices.findByContractId(rejected.view().contractId()).orElseThrow().view())
+        assertThat(invoiceOf(rejected.view().contractId()).orElseThrow().view())
                 .returns(InvoiceState.REJECTED, InvoiceView::state)
                 .returns(Optional.of("CheckoutValidatorService.valid"), InvoiceView::rejectionCode);
     }
@@ -132,7 +136,7 @@ class OrderInvoiceRepositoryTest {
         PaymentOrder order = rows.created(NOW, "o-1");
         rows.invoice(order, NOW, invoice -> ReflectionTestUtils.setField(invoice, "state", state));
 
-        assertThat(invoices.findByContractId(order.view().contractId()).orElseThrow().view().state()).isEqualTo(state);
+        assertThat(invoiceOf(order.view().contractId()).orElseThrow().view().state()).isEqualTo(state);
         assertThat(jdbc.sql("select state::text from payment_invoices").query(String.class).single())
                 .isEqualTo(state.name());
     }
@@ -151,7 +155,6 @@ class OrderInvoiceRepositoryTest {
                 .extracting(invoice -> invoice.view().orderId())
                 .containsExactlyInAnyOrder(first.view().id(), third.view().id());
         assertThat(invoices.findByContractIdIn(List.of())).isEmpty();
-        assertThat(invoices.findByContractId(UUID.fromString("00000000-0000-4000-8000-000000000001"))).isEmpty();
     }
 
     @Test
@@ -161,10 +164,10 @@ class OrderInvoiceRepositoryTest {
         rows.invoice(order, NOW, invoice -> { });
 
         List<InvoiceView> views = transaction.execute(status -> {
-            InvoiceView loaded = invoices.findByContractId(contractId).orElseThrow().view();
+            InvoiceView loaded = invoiceOf(contractId).orElseThrow().view();
             jdbc.sql("update payment_invoices set state = 'READY'::payment_invoice_state, fix_repeats = 2"
                     + " where contract_id = :contract").param("contract", contractId).update();
-            InvoiceView readAgain = invoices.findByContractId(contractId).orElseThrow().view();
+            InvoiceView readAgain = invoiceOf(contractId).orElseThrow().view();
             InvoiceView fresh = invoices.findFreshByContractId(contractId).orElseThrow().view();
             return List.of(loaded, readAgain, fresh);
         });
@@ -181,7 +184,7 @@ class OrderInvoiceRepositoryTest {
         rows.invoice(order, NOW, invoice -> { });
 
         Boolean sameRecord = transaction.execute(status -> {
-            OrderInvoice loaded = invoices.findByContractId(order.view().contractId()).orElseThrow();
+            OrderInvoice loaded = invoiceOf(order.view().contractId()).orElseThrow();
             return invoices.findFreshByContractId(order.view().contractId()).orElseThrow() == loaded;
         });
 

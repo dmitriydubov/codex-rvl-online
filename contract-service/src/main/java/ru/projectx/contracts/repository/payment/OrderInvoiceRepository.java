@@ -3,7 +3,6 @@ package ru.projectx.contracts.repository.payment;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,8 +12,6 @@ import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 
 public interface OrderInvoiceRepository extends JpaRepository<OrderInvoice, UUID>, FreshInvoices {
-
-    Optional<OrderInvoice> findByContractId(UUID contractId);
 
     List<OrderInvoice> findByContractIdIn(Collection<UUID> contractIds);
 
