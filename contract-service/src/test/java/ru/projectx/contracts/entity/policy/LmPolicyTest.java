@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.issuance.CancelReason;
 import ru.projectx.contracts.entity.issuance.IssuanceTerms;
@@ -23,6 +24,7 @@ class LmPolicyTest {
     private static final UUID CHILD = UUID.fromString("6778e8c2-985a-4d54-9bd3-0f6403b104d6");
     private static final UUID POLICYHOLDER = UUID.fromString("ae8312c3-350b-4d0b-806c-5e2460e74dbc");
     private static final UUID PROGRAM = UUID.fromString("2f6a0c1e-3d5b-4a7c-9e8f-0b1c2d3e4f5a");
+    private static final UUID POLICY_ID = UUID.fromString("b41e7c90-2a5d-4f3b-8e6c-1d9a0f7b3c58");
     private static final IssuedPolicy ISSUED = new IssuedPolicy(
             UUID.fromString("cb904f2a-7d61-4e08-89a5-40b1e3c7f012"), "LM-000012204",
             UUID.fromString("13ab5388-61ee-4e21-8a46-c325478b78c0"), "0555123456");
@@ -77,10 +79,11 @@ class LmPolicyTest {
 
     @Test
     void submit_refusalNamesThePolicyItsStatusAndTheExpectedOne() {
+        ReflectionTestUtils.setField(policy, "id", POLICY_ID);
         policy.submit(LATER);
 
         assertThatThrownBy(() -> policy.submit(LATER)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("полис ЛМ " + policy.id() + " в статусе SUBMITTED, а не NEW");
+                .hasMessage("полис ЛМ b41e7c90-2a5d-4f3b-8e6c-1d9a0f7b3c58 в статусе SUBMITTED, а не NEW");
     }
 
     @Test
@@ -106,8 +109,10 @@ class LmPolicyTest {
 
     @Test
     void markIssued_refusalNamesThePolicyItsStatusAndTheExpectedOne() {
+        ReflectionTestUtils.setField(policy, "id", POLICY_ID);
+
         assertThatThrownBy(() -> policy.markIssued(ISSUED, LATER)).isInstanceOf(IllegalStateException.class)
-                .hasMessage("полис ЛМ " + policy.id() + " в статусе NEW, а не SUBMITTED");
+                .hasMessage("полис ЛМ b41e7c90-2a5d-4f3b-8e6c-1d9a0f7b3c58 в статусе NEW, а не SUBMITTED");
     }
 
     @Test
