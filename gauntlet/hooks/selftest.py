@@ -623,11 +623,12 @@ def multi_module_stop_tests(repo):
     check("fixed adapter -> green", r.returncode == 0, r.stderr)
 
 
-def acceptance_inputs_stop_tests(repo):
-    """A file the acceptance steps read (acceptance.inputs) is code for the gate; any other document is not. The setting
-    is per module (gauntlet/config/<module>/gauntlet.properties) or, for a build at the root, in the common file."""
+def test_inputs_stop_tests(repo, key, document, session):
+    """A file the tests read outside their source sets (acceptance.inputs, test.inputs) is code for the gate; any other
+    document is not. The setting is per module (gauntlet/config/<module>/gauntlet.properties) or, for a build at the
+    root, in the common file."""
     def stop():
-        event = {"session_id": "s5", "cwd": repo, "hook_event_name": "Stop", "stop_hook_active": False}
+        event = {"session_id": session, "cwd": repo, "hook_event_name": "Stop", "stop_hook_active": False}
         return run_hook(repo, "stop_gate.py", event, args=("--task", "gauntletFast", "--max-attempts", "3", "--timeout", "60"))
 
     def log_of(prefix):
@@ -640,44 +641,45 @@ def acceptance_inputs_stop_tests(repo):
     others = [m + "/" for m in MODULES[1:]]
     sh(repo, "git", "stash", "-u", "-q")             # leftovers of the previous scenario
     git(repo, "checkout", "-q", "main")
-    git(repo, "checkout", "-q", "-b", "claude/feature-docs")
+    git(repo, "checkout", "-q", "-b", "claude/feature-docs-" + session)
     if MODULES:
-        write(repo, "gauntlet/config/" + MODULES[0] + "/gauntlet.properties", "acceptance.inputs=docs/operations.md\n")
+        write(repo, "gauntlet/config/" + MODULES[0] + "/gauntlet.properties", f"{key}={document}\n")
     else:
         with open(os.path.join(repo, "gauntlet/config/gauntlet.properties"), "a") as f:
-            f.write("acceptance.inputs=docs/operations.md\n")
+            f.write(f"{key}={document}\n")
     for prefix in [M] + others:
-        write(repo, prefix + "docs/operations.md", "# Procedures\n")
+        write(repo, prefix + document, "# Document the tests read\n")
     write(repo, M + "docs/design.md", "# Design\n")
     git(repo, "add", "-A")
-    git(repo, "commit", "-q", "-m", "documents and acceptance inputs")
+    git(repo, "commit", "-q", "-m", "documents and test inputs")
     for prefix in [M] + others:
         shutil.rmtree(os.path.join(repo, prefix + "build"), ignore_errors=True)
-    run_hook(repo, "stop_gate.py", {"session_id": "s5", "cwd": repo, "hook_event_name": "SessionStart"},
+    run_hook(repo, "stop_gate.py", {"session_id": session, "cwd": repo, "hook_event_name": "SessionStart"},
              args=("--record-start",))
     write(repo, M + "docs/design.md", "# Design\nchanged\n")
     r = stop()
-    check("acceptance.inputs: another document changed -> no run", r.returncode == 0 and "fake gradle" not in log_of(M),
+    check(f"{key}: another document changed -> no run", r.returncode == 0 and "fake gradle" not in log_of(M),
           r.stderr + log_of(M))
-    write(repo, M + "docs/operations.md", "# Procedures\nchanged\n")
+    write(repo, M + document, "# Document the tests read\nchanged\n")
     r = stop()
-    check("acceptance.inputs: docs/operations.md changed -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
+    check(f"{key}: {document} changed -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
           r.stderr + log_of(M))
     shutil.rmtree(os.path.join(repo, M + "build"), ignore_errors=True)
-    os.remove(os.path.join(repo, M + "docs/operations.md"))
+    os.remove(os.path.join(repo, M + document))
     r = stop()
-    check("acceptance.inputs: docs/operations.md deleted -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
+    check(f"{key}: {document} deleted -> gradle runs", r.returncode == 0 and "fake gradle" in log_of(M),
           r.stderr + log_of(M))
     for prefix in others:
-        write(repo, prefix + "docs/operations.md", "# Procedures\nchanged\n")
+        write(repo, prefix + document, "# Document the tests read\nchanged\n")
         r = stop()
-        check("acceptance.inputs: the same file in a module without the setting -> no run there",
+        check(f"{key}: the same file in a module without the setting -> no run there",
               r.returncode == 0 and "fake gradle" not in log_of(prefix), r.stderr + log_of(prefix))
 
 
 def workflow_paths_tests():
-    """In the repository the kit is installed in: every acceptance input of a module is re-included by name at the end
-    of the CI `paths` filter, after the '!' patterns - otherwise CI skips a documents-only change to it."""
+    """In the repository the kit is installed in: every file a module's tests read outside the source sets
+    (acceptance.inputs, test.inputs) is listed by name at the end of the CI `paths` filter, after the '!' patterns - so
+    that no exclusion of documents, today's or a later one, makes CI skip a change to it."""
     workflow = os.path.join(os.path.dirname(KIT), ".github", "workflows", "gauntlet.yml")
     if not os.path.isfile(workflow):
         return
@@ -692,9 +694,10 @@ def workflow_paths_tests():
         if not os.path.isfile(props):
             continue
         with open(props) as f:
-            values = [line.split("=", 1)[1] for line in f if line.strip().startswith("acceptance.inputs=")]
+            values = [line.split("=", 1)[1] for line in f
+                      if line.strip().startswith(("acceptance.inputs=", "test.inputs="))]
         for entry in [e.strip() for v in values for e in v.split(",") if e.strip()]:
-            check(f"CI paths re-include {module}/{entry} after the '!' patterns", f"{module}/{entry}" in tail,
+            check(f"CI paths list {module}/{entry} after the '!' patterns", f"{module}/{entry}" in tail,
                   str(patterns))
 
 
@@ -999,7 +1002,8 @@ def main():
             stop_tests(repo)
             if len(MODULES) > 1:
                 multi_module_stop_tests(repo)
-            acceptance_inputs_stop_tests(repo)
+            test_inputs_stop_tests(repo, "acceptance.inputs", "docs/operations.md", "s5")
+            test_inputs_stop_tests(repo, "test.inputs", "docs/openapi.yaml", "s6")
         finally:
             shutil.rmtree(os.path.dirname(repo), ignore_errors=True)
         stale_base_tests()

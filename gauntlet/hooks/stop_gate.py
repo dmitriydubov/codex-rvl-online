@@ -7,7 +7,8 @@ An agent may not finish while the gauntlet is red.
   stop_gate.py --task gauntletFast [--max-attempts 3]      # Stop / SubagentStop
 
 The working tree here is what the gauntlet checks: every guarded build's src/, gradle/ and build files, the
-files its acceptance steps read (acceptance.inputs in gauntlet.properties, e.g. docs/operations.md), and gauntlet/.
+files its tests read outside the source sets (acceptance.inputs and test.inputs in gauntlet.properties, e.g.
+docs/operations.md, docs/openapi.yaml), and gauntlet/.
 The gate runs only when the content of the working tree differs from what it was when the session
 started (the developer's pre-existing uncommitted work does not count, and committing it changes
 nothing) and that exact content has not been verified before - so questions and read-only turns cost
@@ -45,7 +46,8 @@ SPEC_DEPENDENT_TASKS = ["acceptanceTest", "acceptanceCheck"]
 # relative to the repository root.
 MODULES = []
 WATCHED = list(BUILD_FILES) + ["gauntlet"]
-INPUTS = []          # files the acceptance steps read (acceptance.inputs): watched even when missing
+INPUT_KEYS = ["acceptance.inputs", "test.inputs"]   # files the tests read outside the source sets
+INPUTS = []          # those files, relative to the repository root: watched even when missing
 REPORT_DIRS = ["build/test-results", "build/reports"]   # newer files here = the agent ran Gradle itself
 INTERESTING = re.compile(
     r"^(CRAP FAIL|DUPLICATE|DRY gate: FAILED|INTEGRITY|"
@@ -333,11 +335,11 @@ def module_properties(module):
     return props
 
 
-def acceptance_inputs(props):
-    """Files outside the source sets that the acceptance steps read, relative to the build: a change to one - or its
+def test_inputs(props):
+    """Files outside the source sets that the tests read (INPUT_KEYS), relative to the build: a change to one - or its
     removal - is a code change. An absolute path or one with '..' is no input here; gauntlet.gradle rejects it."""
-    entries = [p.strip() for p in props.get("acceptance.inputs", "").split(",") if p.strip()]
-    return [p for p in entries if not p.startswith("/") and ".." not in p.split("/")]
+    entries = [p.strip() for key in INPUT_KEYS for p in props.get(key, "").split(",") if p.strip()]
+    return list(dict.fromkeys(p for p in entries if not p.startswith("/") and ".." not in p.split("/")))
 
 
 def configure_module():
@@ -347,13 +349,13 @@ def configure_module():
     if MODULES:
         WATCHED = [os.path.join(m, p) for m in MODULES for p in BUILD_FILES] + ["gauntlet"]
         REPORT_DIRS = [os.path.join(m, p) for m in MODULES for p in REPORT_DIRS]
-        INPUTS = [os.path.join(m, p) for m in MODULES for p in acceptance_inputs(module_properties(m))]
+        INPUTS = [os.path.join(m, p) for m in MODULES for p in test_inputs(module_properties(m))]
     else:
-        INPUTS = acceptance_inputs(properties())
+        INPUTS = test_inputs(properties())
 
 
 def watched():
-    """Pathspecs of what the gate checks: build paths that do not exist are left out, acceptance inputs never are -
+    """Pathspecs of what the gate checks: build paths that do not exist are left out, test inputs never are -
     deleting one must count as a change."""
     return existing(WATCHED) + INPUTS
 
