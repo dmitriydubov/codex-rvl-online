@@ -1154,6 +1154,10 @@ rvl-online (contract-service)» (`session_015zkTRPLvQU4ETV9sMKYuuK`), решен
   следы — пусто, конфликтов с `main` `b6b3672` нет. **PR #258 готов к мержу** (координатор, два контрольных прогона:
   `117ef11` и `d76ddcb` + `main`). После мержа — пункты 2–4 PR (README, `contract-service/CLAUDE.md`, журнал Д-09,
   «Структура данных — редакция 2»), архив сессии К10, сверка раскладки К11 по `main`.
+- 2026-11-11, **PR #292 смержен** (09:13 UTC, `main` e4469926): `acceptance.inputs`. Подписка снята сама, страховочная
+  проверка отменена. Ветка F3 `claude/gauntlet-test-inputs` слита с `main` (`ff4797a6`). Опыт на `data-reference`: после
+  порчи `docs/openapi.yaml` (`maximum: 100` → `200`) без F3 задача `test` — `UP-TO-DATE`, с F3 — перезапуск по
+  `testInputs.0` и падение `OpenApiContractTest`. PR откроется после ревью.
 - 2026-11-11, **PR #293 открыт сессией К7b — доработка 10а** (решение владельца «1) а», передано сессии в 08:44
   UTC; ветка `claude/k7b-contract-service-ordering-payment`, `0311d5c` — это `4a17db6` и слияние `main` c9f1254b).
   - Проверка координатора: разница с `main` — ровно `4a17db6`, 12 файлов. Отчёт полный: полный `gauntlet` зелёный,
