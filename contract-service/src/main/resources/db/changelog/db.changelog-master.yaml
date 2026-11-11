@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/012-leader-lock-and-quarantine.yaml
   - include:
       file: db/changelog/013-payment-orders.yaml
+  - include:
+      file: db/changelog/014-payment-invoices.yaml

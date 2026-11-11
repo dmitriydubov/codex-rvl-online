@@ -22,6 +22,9 @@ public class InboxSteps {
 
     private static final Duration PATIENCE = Duration.ofSeconds(40);
     private static final Set<String> PENDING = Set.of("ждёт разбора", "отложено до повтора");
+    private static final String CORRELATION_ID = "correlation_id";
+    private static final String PROCESSED = "обработано";
+    private static final String SKIPPED = "пропущено";
 
     private final InboxJournal journal;
     private final StandQueues queues;
@@ -33,10 +36,13 @@ public class InboxSteps {
     private final QuarantinePayloadRetention quarantineErasure;
     private final OutboxRecords outbox;
     private final ErasureStates statesBeforeErasure;
+    private final PaymentOrderRecords orders;
 
     public InboxSteps(InboxJournal journal, StandQueues queues, TaskMessages messages, PublishedMessages published,
             InboxProcessor processor, InboxPayloadRetention erasure, OutboxPayloadRetention outboxErasure,
-            QuarantinePayloadRetention quarantineErasure, OutboxRecords outbox, ErasureStates statesBeforeErasure) {
+            QuarantinePayloadRetention quarantineErasure, OutboxRecords outbox, ErasureStates statesBeforeErasure,
+            PaymentOrderRecords orders) {
+        this.orders = orders;
         this.journal = journal;
         this.queues = queues;
         this.messages = messages;
@@ -102,8 +108,10 @@ public class InboxSteps {
 
     @Тогда("запись о сообщении {string} в журнале входящих:")
     public void entryRequisites(String messageId, Map<String, String> expected) {
-        StepTables.onlyKnown(expected, Set.of("тип события", "заявка", "версия", "тело"));
+        StepTables.onlyKnown(expected, Set.of("тип события", "заявка", "версия", "тело", CORRELATION_ID));
         InboxJournal.Entry entry = entry(messageId);
+        StepTables.cell(expected, CORRELATION_ID).ifPresent(source ->
+                assertThat(entry.correlationId()).as(CORRELATION_ID).isEqualTo(correlationOf(source, entry)));
         StepTables.cell(expected, "тип события").ifPresent(type -> assertThat(entry.eventType()).isEqualTo(type));
         StepTables.cell(expected, "заявка").ifPresent(request ->
                 assertThat(entry.correlationId()).isEqualTo(UUID.fromString(request)));
@@ -129,7 +137,7 @@ public class InboxSteps {
 
     @Тогда("сообщения {sender} в журнале входящих в порядке приёма — {string}")
     public void entriesInOrder(MessageSender sender, String messageIds) {
-        List<String> expected = list(messageIds);
+        List<String> expected = list(messageIds).stream().map(sender::messageId).toList();
         Awaitility.await().atMost(PATIENCE).until(() -> received(sender).size() >= expected.size());
         assertThat(received(sender)).containsExactlyElementsOf(expected);
     }
@@ -162,14 +170,31 @@ public class InboxSteps {
     @Дано("Договоры разобрали присланные сообщения")
     public void everythingProcessed() {
         awaitReceipts();
-        List<UUID> pending = journal.inOrderOfReceipt().stream()
+        List<InboxJournal.Entry> pending = journal.inOrderOfReceipt().stream()
                 .filter(entry -> PENDING.contains(entry.outcome()))
-                .map(InboxJournal.Entry::messageId)
                 .toList();
+        if (pending.isEmpty() && !published.repeatedSincePass().isEmpty()) {
+            awaitRepeatsTaken();
+            return;
+        }
         assertThat(pending).as("сообщения, которые ждёт проход").isNotEmpty();
         processor.processDue();
-        assertThat(journal.inOrderOfReceipt()).filteredOn(entry -> pending.contains(entry.messageId()))
-                .extracting(InboxJournal.Entry::outcome).containsOnly("обработано");
+        published.passDone();
+        pending.forEach(entry -> assertThat(entry(entry.messageId().toString()).outcome())
+                .as("исход сообщения %s", entry.messageId()).isIn(outcomesOfProcessed(entry.eventType())));
+    }
+
+    private void awaitRepeatsTaken() {
+        Map<String, String> repeated = published.repeatedSincePass();
+        repeated.keySet().forEach(messageId -> assertThat(entry(messageId).outcome())
+                .as("исход сообщения %s, присланного повторно", messageId).isIn(PROCESSED, SKIPPED));
+        Awaitility.await().atMost(PATIENCE).untilAsserted(() -> repeated.values().forEach(alias ->
+                assertThat(queues.called(alias).state().getMessageCount()).as("сообщений в очереди «%s»", alias).isZero()));
+        published.passDone();
+    }
+
+    private static Set<String> outcomesOfProcessed(String eventType) {
+        return MessageSender.ORDERING.sends(eventType) ? Set.of(PROCESSED, SKIPPED) : Set.of(PROCESSED);
     }
 
     @Когда("Договоры выполняют проход стирания персональных данных")
@@ -211,7 +236,16 @@ public class InboxSteps {
                 .orElseThrow(() -> new AssertionError("в журнале входящих нет записи о сообщении " + messageId));
     }
 
-    private InboxJournal.Entry entry(MessageSender sender, String messageId) {
+    private UUID correlationOf(String source, InboxJournal.Entry entry) {
+        return switch (source) {
+            case "как у заказа" -> UUID.fromString(orders.onlyOrder().get("id"));
+            case "как message_id" -> entry.messageId();
+            default -> throw new IllegalArgumentException("стенд не знает источника correlation_id «" + source + "»");
+        };
+    }
+
+    private InboxJournal.Entry entry(MessageSender sender, String name) {
+        String messageId = sender.messageId(name);
         InboxJournal.Entry entry = entry(messageId);
         assertThat(sender.sends(entry.eventType()))
                 .as("сообщение %s с типом события %s прислано %s", messageId, entry.eventType(), sender.alias())

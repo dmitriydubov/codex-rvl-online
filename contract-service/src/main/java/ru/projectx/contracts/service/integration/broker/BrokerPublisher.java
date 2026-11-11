@@ -1,6 +1,8 @@
 package ru.projectx.contracts.service.integration.broker;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.Set;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
@@ -28,6 +30,11 @@ public class BrokerPublisher implements OutboundPublisher {
         return routes.of(message.eventType())
                 .map(route -> send(route, message))
                 .orElseGet(() -> new PublishOutcome.Refused("для типа события " + message.eventType() + " нет очереди"));
+    }
+
+    @Override
+    public Collection<Set<String>> eventTypesByBroker() {
+        return routes.eventTypesByBroker();
     }
 
     private PublishOutcome send(OutboundRoute route, OutboundMessage message) {

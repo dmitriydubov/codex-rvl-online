@@ -16,7 +16,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.dao.CannotAcquireLockException;
@@ -37,6 +39,7 @@ class OutboxPublisherTest {
     private static final UUID REQUEST = UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803");
     private static final String FIRST = "7d2a41c9-9f01-4f77-8a1c-2b9cf0e5a442";
     private static final String SECOND = "0c7d2e4f-6a8b-4c0d-9e1f-2a3b4c5d6e7f";
+    private static final Set<String> STATUS_CHANGES = Set.of("ContractStatusChanged");
 
     private final OutboxMessageRepository messages = mock();
     private final OutboundPublisher broker = mock();
@@ -45,9 +48,14 @@ class OutboxPublisherTest {
     private final OutboxMessage first = message(FIRST, "{\"n\": 1}");
     private final OutboxMessage second = message(SECOND, "{\"n\": 2}");
 
+    @BeforeEach
+    void oneBrokerCarriesStatusChanges() {
+        given(broker.eventTypesByBroker()).willReturn(List.of(STATUS_CHANGES));
+    }
+
     @Test
     void dueMessages_arePublishedInOrderAndEachOutcomeIsRecordedBeforeTheNextSend() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         given(broker.publish(any())).willReturn(new PublishOutcome.Delivered());
 
         assertThat(publisher.publishDue()).isEqualTo(2);
@@ -63,7 +71,7 @@ class OutboxPublisherTest {
 
     @Test
     void refusedMessage_isRecordedAndTheOthersAreStillSent() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         PublishOutcome.Refused refused = new PublishOutcome.Refused("брокер вернул сообщение: NO_ROUTE (312)");
         given(broker.publish(any())).willReturn(refused, new PublishOutcome.Delivered());
 
@@ -75,7 +83,7 @@ class OutboxPublisherTest {
 
     @Test
     void unreachableBroker_endsThePassWithoutRecordingAnAttempt() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         given(broker.publish(any())).willReturn(new PublishOutcome.NotSent("брокер недоступен"));
 
         assertThat(publisher.publishDue()).isZero();
@@ -86,7 +94,7 @@ class OutboxPublisherTest {
 
     @Test
     void interruptedWait_endsThePassWithoutRecordingAnAttempt() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         given(broker.publish(any())).willReturn(new PublishOutcome.Interrupted());
 
         assertThat(publisher.publishDue()).isZero();
@@ -97,7 +105,7 @@ class OutboxPublisherTest {
 
     @Test
     void unconfirmedMessage_isRecordedAndEndsThePass() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         PublishOutcome.Unconfirmed unconfirmed = new PublishOutcome.Unconfirmed(Duration.ofSeconds(10));
         given(broker.publish(any())).willReturn(unconfirmed);
 
@@ -110,17 +118,17 @@ class OutboxPublisherTest {
     @Test
     void messageWithoutBody_isRefusedWithoutSending() {
         OutboxMessage erased = message(FIRST, null);
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(erased));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(erased));
 
         assertThat(publisher.publishDue()).isEqualTo(1);
 
-        verifyNoInteractions(broker);
+        verify(broker, never()).publish(any());
         verify(outcomes).record(erased.id(), new PublishOutcome.Refused("тело сообщения стёрто по сроку хранения"));
     }
 
     @Test
     void failedOutcomeRecording_endsThePassWithTheFailureBeforeTheNextMessage() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         PublishOutcome.Refused refused = new PublishOutcome.Refused("брокер вернул сообщение: NO_ROUTE (312)");
         given(broker.publish(any())).willReturn(refused);
         CannotAcquireLockException busy = new CannotAcquireLockException("строка полиса занята");
@@ -141,7 +149,7 @@ class OutboxPublisherTest {
 
     @Test
     void lostLeaderLockWhileRecordingAnOutcome_endsThePassQuietlyBeforeTheNextMessage() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of(first, second));
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of(first, second));
         given(broker.publish(any())).willReturn(new PublishOutcome.Delivered());
         willThrow(new LeadershipLostException("0b5f3c1e")).given(outcomes).record(first.id(), new PublishOutcome.Delivered());
 
@@ -153,10 +161,11 @@ class OutboxPublisherTest {
 
     @Test
     void nothingDue_sendsNothing() {
-        given(messages.findDue(NOW, Limit.of(7))).willReturn(List.of());
+        given(messages.findDueOf(STATUS_CHANGES, NOW, Limit.of(7))).willReturn(List.of());
 
         assertThat(publisher.publishDue()).isZero();
-        verifyNoInteractions(broker, outcomes);
+        verify(broker, never()).publish(any());
+        verifyNoInteractions(outcomes);
     }
 
     private OutboxPublisher publisher(BackgroundLeadership role) {

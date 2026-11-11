@@ -1,6 +1,7 @@
 package ru.projectx.contracts.repository.journal;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
@@ -13,17 +14,33 @@ import ru.projectx.contracts.entity.outbox.OutboxStatus;
 
 public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UUID> {
 
-    default List<OutboxMessage> findDue(Instant now, Limit limit) {
-        return findDueIn(OutboxStatus.NEW, now, limit);
+    default List<OutboxMessage> findDueOf(Collection<String> eventTypes, Instant now, Limit limit) {
+        return findDueIn(OutboxStatus.NEW, eventTypes, now, limit);
+    }
+
+    default List<OutboxMessage> findDueExcept(Collection<String> eventTypes, Instant now, Limit limit) {
+        return findDueNotIn(OutboxStatus.NEW, eventTypes, now, limit);
     }
 
     @Query("""
             select m from OutboxMessage m
              where m.status = :status
+               and m.eventType in :eventTypes
                and (m.nextAttemptAt is null or m.nextAttemptAt <= :now)
              order by m.createdAt, m.id
             """)
-    List<OutboxMessage> findDueIn(@Param("status") OutboxStatus status, @Param("now") Instant now, Limit limit);
+    List<OutboxMessage> findDueIn(@Param("status") OutboxStatus status,
+            @Param("eventTypes") Collection<String> eventTypes, @Param("now") Instant now, Limit limit);
+
+    @Query("""
+            select m from OutboxMessage m
+             where m.status = :status
+               and m.eventType not in :eventTypes
+               and (m.nextAttemptAt is null or m.nextAttemptAt <= :now)
+             order by m.createdAt, m.id
+            """)
+    List<OutboxMessage> findDueNotIn(@Param("status") OutboxStatus status,
+            @Param("eventTypes") Collection<String> eventTypes, @Param("now") Instant now, Limit limit);
 
     @Modifying
     @Query(value = """

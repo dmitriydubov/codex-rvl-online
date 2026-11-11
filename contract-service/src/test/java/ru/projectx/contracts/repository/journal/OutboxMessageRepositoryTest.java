@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,10 @@ class OutboxMessageRepositoryTest {
     private static final String THIRD = "c3f80a67-9d12-4b58-8e44-0a7b1f25e903";
     private static final String FOURTH = "d4a91b78-0e23-4c69-9f55-1b8c2a36f014";
     private static final String FIFTH = "5b1e7d44-2c09-4a63-8f17-6e0b9a3c1d05";
+    private static final String SIXTH = "6c2f8e55-3d10-4b74-9a28-7f1c0b4d2e16";
+    private static final String STATUS_CHANGE = "ContractStatusChanged";
+    private static final String POLICY_REQUEST = "LmPolicyRequested";
+    private static final String DOCUMENT_FIX = "PaymentOrderFixed";
 
     @Autowired
     private OutboxMessageRepository messages;
@@ -55,20 +60,47 @@ class OutboxMessageRepositoryTest {
     }
 
     @Test
-    void due_areNewMessagesWhoseNextAttemptHasComeInOrderOfCreationWithinTheLimit() {
+    void dueOfEventTypes_areNewMessagesOfThoseTypesWhoseNextAttemptHasComeInOrderOfCreationWithinTheLimit() {
         transaction.executeWithoutResult(status -> {
             messages.save(message(SECOND, NOW.plusSeconds(1)));
             messages.save(message(FIRST, NOW));
             messages.save(message(THIRD, NOW.minusSeconds(5))).markRetry("отказ", NOW.plusSeconds(60));
             messages.save(message(FOURTH, NOW.minusSeconds(9))).markRetry("отказ", NOW);
             messages.save(message(FIFTH, NOW.minusSeconds(10))).markPublished(NOW);
+            messages.save(message(SIXTH, POLICY_REQUEST, NOW.minusSeconds(20)));
         });
 
-        List<UUID> due = messages.findDue(NOW, Limit.of(10)).stream().map(m -> m.envelope().messageId()).toList();
-        List<UUID> limited = messages.findDue(NOW, Limit.of(1)).stream().map(m -> m.envelope().messageId()).toList();
+        assertThat(dueOf(Set.of(STATUS_CHANGE), 10)).containsExactly(FOURTH, FIRST, SECOND);
+        assertThat(dueOf(Set.of(STATUS_CHANGE), 1)).containsExactly(FOURTH);
+        assertThat(dueOf(Set.of(POLICY_REQUEST, STATUS_CHANGE), 10)).containsExactly(SIXTH, FOURTH, FIRST, SECOND);
+        assertThat(dueOf(Set.of(DOCUMENT_FIX), 10)).isEmpty();
+    }
 
-        assertThat(due).containsExactly(UUID.fromString(FOURTH), UUID.fromString(FIRST), UUID.fromString(SECOND));
-        assertThat(limited).containsExactly(UUID.fromString(FOURTH));
+    @Test
+    void dueExceptEventTypes_areNewMessagesOfOtherTypesWhoseNextAttemptHasComeInOrderOfCreationWithinTheLimit() {
+        transaction.executeWithoutResult(status -> {
+            messages.save(message(FIRST, NOW));
+            messages.save(message(SECOND, DOCUMENT_FIX, NOW.plusSeconds(1)));
+            messages.save(message(THIRD, DOCUMENT_FIX, NOW.minusSeconds(5))).markRetry("отказ", NOW.plusSeconds(60));
+            messages.save(message(FOURTH, POLICY_REQUEST, NOW.minusSeconds(9))).markRetry("отказ", NOW);
+            messages.save(message(FIFTH, POLICY_REQUEST, NOW.minusSeconds(10))).markPublished(NOW);
+            messages.save(message(SIXTH, DOCUMENT_FIX, NOW.minusSeconds(20))).markFailed("отказ");
+        });
+
+        assertThat(dueExcept(Set.of(STATUS_CHANGE), 10)).containsExactly(FOURTH, SECOND);
+        assertThat(dueExcept(Set.of(STATUS_CHANGE), 1)).containsExactly(FOURTH);
+        assertThat(dueExcept(Set.of(STATUS_CHANGE, POLICY_REQUEST), 10)).containsExactly(SECOND);
+        assertThat(dueExcept(Set.of(STATUS_CHANGE, POLICY_REQUEST, DOCUMENT_FIX), 10)).isEmpty();
+    }
+
+    @Test
+    void dueExceptNoEventTypes_areAllNewMessagesWhoseNextAttemptHasCome() {
+        transaction.executeWithoutResult(status -> {
+            messages.save(message(FIRST, NOW));
+            messages.save(message(SECOND, DOCUMENT_FIX, NOW.minusSeconds(1)));
+        });
+
+        assertThat(dueExcept(Set.of(), 10)).containsExactly(SECOND, FIRST);
     }
 
     @Test
@@ -90,9 +122,25 @@ class OutboxMessageRepositoryTest {
                 .containsExactlyInAnyOrder(UUID.fromString(THIRD), UUID.fromString(FOURTH));
     }
 
+    private List<String> dueOf(Set<String> eventTypes, int limit) {
+        return ids(messages.findDueOf(eventTypes, NOW, Limit.of(limit)));
+    }
+
+    private List<String> dueExcept(Set<String> eventTypes, int limit) {
+        return ids(messages.findDueExcept(eventTypes, NOW, Limit.of(limit)));
+    }
+
+    private static List<String> ids(List<OutboxMessage> found) {
+        return found.stream().map(message -> message.envelope().messageId().toString()).toList();
+    }
+
     private static OutboxMessage message(String messageId, Instant createdAt) {
+        return message(messageId, STATUS_CHANGE, createdAt);
+    }
+
+    private static OutboxMessage message(String messageId, String eventType, Instant createdAt) {
         return OutboxMessage.compose(new OutboxDraft("INDIVIDUAL_REQUEST", REQUEST,
                 new MessageEnvelope(UUID.fromString(messageId), REQUEST, "rvl.contract-status.changed",
-                        "ContractStatusChanged", 1), "{\"data\": {\"n\": 1}}"), createdAt);
+                        eventType, 1), "{\"data\": {\"n\": 1}}"), createdAt);
     }
 }

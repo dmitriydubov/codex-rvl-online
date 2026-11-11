@@ -1,5 +1,7 @@
 package ru.projectx.contracts.service.integration.listener;
 
+import java.util.List;
+import org.springframework.amqp.core.MessageListener;
 import org.springframework.amqp.rabbit.annotation.RabbitListenerConfigurer;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerEndpoint;
@@ -18,10 +20,13 @@ public class InboxQueueEndpoints implements RabbitListenerConfigurer {
     private final InternalBrokerProperties internal;
     private final SimpleRabbitListenerContainerFactory onecFactory;
     private final OneCBrokerProperties onec;
+    private final List<AdditionalInboxEndpoint> additional;
 
     public InboxQueueEndpoints(InboxQueueListener listener,
             @InternalBroker SimpleRabbitListenerContainerFactory internalFactory, InternalBrokerProperties internal,
-            @OneCBroker SimpleRabbitListenerContainerFactory onecFactory, OneCBrokerProperties onec) {
+            @OneCBroker SimpleRabbitListenerContainerFactory onecFactory, OneCBrokerProperties onec,
+            List<AdditionalInboxEndpoint> additional) {
+        this.additional = List.copyOf(additional);
         this.listener = listener;
         this.internalFactory = internalFactory;
         this.internal = internal;
@@ -34,13 +39,20 @@ public class InboxQueueEndpoints implements RabbitListenerConfigurer {
         registrar.registerEndpoint(endpoint(internal.queues().taskChanges()), internalFactory);
         registrar.registerEndpoint(endpoint(onec.queues().lmPolicyIssues()), onecFactory);
         registrar.registerEndpoint(endpoint(onec.queues().kmContractRegistrations()), onecFactory);
+        for (AdditionalInboxEndpoint extra : additional) {
+            registrar.registerEndpoint(endpoint(extra.queue(), extra.listener()), extra.containerFactory());
+        }
     }
 
     SimpleRabbitListenerEndpoint endpoint(String queue) {
+        return endpoint(queue, listener);
+    }
+
+    private static SimpleRabbitListenerEndpoint endpoint(String queue, MessageListener queueListener) {
         SimpleRabbitListenerEndpoint endpoint = new SimpleRabbitListenerEndpoint();
         endpoint.setId(queue);
         endpoint.setQueueNames(queue);
-        endpoint.setMessageListener(listener);
+        endpoint.setMessageListener(queueListener);
         endpoint.setAutoStartup(false);
         return endpoint;
     }

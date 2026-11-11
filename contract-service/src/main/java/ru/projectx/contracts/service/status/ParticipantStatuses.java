@@ -39,19 +39,16 @@ final class ParticipantStatuses {
 
     private static ParticipantStatus kmContract(UUID id, IssuanceSnapshot snapshot) {
         Contract contract = snapshot.contractOf(id);
-        return kmContract(id, contract, snapshot.formsOf(contract));
-    }
-
-    private static ParticipantStatus kmContract(UUID id, Contract contract, List<PrintedForm> forms) {
         Optional<IssueError> error = currentError(contract);
         ContractProgress progress = contract.progress();
+        PaymentOffer offer = snapshot.paymentOf(contract);
         Optional<ContractRegistration> registration = progress.registration();
         return new ParticipantStatus(id, IssuedDocumentKind.KM_CONTRACT, contract.id(),
-                KmContractStates.of(contract.status()), contract.number(),
+                KmContractStates.shown(contract.status(), offer), contract.number(),
                 registration.map(ContractRegistration::issuedPolicyId).orElse(null),
                 registration.map(ContractRegistration::issuedPolicyNumber).orElse(null), null, null,
-                payment(progress), documents(forms), error.map(IssueError::code).orElse(null),
-                error.map(IssueError::message).orElse(null));
+                payment(progress, offer), offer.link().orElse(null), documents(snapshot.formsOf(contract)),
+                error.map(IssueError::code).orElse(null), error.map(IssueError::message).orElse(null));
     }
 
     private static ParticipantStatus lmPolicy(UUID id, LmPolicy policy, List<PrintedForm> forms) {
@@ -59,12 +56,15 @@ final class ParticipantStatuses {
         Optional<IssuedPolicy> issued = policy.issued();
         return new ParticipantStatus(id, IssuedDocumentKind.LM_POLICY, null, KmContractState.NOT_REQUIRED, null, null,
                 null, issued.map(IssuedPolicy::issuedPolicyId).orElse(null),
-                issued.map(IssuedPolicy::issuedPolicyNumber).orElse(null), PaymentStatus.NOT_REQUIRED,
+                issued.map(IssuedPolicy::issuedPolicyNumber).orElse(null), PaymentStatus.NOT_REQUIRED, null,
                 documents(forms), error.map(IssueError::code).orElse(null), error.map(IssueError::message).orElse(null));
     }
 
-    private static PaymentStatus payment(ContractProgress progress) {
-        return progress.paidAt().isPresent() ? PaymentStatus.PAID : PaymentStatus.NOT_REQUIRED;
+    private static PaymentStatus payment(ContractProgress progress, PaymentOffer offer) {
+        if (progress.paidAt().isPresent()) {
+            return PaymentStatus.PAID;
+        }
+        return offer.link().isPresent() ? PaymentStatus.PENDING : PaymentStatus.NOT_REQUIRED;
     }
 
     private static List<StatusDocument> documents(List<PrintedForm> forms) {

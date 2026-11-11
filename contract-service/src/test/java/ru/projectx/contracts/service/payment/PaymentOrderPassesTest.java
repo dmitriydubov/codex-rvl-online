@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Limit;
 import org.springframework.test.util.ReflectionTestUtils;
+import ru.projectx.contracts.entity.payment.InvoiceState;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.entity.payment.PaymentOrderState;
 import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
@@ -143,6 +144,62 @@ class PaymentOrderPassesTest {
 
         assertThat(count).isEqualTo(1);
         assertThat(handled).hasSize(1);
+    }
+
+    @Test
+    void ordersWithInvoiceInTheAskedState_areHandledInTheBatchOfThePass() {
+        given(orders.findWithInvoiceIn(PaymentOrderState.CREATED, InvoiceState.READY,
+                Limit.of(OrderingTestProperties.BATCH))).willReturn(List.of(first, second));
+
+        int count = passes.eachWithInvoice(PaymentOrderState.CREATED, InvoiceState.READY, order -> {
+            assertThat(MDC.get("correlationId")).isEqualTo(order.correlationId().toString());
+            return handled.add(order.id());
+        });
+
+        assertThat(count).isEqualTo(2);
+        assertThat(handled).containsExactly(PaymentOrders.ORDER, second.view().id());
+    }
+
+    @Test
+    void ordersWithInvoice_areNotTouchedByStandby() {
+        org.mockito.BDDMockito.willReturn(0).given(leadership).countAsLeader(any());
+
+        int count = passes.eachWithInvoice(PaymentOrderState.CREATED, InvoiceState.READY, order -> handled.add(order.id()));
+
+        assertThat(count).isZero();
+        assertThat(handled).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(orders);
+    }
+
+    @Test
+    void ordersOfAGivenSelection_areAskedWithTheBatchOfThePassAndHandledUntilOneAsksToStop() {
+        List<Limit> asked = new ArrayList<>();
+
+        int count = passes.eachOf(batch -> {
+            asked.add(batch);
+            return List.of(first, second);
+        }, order -> {
+            handled.add(order.id());
+            return false;
+        });
+
+        assertThat(count).isEqualTo(1);
+        assertThat(asked).containsExactly(Limit.of(OrderingTestProperties.BATCH));
+        assertThat(handled).containsExactly(PaymentOrders.ORDER);
+    }
+
+    @Test
+    void ordersOfAGivenSelection_areNotAskedByStandby() {
+        org.mockito.BDDMockito.willReturn(0).given(leadership).countAsLeader(any());
+        List<Limit> asked = new ArrayList<>();
+
+        int count = passes.eachOf(batch -> {
+            asked.add(batch);
+            return List.of(first);
+        }, order -> true);
+
+        assertThat(count).isZero();
+        assertThat(asked).isEmpty();
     }
 
     @Test

@@ -5,8 +5,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.payment.OrderInvoice;
 import ru.projectx.contracts.entity.payment.PaymentOrder;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
+import ru.projectx.contracts.repository.payment.OrderInvoiceRepository;
 import ru.projectx.contracts.repository.payment.PaymentOrderRepository;
 
 @Component
@@ -15,9 +17,13 @@ public class PaymentOrderLocks {
     private final ContractRepository contracts;
     private final PaymentOrderRepository orders;
 
-    public PaymentOrderLocks(ContractRepository contracts, PaymentOrderRepository orders) {
+    private final OrderInvoiceRepository invoices;
+
+    public PaymentOrderLocks(ContractRepository contracts, PaymentOrderRepository orders,
+            OrderInvoiceRepository invoices) {
         this.contracts = contracts;
         this.orders = orders;
+        this.invoices = invoices;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -27,5 +33,14 @@ public class PaymentOrderLocks {
         PaymentOrder order = orders.findLockedByContractId(contractId)
                 .orElseThrow(() -> new IllegalStateException("у договора КМ " + contractId + " нет заказа на оплату"));
         return new LockedOrder(contract, order);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LockedInvoice lockInvoice(UUID contractId) {
+        LockedOrder locked = lock(contractId);
+        OrderInvoice invoice = invoices.findFreshByContractId(contractId)
+                .orElseThrow(() -> new IllegalStateException(
+                        "у заказа на оплату договора КМ " + contractId + " нет счёта"));
+        return new LockedInvoice(locked.contract(), locked.order(), invoice);
     }
 }

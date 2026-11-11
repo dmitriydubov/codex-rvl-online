@@ -31,13 +31,15 @@ public record PackageItem(
     public record PackageAcceptance(Instant acceptedAt, int contractVersion) {
     }
 
-    public record PackagePayment(PaymentState status, BigDecimal amount) {
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PackagePayment(PaymentState status, BigDecimal amount, @Nullable String paymentUrl,
+            @Nullable Instant expiresAt) {
     }
 
     public record PackageDocument(UUID documentId, String docType, String kind, int version, @Nullable String url) {
     }
 
     public enum PaymentState {
-        PENDING
+        PENDING, PAID
     }
 }

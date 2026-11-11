@@ -13,5 +13,12 @@ public record AcceptanceRequest(
         @NotNull OffsetDateTime acceptedAt,
         @NotNull AcceptanceChannel channel,
         @Nullable @Pattern(regexp = IpAddressFormat.PATTERN) String ipAddress,
-        @Nullable String userAgent) {
+        @Nullable String userAgent,
+        @Nullable @PayerEmailFormat String email) {
+
+    @Override
+    public String toString() {
+        return "AcceptanceRequest[contractVersion=" + contractVersion + ", acceptedBy=" + acceptedBy
+                + ", acceptedAt=" + acceptedAt + ", channel=" + channel + "]";
+    }
 }

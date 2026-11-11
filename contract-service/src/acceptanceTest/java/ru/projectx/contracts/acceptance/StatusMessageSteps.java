@@ -18,7 +18,7 @@ public class StatusMessageSteps {
 
     private static final Set<String> PARTICIPANT = Set.of("участник", "document_kind", "km_contract_state",
             "km_contract_id", "km_contract_number", "km_policy_id", "km_policy_number", "policy_id", "policy_number",
-            "payment_status", "documents", "error_code", "error_message");
+            "payment_status", "payment_url", "documents", "error_code", "error_message");
     private static final String LM_POLICY_KIND = "LM_POLICY";
     private static final String DOCUMENT_SEPARATOR = "; ";
     private static final String KM_CONTRACT = "договор КМ";

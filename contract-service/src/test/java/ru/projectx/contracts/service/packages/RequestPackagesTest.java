@@ -24,6 +24,7 @@ import ru.projectx.contracts.dto.PackageItem.PaymentState;
 import ru.projectx.contracts.dto.PackageResponse;
 import ru.projectx.contracts.entity.contract.AcceptanceChannel;
 import ru.projectx.contracts.entity.contract.Contract;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
@@ -94,7 +95,7 @@ class RequestPackagesTest {
 
     @Test
     void acceptedContract_carriesTheAcceptanceAndAPendingPaymentOfThePremiumWithoutLink() {
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         given(acceptances.findByContractIdIn(anyCollection())).willReturn(List.of(ContractAcceptance.record(
                 contract.id(), new OfferAcceptance(1, Tasks.INSURED, Instant.parse("2026-02-10T07:04:58Z"),
                         AcceptanceChannel.WEB, null, null), NOW)));
@@ -104,7 +105,8 @@ class RequestPackagesTest {
 
         assertThat(item.state()).isEqualTo(DocumentState.ACCEPTED);
         assertThat(item.acceptance()).isEqualTo(new PackageAcceptance(Instant.parse("2026-02-10T07:04:58Z"), 1));
-        assertThat(item.payment()).isEqualTo(new PackagePayment(PaymentState.PENDING, new BigDecimal("34000.00")));
+        assertThat(item.payment()).isEqualTo(new PackagePayment(PaymentState.PENDING, new BigDecimal("34000.00"), null,
+                null));
     }
 
     @Test

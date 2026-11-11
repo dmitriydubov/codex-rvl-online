@@ -1,8 +1,11 @@
 package ru.projectx.contracts.service.outbox;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Limit;
@@ -38,10 +41,25 @@ public class OutboxPublisher {
     }
 
     public int publishDue() {
-        return leadership.countAsLeader(() -> publish(messages.findDue(clock.instant(), batch)));
+        return leadership.countAsLeader(this::publishEachBroker);
     }
 
-    private int publish(List<OutboxMessage> due) {
+    private int publishEachBroker() {
+        Instant now = clock.instant();
+        Set<String> routed = new HashSet<>();
+        int handled = 0;
+        for (Set<String> eventTypes : publisher.eventTypesByBroker()) {
+            routed.addAll(eventTypes);
+            BrokerPass pass = publish(messages.findDueOf(eventTypes, now, batch));
+            handled += pass.handled();
+            if (pass.serviceStopping()) {
+                return handled;
+            }
+        }
+        return handled + publish(messages.findDueExcept(routed, now, batch)).handled();
+    }
+
+    private BrokerPass publish(List<OutboxMessage> due) {
         int handled = 0;
         for (OutboxMessage message : due) {
             PublishOutcome outcome = attempt(message);
@@ -49,10 +67,10 @@ public class OutboxPublisher {
             if (outcome.endsPass()) {
                 log.warn("проход публикации остановлен на сообщении {}: {}", message.envelope().messageId(),
                         outcome.reason());
-                break;
+                return new BrokerPass(handled, outcome.stopsPublishing());
             }
         }
-        return handled;
+        return new BrokerPass(handled, false);
     }
 
     private PublishOutcome attempt(OutboxMessage message) {
@@ -73,5 +91,8 @@ public class OutboxPublisher {
             return 1;
         }
         return 0;
+    }
+
+    private record BrokerPass(int handled, boolean serviceStopping) {
     }
 }

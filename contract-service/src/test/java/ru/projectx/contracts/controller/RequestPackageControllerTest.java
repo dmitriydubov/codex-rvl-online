@@ -57,7 +57,8 @@ class RequestPackageControllerTest {
                 new PackageItem(SPOUSE, DocumentKind.KM_CONTRACT, CONTRACT, "DKM-2026-000001", 1,
                         DocumentState.ACCEPTED, new BigDecimal("34000.00"), null,
                         new PackageAcceptance(Instant.parse("2026-02-10T07:04:58Z"), 1),
-                        new PackagePayment(PaymentState.PENDING, new BigDecimal("34000.00")), List.of(), null, null),
+                        new PackagePayment(PaymentState.PENDING, new BigDecimal("34000.00"), null, null), List.of(),
+                        null, null),
                 new PackageItem(CHILD, DocumentKind.LM_POLICY, null, null, null, DocumentState.ISSUED, null,
                         "0555123456", null, null, List.of(new PackageDocument(FORM, "POLICY", "FINAL", 1,
                         "https://s3.example.test/lm/0555123456.pdf")), null, null))));

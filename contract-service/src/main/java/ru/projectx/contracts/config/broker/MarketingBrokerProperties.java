@@ -13,7 +13,12 @@ import ru.projectx.contracts.config.payment.PaymentSwitch;
 @ConditionalOnBooleanProperty(PaymentSwitch.ENABLED)
 public record MarketingBrokerProperties(
         @Valid @NotNull BrokerConnectionProperties connection,
-        @Valid @NotNull DocumentFixes documentFixes) {
+        boolean listenerAutoStartup,
+        @Valid @NotNull DocumentFixes documentFixes,
+        @Valid @NotNull OrderEvents orderEvents) {
+
+    public record OrderEvents(@NotBlank String queue) {
+    }
 
     public record DocumentFixes(@NotBlank String exchange, @NotBlank String routingKey) {
     }

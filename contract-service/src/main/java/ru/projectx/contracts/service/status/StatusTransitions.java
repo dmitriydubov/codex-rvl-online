@@ -18,7 +18,11 @@ final class StatusTransitions {
     }
 
     private static boolean participantChangedSince(IssuanceSnapshot before, IssuanceSnapshot after) {
-        return enteredSince(before, after) || leftErrorSince(before, after);
+        return enteredSince(before, after) || leftErrorSince(before, after) || resumedSince(before, after);
+    }
+
+    private static boolean resumedSince(IssuanceSnapshot before, IssuanceSnapshot after) {
+        return after.records().stream().anyMatch(before::resumed);
     }
 
     private static boolean enteredSince(IssuanceSnapshot before, IssuanceSnapshot after) {
@@ -27,7 +31,7 @@ final class StatusTransitions {
     }
 
     private static boolean reportedOnEntry(RecordOutcome record) {
-        return record.stopped() || KmContractStates.reportedOnEntry(record.status());
+        return record.stopped() || record.linked() || KmContractStates.reportedOnEntry(record.status());
     }
 
     private static boolean leftErrorSince(IssuanceSnapshot before, IssuanceSnapshot after) {

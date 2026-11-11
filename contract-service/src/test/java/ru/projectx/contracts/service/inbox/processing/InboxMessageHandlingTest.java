@@ -76,7 +76,7 @@ class InboxMessageHandlingTest {
         order.verify(transactions).commit(any());
         order.verify(handler).prepare("{\"data\":{}}");
         order.verify(transactions).getTransaction(any());
-        order.verify(work).apply(NOW);
+        order.verify(work).applyOrSkip(NOW);
         order.verify(transactions).commit(any());
         assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
         assertThat(message).hasFieldOrPropertyWithValue("processedAt", NOW);
@@ -93,7 +93,7 @@ class InboxMessageHandlingTest {
 
         handling.process(message.id());
 
-        verify(work).apply(NOW);
+        verify(work).applyOrSkip(NOW);
         assertThat(MDC.get("messageId")).isNull();
     }
 
@@ -103,7 +103,7 @@ class InboxMessageHandlingTest {
 
         handling.process(message.id());
 
-        verify(work).apply(NOW);
+        verify(work).applyOrSkip(NOW);
         assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
     }
 
@@ -140,7 +140,7 @@ class InboxMessageHandlingTest {
         handling.process(issued.id());
 
         verify(messages, never()).maxProcessedVersion(any(), any());
-        verify(work).apply(NOW);
+        verify(work).applyOrSkip(NOW);
         assertThat(issued.status()).isEqualTo(InboxStatus.PROCESSED);
     }
 
@@ -171,7 +171,7 @@ class InboxMessageHandlingTest {
     @Test
     void applicationFailure_rollsTheSecondTransactionBackAndLeavesMessageUntouched() {
         given(messages.maxProcessedVersion(REQUEST, TASKS)).willReturn(Optional.empty());
-        org.mockito.BDDMockito.willThrow(new IllegalStateException("отказ")).given(work).apply(NOW);
+        org.mockito.BDDMockito.willThrow(new IllegalStateException("отказ")).given(work).applyOrSkip(NOW);
 
         assertThatThrownBy(() -> handling.process(message.id())).hasMessage("отказ");
         assertThat(message.status()).isEqualTo(InboxStatus.NEW);
@@ -187,7 +187,7 @@ class InboxMessageHandlingTest {
 
         handling.process(message.id());
 
-        verify(work, never()).apply(any());
+        verify(work, never()).applyOrSkip(any());
         assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
     }
 
@@ -231,7 +231,7 @@ class InboxMessageHandlingTest {
         assertThatThrownBy(() -> handling.process(message.id())).isInstanceOf(LeadershipLostException.class);
 
         verify(handler).prepare("{\"data\":{}}");
-        verify(work).apply(NOW);
+        verify(work).applyOrSkip(NOW);
         assertThat(message.status()).isEqualTo(InboxStatus.NEW);
         verify(transactions).rollback(any());
     }
@@ -245,7 +245,7 @@ class InboxMessageHandlingTest {
         InOrder order = inOrder(messages, fence, work, transactions);
         order.verify(messages).maxProcessedVersion(REQUEST, TASKS);
         order.verify(fence).holdUntilCommit();
-        order.verify(work).apply(NOW);
+        order.verify(work).applyOrSkip(NOW);
         order.verify(fence).holdUntilCommit();
         order.verify(transactions).commit(any());
         assertThat(message.status()).isEqualTo(InboxStatus.PROCESSED);
