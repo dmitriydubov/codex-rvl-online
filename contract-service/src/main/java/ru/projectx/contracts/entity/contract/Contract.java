@@ -95,7 +95,7 @@ public class Contract extends IssuanceRecord {
 
     @Override
     protected void enter(IssuanceTransition transition) {
-        this.status = status.after(transition, id());
+        this.status = transition.after(ContractStatus.ISSUANCE_FLOW, status, id());
     }
 
     public String number() {

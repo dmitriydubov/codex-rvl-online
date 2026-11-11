@@ -57,8 +57,7 @@ public class LmPolicy extends IssuanceRecord {
     }
 
     public void markIssued(IssuedPolicy issued, Instant now) {
-        require(LmPolicyStatus.SUBMITTED);
-        this.status = LmPolicyStatus.ISSUED;
+        this.status = LmPolicyStatus.ISSUANCE_FLOW.move(status, LmPolicyStatus.SUBMITTED, LmPolicyStatus.ISSUED, id());
         this.policyUskId = issued.uskId();
         this.policyUskNumber = issued.uskNumber();
         this.issuedPolicyId = issued.issuedPolicyId();
@@ -66,24 +65,9 @@ public class LmPolicy extends IssuanceRecord {
         advanceVersion(now);
     }
 
-    private void require(LmPolicyStatus expected) {
-        if (status != expected) {
-            throw new IllegalStateException("полис ЛМ " + id() + " в статусе " + status + ", а не " + expected);
-        }
-    }
-
     @Override
     protected void enter(IssuanceTransition transition) {
-        this.status = switch (transition) {
-            case SUBMITTED -> submittedFromNew();
-            case ERROR -> LmPolicyStatus.ERROR;
-            case CANCELLED -> LmPolicyStatus.CANCELLED;
-        };
-    }
-
-    private LmPolicyStatus submittedFromNew() {
-        require(LmPolicyStatus.NEW);
-        return LmPolicyStatus.SUBMITTED;
+        this.status = transition.after(LmPolicyStatus.ISSUANCE_FLOW, status, id());
     }
 
     public boolean submitted() {
