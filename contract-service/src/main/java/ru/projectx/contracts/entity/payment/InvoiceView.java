@@ -20,6 +20,10 @@ public record InvoiceView(
         return state.awaitsPayment();
     }
 
+    public boolean lacksPaymentLink() {
+        return awaitsPayment() && link.isEmpty();
+    }
+
     public boolean cancellationDeferred() {
         return deferredCancellation.isPresent();
     }

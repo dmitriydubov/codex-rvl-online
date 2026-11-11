@@ -48,7 +48,7 @@ gauntlet/
   archtest/               ArchUnit-тест, читающий config/architecture.properties
   hooks/                  guard.py (PreToolUse), stop_gate.py (Stop; SubagentStop hardener'а — matcher в
                           .claude/settings.json), session_start.sh (SessionStart),
-                          selftest.py (714 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
+                          selftest.py (проверки хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
   templates/              конфигурация Cucumber+Spring, пример фичи на русском
   claude/, ci/            только до установки: install.sh переносит их в .claude/ и .github/workflows/
 ```
@@ -81,10 +81,10 @@ gauntlet/
 `module=data-reference,contract-service`. Хуки запускают Gradle в каждом
 изменённом модуле, CI — в модулях, которых касается PR (все — когда менялись `gauntlet/` или `.github/`);
 `src/` и `build/` — каждого модуля, `gauntlet/` остаётся в корне, прочие модули не трогаются. Общие
-пороги — в `config/`, своё у модуля (`basePackage`, `acceptance.glue`, `exclude.classes`, архитектура) —
-в `config/<module>/` (`gauntlet.properties` дополняет общий, остальные файлы заменяют одноимённые);
-`./gradlew gauntletInfo` в модуле показывает, что подхватилось. Спецификация одна на задачу: коммит
-фич любого модуля замораживает фичи всех. Groovy и Kotlin DSL поддерживаются одинаково.
+пороги — в `config/`, своё у модуля (`basePackage`, `acceptance.glue`, `acceptance.inputs`, `test.inputs`,
+`exclude.classes`, архитектура) — в `config/<module>/` (`gauntlet.properties` дополняет общий, остальные файлы
+заменяют одноимённые); `./gradlew gauntletInfo` в модуле показывает, что подхватилось. Спецификация одна на
+задачу: коммит фич любого модуля замораживает фичи всех. Groovy и Kotlin DSL поддерживаются одинаково.
 
 **Configuration cache.** В `data-reference/gradle.properties` включён `org.gradle.configuration-cache`.
 Задачи набора читают проект во время выполнения, поэтому помечены `notCompatibleWithConfigurationCache`:
@@ -153,8 +153,10 @@ SessionStart-хук); иначе сборка пойдёт в Nexus контур
 
 **CI и защита ветки.** `.github/workflows/gauntlet.yml` гоняет `./gradlew gauntlet` на каждый PR с
 полной историей (`fetch-depth: 0`) — это проверка, которую агент не может обойти (хуки работают только
-внутри Claude Code). Если репозиторий приватный на бесплатном плане GitHub, правила защиты веток
-недоступны; тогда гейт — это ваше правило не мержить красный PR. Агент мержить не может в любом случае.
+внутри Claude Code). PR только с документами (`docs/**`, `project_files/**`, `*.md`) CI не запускает, кроме
+файлов, которые читают тесты модуля (`acceptance.inputs`, `test.inputs`): фильтр `paths` называет их по имени.
+Если репозиторий приватный на бесплатном плане GitHub, правила защиты веток недоступны; тогда гейт — это ваше
+правило не мержить красный PR. Агент мержить не может в любом случае.
 Auto-fix (кнопка в CI status bar сессии): на упавший CI или комментарий в PR Claude отвечает сам, в той же
 сессии, под теми же хуками.
 
