@@ -4,10 +4,12 @@ name: gauntlet
 
 on:
   pull_request:
-    paths-ignore:                           # documents never change what the gates check; CI minutes are metered
-      - 'docs/**'
-      - 'project_files/**'
-      - '**.md'
+    paths:                                  # documents never change what the gates check; CI minutes are metered
+      - '**'
+      - '!docs/**'
+      - '!project_files/**'
+      - '!**.md'
+      - 'contract-service/docs/operations.md'   # except files the acceptance steps run: acceptance.inputs of the module
   workflow_dispatch:
 
 concurrency:

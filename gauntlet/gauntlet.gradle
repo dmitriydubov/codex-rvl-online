@@ -56,6 +56,13 @@ def baseRef = (findProperty('gauntlet.baseRef') ?: setting('baseRef', 'origin/ma
 def featuresPath = setting('acceptance.features', 'src/acceptanceTest/resources/features')
 def featuresDir = file(featuresPath)
 def glue = setting('acceptance.glue', '')
+def acceptanceInputs = listSetting('acceptance.inputs', '')
+acceptanceInputs.each { path ->
+    if (path.startsWith('/') || path.split('/').contains('..')) {
+        throw new GradleException("gauntlet: acceptance.inputs entry '${path}' must be a file inside the module " +
+                '(a relative path without ..)')
+    }
+}
 def basePackage = setting('basePackage', '')
 def excludedClassGlobs = listSetting('exclude.classes', '*Application,*MapperImpl')  // not 'excludedClasses': a local of that name would shadow pitest.excludedClasses
 def tools = gauntletFile('tools').absolutePath
@@ -164,7 +171,8 @@ tasks.register('gauntletInfo') {
                     "${gauntletDir.toPath().relativize(configFile('pit-runerror-allowlist.txt').toPath())}",
             "basePackage  : ${basePackage ?: '(not set)'}    glue: ${glue ?: '(not set)'}",
             "cucumber     : ${setting('cucumber.version', '7.23.0')}    scope: ${scope}    baseRef: ${baseRef}",
-            "features     : ${featuresPath}"].collect { it.toString() }
+            "features     : ${featuresPath}",
+            "acc. inputs  : ${acceptanceInputs ? acceptanceInputs.join(', ') : '(none)'}"].collect { it.toString() }
     doLast { lines.each { println it } }
 }
 
@@ -325,6 +333,11 @@ tasks.register('acceptanceTest', Test) {
     configureCucumber(it, featuresDir)
     testLogging { events 'failed'; exceptionFormat = 'full' }
     onlyIf { hasFeatures(featuresDir) }
+    // files outside the source sets the steps read (acceptance.inputs): a change to one must rerun the tests, and a
+    // missing one fails the build - a renamed or deleted file must not switch this protection off without a word
+    acceptanceInputs.eachWithIndex { path, i ->
+        inputs.file(path).withPropertyName("acceptanceInputs.${i}").withPathSensitivity(PathSensitivity.RELATIVE)
+    }
     mustRunAfter 'archTest'
     finalizedBy 'acceptanceCheck'
     // acceptanceCheck must judge this run only, never results a previous run left behind
