@@ -5089,6 +5089,20 @@ REST.
   **PR #261 смержен 2026-10-27 (`main` cfa9d1f).** Проверка после мержа: дерево `main` совпадает с головой PR `96772ed`,
   каталог `data-reference` — с `cfd6403`, на котором прошли `gauntletFast` (2052 / 705 / 7), `mutationGate` (27/27) и
   `gherkinMutation`, поэтому контрольный прогон не повторялся; обе команды следов разработки на `main` пусты.
+- 2026-11-11, **записка координатора contract-service (по решению владельца 2026-11-11, пришла плановой задачей):
+  правки набора в `main`.** PR #292 (`e4469926`) — `acceptance.inputs` (у data-reference пусто); PR #294 (`3b8c3247`) —
+  `test.inputs`: в `gauntlet/config/data-reference/gauntlet.properties` — `test.inputs=docs/openapi.yaml` (его читает
+  `OpenApiContractTest`), правка описания перезапускает `test` (раньше `UP-TO-DATE`, разошедшееся описание оставалось
+  зелёным); `architecture.properties` — вход `archTest`. Сверено координатором по `main` 3b8c3247: строка оверлея, `paths`
+  в `.github/workflows/gauntlet.yml` (`data-reference/docs/openapi.yaml`), Stop-хук следит за `INPUTS`
+  (`acceptance.inputs`, `test.inputs`). Для data-reference: (1) правка `docs/openapi.yaml` в ходе координатора или сессии
+  шага запускает Stop-хук с `gauntletFast` модуля — Docker держать поднятым до конца хода; (2) переименование или
+  удаление `openapi.yaml` роняет сборку («property 'testInputs.0' specifies file … which doesn't exist»), пока не
+  поправлены строка оверлея и `paths` workflow — это правка набора, решение владельца; (3) новый файл вне исходников,
+  который читают тесты, — в `test.inputs` или `acceptance.inputs` оверлея и в `paths` workflow (вторую часть проверяет
+  `python3 gauntlet/hooks/selftest.py`), в задание сессии шага — пунктом «переслать координатору». PR #283 координатора
+  смержен 2026-11-04 13:59 UTC; ветка координатора с `main` после него не сливалась (новые правки в `main` — набор и
+  contract-service, файлы data-reference не тронуты).
 - 2026-11-03, **контур: MR !3 разработчика Заявок в чарт стенда data-reference** («поиск по фамилиям не работал»): в
   `devops/test/helm/values.yaml` добавлена `internal/v1/policies` в ingress и удалён блок `jvm`. Разбор координатора:
   без блока `jvm` чарт не собирается (Helm 3.19.0 `helm template`: «nil pointer evaluating interface {}.options» в
