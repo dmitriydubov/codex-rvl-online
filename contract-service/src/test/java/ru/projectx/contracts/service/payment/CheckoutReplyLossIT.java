@@ -109,6 +109,56 @@ class CheckoutReplyLossIT {
         assertThat(invoice.get("reply_lost_reported")).isEqualTo(true);
     }
 
+    @Test
+    void lostReplyOfInvoiceWhosePaymentFailed_isReportedOnceWhileOrderingAwaitsThePayment() {
+        double alertsBefore = replyLostAlerts();
+        invoiceWithoutLinkWhosePaymentFailed();
+        assertThat(replyLostAlerts()).isEqualTo(alertsBefore);
+
+        stand.makeInvoiceStale(contractId);
+        reconciliation.reconcileDue();
+
+        assertThat(replyLostAlerts()).isEqualTo(alertsBefore + 1);
+        assertThat(stand.invoice(contractId).get("reply_lost_reported")).isEqualTo(true);
+
+        stand.makeInvoiceStale(contractId);
+        reconciliation.reconcileDue();
+
+        assertThat(replyLostAlerts()).isEqualTo(alertsBefore + 1);
+        Map<String, Object> invoice = stand.invoice(contractId);
+        assertThat(invoice.get("state")).isEqualTo("PAYMENT_ERROR");
+        assertThat(invoice.get("payment_url")).isNull();
+        assertThat(stand.contract(contractId).get("status")).isEqualTo("INVOICE_ISSUED");
+    }
+
+    @Test
+    void lostReplyOfInvoiceWhosePaymentFailed_isReportedOnceWhileOrderingReportsThePaymentError() {
+        double alertsBefore = replyLostAlerts();
+        invoiceWithoutLinkWhosePaymentFailed();
+        ordering.orderIs((String) stand.order(contractId).get("external_order_id"),
+                new OrderingOrder(OrderingStatuses.PAYMENT_ERROR, List.of()));
+
+        stand.makeInvoiceStale(contractId);
+        reconciliation.reconcileDue();
+        stand.makeInvoiceStale(contractId);
+        reconciliation.reconcileDue();
+
+        assertThat(replyLostAlerts()).isEqualTo(alertsBefore + 1);
+        Map<String, Object> invoice = stand.invoice(contractId);
+        assertThat(invoice.get("state")).isEqualTo("PAYMENT_ERROR");
+        assertThat(invoice.get("payment_url")).isNull();
+        assertThat(invoice.get("reply_lost_reported")).isEqualTo(true);
+    }
+
+    private void invoiceWithoutLinkWhosePaymentFailed() {
+        assertThat(stand.orderingEvent(contractId, "pendingPayment", FixedClockConfig.NOW)).isEmpty();
+        assertThat(stand.orderingEvent(contractId, "paymentError", FixedClockConfig.NOW)).isEmpty();
+        Map<String, Object> failed = stand.invoice(contractId);
+        assertThat(failed.get("state")).isEqualTo("PAYMENT_ERROR");
+        assertThat(failed.get("payment_url")).isNull();
+        assertThat(failed.get("reply_lost_reported")).isEqualTo(false);
+    }
+
     private double replyLostAlerts() {
         return Optional.ofNullable(meters.find("contracts.payment.reconciliation.alerts")
                 .tag("reason", "checkout_reply_lost").counter()).map(Counter::count).orElse(0.0);

@@ -83,6 +83,37 @@ class FailedPaymentReconcilerTest {
 
         assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
         verify(metrics, never()).countPaymentError();
+        verifyNoInteractions(alerts, recording);
+    }
+
+    private static OrderInvoice issuedWithoutLink() {
+        OrderInvoice invoice = Invoices.inCheckout();
+        invoice.pass(InvoiceTransition.PAYMENT_AWAITED, Invoices.STARTED);
+        return invoice;
+    }
+
+    @Test
+    void failedPaymentOfIssuedInvoiceWithoutLink_reportsTheLostReplyAndMarksTheFailure() {
+        OrderInvoice invoice = issuedWithoutLink();
+
+        assertThat(reconciler.reconcile(locked(invoice), FAILED, BEFORE_DEADLINE)).isEqualTo(Followup.NONE);
+
+        verify(recording).replyLost(PaymentOrders.CONTRACT);
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        verify(metrics).countPaymentError();
+        verifyNoInteractions(alerts);
+    }
+
+    @Test
+    void failedPaymentAlreadyMarkedOfInvoiceWithoutLink_reportsTheLostReply() {
+        OrderInvoice invoice = issuedWithoutLink();
+        invoice.pass(InvoiceTransition.PAYMENT_FAILED, Invoices.STARTED);
+
+        assertThat(reconciler.reconcile(locked(invoice), FAILED, BEFORE_DEADLINE)).isEqualTo(Followup.NONE);
+
+        verify(recording).replyLost(PaymentOrders.CONTRACT);
+        assertThat(invoice.view().state()).isEqualTo(InvoiceState.PAYMENT_ERROR);
+        verify(metrics, never()).countPaymentError();
         verifyNoInteractions(alerts);
     }
 
