@@ -11,7 +11,7 @@ public enum LmPolicyStatus implements IssuanceStatus {
     ERROR(IssuanceOutcome.ERROR),
     CANCELLED(IssuanceOutcome.CANCELLED);
 
-    static final IssuanceFlow<LmPolicyStatus> ISSUANCE_FLOW =
+    public static final IssuanceFlow<LmPolicyStatus> ISSUANCE_FLOW =
             new IssuanceFlow<>(NEW, SUBMITTED, ERROR, CANCELLED, "полис ЛМ");
 
     private final IssuanceOutcome outcome;

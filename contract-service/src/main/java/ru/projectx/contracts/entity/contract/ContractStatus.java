@@ -18,11 +18,11 @@ public enum ContractStatus implements IssuanceStatus {
     ERROR(IssuanceOutcome.ERROR),
     CANCELLED(IssuanceOutcome.CANCELLED);
 
+    public static final IssuanceFlow<ContractStatus> ISSUANCE_FLOW =
+            new IssuanceFlow<>(PAID, SUBMITTED, ERROR, CANCELLED, "договор КМ");
+
     private static final Set<ContractStatus> OFFER_ACCEPTED = EnumSet.of(ACCEPTED, INVOICE_ISSUED, PAID, SUBMITTED);
     private static final Set<ContractStatus> AWAITING_PAYMENT = EnumSet.of(ACCEPTED, INVOICE_ISSUED);
-
-    static final IssuanceFlow<ContractStatus> ISSUANCE_FLOW =
-            new IssuanceFlow<>(PAID, SUBMITTED, ERROR, CANCELLED, "договор КМ");
 
     private final IssuanceOutcome outcome;
 

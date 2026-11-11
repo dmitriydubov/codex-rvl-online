@@ -23,7 +23,7 @@ class IssuanceKindTest {
     private final IssuanceKind<Contract, ContractStatus> kind = new IssuanceKind<>(
             new UskWording("договор КМ", "договора КМ", "договору КМ", "результат", "не отправлялась", "отложена",
                     "не подготовлена", "{} {}", "{}"),
-            "CONTRACT", "KmContractSubmitted", "KmContractRegistered", ContractStatus.PAID, ContractStatus.SUBMITTED,
+            "CONTRACT", "KmContractSubmitted", "KmContractRegistered", ContractStatus.ISSUANCE_FLOW,
             new IssuanceErrors(new IssueError("KM_CONTRACT_SUBMISSION_UNDELIVERED", "не передан"),
                     new IssueError("KM_CONTRACT_SUBMISSION_PREPARATION_FAILED", "не подготовлена")), PersonOwner::contract,
             Contract::markIssued);
@@ -59,6 +59,12 @@ class IssuanceKindTest {
         ReflectionTestUtils.setField(contract, "status", status);
 
         assertThat(kind.requested(contract)).isFalse();
+    }
+
+    @Test
+    void readyAndAwaitingStatuses_comeFromTheIssuanceFlowOfTheRecord() {
+        assertThat(kind.readyForUsk()).isEqualTo(ContractStatus.PAID);
+        assertThat(kind.awaitingUsk()).isEqualTo(ContractStatus.SUBMITTED);
     }
 
     @Test
