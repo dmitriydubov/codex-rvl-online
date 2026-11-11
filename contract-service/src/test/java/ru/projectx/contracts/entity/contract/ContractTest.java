@@ -266,6 +266,12 @@ class ContractTest {
     }
 
     @Test
+    void submit_refusalNamesTheContractItsStatusAndTheExpectedOne() {
+        assertThatThrownBy(() -> contract.submit(LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("договор КМ " + contract.id() + " в статусе NEW, а не PAID");
+    }
+
+    @Test
     void markIssued_storesTheRegistrationAndFinishesTheSubmittedContract() {
         paid();
         contract.submit(LATER);
@@ -291,6 +297,12 @@ class ContractTest {
                 .hasMessageContaining(status.name()).hasMessageContaining("SUBMITTED");
         assertThat(contract.progress().registration()).isEmpty();
         assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void markIssued_refusalNamesTheContractItsStatusAndTheExpectedOne() {
+        assertThatThrownBy(() -> contract.markIssued(ISSUED, LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("договор КМ " + contract.id() + " в статусе NEW, а не SUBMITTED");
     }
 
     @Test

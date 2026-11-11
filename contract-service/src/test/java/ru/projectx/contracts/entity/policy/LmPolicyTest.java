@@ -76,6 +76,14 @@ class LmPolicyTest {
     }
 
     @Test
+    void submit_refusalNamesThePolicyItsStatusAndTheExpectedOne() {
+        policy.submit(LATER);
+
+        assertThatThrownBy(() -> policy.submit(LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("полис ЛМ " + policy.id() + " в статусе SUBMITTED, а не NEW");
+    }
+
+    @Test
     void markIssued_storesUskIdentifiersAndOurPolicyAndFinishesIt() {
         policy.submit(LATER);
 
@@ -94,6 +102,12 @@ class LmPolicyTest {
                 .hasMessageContaining("NEW").hasMessageContaining("SUBMITTED");
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.NEW);
         assertThat(policy.issued()).isEmpty();
+    }
+
+    @Test
+    void markIssued_refusalNamesThePolicyItsStatusAndTheExpectedOne() {
+        assertThatThrownBy(() -> policy.markIssued(ISSUED, LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("полис ЛМ " + policy.id() + " в статусе NEW, а не SUBMITTED");
     }
 
     @Test
