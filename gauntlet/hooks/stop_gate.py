@@ -6,6 +6,8 @@ An agent may not finish while the gauntlet is red.
   stop_gate.py --record-start                              # SessionStart: remember the working tree
   stop_gate.py --task gauntletFast [--max-attempts 3]      # Stop / SubagentStop
 
+The working tree here is what the gauntlet checks: every guarded build's src/, gradle/ and build files, the
+files its acceptance steps read (acceptance.inputs in gauntlet.properties, e.g. docs/operations.md), and gauntlet/.
 The gate runs only when the content of the working tree differs from what it was when the session
 started (the developer's pre-existing uncommitted work does not count, and committing it changes
 nothing) and that exact content has not been verified before - so questions and read-only turns cost
@@ -43,6 +45,7 @@ SPEC_DEPENDENT_TASKS = ["acceptanceTest", "acceptanceCheck"]
 # relative to the repository root.
 MODULES = []
 WATCHED = list(BUILD_FILES) + ["gauntlet"]
+INPUTS = []          # files the acceptance steps read (acceptance.inputs): watched even when missing
 REPORT_DIRS = ["build/test-results", "build/reports"]   # newer files here = the agent ran Gradle itself
 INTERESTING = re.compile(
     r"^(CRAP FAIL|DUPLICATE|DRY gate: FAILED|INTEGRITY|"
@@ -176,7 +179,7 @@ def gate(opts, event, state, session, started):
 
 def uncommitted_paths():
     paths = set()
-    status = git_bytes("status", "--porcelain", "--untracked-files=all", "--", *existing(WATCHED)).decode("utf-8", "replace")
+    status = git_bytes("status", "--porcelain", "--untracked-files=all", "--", *watched()).decode("utf-8", "replace")
     for line in status.splitlines():  # "XY path", relative to the repository root - do not strip: X may be a space
         paths.add(line[3:].strip().split(" -> ")[-1].strip('"'))
     return {p for p in paths if p}
@@ -202,7 +205,7 @@ def changed_paths(start_head):
     """Paths changed in this session: uncommitted changes plus commits made since the session started."""
     paths = uncommitted_paths()
     if start_head and git("rev-parse", "HEAD") != start_head:
-        paths.update(git("diff", "--name-only", start_head, "HEAD", "--", *existing(WATCHED)).splitlines())
+        paths.update(git("diff", "--name-only", start_head, "HEAD", "--", *watched()).splitlines())
     return {p for p in paths if p}
 
 
@@ -295,7 +298,7 @@ def summarize(output, limit=12000):
 def tree_fingerprint(exclude=()):
     """Content of every tracked or untracked (not ignored) file under the watched paths - not HEAD."""
     h = hashlib.sha256()
-    pathspec = existing(WATCHED) + [f":(exclude){e}" for e in exclude]
+    pathspec = watched() + [f":(exclude){e}" for e in exclude]
     files = git_bytes("ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *pathspec)
     for path in sorted(set(p for p in files.decode("utf-8", "replace").split("\0") if p)):
         h.update(path.encode() + b"\0")
@@ -308,9 +311,9 @@ def tree_fingerprint(exclude=()):
     return h.hexdigest()
 
 
-def properties():
+def parse_properties(text):
     props = {}
-    for line in read(PROPERTIES).splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             key, value = line.split("=", 1)
@@ -318,13 +321,41 @@ def properties():
     return props
 
 
+def properties():
+    return parse_properties(read(PROPERTIES))
+
+
+def module_properties(module):
+    """The common settings with the module's overlay on top; module keys win, as in gauntlet.gradle. Only key=value
+    lines are read - the way the kit's properties files are written."""
+    props = properties()
+    props.update(parse_properties(read(os.path.join("gauntlet", "config", module, "gauntlet.properties"))))
+    return props
+
+
+def acceptance_inputs(props):
+    """Files outside the source sets that the acceptance steps read, relative to the build: a change to one - or its
+    removal - is a code change. An absolute path or one with '..' is no input here; gauntlet.gradle rejects it."""
+    entries = [p.strip() for p in props.get("acceptance.inputs", "").split(",") if p.strip()]
+    return [p for p in entries if not p.startswith("/") and ".." not in p.split("/")]
+
+
 def configure_module():
     """Point every path at the modules' build directories when the build is not at the repository root."""
-    global MODULES, WATCHED, REPORT_DIRS
+    global MODULES, WATCHED, REPORT_DIRS, INPUTS
     MODULES = [m.strip().strip("/") for m in properties().get("module", "").split(",") if m.strip()]
     if MODULES:
         WATCHED = [os.path.join(m, p) for m in MODULES for p in BUILD_FILES] + ["gauntlet"]
         REPORT_DIRS = [os.path.join(m, p) for m in MODULES for p in REPORT_DIRS]
+        INPUTS = [os.path.join(m, p) for m in MODULES for p in acceptance_inputs(module_properties(m))]
+    else:
+        INPUTS = acceptance_inputs(properties())
+
+
+def watched():
+    """Pathspecs of what the gate checks: build paths that do not exist are left out, acceptance inputs never are -
+    deleting one must count as a change."""
+    return existing(WATCHED) + INPUTS
 
 
 def features_dirs():
