@@ -24,15 +24,20 @@ GitHub) и в рабочий контур не переносится. По пр
 - отдаёт сервису Заявок состояние выпуска: асинхронно (ДГ-03) и синхронно (состояние пакета СЭ-01, акцепт СЭ-03);
 - читает справочники у `data-reference` по REST: программы, полисы, договоры страхования.
 
-Оплата сделана наполовину (К7a, PR #285). Её включает настройка `PAYMENT_ENABLED` без умолчания: не задана — сервис не
-стартует. При `true` акцепт договора КМ в той же транзакции заводит заказ на оплату, фоновый проход ведущего создаёт его
-в Ordering и подтверждает документ сообщением `fixed`, а прекращение договора отменяет заказ отдельным проходом; акцепт
-Ordering не ждёт. При `false` заказ не заводится, клиента Ordering и подключения к брокеру маркетинга нет, флаг
-`contracts_payment_disabled` равен 1; договор, акцептованный при выключенной оплате, заказа не получает и после
-включения. Счёт (`checkout`) и ссылка на оплату, события оплаты, e-mail плательщика, сверка зависших заказов и отказ от
-заказа, когда граница накануне заезда уже прошла (решение 14 карточки 8.К7), — К7b; до него в PAID договор ставит
-только тестовая подготовка. До мержа К7b оплату в контуре не включают (`PAYMENT_ENABLED=false`; решения 2 и 14
-карточки 8.К7).
+Оплата через Ordering сделана целиком: заказ и подтверждение документа — К7a (PR #285), адрес плательщика, счёт, события
+оплаты и сверка — К7b (PR #289, доработка 10а — PR #293). Её включает настройка `PAYMENT_ENABLED` без умолчания: не
+задана — сервис не стартует. При `true` акцепт договора КМ требует адрес электронной почты плательщика (`email`) и в той
+же транзакции заводит заказ на оплату; акцепт Ordering не ждёт. Дальше работают проходы ведущего: создание заказа в
+Ordering и подтверждение документа сообщением `fixed`, выставление счёта (`checkout`) со сроком оплаты и ссылкой для
+сервиса Заявок, сверка заказов с Ordering и отмена заказа прекращённого договора. Об оплате, ошибке оплаты и просрочке
+сервис узнаёт из событий Ordering в очереди продукта, а если события нет — из сверки; оплаченный договор уходит в 1С:УСК,
+просроченный прекращается. При `false` заказ не заводится, клиента Ordering, брокера маркетинга и проходов оплаты нет,
+`email` в акцепте необязателен (формат проверяется) и нигде не хранится, флаг `contracts_payment_disabled` равен 1;
+договор, акцептованный при выключенной оплате, заказа не получает и после включения. Включение оплаты держат соседи, а
+не код (карточка 8.К7; журнал, строка «Команда Ordering»): Ordering заводит продукт и канал и выдаёт доступы, сервис
+Заявок начинает передавать `email`; включают раньше, чем застрахованные начнут принимать оферты. Выключать оплату нельзя,
+пока есть заказы в работе и счета без итога: сервис перестал бы читать события, сверять и отменять заказы
+(`docs/operations.md`, порядок включения и выключения).
 
 Собственного пользовательского интерфейса у сервиса нет. Фронтенд и BFF к нему не обращаются: всё, что застрахованное
 лицо видит по договору и оплате, проходит через сервис Заявок.
@@ -46,18 +51,22 @@ Ordering не ждёт. При `false` заказ не заводится, кл�
 - **Дата-референс** (`data-reference`, этот же репозиторий): REST-чтение справочников, только чтение.
 - **Ordering Service** (сервис управления заказами) — внутренний сервис оплаты. REST к нему — с токеном Keycloak
   (OAuth 2.0, client credentials): создание заказа `POST /orders`, поиск заказов клиента `POST /orders/{clientId}`,
-  состояние заказа `GET /orders/{orderId}`, отмена `POST /orders/{orderId}/cancel`. Подтверждение документа `fixed`
-  уходит в обменник продукта на брокере маркетинга. Счёт — REST-вызов `checkout`, события оплаты (`paid`,
-  `paymentError`, `paymentOverdue`) — из очереди продукта на том же брокере; то и другое — К7b.
+  состояние заказа и история его событий `GET /orders/{orderId}`, счёт `POST /orders/{orderId}/checkout`, отмена
+  `POST /orders/{orderId}/cancel`. Подтверждение документа `fixed` уходит в обменник продукта на брокере маркетинга;
+  события заказа (`fixed`, `pendingPayment`, `paid`, `paymentError`, `paymentOverdue`, `canceled`) сервис читает из
+  очереди продукта на том же брокере.
 
 Брокеров RabbitMQ у сервиса три: межсервисный, 1С:УСК и маркетинга (в схемах владельца — «Оплата»). Это разные
 подключения со своими адресами и учётными данными (`projectx.brokers.internal`, `projectx.brokers.onec`,
-`projectx.brokers.marketing`). Брокер маркетинга подключается только при включённой оплате, и сервис туда только
-публикует — подтверждение документа `fixed` в обменник продукта (`MARKETING_DOCUMENT_FIXES_EXCHANGE`, ключ
-`MARKETING_DOCUMENT_FIXES_ROUTING_KEY`); очередей на нём сервис пока не слушает. Публикация исходящих — один проход на
-все брокеры, и он останавливается на первом неотправленном сообщении: пока брокер маркетинга недоступен и в журнале
-исходящих ждёт `fixed`, стоят и более поздние ответы сервису Заявок и передачи в 1С:УСК (принятый риск до К7b,
-требование 8a карточки 8.К7).
+`projectx.brokers.marketing`). Брокер маркетинга подключается только при включённой оплате: туда сервис публикует
+подтверждение документа `fixed` в обменник продукта (`MARKETING_DOCUMENT_FIXES_EXCHANGE`, ключ
+`MARKETING_DOCUMENT_FIXES_ROUTING_KEY`), оттуда читает события заказов из очереди продукта
+(`MARKETING_ORDER_EVENTS_QUEUE`, `order.event.<продукт>.topic`, без умолчания; читать ли —
+`RABBITMQ_MARKETING_LISTENER_AUTO_STARTUP`). Обменник и очередь заводит Ordering, сервис их не объявляет; учётной записи
+сервиса нужны право публикации в обменник и право чтения очереди. Публикация исходящих идёт отдельно по каждому брокеру
+(`OutboxPublisher`; требование 8a карточки 8.К7, сделано в К7b): недоступный брокер или неподтверждённое сообщение держат
+только сообщения своего брокера, ответы сервису Заявок и передачи в 1С:УСК из-за брокера маркетинга не ждут; остановка
+сервиса прерывает весь проход.
 
 Терминология контура (КМ, ЛМ, ГП, 070/у, ЛПУ, ЦКЗ, СОБ) — раздел «Терминология» в `data-reference/CLAUDE.md`. Здесь
 важно: **КМ** — договор на сумму доплаты застрахованного и выпускаемый по нему полис; **ЛМ** — полис родственнику без
@@ -114,7 +123,12 @@ README.
   после исчерпания — FAILED и оповещение, вернуть в разбор можно процедурой дежурного (`docs/operations.md`, «Сбои и ручные операции»). Дубль по
   `message_id` отсекается уникальным индексом. Сообщение с
   `entity_version` не выше обработанной по той же заявке (`correlation_id`) отбрасывается с причиной; это правило задач
-  сервиса Заявок, результаты 1С:УСК по версии не упорядочиваются (`LmPolicyIssuedHandler` — `InboxOrdering.NONE`).
+  сервиса Заявок, результаты 1С:УСК (`UskResultHandler`) и события Ordering (`PaymentOrderEventHandler`) по версии не
+  упорядочиваются (`InboxOrdering.NONE`). У событий Ordering конверта `meta` нет, запись журнала входящих собирает
+  `OrderEventEnvelopes`: `message_id` — `eventId`, если это GUID, иначе UUID по имени от его байтов UTF-8;
+  `correlation_id` — `documentId` документа нашего продукта (он же `payment_orders.id`), а у чужого события — тот же
+  `message_id`; тип записи `PaymentOrderEvent`, версия 0. Событие, которое заказ не меняет, при разборе получает статус
+  SKIPPED с причиной (`contracts_payment_events_ignored_total{reason}`).
   Бизнес-ошибка — не сбой обработки: сообщение помечается обработанным, результат уходит ответным сообщением с
   `error_code` и `error_message`. Исходящее сообщение пишется в `outbox_messages` в одной транзакции с изменением данных
   и публикуется отдельным процессом с подтверждением брокера; вложения хранятся отдельно, тело собирается на публикации.
@@ -123,7 +137,10 @@ README.
   персональными данными.
 - ДГ-03 самодостаточно: всегда полное состояние по всем участникам. Внутренние статусы наружу не транслируются —
   только `km_contract_state` (NOT_REQUIRED / DRAFTED / ISSUED / CANCELLED), `payment_status` (NOT_REQUIRED / PENDING /
-  PAID), документы и ошибки по участнику; статус заявки IN_PROGRESS / COMPLETED / ERROR / CANCELLED.
+  PAID), ссылка на оплату `payment_url`, документы и ошибки по участнику; статус заявки IN_PROGRESS / COMPLETED / ERROR /
+  CANCELLED. `payment_status` (`ParticipantStatuses`): PAID — у договора есть момент оплаты (`contracts.paid_at`);
+  PENDING вместе с `payment_url` — договор INVOICE_ISSUED и ссылка записана; иначе NOT_REQUIRED, в том числе у счёта без
+  ссылки и у договора с отложенным прекращением (он показан CANCELLED, см. «Статусы и события»).
 - Идентификаторы договора страхования, полиса страхователя и программы в ДГ-01 — идентификаторы `data-reference`
   (так объявляет «Структура данных»); `external_id` для 1С подтягиваются у Дата-референса при формировании ДГ-04 и
   ДГ-06 и в наших таблицах не дублируются.
@@ -135,8 +152,8 @@ README.
 | Вызов | Назначение |
 |---|---|
 | `POST /requests/{individual_request_id}/participants/{participant_id}/attachments` (СЭ-04) | загрузка справки 070/у (multipart: `attachment_id`, `file`); идемпотентна по `attachment_id`: повтор — 200 и прежняя запись, другое содержимое или другой участник — 409 `ATTACHMENT_CONFLICT`; контракт согласован с разработчиком Заявок |
-| `GET /requests/{individual_request_id}/package` (СЭ-01) | состояние пакета по заявке: по участнику — вид документа, номер, состояние, премия, `contract_version`, акцепт, оплата, итоговые формы 1С, ошибка; справок нет |
-| `POST /contracts/{contract_id}/acceptance` (СЭ-03) | акцепт оферты по `contract_version` (без `document_id`/`document_hash`); идемпотентен по `contract_id`: повтор с той же версией — 200 и прежняя запись; другая версия после акцепта — 409 `ALREADY_ACCEPTED`; договор занят дольше `DB_LOCK_TIMEOUT` — 503 `SERVICE_UNAVAILABLE` |
+| `GET /requests/{individual_request_id}/package` (СЭ-01) | состояние пакета по заявке: по участнику — вид документа, номер, состояние, премия, `contract_version`, акцепт, оплата, итоговые формы 1С, ошибка; справок нет. Блок `payment` (`PackagePayments`): PAID и сумма — у договора с моментом оплаты; PENDING и сумма — у ACCEPTED; PENDING, сумма, `payment_url` и срок `expires_at` — у INVOICE_ISSUED (ссылки нет, пока ответ на выставление счёта не записан или если он потерян); у остальных блока нет. Договор с отложенным прекращением показан CANCELLED без блока |
+| `POST /contracts/{contract_id}/acceptance` (СЭ-03) | акцепт оферты по `contract_version` (без `document_id`/`document_hash`); идемпотентен по `contract_id`: повтор с той же версией — 200 и прежняя запись; другая версия после акцепта — 409 `ALREADY_ACCEPTED`; договор занят дольше `DB_LOCK_TIMEOUT` — 503 `SERVICE_UNAVAILABLE`. Адрес плательщика `email` (формат — `PayerEmailFormat`) при включённой оплате обязателен: без него — 400 `VALIDATION_ERROR` по полю `email`; проверка идёт до чтения договора, поэтому и на повторе и вместо 404. Повтор с другим адресом — 200, адрес из повтора нигде не сохраняется; в ответе адреса нет |
 
 Выдача содержимого документа (СЭ-02) не реализуется: проектов печатных форм у Договоров нет, справки в личный кабинет не
 отдаются.
@@ -146,8 +163,8 @@ README.
 `VALIDATION_ERROR` 400, `*_NOT_FOUND` 404, `ALREADY_ACCEPTED`, `DOCUMENT_VERSION_MISMATCH`, `INVALID_STATE`,
 `ATTACHMENT_CONFLICT` 409, `INTERNAL_ERROR` 500, `STORAGE_UNAVAILABLE`, `SERVICE_UNAVAILABLE` 503;
 `REFERENCE_UNAVAILABLE` и `ORDERING_UNAVAILABLE` из ТЗ не используются — синхронные вызовы не читают справочники и не
-вызывают Ordering: заказ создаёт фоновый проход после акцепта (К7a). Текст ошибки — для журнала, не для показа
-пользователю. Время ответа СЭ-01 и СЭ-03 — до 1 с на 95 % запросов.
+вызывают Ordering: заказ, счёт и отмену заказа делают фоновые проходы ведущего. Текст ошибки — для журнала, не для
+показа пользователю. Время ответа СЭ-01 и СЭ-03 — до 1 с на 95 % запросов.
 Общая основа — аннотация `@InternalApi`, фильтр `RequestIdFilter`, `ErrorResponse` и советники ошибок; новый вызов не
 заводит своего формата ошибки и своего обработчика непредвиденных отказов.
 
@@ -226,45 +243,85 @@ README.
 ## Статусы и события
 
 Договор КМ: NEW → DRAFT_READY → ACCEPTED → INVOICE_ISSUED → PAID → SUBMITTED → ISSUED; из любого незавершённого —
-CANCELLED (причина REQUEST_CANCELLED / INSURED_REFUSED / EXPIRED / OTHER); ERROR — ошибка в данных участника, отказ
-справочника, недоставка или ошибка регистрации в 1С. Полис ЛМ:
-NEW → SUBMITTED → ISSUED, ERROR, CANCELLED. ДГ-03 публикуется на DRAFT_READY, INVOICE_ISSUED, ERROR, CANCELLED, на
-выход участника из ошибки (новая запись не в ERROR, смена вида документа, исключение из состава — по участнику,
-`StatusTransitions`, Д-06) и когда по всем участникам заявки работа завершена; ACCEPTED, PAID и SUBMITTED наружу не
-публикуются. Перечисления — нативные
-типы PostgreSQL (`CREATE TYPE … AS ENUM`), как требует «Структура данных».
+CANCELLED (причина REQUEST_CANCELLED / INSURED_REFUSED / EXPIRED / OTHER; EXPIRED ставит и истёкший срок оплаты); ERROR —
+ошибка в данных участника, отказ справочника, недоставка или ошибка регистрации в 1С, оплата после прекращения
+(`KM_CONTRACT_PAID_AFTER_CANCELLATION`). Полис ЛМ: NEW → SUBMITTED → ISSUED, ERROR, CANCELLED. ДГ-03 публикуется
+(`StatusTransitions`, `RecordOutcome`, Д-06) на DRAFT_READY, ERROR и CANCELLED — в том числе на отложенное прекращение,
+которое наружу показано CANCELLED; когда у договора впервые записана ссылка на оплату; на выход участника из ошибки
+(новая запись не в ERROR, смена вида документа, исключение из состава — по участнику); на снятие отложенного прекращения
+новой задачей, даже если больше ничего не изменилось; и когда по всем участникам заявки работа завершена. ACCEPTED, PAID,
+SUBMITTED и INVOICE_ISSUED без ссылки (ответ на выставление счёта потерян или событие `pendingPayment` обогнало ответ)
+наружу не публикуются. Исключение из Д-06 (ответ владельца 4 по спецификации К7b): когда отложенное прекращение
+применяется — просрочкой, отказом Ordering в счёте или повтором брошенного вызова `checkout`, — договор уже был показан
+CANCELLED, и нового ответа нет. Перечисления — нативные типы PostgreSQL (`CREATE TYPE … AS ENUM`), как требует
+«Структура данных».
 
-Заказ на оплату договора КМ (`payment_orders`, одна запись на договор, тип `payment_order_state`; с К7a) заводится при
-акцепте, если оплата включена: AWAITING_CREATION → CREATED, когда Ordering вернул `orderId` (в той же транзакции в
-журнал исходящих пишется подтверждение документа `fixed`); REJECTED — Ordering отказал в создании по существу или `fixed`
-не доставлен (`FIXED_UNDELIVERED`): договор не меняется, вернуть заказ в работу — процедура дежурного
-(`docs/operations.md`, «Возврат отклонённого заказа на оплату в работу»). Прекращение договора — ДГ-02, исключение
-участника, смена вида документа — переводит заказ в CANCEL_PENDING, а если запроса на создание ещё не было — сразу в
-CANCELLED (`PaymentOrderWithdrawal`). Из CANCEL_PENDING — CANCELLED (заказ отменён или не найден в Ordering) или
-CANCEL_REJECTED (Ordering отказал в отмене, договор остаётся прекращённым); если проход отмены уже закрыл заказ как
-ненайденный (CANCELLED), поздний ответ на создание с `orderId` возвращает его в CANCEL_PENDING. Запись «к отмене» без
-номера заказа, по которой Ordering раз за разом отклоняет поиск, дежурный после сверки с командой Ordering закрывает или
-дополняет номером заказа (`docs/operations.md`, «Закрытие заказа к отмене, которого нет в Ordering»). Наружу состояние
-заказа не выходит: ДГ-03 и СЭ-01 его не показывают, договор до счёта остаётся ACCEPTED; выставление счёта
-(INVOICE_ISSUED, вызов `checkout`) и оплата (PAID, событие `paid`) — К7b.
+Заказ на оплату договора КМ (`payment_orders`, одна запись на договор, тип `payment_order_state`) заводится при акцепте,
+если оплата включена, с адресом плательщика (`payer_email`): AWAITING_CREATION → CREATED, когда Ordering вернул `orderId`
+(в той же транзакции заводится запись счёта и в журнал исходящих пишется подтверждение документа `fixed`); REJECTED —
+Ordering отказал в создании по существу или `fixed` не доставлен (`FIXED_UNDELIVERED`): договор не меняется, вернуть
+заказ в работу — процедура дежурного (`docs/operations.md`, «Возврат отклонённого заказа на оплату в работу»); EXPIRED —
+граница накануне заезда прошла раньше, чем запрос на создание ушёл в Ordering: заказ не создаётся, договор прекращён с
+причиной EXPIRED. Из CANCEL_PENDING — CANCELLED (заказ отменён или не найден в Ordering) или CANCEL_REJECTED (Ordering
+отказал в отмене, договор остаётся прекращённым); если проход отмены уже закрыл заказ как ненайденный (CANCELLED),
+поздний ответ на создание с `orderId` возвращает его в CANCEL_PENDING. Запись «к отмене» без номера заказа, по которой
+Ordering раз за разом отклоняет поиск, дежурный после сверки с командой Ordering закрывает или дополняет номером заказа
+(`docs/operations.md`, «Закрытие заказа к отмене, которого нет в Ordering»).
+
+Счёт по заказу (`payment_invoices`, одна запись на заказ и на договор, тип `payment_invoice_state`, `OrderInvoice`; К7b):
+AWAITING_DOCUMENT — Ordering ещё не подтвердил документ; DOCUMENT_UNCONFIRMED — не подтвердил и после
+`PAYMENT_DOCUMENT_FIX_REPEATS` повторов `fixed` сверкой; READY — документ подтверждён (событие `fixed` или состояние
+READY_TO_PAYMENT на сверке), счёт выставит ближайший проход; CHECKOUT — отметка «счёт начат» (`checkout_started_at`) и
+срок оплаты записаны отдельной транзакцией до вызова, с неё договор считается договором со счётом; ISSUED — счёт
+выставлен (`invoice_id`, `payment_url`; ссылки нет, если ответ потерян или `pendingPayment` пришёл раньше ответа, — она
+дописывается, если ответ придёт), договор INVOICE_ISSUED; REJECTED — Ordering отказал в счёте по существу
+(`rejection_code`), договор остаётся ACCEPTED и договором со счётом не считается (если прекращение договора отложено,
+отказ применяет его сразу — ниже); PAYMENT_ERROR — ошибка оплаты, не итог: следующий `paid` принимается; PAID; OVERDUE.
+Срок оплаты — меньшее из «отметка + `PAYMENT_TERM`» и границы накануне заезда (`document_ttl` заказа: начало дня
+заезда в `ORDERING_DOCUMENT_ZONE` минус
+`ORDERING_DOCUMENT_TTL_BEFORE_CHECK_IN`, отдельной настройки нет); до границы меньше `PAYMENT_MIN_TERM` или она прошла —
+счёт не выставляется, договор прекращается с причиной EXPIRED (`PaymentTermExpiry`). Созданный или отклонённый заказ без
+счёта за границей сверка закрывает без вызова Ordering, и при его недоступности тоже (`PaymentReconciliation`, сначала
+`closeExpired`). Ещё не созданный закрывает проход создания, но при недоступном Ordering проход останавливается на первом
+заказе, которому нужен вызов, и просроченные заказы за ним ждут Ordering.
+
+Прекращение договора — ДГ-02, исключение участника, смена вида документа — решает одно правило (`ContractStops`; ответы
+владельца 4–6 и 12 по спецификации К7b). Договор со счётом (ACCEPTED или INVOICE_ISSUED, счёт в CHECKOUT, ISSUED или
+PAYMENT_ERROR) не прекращается: причина, комментарий и момент пишутся в счёт (`deferred_*`), наружу договор сразу показан
+CANCELLED без ссылки, заказ не отменяется — Ordering не отменяет заказ после счёта. Отложенное прекращение применяют
+просрочка (событие `paymentOverdue`, состояние PAYMENT_OVERDUE на сверке или ошибка оплаты без итога после срока и
+`PAYMENT_OVERDUE_GRACE`), отказ Ordering в счёте и повтор брошенного вызова `checkout`; снимает его новая задача с
+большей версией — она возвращает участнику тот же договор. Договор с моментом оплаты прекращается сразу, заказ остаётся
+оплаченным и в отмену не уходит, растёт `contracts_km_contracts_paid_cancelled_total`, деньги возвращает дежурный.
+Остальные договоры прекращаются сразу: заказ — в CANCEL_PENDING, а если запроса на создание ещё не было, — сразу в
+CANCELLED, адрес плательщика стирается; заказ с оплаченным счётом в отмену не уходит ни в каком случае. Состояние заказа
+наружу не выходит; счёт выходит ссылкой (ДГ-03, СЭ-01), сроком (СЭ-01) и отложенным прекращением.
 
 Оплаченный договор (PAID, момент оплаты — `contracts.paid_at`) новой записью не перевыпускается: деньги уже заплачены.
 Оплаченный договор в ERROR по любой причине остаётся в сверке задачи (`ContractRepository.findRunningOrFailedAfterPayment`,
 `PaidContracts`): повторная задача новой записи не заводит, изменений не применяет — WARN «договор КМ оплачен»
 (`KmContractIssuance.frozenBecause`); смена вида документа и исключение участника его прекращают, как договор в PAID и
-SUBMITTED (решение владельца 2026-10-26, К8b, вариант Б). Договор в ERROR с кодом `KM_CONTRACT_SUBMISSION_UNDELIVERED` или
-`KM_CONTRACT_SUBMISSION_PREPARATION_FAILED` возвращает в PAID дежурный (`docs/operations.md`, «Сбои и ручные операции»), и он
-уходит в 1С заново. Пока событий оплаты нет (К7b), в PAID договор ставит только тестовая подготовка
-(`ContractPayments.markPaid`); продовый путь — событие `paid` от Ordering.
+SUBMITTED (решение владельца 2026-10-26, К8b, вариант Б). Договор в ERROR с моментом оплаты и кодом
+`KM_CONTRACT_SUBMISSION_UNDELIVERED`, `KM_CONTRACT_SUBMISSION_PREPARATION_FAILED` или кодом справочника (`PROGRAM_*`,
+`INSURANCE_CONTRACT_*`, `POLICY_*` с окончанием `_NOT_FOUND` или `_ARCHIVED`; запись справочника дежурный сначала
+проверяет) возвращает в PAID дежурный (`docs/operations.md`, «Возврат договора КМ, не переданного в 1С:УСК, в
+оплаченные»), и он уходит в 1С заново; `PROGRAM_REQUIRED` и `KM_CONTRACT_PAID_AFTER_CANCELLATION` процедура не берёт
+(решение 17 карточки 8.К7). В PAID договор переводит `PaymentOutcomes.paid`: событие `paid` (момент оплаты — его поле
+`updated`, без него событие нарушает контракт) или сверка, когда Ordering показывает заказ оплаченным (момент — `created`
+последнего события `paid` в истории заказа, иначе момент сверки). `ContractPayments.markPaid` остался только для приёмки:
+шаг тестовой подготовки «договор КМ … оплачен». Оплата договора с отложенным прекращением переводит его в ERROR
+`KM_CONTRACT_PAID_AFTER_CANCELLATION` без `contracts.paid_at` (момент — в `payment_invoices.paid_at`), растёт
+`contracts_km_contracts_paid_after_cancellation_total`, в 1С:УСК он не уходит, деньги возвращает дежурный; оплата
+договора, уже прекращённого по просрочке, договор не меняет, счётчик тот же.
 
 Акцепт оферты хранится неизменяемой записью (`contract_acceptances`, одна на договор) с версией данных договора, которую
 видел застрахованный: печатных форм у Договоров нет, акцептуются данные договора. Акцепт выполняет застрахованный за
 всех участников. После акцепта снимок сторон, премия и даты договора вслед за сервисом Заявок не обновляются: повторная
 задача с изменениями по такому договору — WARN в журнале сервиса, договор не меняется, ответа сервису Заявок нет; смена
-вида документа или исключение участника — прекращение, как обычно. Пока договор ещё проект (NEW, DRAFT_READY), повторная
-задача с большей версией обновляет премию, даты и снимок сторон, и версия договора растёт (решения владельца 2026-10-12,
-К3, и 2026-10-22, К6b). ДГ-03 по акцептованному договору не меняется — ACCEPTED не публикуется, личный кабинет показывает
-состояние пакета.
+вида документа или исключение участника — прекращение по общему правилу (у договора со счётом — отложенное, см. выше).
+Пока договор ещё проект (NEW, DRAFT_READY), повторная задача с большей версией обновляет премию, даты и снимок сторон, и
+версия договора растёт (решения владельца 2026-10-12, К3, и 2026-10-22, К6b). ДГ-03 по акцептованному договору не
+меняется — ACCEPTED не публикуется, личный кабинет показывает состояние пакета.
 
 Выпущенная запись (полис ЛМ или договор КМ в ISSUED) уже существует в 1С:УСК и не перевыпускается и не меняется: разбор
 задачи сверяет задачу со всеми записями заявки, кроме CANCELLED и ERROR без оплаты, по участнику — одна запись, выпущенная
@@ -277,8 +334,9 @@ SUBMITTED (решение владельца 2026-10-26, К8b, вариант Б
 ## Стек
 
 Java 21, Spring Boot 4.0.7, Spring MVC на виртуальных потоках (реактивный стек не используем), Spring AMQP, Spring Data
-JPA, Liquibase, PostgreSQL, RabbitMQ (три подключения; третье, к брокеру маркетинга, — только при включённой оплате и
-только на публикацию), клиент OAuth 2.0 Spring Security (токен Keycloak для Ordering). Тесты — JUnit, Testcontainers.
+JPA, Liquibase, PostgreSQL, RabbitMQ (три подключения; третье, к брокеру маркетинга, — только при включённой оплате:
+публикация `fixed` и очередь событий заказов), клиент OAuth 2.0 Spring Security (токен Keycloak для Ordering). Тесты —
+JUnit, Testcontainers.
 Версии библиотек задаёт BOM Spring Boot; в объявлениях зависимостей координаты пишутся без версий. Сборка — Gradle с
 Groovy DSL, версия зафиксирована обёрткой (`./gradlew`, не системный `gradle`); версия Spring Boot — в
 `gradle.properties`, там же `version=` сервиса по Semantic Versioning 2.0.0 (история — `CHANGELOG.md` по Keep a
@@ -327,7 +385,7 @@ ru.projectx.contracts
 │   ├── journal/       — журналы входящих и исходящих, лестницы повторов
 │   ├── leadership/    — ведущий экземпляр и пул его блокировки
 │   ├── payment/       — выключатель оплаты (`PaymentSwitch`, `PaymentProperties`), Ordering и сервер токенов
-│   │                    (`OrderingProperties`), проходы заказов на оплату (`PaymentOrderPassesProperties`)
+│   │                    (`OrderingProperties`), проходы заказов, счетов и сверки (`PaymentOrderPassesProperties`)
 │   ├── storage/       — хранилище S3 и пределы справок
 │   └── usk/           — передача договоров КМ и запросы полисов ЛМ в 1С:УСК
 ├── entity/            — JPA-сущности; в корне — общая основа журналов (`JournalMessage`, `MessageEnvelope`)
@@ -338,22 +396,26 @@ ru.projectx.contracts
 │   ├── document/      — печатные формы 1С:УСК и файлы справок 070/у
 │   ├── inbox/         — журнал входящих, приём, карантин
 │   ├── outbox/        — журнал исходящих
-│   └── payment/       — заказ на оплату договора КМ (`PaymentOrder`, `PaymentOrderState`, документ `OrderDocument`)
+│   └── payment/       — заказ на оплату договора КМ (`PaymentOrder`, `PaymentOrderState`, документ `OrderDocument`,
+│                        адрес плательщика `PayerEmail`) и счёт по заказу (`OrderInvoice`, `InvoiceState`, переходы
+│                        `InvoiceTransition`, срок и ссылка `InvoiceTerm`, `InvoiceLink`)
 ├── exception/         — исключения домена, плоский: полные имена классов уходят в журнал и `error_message` (`docs/design.md`)
 ├── repository/        — Spring Data JPA; в корне — блокировка записей заявки (`IssuanceRepositoryLocking` и фрагмент
 │   │                    `…Impl` рядом) и общий `UskRecordRepository`
 │   ├── issuance/      — договоры, полисы, стороны, акцепты, номера, заявки, печатные формы
 │   ├── journal/       — журналы входящих и исходящих, проба журнала, карантин
-│   ├── payment/       — заказы на оплату (`PaymentOrderRepository`)
+│   ├── payment/       — заказы на оплату и счета (`PaymentOrderRepository`, `OrderInvoiceRepository`; чтение счёта с
+│   │                    обновлением из базы — фрагмент `FreshInvoices` и `FreshInvoicesImpl`)
 │   └── database/      — сеанс базы (`SessionSettingsRepository`) и строка блокировки ведущего (`LeaderLockRepository`)
 ├── dto/               — тела ответов REST и единый формат ошибки
 ├── message/           — тела сообщений и конверт `meta` (record'ы); в корне — `MessageMeta`, `ParticipantDocument`
 │   ├── task/          — задачи сервиса Заявок (ДГ-01, ДГ-02)
 │   ├── status/        — ответ сервису Заявок (ДГ-03)
 │   ├── usk/           — обмен с 1С:УСК (ДГ-04…ДГ-07)
-│   └── payment/       — подтверждение документа `fixed`: константы типа события, типа записи журнала, топика и полей
-│                        (`PaymentOrderEvents`); тело без конверта `meta` собирает `DocumentFixMessages` в
-│                        `service/payment/order`
+│   └── payment/       — обмен с Ordering: константы подтверждения документа `fixed` и событий заказа — типы событий,
+│                        типы записей журналов, топики, поля (`PaymentOrderEvents`); тело `fixed` без конверта `meta`
+│                        собирает `DocumentFixMessages` в `service/payment/order`, события разбирает
+│                        `service/payment/event`
 ├── service/           — бизнес-логика; в корне — только общее для подпакетов (`ScheduledPasses`, `InboxLogContext`,
 │   │                    `IssueErrors`, `FlagGauges`, `RequestIds`, `Guids`, `Enums`)
 │   ├── issuance/      — выпуск по задаче: разбор состава, договоры КМ, полисы ЛМ, снимок сторон, оплаченные договоры
@@ -374,14 +436,26 @@ ru.projectx.contracts
 │   ├── lm/            — вид записи «полис ЛМ» (`LmPolicyKind`): `request/`, `issue/`, `awaiting/`
 │   ├── payment/       — оплата договора КМ через Ordering; в корне — порты Ordering (`Ordering`, `OrderingSession`) и
 │   │   │                записи заказа при акцепте (`PaymentOrderOpening`), общий проход по заказам (`PaymentOrderPasses`,
-│   │   │                `OrderingStepRunner`, `OrderingAttempts`), блокировка договора и заказа (`PaymentOrderLocks`),
-│   │   │                метрики, переход в PAID (`ContractPayments`, пока его вызывает только приёмка)
+│   │   │                `OrderingStepRunner`, `OrderingAttempts`), блокировка договора и заказа и чтение счёта под ней
+│   │   │                (`PaymentOrderLocks`), метрики и оповещения (`PaymentMetrics`, `PaymentAlert`, `IgnoredEvent`);
+│   │   │                `ContractPayments` — переход в PAID для приёмки, рабочий код его не вызывает
 │   │   ├── order/     — заказ: запись при акцепте (`PaymentOrderOpenings`, при выключенной оплате —
 │   │   │                `DisabledPaymentOrders`), создание и его итог (`PaymentOrderCreation`, `PaymentOrderRecording`),
-│   │   │                подтверждение документа и его недоставка (`DocumentFixMessages`, `RejectedDocumentFixes`),
-│   │   │                сводка договоров без заказа, флаг выключателя (`PaymentSwitchReport`)
-│   │   └── cancellation/ — отмена заказа прекращённого договора (`PaymentOrderWithdrawal`, `PaymentOrderCancelling`,
-│   │                    `PaymentOrderCancelRecording`)
+│   │   │                подтверждение документа и его недоставка (`DocumentFixMessages`, `DocumentFixes`,
+│   │   │                `RejectedDocumentFixes`), сводка договоров без заказа, флаг выключателя (`PaymentSwitchReport`)
+│   │   ├── invoice/   — счёт: проход выставления (`InvoiceIssuing`), отметка «счёт начат» до вызова (`CheckoutClaims`),
+│   │   │                повтор вызова с запроса состояния (`CheckoutAttempt`), брошенная отметка (`CheckoutMarks`),
+│   │   │                запись итогов (`InvoiceRecording`), оплата, ошибка оплаты и просрочка (`PaymentOutcomes`), срок
+│   │   │                оплаты и прекращение по нему (`PaymentTerms`, `PaymentTermExpiry`), сводки (`InvoiceSummaries`)
+│   │   ├── event/     — события Ordering из журнала входящих: обработчик (`PaymentOrderEventHandler`), разбор
+│   │   │                (`OrderEventParser`), сверка с заказом (`OrderEventMatching`), реакции по типу события
+│   │   │                (`FixedReaction`, `PendingPaymentReaction`, `PaidReaction`, `PaymentErrorReaction`,
+│   │   │                `PaymentOverdueReaction`, `CanceledReaction`)
+│   │   ├── reconciliation/ — сверка заказов с Ordering по расписанию (`PaymentReconciliation`, запись —
+│   │   │                `ReconciliationRecording`, реакции на состояние заказа — `StateReconciler` и его реализации);
+│   │   │                расписание счетов, сверки и сводок — `PaymentInvoiceScheduler`
+│   │   └── cancellation/ — прекращение договора с заказом (`ContractStops`: сразу, отложенно до просрочки или без отмены
+│   │                    оплаченного заказа) и отмена заказа (`PaymentOrderCancelling`, `PaymentOrderCancelRecording`)
 │   ├── status/        — ответ сервису Заявок о состоянии выпуска (ДГ-03)
 │   ├── retention/     — стирание тел сообщений по сроку
 │   ├── leadership/    — ведущий экземпляр: роль, строка `leader_lock` и её пул `leader-lock`, фенс транзакций
@@ -392,11 +466,16 @@ ru.projectx.contracts
 │   └── integration/   — граница с внешними системами, только здесь знают про AMQP, HTTP к data-reference и Ordering,
 │       │                токен Keycloak и S3
 │       ├── broker/    — фабрики подключений, шаблоны, контейнеры, маршруты и публикация с подтверждением, здоровье
-│       │                брокеров; брокер маркетинга — `MarketingBrokerConfig`
-│       ├── listener/  — точки приёма и слушатель (`InboxQueueListener`), ответ брокеру и отказы записи
-│       ├── consumer/  — потребители по роли, пауза приёма и проба базы, здоровье `inbox`
-│       ├── ordering/  — адаптер порта Ordering на `RestClient` (`OrderingHttpClient`, разбор ответов `OrderingReplies`)
-│       │                и токен Keycloak клиентом OAuth 2.0 Spring Security (`OrderingTokenSources`)
+│       │                брокеров; брокер маркетинга с его фабрикой контейнеров — `MarketingBrokerConfig`
+│       ├── listener/  — точки приёма и слушатель (`InboxQueueListener`), разбор конверта (`InboxEnvelopes`: по `meta` —
+│       │                `TaskEnvelopeParser`, события Ordering — `OrderEventEnvelopes`), очередь событий Ordering при
+│       │                включённой оплате (`OrderEventQueueConfig`, `AdditionalInboxEndpoint`), ответ брокеру и отказы
+│       │                записи
+│       ├── consumer/  — потребители по роли, пауза приёма и проба базы, здоровье `inbox`; очередь, добавленная условной
+│       │                конфигурацией, — `AdditionalInboxQueue`
+│       ├── ordering/  — адаптер порта Ordering на `RestClient` (`OrderingHttpClient`, разбор ответов `OrderingReplies`,
+│       │                состояния и истории заказа `OrderingOrders`) и токен Keycloak клиентом OAuth 2.0 Spring Security
+│       │                (`OrderingTokenSources`)
 │       ├── reference/ — адаптер порта справочников на `RestClient`
 │       └── storage/   — адаптер хранилища на клиенте MinIO
 └── controller/        — приём справок, состояние пакета и акцепт под общей аннотацией внутреннего API, фильтр
@@ -408,16 +487,22 @@ ru.projectx.contracts
 переименовываются: на них опирается политика (`forbidden.controller`), а новый пакет верхнего уровня — правка политики.
 Зависимости между подпакетами идут в одну сторону, например: `service.km`, `service.lm` → `service.usk`;
 `service.usk.request`, `service.usk.result` → `service.status`, `service.reference`; `service.status` → `service.outbox`;
-`service.payment.order`, `service.payment.cancellation` → корень `service.payment`; `service.payment.order` →
-`service.outbox`; `service.acceptance` → `service.payment`; `service.issuance`, `service.cancellation` →
-`service.payment.cancellation`; `service.integration.*` → прикладные подпакеты, обратно — никогда; `entity.contract`,
-`entity.policy` → `entity.issuance`; `message.*` → корень `message`.
+подпакеты `service.payment` → его корень, корень в свои подпакеты не смотрит; `service.payment.order`,
+`service.payment.event`, `service.payment.reconciliation` → `service.payment.invoice`; `service.payment.reconciliation` →
+`service.payment.order`; `service.payment.order` → `service.outbox`; `service.payment.invoice` → `service.status`;
+`service.payment.event` → `service.inbox`; `service.acceptance` → `service.payment`; `service.issuance`,
+`service.cancellation` → `service.payment.cancellation`; `service.integration.*` → прикладные подпакеты (например,
+`service.integration.listener` → `service.payment.event`), обратно — никогда; `entity.contract`, `entity.policy` →
+`entity.issuance`; `message.*` → корень `message`.
 
 Правила слоёв — как у `data-reference`: контроллер только вызывает сервис чтения своего ресурса через узкий интерфейс
 `*Reads` и отдаёт ответ; транзакция и сборка DTO — в сервисе (`open-in-view` выключен); зависимости идут сверху вниз и
 не разворачиваются; `config` не ссылается на пакеты модуля; циклов нет ни между компонентами, ни между подпакетами.
 Про AMQP знает только `service/integration`: дальше границы идут `message_id` и тело как строка. Новая очередь — новая
-строка реестра очередей и свойство, а не новый метод с `@RabbitListener`. Про HTTP к data-reference тоже знает только
+строка реестра очередей и свойство, а не новый метод с `@RabbitListener`; очередь, которая нужна только при включённой
+настройке, — два бина условной конфигурации, `AdditionalInboxQueue` (имя и признак чтения для роли, паузы приёма и
+здоровья `inbox`) и `AdditionalInboxEndpoint` (точка приёма со своей фабрикой контейнеров и разбором конверта), как
+очередь событий Ordering в `OrderEventQueueConfig`. Про HTTP к data-reference тоже знает только
 `service/integration`: прикладной слой зависит от порта `service/reference` и исключений домена, а не от `RestClient`
 и кодов ответов; серверная часть web (MVC, биндинг, фильтры, servlet API) слою `service` запрещена политикой. Так же
 с Ordering: HTTP, токен Keycloak и разбор кодов ответа — только в `service/integration/ordering`, прикладной слой
@@ -443,13 +528,19 @@ REST. Ответ брокеру слушатель отправляет сам �
 5. экземпляр больше не ведущий (`LeadershipLostException` из фенса) — ответа нет, потребители останавливаются без
    проверки, роль отдаётся (`BackgroundLeadership.stepDown`);
 6. нечитаемое тело и непригодное поле конверта `meta` (`message_id`, `correlation_id`, `topic`, `event_type`,
-   `entity_version`) — `ack`, ERROR в журнал без тела и `contracts_inbox_lost_total`: сообщение теряется.
+   `entity_version`) — `ack`, ERROR в журнал без тела и `contracts_inbox_lost_total`: сообщение теряется. У событий
+   Ordering конверта нет: теряются только тело не в формате JSON и событие без `eventId`; событие без `eventType` или
+   `orderId`, чужое (нет документа нашего продукта) или неприменимое записывается и при разборе пропускается (SKIPPED с
+   причиной).
 
 **Фоновая работа — только у ведущего** (`service/leadership`): приём из очередей межсервисного брокера и брокера 1С:УСК,
 разбор журнала входящих, публикация исходящих, подготовка запросов и передач в 1С:УСК, сводки ожидания ответа, стирание
-тел, а при включённой оплате — создание и отмена заказов в Ordering и сводка договоров без заказа. Ведущего выбирает
-строка `leader_lock` (Spring Integration `JdbcLockRegistry` и `LockRegistryLeaderInitiator`, `LeadershipConfiguration`),
-продление — каждую секунду, после гибели ведущего роль переходит через `LEADER_LOCK_TTL`. Потребителей запускает и
+тел, а при включённой оплате — приём из очереди событий заказов на брокере маркетинга, создание и отмена заказов в
+Ordering, выставление счетов, сверка заказов, сводка договоров без заказа и сводки счетов (`InvoiceSummaries`).
+Ведущего выбирает строка `leader_lock` (Spring Integration `JdbcLockRegistry` и `LockRegistryLeaderInitiator`,
+`LeadershipConfiguration`), продление — каждую секунду, после гибели ведущего роль переходит через `LEADER_LOCK_TTL`.
+Пул планировщика (`spring.task.scheduling.pool.size`, 16 потоков, свой бин `SchedulingConfig`) не меньше числа задач по
+расписанию — без оплаты их 9, с оплатой 15: новая задача по расписанию — повод пересчитать пул. Потребителей запускает и
 останавливает роль (`InboxIngestLeadership`, `InboxQueueContainers`), автостарта у точек приёма нет. Синхронные вызовы,
 включая акцепт, отвечает каждый экземпляр.
 
@@ -515,6 +606,10 @@ unit-тест подменяет (`Pauses`). Порт справочников �
   одной ответственности.
 - **Класс отвечает за одно.** Слушатель не разбирает бизнес-правила, публикатор не решает, что публиковать, сущность не
   знает про JSON сообщения, генератор печатной формы не ходит в хранилище.
+- **В default-методах репозиториев ветвлений нет** (ответ владельца 4 по PR #289): такой метод только передаёт
+  аргументы в запрос, как `PaymentOrderRepository.findWithInvoiceToReconcile`. Классы `*Repository` исключены из
+  мутационного тестирования (`exclude.classes` в `gauntlet/config/contract-service/gauntlet.properties`), и правило в
+  репозитории осталось бы непроверенным — оно живёт в сервисе.
 - **Инъекция через конструктор, поля `final`.** Полевой `@Autowired` не используем.
 
 ### Никаких магических значений
@@ -543,9 +638,12 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 
 Не используем. `record` закрывает боль, ради которой обычно тянут `@Value`/`@Data`. Сущности JPA не анемичные:
 приватный конструктор за статической фабрикой (конструктор без параметров — `protected`, его требует JPA), мутация
-только через именованные переходы (например, у договора — `offerDraft`, `revise`, `accept`, `markPaid`, `submit`,
-`markIssued`, `cancel`; у заказа на оплату — `recordOrder`, `reject`, `withdraw`, `recordCancelled`,
-`rejectCancellation`) — сеттеров нет ни одного. По той же причине **не
+только через именованные переходы (например, у договора — `offerDraft`, `revise`, `advance`, `markPaid`, `submit`,
+`markIssued`, `cancel`; у заказа на оплату — `markRequested`, `recordOrder`, `reject`, `withdraw`, `expire`,
+`forgetPayer`, `recordCancelled`, `rejectCancellation`; у счёта — `start`, `issue`, `reject`, `pay`, `pass`,
+`deferCancellation`, `liftDeferredCancellation`) — сеттеров нет ни одного. Переход-параметр (`advance(ContractStep)`,
+`markRequested(OrderRequest)`, `pass(InvoiceTransition)`) — вынужденный долг предела 12 методов у `Contract`,
+`PaymentOrder` и `OrderInvoice` (план, раздел 4.3), а не образец. По той же причине **не
 `@CreationTimestamp`/`@UpdateTimestamp`**: везде, где нужно «сейчас», инъецируется `java.time.Clock` — им тесты
 управляют временем без `Thread.sleep`.
 
@@ -559,7 +657,7 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 | Ошибка **временная** (сеть, таймаут, недоступная база, 503 соседа) | повтор по лестнице: обработка Inbox — первая попытка и три повтора через 1 / 5 / 15 мин; клиент справочников — ограниченные повторы из настроек; вызовы Ordering и сервера токенов — до `ORDERING_ATTEMPTS` попыток за проход (`OrderingAttempts`), затем следующий проход; недоступность Ordering или сервера токенов останавливает проход, сбой одного заказа — нет |
 | Ошибка **постоянная** (невалидное сообщение, тело не по контракту, архивная программа) | повторять бессмысленно: терминальный статус с причиной, ответ соседу с `error_code`, оповещение |
 | Бизнес-ошибка по участнику | это не сбой обработки: сообщение обработано, участник — в ERROR с кодом и текстом в ДГ-03 |
-| Отказ Ordering **по существу** (2xx со `status = error`, 4xx, кроме 401, 403, 408 и 429) | не повтор: в создании — заказ REJECTED, в отмене — CANCEL_REJECTED, с кодом Ordering, ERROR и счётчик; договор не меняется, сервису Заявок ничего не уходит. Отказ поиска заказов и запроса состояния — не отказ в заказе, а сбой этого заказа: попытки `ORDERING_ATTEMPTS` в проходе, затем заказ ждёт следующего прохода, а проход идёт к следующему заказу |
+| Отказ Ordering **по существу** (2xx со `status = error`, 4xx, кроме 401, 403, 408 и 429) | не повтор: в создании — заказ REJECTED, в отмене — CANCEL_REJECTED, в выставлении счёта — счёт REJECTED (заказ остаётся CREATED), с кодом Ordering, ERROR и счётчик `contracts_payment_orders_rejected_total` (у отмены — свой); договор не меняется, сервису Заявок ничего не уходит. Исключение — отказ в счёте договору с отложенным прекращением: оно применяется в той же транзакции (договор CANCELLED, заказ к отмене, адрес стёрт). Отказ поиска заказов и запроса состояния — не отказ в заказе, а сбой этого заказа: попытки `ORDERING_ATTEMPTS` в проходе, затем заказ ждёт следующего прохода, а проход идёт к следующему заказу |
 | `InterruptedException` | восстановить флаг `Thread.currentThread().interrupt()` и выйти |
 
 - Ловим конкретные типы. `catch (Exception e)` — только на верхней границе слушателя, планировщика и внешнего клиента, и
@@ -594,38 +692,62 @@ unit-тест подменяет (`Pauses`). Порт справочников �
   прежняя запись; повторный ДГ-05 или ДГ-07 — состояние не меняется. У Ordering ключа идемпотентности нет: перед
   созданием и отменой заказа отдельная транзакция ставит отметку «запрос отправлялся» (`creation_requested`,
   `cancel_requested`), и повтор начинается с поиска заказа по идентификатору документа или с запроса его состояния, а
-  не вслепую (`CreationAttempt`, `PaymentOrderCancelling`).
+  не вслепую (`CreationAttempt`, `PaymentOrderCancelling`). Счёт — в три шага: отметка «счёт начат» и срок оплаты
+  отдельной транзакцией до вызова (`CheckoutClaims`), вызов `checkout` вне транзакции, итог — третьей транзакцией
+  (`InvoiceRecording`). Повтор в том же проходе начинается с запроса состояния заказа: готов к оплате — вызов ещё раз,
+  ждёт оплаты — ответ потерян (`CheckoutAttempt`); между проходами вызов повторяет только сверка и только по отметке
+  старше `PAYMENT_RECONCILIATION_THRESHOLD` (`CheckoutMarks`). Итог оплаты применяется один раз: переход счёта, который
+  уже сделан, возвращает «не применён» (`OrderInvoice.pay`, `pass`). О потерянном ответе на выставление счёта
+  (`checkout_reply_lost`) сервис оповещает один раз на заказ — отметка `payment_invoices.reply_lost_reported`, поздний
+  ответ со ссылкой закрывает оповещение навсегда; по событию `pendingPayment` счёт только переводится, без оповещения
+  (ответ владельца 1 по PR #289), а оповещают проход счетов (вызов не ответил, а Ordering уже ждёт оплаты) и сверка
+  (ссылки нет к порогу сверки) — в том числе по счёту в «ошибке оплаты» без ссылки; его состояние сверка при этом не
+  меняет (правило 10а, PR #293; причины — `docs/design.md`).
 - Строку полиса ЛМ и договора КМ каждый путь записи берёт с блокировкой и решает по состоянию под блокировкой: одну
   запись — `findLockedById` (`@Lock(PESSIMISTIC_WRITE)`), записи заявки — `IssuanceRepositoryLocking.lockFresh`
   (`refresh` с блокировкой: сначала договоры, потом полисы, в каждой таблице по возрастанию `id` — один порядок на всех
   многострочных путях, чтобы не было взаимной блокировки). Строку заказа на оплату каждый путь берёт после строки его
-  договора (`PaymentOrderLocks`; прекращение и разбор задачи — `PaymentOrderWithdrawal` после договоров заявки). В
-  транзакции записи сущность заказа до её блокировки не загружается: версии у заказа нет, и после блокировки Hibernate
-  вернул бы уже загруженный объект со старым состоянием, поэтому до блокировки читаются только ключи
-  (`PaymentOrderRepository.findKeysById`, `RejectedDocumentFixes`). Ожидание ограничено `DB_LOCK_TIMEOUT`; отказ по
-  таймауту и взаимная блокировка (40P01) — временная ошибка по правилам прохода. Hibernate пишет строку целиком, поэтому
-  без блокировки последняя фиксация затирает чужой переход.
+  договора (`PaymentOrderLocks`; прекращение и разбор задачи — `ContractStops` после договоров заявки). В транзакции
+  записи сущность заказа до её блокировки не загружается: версии у заказа нет, и после блокировки Hibernate вернул бы уже
+  загруженный объект со старым состоянием, поэтому до блокировки читаются только ключи
+  (`PaymentOrderRepository.findKeysById`, `RejectedDocumentFixes`). Счёт своей блокировки не берёт: его защищает
+  блокировка заказа, а читается он после неё запросом с обновлением из базы (`PaymentOrderLocks.lockInvoice`,
+  `FreshInvoices.findFreshByContractId`) — версии у счёта тоже нет, а снимок задачи мог загрузить его раньше. Ожидание
+  ограничено `DB_LOCK_TIMEOUT`; отказ по таймауту и взаимная блокировка (40P01) — временная ошибка по правилам прохода.
+  Hibernate пишет строку целиком, поэтому без блокировки последняя фиксация затирает чужой переход.
 - **Фоновая транзакция записи ограждена ролью ведущего.** Приём (`InboxReceiver`), разбор (`InboxMessageHandling`,
   `InboxOutcomes`), карантин (`QuarantineService`), запись исхода публикации (`OutboxOutcomes`), подготовка запроса в
-  1С:УСК (`UskRequestRecording`) и запись отметок запросов и итогов вызовов Ordering (`PaymentOrderRecording`,
-  `PaymentOrderCancelRecording`) вызывают `LeadershipFence.holdUntilCommit()` — чтение своей строки `leader_lock`
-  `FOR SHARE` — после блокировок своих строк и проверок состояния, до фиксации: строки с нашим `CLIENT_ID` нет —
-  откат `LeadershipLostException`, роль отдаётся. Проходы без своей транзакции записи (публикация, сводки, стирание,
-  проходы заказов на оплату — `PaymentOrderPasses`) проверяют роль на входе (`BackgroundLeadership`). Новый фоновый
-  путь записи берёт фенс тем же порядком, иначе экземпляр, потерявший роль, допишет начатое.
+  1С:УСК (`UskRequestRecording`), запись отметок запросов и итогов вызовов Ordering (`PaymentOrderRecording`,
+  `PaymentOrderCancelRecording`, `InvoiceRecording`) и запись сверки (`ReconciliationRecording`) вызывают
+  `LeadershipFence.holdUntilCommit()` — чтение своей строки `leader_lock` `FOR SHARE` — после блокировок своих строк и
+  проверок состояния, до фиксации: строки с нашим `CLIENT_ID` нет — откат `LeadershipLostException`, роль отдаётся.
+  События Ordering применяются в транзакции разбора журнала входящих, которая сама ограждена фенсом. Проходы без своей
+  транзакции записи (публикация, сводки, стирание, проходы заказов, счетов и сверки — `PaymentOrderPasses`) проверяют
+  роль на входе (`BackgroundLeadership`). Новый фоновый путь записи берёт фенс тем же порядком, иначе экземпляр,
+  потерявший роль, допишет начатое.
 
 ### Персональные данные
 
 ПДн в сервисе: снимок сторон договора (`contract_persons`: ФИО, дата рождения, пол, документ, адрес), тела ДГ-01 в Inbox,
 тела ДГ-04 и ДГ-06 в Outbox (справки в ДГ-04 — только ссылками на файлы), печатные формы в хранилище, свободный
-комментарий прекращения (`cancel_comment` в `contracts` и `lm_policies`) и медицинские данные — справки 070/у в S3.
-Справка и имя её файла не попадают ни в журнал, ни в метрики, ни в ответы; имя файла не хранится. Заказ на оплату
-(`payment_orders`) и запросы к Ordering ПДн не несут: клиент — непрозрачный идентификатор участника-плательщика из
-задачи (`client_id`), идентификатор документа (идентификатор записи заказа), номер договора, сумма, дата и срок жизни
-документа, коды продукта и канала, причина отмены, `correlation_id`; от Ordering хранятся номер заказа
-(`external_order_id`) и код отказа (`rejection_code`); подтверждение документа `fixed` в Outbox — код продукта и
-идентификатор документа. E-mail плательщика сервис пока не
-принимает и не хранит: он придёт в акцепте с К7b (Д-15) и станет ПДн.
+комментарий прекращения (`cancel_comment` в `contracts` и `lm_policies`; `deferred_cancel_comment` в `payment_invoices` —
+пока отложенное прекращение не применено или не снято), адрес электронной почты плательщика
+(`payment_orders.payer_email`) и медицинские данные — справки 070/у в S3. Справка и имя её файла не попадают ни в
+журнал, ни в метрики, ни в ответы; имя файла не хранится.
+
+Адрес плательщика приходит в акцепте (СЭ-03) и хранится только в заказе и только до счёта (Д-15): в запись акцепта,
+журналы, метрики и health он не попадает (`PayerEmail` и `AcceptanceRequest` в строковом представлении его не
+показывают), наружу уходит только в Ordering — в теле `checkout` (`payment.email`). Стирается, когда счёт выставлен (в
+том числе без ссылки), договор оплачен, прекращён или просрочен, а срок оплаты истёк до заказа или до счёта. У заказа и
+счёта, отклонённых Ordering, адрес остаётся — он нужен для возврата в работу — до прекращения договора, границы накануне
+заезда или, у отклонённого счёта, ручного стирания дежурным (`docs/operations.md`). Кроме адреса и комментария
+отложенного прекращения, заказ, счёт и запросы к Ordering ПДн не несут: клиент — непрозрачный идентификатор
+участника-плательщика из задачи (`client_id`), идентификатор
+документа (идентификатор записи заказа), номер договора, сумма, дата и срок жизни документа, срок оплаты, коды продукта
+и канала, причина отмены, `correlation_id`; от Ordering хранятся номер заказа (`external_order_id`), идентификатор счёта
+(`invoice_id`), ссылка на оплату (`payment_url` — не ПДн, но в журнал не пишется, `InvoiceLink` её скрывает), момент
+оплаты и коды отказа (`rejection_code`); события Ordering в Inbox и подтверждение документа `fixed` в Outbox ПДн не
+несут.
 
 - **ПДн не пишутся в лог, метрики, health и тексты исключений.** В ошибке называется поле, но не значение; текст чужого
   исключения не идёт ни в лог, ни в `error_message` таблиц. Соединения открываются с `logServerErrorDetail=false`. Из
@@ -643,11 +765,9 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 ### Тесты
 
 - Testcontainers для PostgreSQL и RabbitMQ; без Docker — адреса `TEST_POSTGRES_URL` и `TEST_RABBITMQ_URL`, кроме тестов
-  хранилища и `MarketingBrokerIT`: им Docker нужен всегда (при заданном `TEST_RABBITMQ_URL` контейнера RabbitMQ нет, и
-  `MarketingBrokerIT` падает — долг К7a, исправление — вход К7b). Mockito в unit-тестах подменяет соседние классы,
-  репозитории и канал брокера, но не инфраструктуру тестов с контекстом. Ответы
-  Дата-референса в тестах — `MockRestServiceServer` из spring-test на примерах стенда `data-reference` (копия в тестовых
-  ресурсах); расхождение с сервисом ловит тест стенда на его стороне.
+  хранилища: им Docker нужен всегда. Mockito в unit-тестах подменяет соседние классы, репозитории и канал брокера, но не
+  инфраструктуру тестов с контекстом. Ответы Дата-референса в тестах — `MockRestServiceServer` из spring-test на примерах
+  стенда `data-reference` (копия в тестовых ресурсах); расхождение с сервисом ловит тест стенда на его стороне.
 - Тесты, поднимающие приложение, помечаются одной аннотацией `@IntegrationTest`: настоящий PostgreSQL, остановленные
   часы (`FixedClockConfig`) и никакого брокера — слушатели не стартуют (`listener-auto-startup=false`), здоровье
   брокеров выключено (`management.health.brokers.enabled=false`) и расписания выключены
@@ -657,11 +777,15 @@ unit-тест подменяет (`Pauses`). Порт справочников �
 - Тестам с брокерами — `@AmqpIntegrationTest`; очереди в нём объявляет тест: на контуре их заводят соседи и 1С.
   Расписания в нём тоже выключены.
 - Обе аннотации выключают оплату (`projectx.payment.enabled=false`): клиента Ordering, брокера маркетинга и проходов
-  оплаты в них нет. Тест оплаты включает её сам через `@TestPropertySource`: `PaymentOrderRaceIT` — с адресами-заглушками
-  Ordering, сервера токенов и брокера маркетинга, без брокера; `MarketingBrokerIT` — с брокером маркетинга на отдельном
-  vhost того же контейнера RabbitMQ (подключение задаёт `DynamicPropertyRegistrar`). Ordering и сервер токенов в тестах
-  клиента — HTTP-сервер JDK на петлевом адресе (`OrderingTestServer`), в тесте гонок порт `Ordering` подменяет
-  `ScriptedOrdering`; на стенде приёмки оплата включена, Ordering и сервер токенов — заглушка `OrderingStub`.
+  оплаты в них нет. Тест оплаты включает её сам: тесты гонок оплаты на PostgreSQL (`PaymentOrderRaceIT`,
+  `PaymentInvoiceRaceIT`, `PaymentOutcomeRaceIT`, `ContractStopRaceIT`, `CheckoutRejectionRaceIT`, `CheckoutReplyLossIT`)
+  — общей мета-аннотацией `@PaymentRaceTest`: адреса-заглушки Ordering, сервера токенов и брокера маркетинга, без
+  брокера, порт `Ordering` подменяет `ScriptedOrdering`; `MarketingBrokerIT` — через `@TestPropertySource`, с брокером
+  маркетинга на отдельном vhost контейнера RabbitMQ, а при заданном `TEST_RABBITMQ_URL` — на том же адресе и vhost из
+  URL, отделяясь именами обменника и очередей (подключение задаёт `DynamicPropertyRegistrar`; очередь событий объявляет
+  тест). Ordering и сервер токенов в тестах клиента — HTTP-сервер JDK на петлевом адресе (`OrderingTestServer`); на
+  стенде приёмки оплата включена, Ordering и сервер токенов — заглушка `OrderingStub`, очередь событий объявляет стенд
+  (`OrderEventQueue`), события публикуются прямо в неё (`OrderEventSteps`).
 - Обе аннотации задают `projectx.leadership.group=${random.uuid}` — своя группа блокировки на каждый контекст, чтобы
   кэшированные контексты тестов не делили роль ведущего в одной базе, — и подключают `LeadershipAwaitConfig`: контекст
   не начинает тест, пока не стал ведущим (`LeadershipAwait`). Тест, которому нужен неведущий или второй экземпляр,
