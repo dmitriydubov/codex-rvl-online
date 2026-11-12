@@ -7,6 +7,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.message.ParticipantDocument;
@@ -48,7 +50,9 @@ class ContractTaskParserTest {
                 .withoutParticipantField(1, "personal_data.relation_type")
                 .withoutParticipantField(1, "personal_data.address")
                 .withoutParticipantField(1, "personal_data.document.series")
-                .withoutParticipantField(1, "personal_data.document.issued_at");
+                .withoutParticipantField(1, "personal_data.document.issued_by")
+                .withoutParticipantField(1, "personal_data.document.issued_at")
+                .withoutParticipantField(1, "personal_data.document.division_code");
 
         ParticipantPerson person = parser.parse(body.toJson()).participants().get(1).person();
 
@@ -56,7 +60,27 @@ class ContractTaskParserTest {
         assertThat(person.relationType()).isNull();
         assertThat(person.address()).isNull();
         assertThat(person.document().series()).isNull();
+        assertThat(person.document().issuedBy()).isNull();
         assertThat(person.document().issuedAt()).isNull();
+        assertThat(person.document().divisionCode()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"individual_request_id", "insurance_contract_id", "insurer_policy_id", "date_to",
+            "participants"})
+    void missingRequiredTaskField_isViolationNamingTheField(String field) {
+        assertThatThrownBy(() -> parser.parse(TaskBodies.upserted().withoutDataField(field).toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("нет обязательного поля data." + field);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"id", "is_relative", "amount_due", "personal_data.first_name", "personal_data.birth_date",
+            "personal_data.gender", "personal_data.document.type", "personal_data.document.number"})
+    void missingRequiredParticipantField_isViolationNamingTheField(String field) {
+        assertThatThrownBy(() -> parser.parse(TaskBodies.upserted().withoutParticipantField(1, field).toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("нет обязательного поля data.participants[1]." + field);
     }
 
     @Test
