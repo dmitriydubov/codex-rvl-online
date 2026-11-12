@@ -6,6 +6,7 @@ import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.service.Enums;
+import ru.projectx.contracts.service.inbox.parse.JsonField;
 import ru.projectx.contracts.service.inbox.parse.JsonFields;
 
 final class IssuedDocuments {
@@ -24,10 +25,11 @@ final class IssuedDocuments {
     }
 
     private static IssuedDocument document(JsonFields document) {
-        String type = document.field(DOC_TYPE).text();
+        JsonField typeField = document.field(DOC_TYPE);
+        String type = typeField.text();
         Enums.named(PrintedFormType.class, type)
                 .filter(PrintedFormType::issuedByUsk)
-                .orElseThrow(() -> ContractViolationException.invalidValue(document.field(DOC_TYPE).path()));
+                .orElseThrow(() -> ContractViolationException.invalidValue(typeField.path()));
         return new IssuedDocument(type, document.field("file_url").text(),
                 document.field("file_size").optional().longInteger());
     }

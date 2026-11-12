@@ -4,6 +4,7 @@ import java.util.List;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
+import ru.projectx.contracts.service.inbox.parse.JsonField;
 import ru.projectx.contracts.service.inbox.parse.JsonFields;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.parse.PayloadParser;
@@ -27,7 +28,8 @@ public class UskResultParser implements PayloadParser<UskResult> {
     @Override
     public UskResult parse(String payload) {
         JsonFields data = bodies.data(payload);
-        String status = data.field(STATUS).text();
+        JsonField statusField = data.field(STATUS);
+        String status = statusField.text();
         if (layout.issuedStatus().equals(status)) {
             return issued(data);
         }
@@ -35,7 +37,7 @@ public class UskResultParser implements PayloadParser<UskResult> {
             return new UskResult.Failed(data.field(ID).uuid(), data.field("error_code").text(),
                     data.field("error_message").text());
         }
-        throw ContractViolationException.invalidValue(data.field(STATUS).path());
+        throw ContractViolationException.invalidValue(statusField.path());
     }
 
     private UskResult.Issued issued(JsonFields data) {

@@ -5,6 +5,7 @@ import java.time.format.DateTimeParseException;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
+import ru.projectx.contracts.service.inbox.parse.JsonField;
 import ru.projectx.contracts.service.inbox.parse.JsonFields;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.parse.PayloadParser;
@@ -23,13 +24,14 @@ public class TaskCancellationParser implements PayloadParser<ContractTaskCancell
     @Override
     public ContractTaskCancellation parse(String payload) {
         JsonFields data = bodies.data(payload);
+        JsonField cancelledAt = data.field(CANCELLED_AT);
         try {
             return new ContractTaskCancellation(data.field("individual_request_id").uuid(),
-                    OffsetDateTime.parse(data.field(CANCELLED_AT).text()).toInstant(),
+                    OffsetDateTime.parse(cancelledAt.text()).toInstant(),
                     data.field("cancel_reason").text(), data.field("cancel_comment").optional().text());
         }
         catch (DateTimeParseException notMoment) {
-            throw ContractViolationException.invalidValue(data.field(CANCELLED_AT).path(), notMoment);
+            throw ContractViolationException.invalidValue(cancelledAt.path(), notMoment);
         }
     }
 }
