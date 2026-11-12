@@ -10,8 +10,8 @@ import ru.projectx.contracts.service.usk.IssuanceKind;
 public final class KmContractKind {
 
     public static final IssuanceKind<Contract, ContractStatus> KIND = new IssuanceKind<>(KmContractTexts.WORDING, "CONTRACT",
-            KmContractEvents.KM_CONTRACT_SUBMITTED, KmContractEvents.KM_CONTRACT_REGISTERED, ContractStatus.PAID,
-            ContractStatus.SUBMITTED, IssueErrors.kmContractSubmission(), PersonOwner::contract, Contract::markIssued);
+            KmContractEvents.KM_CONTRACT_SUBMITTED, KmContractEvents.KM_CONTRACT_REGISTERED,
+            ContractStatus.ISSUANCE_FLOW, IssueErrors.kmContractSubmission(), PersonOwner::contract, Contract::markIssued);
 
     private KmContractKind() {
     }
