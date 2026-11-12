@@ -6,7 +6,7 @@ public enum FieldPresence {
     REQUIRED {
         @Override
         public @Nullable String textOf(JsonFields fields, String name) {
-            return fields.text(name);
+            return fields.field(name).text();
         }
 
         @Override
@@ -17,7 +17,7 @@ public enum FieldPresence {
     OPTIONAL {
         @Override
         public @Nullable String textOf(JsonFields fields, String name) {
-            return fields.textOrNull(name);
+            return fields.field(name).optional().text();
         }
 
         @Override

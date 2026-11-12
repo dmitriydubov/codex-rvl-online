@@ -24,10 +24,11 @@ final class IssuedDocuments {
     }
 
     private static IssuedDocument document(JsonFields document) {
-        String type = document.text(DOC_TYPE);
+        String type = document.field(DOC_TYPE).text();
         Enums.named(PrintedFormType.class, type)
                 .filter(PrintedFormType::issuedByUsk)
-                .orElseThrow(() -> ContractViolationException.invalidValue(document.pathOf(DOC_TYPE)));
-        return new IssuedDocument(type, document.text("file_url"), document.longOrNull("file_size"));
+                .orElseThrow(() -> ContractViolationException.invalidValue(document.field(DOC_TYPE).path()));
+        return new IssuedDocument(type, document.field("file_url").text(),
+                document.field("file_size").optional().longInteger());
     }
 }

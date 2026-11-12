@@ -3,9 +3,6 @@ package ru.projectx.contracts.service.inbox.parse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.contracts.exception.ContractViolationException;
 import tools.jackson.databind.json.JsonMapper;
@@ -13,9 +10,7 @@ import tools.jackson.databind.json.JsonMapper;
 class JsonFieldsTest {
 
     private static final String BODY = """
-            {"data": {"id": "61a7982c-a0b4-4bbf-9527-60b40b752803", "date": "2026-04-10", "amount": 34000.00,
-                      "flag": true, "name": "Тестов", "number": 5, "items": [{"n": 1}], "nested": {}, "nothing": null,
-                      "beyondInt": 99999999999, "beyondLong": 99999999999999999999}}
+            {"data": {"name": "Тестов", "items": [{"n": 1}, {"n": 2}], "nested": {"inner": {}}, "nothing": null}}
             """;
 
     private final JsonFields root = new JsonFields(JsonMapper.builder().build().readTree(BODY), "");
@@ -23,52 +18,37 @@ class JsonFieldsTest {
 
     @Test
     void paths_startAtRootWithoutLeadingDot() {
+        assertThat(root.field("data").path()).isEqualTo("data");
         assertThat(data.path()).isEqualTo("data");
-        assertThat(data.child("name").path()).isEqualTo("data.name");
-        assertThat(data.requiredArray("items").item(0).path()).isEqualTo("data.items[0]");
-        assertThat(data.requiredArray("items").size()).isEqualTo(1);
+        assertThat(data.field("name").path()).isEqualTo("data.name");
+        assertThat(data.requiredObject("nested").requiredObject("inner").path()).isEqualTo("data.nested.inner");
+        assertThat(data.requiredArray("items").item(1).path()).isEqualTo("data.items[1]");
     }
 
     @Test
-    void typedValues_areReadFromTheirFields() {
-        assertThat(data.text("name")).isEqualTo("Тестов");
-        assertThat(data.uuid("id")).isEqualTo(UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"));
-        assertThat(data.date("date")).isEqualTo(LocalDate.parse("2026-04-10"));
-        assertThat(data.dateOrNull("date")).isEqualTo(LocalDate.parse("2026-04-10"));
-        assertThat(data.decimal("amount")).isEqualByComparingTo(new BigDecimal("34000.00"));
-        assertThat(data.bool("flag")).isTrue();
-        assertThat(data.optionalText("name")).contains("Тестов");
-        assertThat(data.textOrNull("name")).isEqualTo("Тестов");
+    void fieldsAndItems_holdTheValuesUnderTheirNames() {
+        assertThat(data.field("name").text()).isEqualTo("Тестов");
+        assertThat(data.requiredArray("items").size()).isEqualTo(2);
+        assertThat(data.requiredArray("items").item(1).field("n").integer()).isEqualTo(2);
     }
 
     @Test
-    void optionalFields_areEmptyWhenMissingOrNotText() {
-        assertThat(data.optionalText("missing")).isEmpty();
-        assertThat(data.optionalText("number")).isEmpty();
-        assertThat(data.textOrNull("missing")).isNull();
-        assertThat(data.dateOrNull("missing")).isNull();
-    }
-
-    @Test
-    void missingOrNullRequiredFields_areViolationsNamingTheFullPath() {
-        assertThatThrownBy(() -> data.text("missing")).isInstanceOf(ContractViolationException.class)
+    void missingOrNullStructures_areViolationsNamingTheFullPath() {
+        assertThatThrownBy(() -> data.requiredObject("missing")).isInstanceOf(ContractViolationException.class)
                 .hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.decimal("missing")).hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.bool("missing")).hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.requiredObject("missing")).hasMessage("нет обязательного поля data.missing");
         assertThatThrownBy(() -> data.requiredArray("missing")).hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.text("nothing")).hasMessage("нет обязательного поля data.nothing");
+        assertThatThrownBy(() -> data.requiredObject("nothing")).hasMessage("нет обязательного поля data.nothing");
+        assertThatThrownBy(() -> data.requiredArray("nothing")).hasMessage("нет обязательного поля data.nothing");
         assertThatThrownBy(() -> root.requiredObject("missing")).hasMessage("нет обязательного поля missing");
     }
 
     @Test
-    void presentFieldsOfWrongType_areInvalidValuesNamingTheFullPath() {
-        assertThatThrownBy(() -> data.text("number")).isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля data.number");
-        assertThatThrownBy(() -> data.decimal("name")).hasMessage("недопустимое значение поля data.name");
-        assertThatThrownBy(() -> data.bool("name")).hasMessage("недопустимое значение поля data.name");
-        assertThatThrownBy(() -> data.requiredObject("name")).hasMessage("недопустимое значение поля data.name");
+    void presentStructuresOfWrongType_areInvalidValuesNamingTheFullPath() {
+        assertThatThrownBy(() -> data.requiredObject("name")).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.name");
+        assertThatThrownBy(() -> data.requiredObject("items")).hasMessage("недопустимое значение поля data.items");
         assertThatThrownBy(() -> data.requiredArray("nested")).hasMessage("недопустимое значение поля data.nested");
+        assertThatThrownBy(() -> data.requiredArray("name")).hasMessage("недопустимое значение поля data.name");
     }
 
     @Test
@@ -79,36 +59,5 @@ class JsonFieldsTest {
         assertThatThrownBy(() -> data.hasArray("name")).isInstanceOf(ContractViolationException.class)
                 .hasMessage("недопустимое значение поля data.name");
         assertThatThrownBy(() -> data.hasArray("nested")).hasMessage("недопустимое значение поля data.nested");
-    }
-
-    @Test
-    void integerField_isAWholeNumberThatFitsInt() {
-        assertThat(data.integer("number")).isEqualTo(5);
-        assertThatThrownBy(() -> data.integer("amount")).isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля data.amount");
-        assertThatThrownBy(() -> data.integer("beyondInt")).hasMessage("недопустимое значение поля data.beyondInt");
-        assertThatThrownBy(() -> data.integer("name")).hasMessage("недопустимое значение поля data.name");
-        assertThatThrownBy(() -> data.integer("missing")).hasMessage("нет обязательного поля data.missing");
-        assertThatThrownBy(() -> data.integer("nothing")).hasMessage("нет обязательного поля data.nothing");
-    }
-
-    @Test
-    void optionalLongField_isNullWhenAbsentOrNullAndOtherwiseAWholeNumberThatFitsLong() {
-        assertThat(data.longOrNull("missing")).isNull();
-        assertThat(data.longOrNull("nothing")).isNull();
-        assertThat(data.longOrNull("number")).isEqualTo(5L);
-        assertThat(data.longOrNull("beyondInt")).isEqualTo(99999999999L);
-        assertThatThrownBy(() -> data.longOrNull("amount")).isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля data.amount");
-        assertThatThrownBy(() -> data.longOrNull("beyondLong")).hasMessage("недопустимое значение поля data.beyondLong");
-        assertThatThrownBy(() -> data.longOrNull("name")).hasMessage("недопустимое значение поля data.name");
-    }
-
-    @Test
-    void malformedValues_areViolationsWithoutTheValue() {
-        assertThatThrownBy(() -> data.uuid("name")).isInstanceOf(ContractViolationException.class)
-                .hasMessage("недопустимое значение поля data.name");
-        assertThatThrownBy(() -> data.date("name")).hasMessage("недопустимое значение поля data.name");
-        assertThatThrownBy(() -> data.dateOrNull("name")).hasMessage("недопустимое значение поля data.name");
     }
 }

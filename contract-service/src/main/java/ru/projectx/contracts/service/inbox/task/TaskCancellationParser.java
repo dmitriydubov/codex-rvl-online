@@ -24,12 +24,12 @@ public class TaskCancellationParser implements PayloadParser<ContractTaskCancell
     public ContractTaskCancellation parse(String payload) {
         JsonFields data = bodies.data(payload);
         try {
-            return new ContractTaskCancellation(data.uuid("individual_request_id"),
-                    OffsetDateTime.parse(data.text(CANCELLED_AT)).toInstant(), data.text("cancel_reason"),
-                    data.textOrNull("cancel_comment"));
+            return new ContractTaskCancellation(data.field("individual_request_id").uuid(),
+                    OffsetDateTime.parse(data.field(CANCELLED_AT).text()).toInstant(),
+                    data.field("cancel_reason").text(), data.field("cancel_comment").optional().text());
         }
         catch (DateTimeParseException notMoment) {
-            throw ContractViolationException.invalidValue(data.pathOf(CANCELLED_AT), notMoment);
+            throw ContractViolationException.invalidValue(data.field(CANCELLED_AT).path(), notMoment);
         }
     }
 }
