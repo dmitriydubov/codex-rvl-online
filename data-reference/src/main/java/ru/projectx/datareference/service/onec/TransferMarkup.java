@@ -6,19 +6,19 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.mapper.value.OneCValues;
 import tools.jackson.databind.node.ObjectNode;
 
-record PriceListTransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCount) {
+record TransferMarkup(UUID cid, @Nullable Integer batchCount, int rowCount) {
 
     private static final String CID = "cid";
     private static final String COUNT_MESSAGES = "countMessages";
     private static final String COUNT_ROWS = "countRows";
     private static final String RECORD_SET = "recordSet";
 
-    static PriceListTransferMarkup of(ObjectNode data) {
+    static TransferMarkup of(ObjectNode data) {
         UUID cid = cidOf(data);
         if (data.has(COUNT_MESSAGES)) {
-            return new PriceListTransferMarkup(cid, counter(data, COUNT_MESSAGES), counter(data, COUNT_ROWS));
+            return new TransferMarkup(cid, counter(data, COUNT_MESSAGES), counter(data, COUNT_ROWS));
         }
-        return new PriceListTransferMarkup(cid, null, data.path(RECORD_SET).size());
+        return new TransferMarkup(cid, null, data.path(RECORD_SET).size());
     }
 
     static UUID cidOf(ObjectNode data) {

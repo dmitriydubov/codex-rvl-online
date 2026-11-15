@@ -21,7 +21,7 @@ import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-class PriceListPartCheckTest {
+class TransferPartCheckTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
     private static final Instant NOW = Instant.parse("2026-03-14T09:15:00Z");
@@ -29,7 +29,7 @@ class PriceListPartCheckTest {
     private static final UUID SELF = UUID.fromString("8e4b0f70-0000-4000-8000-0000000000aa");
 
     private final PriceListMapper priceList = mock(PriceListMapper.class);
-    private final PriceListPartCheck check = new PriceListPartCheck(priceList);
+    private final TransferPartCheck check = new TransferPartCheck(priceList::checkRow);
 
     @Test
     void batchWithNumberedRows_passes_andEveryRowIsCheckedByPriceListRules() {
@@ -162,8 +162,8 @@ class PriceListPartCheckTest {
                 .doesNotThrowAnyException();
     }
 
-    private static PriceListTransferMarkup markupOf(ObjectNode data) {
-        return PriceListTransferMarkup.of(data);
+    private static TransferMarkup markupOf(ObjectNode data) {
+        return TransferMarkup.of(data);
     }
 
     private static ObjectNode batch(String... rows) {

@@ -9,11 +9,11 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 
 @Component
-public class PriceTransferPartsReader {
+public class TransferPartsReader {
 
     private final InboundMessageRepository inbound;
 
-    public PriceTransferPartsReader(InboundMessageRepository inbound) {
+    public TransferPartsReader(InboundMessageRepository inbound) {
         this.inbound = inbound;
     }
 

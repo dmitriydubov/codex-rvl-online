@@ -18,7 +18,7 @@ import ru.projectx.datareference.entity.inbound.OneCStream;
 import ru.projectx.datareference.repository.inbound.InboundMessageRepository;
 
 @ExtendWith(MockitoExtension.class)
-class PriceTransferPartsReaderTest {
+class TransferPartsReaderTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
 
@@ -31,12 +31,12 @@ class PriceTransferPartsReaderTest {
                 new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", Instant.EPOCH), "{}");
         when(inbound.findByCorrelationId(CID)).thenReturn(List.of(part));
 
-        assertThat(new PriceTransferPartsReader(inbound).parts(CID)).containsExactly(part);
+        assertThat(new TransferPartsReader(inbound).parts(CID)).containsExactly(part);
     }
 
     @Test
     void partsAreReadInTheirOwnReadOnlyTransaction() throws NoSuchMethodException {
-        Transactional transaction = PriceTransferPartsReader.class.getMethod("parts", UUID.class)
+        Transactional transaction = TransferPartsReader.class.getMethod("parts", UUID.class)
                 .getAnnotation(Transactional.class);
 
         assertThat(transaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);

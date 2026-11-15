@@ -19,6 +19,8 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySea
 
     Optional<Policy> findByExternalId(UUID externalId);
 
+    boolean existsByExternalId(UUID externalId);
+
     List<Policy> findAllByNumberAndExternalContractId(String number, UUID externalContractId);
 
     @Query(nativeQuery = true, value = """

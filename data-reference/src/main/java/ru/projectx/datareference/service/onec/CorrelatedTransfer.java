@@ -10,11 +10,11 @@ import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.mapper.ImportResult;
 
-sealed interface PriceListTransfer {
+sealed interface CorrelatedTransfer {
 
-    static PriceListTransfer of(UUID cid, List<InboundMessage> correlated) {
+    static CorrelatedTransfer of(UUID cid, List<InboundMessage> correlated) {
         List<InboundMessage> buffered = correlated.stream()
-                .filter(PriceListTransfer::isCollected)
+                .filter(CorrelatedTransfer::isCollected)
                 .toList();
         if (isRejected(correlated)) {
             return new Rejected("передача %s уже отклонена".formatted(cid), buffered);
@@ -42,7 +42,7 @@ sealed interface PriceListTransfer {
         return messages.stream().anyMatch(message -> message.outcome().status() == status);
     }
 
-    private static PriceListTransfer assembling(UUID cid, List<InboundMessage> buffered) {
+    private static CorrelatedTransfer assembling(UUID cid, List<InboundMessage> buffered) {
         List<InboundMessage> batches = buffered.stream()
                 .filter(message -> message.transferPart().batchCount() == null)
                 .toList();
@@ -53,7 +53,7 @@ sealed interface PriceListTransfer {
                 .orElseGet(() -> new Pending("передача %s ждёт финального сообщения".formatted(cid)));
     }
 
-    private static PriceListTransfer withFinalMessage(
+    private static CorrelatedTransfer withFinalMessage(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches) {
 
         int expectedBatches = Objects.requireNonNull(finalMessage.transferPart().batchCount());
@@ -64,7 +64,7 @@ sealed interface PriceListTransfer {
         return checkedCounters(cid, finalMessage, batches, expectedBatches);
     }
 
-    private static PriceListTransfer checkedCounters(
+    private static CorrelatedTransfer checkedCounters(
             UUID cid, InboundMessage finalMessage, List<InboundMessage> batches, int expectedBatches) {
 
         int expectedRows = Objects.requireNonNull(finalMessage.transferPart().rowCount());
@@ -93,17 +93,17 @@ sealed interface PriceListTransfer {
         return messages;
     }
 
-    record Pending(String reason) implements PriceListTransfer {
+    record Pending(String reason) implements CorrelatedTransfer {
     }
 
-    record Rejected(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
+    record Rejected(String reason, List<InboundMessage> lateParts) implements CorrelatedTransfer {
 
         List<InboundMessage> fail() {
             return failAll(lateParts, reason);
         }
     }
 
-    record Closed(String reason, List<InboundMessage> lateParts) implements PriceListTransfer {
+    record Closed(String reason, List<InboundMessage> lateParts) implements CorrelatedTransfer {
 
         List<InboundMessage> skip(Instant processedAt) {
             for (InboundMessage message : lateParts) {
@@ -114,14 +114,14 @@ sealed interface PriceListTransfer {
     }
 
     record Mismatched(String reason, InboundMessage finalMessage, List<InboundMessage> batches)
-            implements PriceListTransfer {
+            implements CorrelatedTransfer {
 
         List<InboundMessage> fail() {
             return failAll(wholeTransfer(finalMessage, batches), reason);
         }
     }
 
-    record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements PriceListTransfer {
+    record Assembled(InboundMessage finalMessage, List<InboundMessage> batches) implements CorrelatedTransfer {
 
         List<InboundMessage> markOutcome(ImportResult result, Instant at) {
             return switch (result) {

@@ -19,7 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @ExtendWith(MockitoExtension.class)
-class PriceTransferPartsInAdvanceTest {
+class TransferPartsInAdvanceTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
     private static final UUID SERVICE_ID = UUID.fromString("8e4b0f70-0000-4000-8000-000000000003");
@@ -28,7 +28,7 @@ class PriceTransferPartsInAdvanceTest {
     private final JsonMapper json = JsonMapper.builder().build();
 
     @Mock
-    private PriceTransferPartsReader reader;
+    private TransferPartsReader reader;
 
     @Test
     void partCompletingTransfer_parsesWholeTransfer() {
@@ -107,7 +107,7 @@ class PriceTransferPartsInAdvanceTest {
     }
 
     private ParsedTransferParts parse(InboundMessage received, ObjectNode data) {
-        return new PriceTransferPartsInAdvance(reader, json).parse(received, PriceListTransferMarkup.of(data), data);
+        return new TransferPartsInAdvance(reader, json).parse(received, TransferMarkup.of(data), data);
     }
 
     private static InboundMessage storedCopy(InboundMessage part) {

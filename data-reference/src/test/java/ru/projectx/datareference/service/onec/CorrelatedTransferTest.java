@@ -15,7 +15,7 @@ import ru.projectx.datareference.entity.inbound.ParentKind;
 import ru.projectx.datareference.entity.inbound.ParentWait;
 import ru.projectx.datareference.mapper.ImportResult;
 
-class PriceListTransferStatusTest {
+class CorrelatedTransferTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
     private static final Instant RECEIVED_AT = Instant.parse("2026-03-14T09:00:00Z");
@@ -23,17 +23,17 @@ class PriceListTransferStatusTest {
 
     @Test
     void batchesWithoutFinalMessage_waitForIt() {
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(batch(2)));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(batch(2)));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Pending(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Pending(
                 "передача " + CID + " ждёт финального сообщения"));
     }
 
     @Test
     void fewerBatchesThanPromised_waitForTheRest() {
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(finalMessage(2, 3), batch(1)));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(finalMessage(2, 3), batch(1)));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Pending(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Pending(
                 "передача " + CID + " собрана на 1 из 2 сообщений"));
     }
 
@@ -43,18 +43,18 @@ class PriceListTransferStatusTest {
         InboundMessage second = batch(2);
         InboundMessage finalMessage = finalMessage(2, 3);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(first, finalMessage, second));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(first, finalMessage, second));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of(first, second)));
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Assembled(finalMessage, List.of(first, second)));
     }
 
     @Test
     void emptyTransfer_isAssembledRightAway() {
         InboundMessage finalMessage = finalMessage(0, 0);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(finalMessage));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(finalMessage));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of()));
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Assembled(finalMessage, List.of()));
     }
 
     @Test
@@ -64,9 +64,9 @@ class PriceListTransferStatusTest {
         InboundMessage processedBatch = batch(1);
         processedBatch.markProcessed(PROCESSED_AT);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(processedFinal, processedBatch));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(processedFinal, processedBatch));
 
-        assertThat(transfer).isInstanceOf(PriceListTransfer.Pending.class);
+        assertThat(transfer).isInstanceOf(CorrelatedTransfer.Pending.class);
     }
 
     @Test
@@ -76,9 +76,9 @@ class PriceListTransferStatusTest {
         InboundMessage lateFinal = finalMessage(1, 1);
         InboundMessage lateBatch = batch(1);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(rejectedBatch, lateFinal, lateBatch));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(rejectedBatch, lateFinal, lateBatch));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Rejected(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Rejected(
                 "передача " + CID + " уже отклонена", List.of(lateFinal, lateBatch)));
     }
 
@@ -89,11 +89,11 @@ class PriceListTransferStatusTest {
         InboundMessage surplus = batch(1);
         surplus.markFailed("лишний пакет");
 
-        assertThat(PriceListTransfer.isRejected(List.of(applied, surplus))).isFalse();
-        assertThat(PriceListTransfer.isRejected(List.of(surplus))).isTrue();
-        assertThat(PriceListTransfer.isRejected(List.of(applied))).isFalse();
-        assertThat(PriceListTransfer.of(CID, List.of(applied, surplus, batch(1))))
-                .isInstanceOf(PriceListTransfer.Pending.class);
+        assertThat(CorrelatedTransfer.isRejected(List.of(applied, surplus))).isFalse();
+        assertThat(CorrelatedTransfer.isRejected(List.of(surplus))).isTrue();
+        assertThat(CorrelatedTransfer.isRejected(List.of(applied))).isFalse();
+        assertThat(CorrelatedTransfer.of(CID, List.of(applied, surplus, batch(1))))
+                .isInstanceOf(CorrelatedTransfer.Pending.class);
     }
 
     @Test
@@ -103,9 +103,9 @@ class PriceListTransferStatusTest {
         InboundMessage lateBatch = batch(1);
         InboundMessage lateFinal = finalMessage(1, 1);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(skippedFinal, lateBatch, lateFinal));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(skippedFinal, lateBatch, lateFinal));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Closed(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Closed(
                 "передача " + CID + " уже пропущена", List.of(lateBatch, lateFinal)));
     }
 
@@ -113,7 +113,7 @@ class PriceListTransferStatusTest {
     void closedTransfer_skipsEveryLatePartWithReason() {
         InboundMessage lateBatch = batch(1);
         InboundMessage lateFinal = finalMessage(1, 1);
-        PriceListTransfer.Closed transfer = new PriceListTransfer.Closed("уже пропущена", List.of(lateBatch, lateFinal));
+        CorrelatedTransfer.Closed transfer = new CorrelatedTransfer.Closed("уже пропущена", List.of(lateBatch, lateFinal));
 
         List<InboundMessage> skipped = transfer.skip(PROCESSED_AT);
 
@@ -133,17 +133,17 @@ class PriceListTransferStatusTest {
         InboundMessage skipped = batch(1);
         skipped.markSkipped("прайс по услуге вне справочника", PROCESSED_AT);
 
-        assertThat(PriceListTransfer.isClosed(List.of(rejected))).isTrue();
-        assertThat(PriceListTransfer.isClosed(List.of(skipped, batch(1)))).isTrue();
-        assertThat(PriceListTransfer.isClosed(List.of(applied, batch(1)))).isFalse();
-        assertThat(PriceListTransfer.isClosed(List.of(batch(1)))).isFalse();
+        assertThat(CorrelatedTransfer.isClosed(List.of(rejected))).isTrue();
+        assertThat(CorrelatedTransfer.isClosed(List.of(skipped, batch(1)))).isTrue();
+        assertThat(CorrelatedTransfer.isClosed(List.of(applied, batch(1)))).isFalse();
+        assertThat(CorrelatedTransfer.isClosed(List.of(batch(1)))).isFalse();
     }
 
     @Test
     void rejectedTransfer_failsEveryLatePartWithReason() {
         InboundMessage lateFinal = finalMessage(1, 1);
         InboundMessage lateBatch = batch(1);
-        PriceListTransfer.Rejected transfer = new PriceListTransfer.Rejected("уже отклонена", List.of(lateFinal, lateBatch));
+        CorrelatedTransfer.Rejected transfer = new CorrelatedTransfer.Rejected("уже отклонена", List.of(lateFinal, lateBatch));
 
         List<InboundMessage> failed = transfer.fail();
 
@@ -160,9 +160,9 @@ class PriceListTransferStatusTest {
         InboundMessage first = batch(1);
         InboundMessage second = batch(1);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(finalMessage, first, second));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(finalMessage, first, second));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Mismatched(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Mismatched(
                 "счётчики передачи " + CID + " не сошлись: ожидалось 1 сообщений / 2 строк, получено 2 / 2",
                 finalMessage, List.of(first, second)));
     }
@@ -173,9 +173,9 @@ class PriceListTransferStatusTest {
         InboundMessage first = batch(1);
         InboundMessage second = batch(2);
 
-        PriceListTransfer transfer = PriceListTransfer.of(CID, List.of(first, second, finalMessage));
+        CorrelatedTransfer transfer = CorrelatedTransfer.of(CID, List.of(first, second, finalMessage));
 
-        assertThat(transfer).isEqualTo(new PriceListTransfer.Mismatched(
+        assertThat(transfer).isEqualTo(new CorrelatedTransfer.Mismatched(
                 "счётчики передачи " + CID + " не сошлись: ожидалось 2 сообщений / 5 строк, получено 2 / 3",
                 finalMessage, List.of(first, second)));
     }
@@ -184,7 +184,7 @@ class PriceListTransferStatusTest {
     void mismatchedTransfer_failsEveryMessageWithReason_finalMessageFirst() {
         InboundMessage finalMessage = finalMessage(1, 5);
         InboundMessage batch = batch(1);
-        PriceListTransfer.Mismatched transfer = new PriceListTransfer.Mismatched("счётчики", finalMessage, List.of(batch));
+        CorrelatedTransfer.Mismatched transfer = new CorrelatedTransfer.Mismatched("счётчики", finalMessage, List.of(batch));
 
         List<InboundMessage> failed = transfer.fail();
 
@@ -199,7 +199,7 @@ class PriceListTransferStatusTest {
     void assembledTransfer_marksEveryMessageProcessed_finalMessageFirst() {
         InboundMessage finalMessage = finalMessage(1, 1);
         InboundMessage batch = batch(1);
-        PriceListTransfer.Assembled transfer = new PriceListTransfer.Assembled(finalMessage, List.of(batch));
+        CorrelatedTransfer.Assembled transfer = new CorrelatedTransfer.Assembled(finalMessage, List.of(batch));
 
         List<InboundMessage> processed = transfer.markProcessed(PROCESSED_AT);
 
@@ -220,11 +220,11 @@ class PriceListTransferStatusTest {
         InboundMessage waitingBatch = batch(1);
         AwaitedParent service = new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, CID);
 
-        List<InboundMessage> applied = new PriceListTransfer.Assembled(finalMessage, List.of(batch))
+        List<InboundMessage> applied = new CorrelatedTransfer.Assembled(finalMessage, List.of(batch))
                 .markOutcome(ImportResult.applied(), PROCESSED_AT);
-        List<InboundMessage> skipped = new PriceListTransfer.Assembled(skippedFinal, List.of(skippedBatch))
+        List<InboundMessage> skipped = new CorrelatedTransfer.Assembled(skippedFinal, List.of(skippedBatch))
                 .markOutcome(ImportResult.skipped("услуги нет"), PROCESSED_AT);
-        List<InboundMessage> waiting = new PriceListTransfer.Assembled(waitingFinal, List.of(waitingBatch))
+        List<InboundMessage> waiting = new CorrelatedTransfer.Assembled(waitingFinal, List.of(waitingBatch))
                 .markOutcome(ImportResult.awaitingParent(service), PROCESSED_AT);
 
         assertThat(applied).containsExactly(finalMessage, batch)
@@ -245,18 +245,18 @@ class PriceListTransferStatusTest {
     void transferWaitingForItsService_isAssembledAgainFromTheSameParts() {
         InboundMessage finalMessage = finalMessage(1, 1);
         InboundMessage batch = batch(1);
-        new PriceListTransfer.Assembled(finalMessage, List.of(batch)).markOutcome(
+        new CorrelatedTransfer.Assembled(finalMessage, List.of(batch)).markOutcome(
                 ImportResult.awaitingParent(new AwaitedParent(ParentKind.CONTRAGENT_SERVICE, CID)), PROCESSED_AT);
 
-        assertThat(PriceListTransfer.of(CID, List.of(finalMessage, batch)))
-                .isEqualTo(new PriceListTransfer.Assembled(finalMessage, List.of(batch)));
+        assertThat(CorrelatedTransfer.of(CID, List.of(finalMessage, batch)))
+                .isEqualTo(new CorrelatedTransfer.Assembled(finalMessage, List.of(batch)));
     }
 
     @Test
     void assembledTransfer_skipsEveryMessageWithReason_finalMessageFirst() {
         InboundMessage finalMessage = finalMessage(1, 1);
         InboundMessage batch = batch(1);
-        PriceListTransfer.Assembled transfer = new PriceListTransfer.Assembled(finalMessage, List.of(batch));
+        CorrelatedTransfer.Assembled transfer = new CorrelatedTransfer.Assembled(finalMessage, List.of(batch));
 
         List<InboundMessage> skipped = transfer.markSkipped("услуги нет", PROCESSED_AT);
 
