@@ -43,16 +43,17 @@ public class InsuredAssociationFinalization {
     protected InsuredAssociationFinalization() {
     }
 
-    private InsuredAssociationFinalization(UUID finalMessageId, InsuredAssociationFilter filter) {
-        this.finalMessageId = finalMessageId;
+    private InsuredAssociationFinalization(InboundMessage finalMessage, InsuredAssociationFilter filter) {
+        this.finalMessageId = finalMessage.receipt().messageId();
+        this.finalMessage = finalMessage;
         this.validFrom = filter.validFrom();
         this.insuredPolicyExternalId = filter.insuredPolicy();
         this.relatedPolicyExternalId = filter.relatedPolicy();
         this.relationTypeExternalId = filter.relationType();
     }
 
-    public static InsuredAssociationFinalization of(UUID finalMessageId, InsuredAssociationFilter filter) {
-        return new InsuredAssociationFinalization(finalMessageId, filter);
+    public static InsuredAssociationFinalization of(InboundMessage finalMessage, InsuredAssociationFilter filter) {
+        return new InsuredAssociationFinalization(finalMessage, filter);
     }
 
     public InboundMessage finalMessage() {

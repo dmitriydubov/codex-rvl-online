@@ -63,8 +63,8 @@ class InsuredAssociationOrderTest {
         assertThat(result).isEqualTo(ImportResult.applied());
         ArgumentCaptor<InsuredAssociationFinalization> remembered = ArgumentCaptor.captor();
         verify(finalizations).save(remembered.capture());
-        assertThat(remembered.getValue()).usingRecursiveComparison().isEqualTo(
-                InsuredAssociationFinalization.of(finalMessage.receipt().messageId(), FILTER));
+        assertThat(remembered.getValue()).isNotNull().usingRecursiveComparison().isEqualTo(
+                InsuredAssociationFinalization.of(finalMessage, FILTER));
     }
 
     @Test

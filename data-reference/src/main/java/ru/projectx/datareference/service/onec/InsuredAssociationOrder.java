@@ -30,7 +30,7 @@ public class InsuredAssociationOrder {
 
         ImportResult result = replacement.get();
         if (result instanceof ImportResult.Applied) {
-            finalizations.save(InsuredAssociationFinalization.of(finalMessage.receipt().messageId(), filter));
+            finalizations.save(InsuredAssociationFinalization.of(finalMessage, filter));
         }
         return result;
     }

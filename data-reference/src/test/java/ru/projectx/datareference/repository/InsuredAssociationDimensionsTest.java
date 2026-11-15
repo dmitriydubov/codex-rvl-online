@@ -18,6 +18,7 @@ class InsuredAssociationDimensionsTest {
     private static final UUID TYPE = UUID.fromString("797093be-2c51-11e8-8123-005056b43f21");
 
     private final List<String> constrained = new ArrayList<>();
+    private final List<PredicateSpecification<Object>> made = new ArrayList<>();
 
     @Test
     void everyDimensionOfAFullFilter_isConstrainedByItsAttributeAndValue() {
@@ -38,8 +39,19 @@ class InsuredAssociationDimensionsTest {
         assertThat(constrained).containsExactly("insuredPolicyExternalId=" + INSURED);
     }
 
+    @Test
+    void constrainedDimensions_areTheConditionsMadeForThem_inTheOrderOfTheDimensions() {
+        List<PredicateSpecification<Object>> conditions = InsuredAssociationDimensions.constrained(
+                new InsuredAssociationFilter(START, null, RELATED, TYPE), this::condition);
+
+        assertThat(made).hasSize(3);
+        assertThat(conditions).containsExactlyElementsOf(made);
+    }
+
     private PredicateSpecification<Object> condition(String attribute, Object value) {
         constrained.add(attribute + "=" + value);
-        return PredicateSpecification.unrestricted();
+        PredicateSpecification<Object> condition = (from, builder) -> builder.equal(from.get(attribute), value);
+        made.add(condition);
+        return condition;
     }
 }
