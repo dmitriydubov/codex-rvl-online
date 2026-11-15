@@ -2,26 +2,26 @@ package ru.projectx.datareference.service.onec;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
-import ru.projectx.datareference.mapper.stream.PriceListMapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-final class PriceListPartCheck {
+final class TransferPartCheck {
 
     private static final String RECORD_SET = "recordSet";
 
-    private final PriceListMapper priceList;
+    private final Consumer<JsonNode> rowCheck;
 
-    PriceListPartCheck(PriceListMapper priceList) {
-        this.priceList = priceList;
+    TransferPartCheck(Consumer<JsonNode> rowCheck) {
+        this.rowCheck = rowCheck;
     }
 
-    void check(UUID messageId, PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
-        if (PriceListTransfer.isClosed(parts)) {
+    void check(UUID messageId, TransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
+        if (CorrelatedTransfer.isClosed(parts)) {
             return;
         }
         if (markup.batchCount() == null) {
@@ -31,14 +31,14 @@ final class PriceListPartCheck {
         checkSingleFinal(messageId, markup, parts);
     }
 
-    private void checkBatch(PriceListTransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
+    private void checkBatch(TransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
         StreamSupport.stream(data.path(RECORD_SET).spliterator(), false).forEach(this::checkRow);
         if (isApplied(parts)) {
             throw new OneCFieldException("лишний пакет: передача %s уже применена".formatted(markup.cid()));
         }
     }
 
-    private static void checkSingleFinal(UUID messageId, PriceListTransferMarkup markup, List<InboundMessage> parts) {
+    private static void checkSingleFinal(UUID messageId, TransferMarkup markup, List<InboundMessage> parts) {
         if (parts.stream().anyMatch(part -> isAnotherFinal(part, messageId))) {
             throw new OneCFieldException(secondFinalReason(parts).formatted(markup.cid()));
         }
@@ -59,7 +59,7 @@ final class PriceListPartCheck {
     }
 
     private void checkRow(JsonNode row) {
-        PriceListRowNumber.of(row);
-        priceList.checkRow(row);
+        TransferRowNumber.of(row);
+        rowCheck.accept(row);
     }
 }

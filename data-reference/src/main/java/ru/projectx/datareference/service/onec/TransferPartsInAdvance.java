@@ -13,26 +13,26 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
-public class PriceTransferPartsInAdvance {
+public class TransferPartsInAdvance {
 
-    private final PriceTransferPartsReader reader;
+    private final TransferPartsReader reader;
     private final StoredEnvelope envelope;
 
-    public PriceTransferPartsInAdvance(PriceTransferPartsReader reader, ObjectMapper json) {
+    public TransferPartsInAdvance(TransferPartsReader reader, ObjectMapper json) {
         this.reader = reader;
         this.envelope = new StoredEnvelope(json);
     }
 
-    ParsedTransferParts parse(InboundMessage received, PriceListTransferMarkup markup, ObjectNode data) {
+    ParsedTransferParts parse(InboundMessage received, TransferMarkup markup, ObjectNode data) {
         List<InboundMessage> parts = withReceivedBuffered(reader.parts(markup.cid()), received, markup);
-        if (PriceListTransfer.of(markup.cid(), parts) instanceof PriceListTransfer.Assembled assembled) {
+        if (CorrelatedTransfer.of(markup.cid(), parts) instanceof CorrelatedTransfer.Assembled assembled) {
             return parsed(assembled, received.receipt().messageId(), data);
         }
         return ParsedTransferParts.NONE;
     }
 
     private static List<InboundMessage> withReceivedBuffered(
-            List<InboundMessage> stored, InboundMessage received, PriceListTransferMarkup markup) {
+            List<InboundMessage> stored, InboundMessage received, TransferMarkup markup) {
 
         UUID receivedId = received.receipt().messageId();
         InboundMessage buffered = InboundMessage.receive(received.receipt(), received.payload());
@@ -43,7 +43,7 @@ public class PriceTransferPartsInAdvance {
                 .toList();
     }
 
-    private ParsedTransferParts parsed(PriceListTransfer.Assembled transfer, UUID receivedId, ObjectNode receivedData) {
+    private ParsedTransferParts parsed(CorrelatedTransfer.Assembled transfer, UUID receivedId, ObjectNode receivedData) {
         Map<UUID, ObjectNode> dataByMessage = new HashMap<>();
         for (InboundMessage part : partsOf(transfer)) {
             UUID messageId = part.receipt().messageId();
@@ -53,7 +53,7 @@ public class PriceTransferPartsInAdvance {
         return new ParsedTransferParts(dataByMessage);
     }
 
-    private static List<InboundMessage> partsOf(PriceListTransfer.Assembled transfer) {
+    private static List<InboundMessage> partsOf(CorrelatedTransfer.Assembled transfer) {
         return Stream.concat(Stream.of(transfer.finalMessage()), transfer.batches().stream()).toList();
     }
 

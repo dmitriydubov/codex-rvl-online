@@ -86,7 +86,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 
 ## Очереди 1С:УСК
 
-11 очередей, 10 потоков данных: прейскуранты приходят двумя очередями. Очереди заводит 1С:УСК, сервис их не создаёт.
+13 очередей, 11 потоков данных: прейскуранты и связи застрахованных приходят двумя очередями каждый. Очереди заводит 1С:УСК, сервис их не создаёт.
 Умолчания имён — имена тестового брокера; на контуре их сверяют со списком брокера.
 
 | Переменная | Что приходит |
@@ -102,6 +102,8 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `ONEC_QUEUE_PRICE_LISTS` | прейскуранты ЛПУ, пакетами строк |
 | `ONEC_QUEUE_PRICE_LISTS_FINAL` | финальное сообщение передачи прейскуранта со счётчиками пакетов |
 | `ONEC_QUEUE_CONTRAGENT_SERVICES` | услуги контрагентов по договорам |
+| `ONEC_QUEUE_INSURED_ASSOCIATIONS` | связи застрахованных: чей полис связан с чьим, тип связи и срок; сообщения со строками (в теле — ФИО связанного застрахованного) |
+| `ONEC_QUEUE_INSURED_ASSOCIATIONS_FINAL` | финальное сообщение передачи связей застрахованных со счётчиками сообщений и строк |
 
 ## Порты
 
@@ -188,11 +190,11 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `projectx.import.initial-delay` | `30s` | задержка первого прохода разбора, стирания и проверки зависших передач после старта |
 | `projectx.import.poll-interval` | `10s` | пауза между проходами разбора |
 | `projectx.import.batch-size` | `100` | сообщений за проход разбора |
-| `projectx.import.payload-ttl` | `30d` | срок хранения тел полисов, договоров страхования, пропущенных сообщений и сообщений, не дождавшихся родителя |
+| `projectx.import.payload-ttl` | `30d` | срок хранения тел полисов, договоров страхования, связей застрахованных, пропущенных сообщений и сообщений, не дождавшихся родителя |
 | `projectx.import.quarantine-ttl` | `30d` | срок хранения тел в карантине |
 | `projectx.import.retention-poll-interval` | `1h` | пауза между проходами стирания по сроку |
 | `projectx.import.retention-batch-size` | `500` | строк за пачку стирания |
-| `projectx.import.stuck-transfer-threshold` | `1h` | с какого возраста передача прайса считается зависшей |
+| `projectx.import.stuck-transfer-threshold` | `1h` | с какого возраста передача прайса или связей застрахованных считается зависшей |
 | `projectx.import.stuck-transfer-poll-interval` | `15m` | пауза между проверками зависших передач |
 | `projectx.import.parent-wait-report-limit`, `stuck-transfer-report-limit` | `20` | сколько GUID называет одна запись журнала |
 | `projectx.onec.ingest.storage-check-interval` | `10s` | проверка базы, пока приём на паузе |
@@ -326,6 +328,7 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `onec_inbound_transitions_total{stream,status}` | переходы статусов при разборе | — |
 | `onec_inbound_parent_wait_expired_total{stream}` | сообщения, отклонённые потому, что родитель не пришёл за срок | `increase(onec_inbound_parent_wait_expired_total[1h]) > 0` |
 | `onec_price_transfers_stuck` | передачи прайса, ждущие своих частей дольше часа | `max(onec_price_transfers_stuck) > 0` |
+| `onec_insured_association_transfers_stuck` | передачи связей застрахованных, ждущие своих частей дольше часа | `max(onec_insured_association_transfers_stuck) > 0` ([troubleshooting.md](troubleshooting.md), «Передача связей застрахованных не собралась») |
 | `onec_inbound_backlog_staleness_seconds` | давность снимка, по которому считаются `onec_inbound_messages` и возраст ожидания | `max(onec_inbound_backlog_staleness_seconds)` намного больше 30 с: снимок не обновляется, значения выше устарели |
 | `onec_retention_overdue_payloads`, `onec_retention_overdue_quarantine_bodies` | тела с персональными данными и тела карантина старше срока хранения, ещё не стёртые | `max(…) > 0` дольше двух проходов стирания (2 ч при `retention-poll-interval` 1 ч) |
 | `policies_retention_overdue_personal_data` | полисы, чьи ФИО, дата рождения и почта должны быть стёрты, но ещё нет | `max(policies_retention_overdue_personal_data) > 0` дольше двух проходов стирания (2 ч) |
@@ -337,8 +340,8 @@ GET /internal/v1/policies, параметр «number»: есть в коде, в
 | `reference_cache_notifications_connected` | 1 — экземпляр слушает оповещения о сбросе кэша; 0 — соединения слушателя нет | хотя бы у одного экземпляра 0 дольше минуты — `min(reference_cache_notifications_connected) == 0` или правило по каждому экземпляру, не `sum()`: такой экземпляр не получает сбросов и отдаёт ответы, которые могут отставать до `REFERENCE_CACHE_TTL` |
 
 Метрики снимка из базы (`onec_inbound_messages`, `onec_inbound_pending_oldest_age_seconds`, `onec_price_transfers_stuck`,
-`onec_inbound_backlog_staleness_seconds`, `onec_retention_overdue_*`, `policies_retention_overdue_personal_data`) отдаёт
-только ведущий; у остальных экземпляров этих рядов нет. Правила оповещения по ним строятся на `max()` по экземплярам,
+`onec_insured_association_transfers_stuck`, `onec_inbound_backlog_staleness_seconds`, `onec_retention_overdue_*`,
+`policies_retention_overdue_personal_data`) отдаёт только ведущий; у остальных экземпляров этих рядов нет. Правила оповещения по ним строятся на `max()` по экземплярам,
 а не на `sum()`: с `sum()` значение удвоилось бы, если ряды отдают два экземпляра, например в секунды смены ведущего.
 Пока роль переходит, рядов может не быть ни у кого: правило с `for:` (держится N минут) это окно пропускает. Счётчики
 (`*_total`) у каждого экземпляра свои, а после перезапуска пода начинаются с нуля: `increase()` и `rate()` считаются по

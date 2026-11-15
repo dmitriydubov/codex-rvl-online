@@ -16,33 +16,33 @@ import ru.projectx.datareference.exception.OneCFieldException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-class PriceListTransferMarkupTest {
+class TransferMarkupTest {
 
     private static final UUID CID = UUID.fromString("8e4b0f70-0000-4000-8000-00000000000c");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Test
     void batch_hasNoExpectedBatches_andCountsItsOwnRows() {
-        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+        TransferMarkup markup = TransferMarkup.of(node("""
                 {"cid":"%s","recordSet":[{"rowNumber":1},{"rowNumber":2}]}""".formatted(CID)));
 
-        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, null, 2));
+        assertThat(markup).isEqualTo(new TransferMarkup(CID, null, 2));
     }
 
     @Test
     void finalMessage_carriesCountersOfWholeTransfer() {
-        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+        TransferMarkup markup = TransferMarkup.of(node("""
                 {"cid":"%s","countMessages":2,"countRows":3}""".formatted(CID)));
 
-        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
+        assertThat(markup).isEqualTo(new TransferMarkup(CID, 2, 3));
     }
 
     @Test
     void finalMessageWithZeroBatches_isStillFinal() {
-        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+        TransferMarkup markup = TransferMarkup.of(node("""
                 {"cid":"%s","countMessages":0,"countRows":0}""".formatted(CID)));
 
-        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 0, 0));
+        assertThat(markup).isEqualTo(new TransferMarkup(CID, 0, 0));
     }
 
     @ParameterizedTest
@@ -51,7 +51,7 @@ class PriceListTransferMarkupTest {
         ObjectNode data = node("""
                 {"cid":"%s","countMessages":%s,"countRows":%s}""".formatted(CID, countMessages, countRows));
 
-        assertThatThrownBy(() -> PriceListTransferMarkup.of(data))
+        assertThatThrownBy(() -> TransferMarkup.of(data))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле " + field + " больше допустимого");
     }
@@ -62,22 +62,22 @@ class PriceListTransferMarkupTest {
         ObjectNode data = node("""
                 {"cid":"%s","countMessages":%s,"countRows":%s}""".formatted(CID, countMessages, countRows));
 
-        assertThatThrownBy(() -> PriceListTransferMarkup.of(data))
+        assertThatThrownBy(() -> TransferMarkup.of(data))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("поле " + field + " не является целым числом");
     }
 
     @Test
     void counterWrittenAsText_isReadAsBefore() {
-        PriceListTransferMarkup markup = PriceListTransferMarkup.of(node("""
+        TransferMarkup markup = TransferMarkup.of(node("""
                 {"cid":"%s","countMessages":"2","countRows":"3"}""".formatted(CID)));
 
-        assertThat(markup).isEqualTo(new PriceListTransferMarkup(CID, 2, 3));
+        assertThat(markup).isEqualTo(new TransferMarkup(CID, 2, 3));
     }
 
     @Test
     void messageWithoutTransferId_isContractViolation() {
-        assertThatThrownBy(() -> PriceListTransferMarkup.of(node("{\"recordSet\":[]}")))
+        assertThatThrownBy(() -> TransferMarkup.of(node("{\"recordSet\":[]}")))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessageContaining("cid");
     }
@@ -87,7 +87,7 @@ class PriceListTransferMarkupTest {
         InboundMessage message = InboundMessage.receive(
                 new InboundReceipt(UUID.randomUUID(), OneCStream.PRICE_LISTS, "очередь", Instant.EPOCH), "{}");
 
-        new PriceListTransferMarkup(CID, 2, 3).applyTo(message);
+        new TransferMarkup(CID, 2, 3).applyTo(message);
 
         assertThat(message.outcome().status()).isEqualTo(InboundStatus.BUFFERED);
         assertThat(message.transferPart().correlationId()).isEqualTo(CID);
