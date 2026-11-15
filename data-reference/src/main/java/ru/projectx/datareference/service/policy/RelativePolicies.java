@@ -7,7 +7,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
-import ru.projectx.datareference.dto.PolicyResponse;
+import ru.projectx.datareference.dto.RelativePolicy;
 import ru.projectx.datareference.entity.catalog.InsuranceContract;
 import ru.projectx.datareference.entity.catalog.Program;
 import ru.projectx.datareference.entity.policy.Policy;
@@ -29,7 +29,7 @@ public class RelativePolicies {
         this.rvlPrograms = rvlPrograms;
     }
 
-    public Map<UUID, PolicyResponse> byExternalIds(Collection<UUID> externalIds) {
+    public Map<UUID, RelativePolicy> byExternalIds(Collection<UUID> externalIds) {
         if (externalIds.isEmpty()) {
             return Map.of();
         }
@@ -38,7 +38,7 @@ public class RelativePolicies {
         Map<UUID, InsuranceContract> contracts = contractsOf(found);
         Map<UUID, Program> programs = rvlPrograms.referencedBy(found);
         return found.stream().collect(Collectors.toMap(Policy::externalId,
-                policy -> PolicyResponse.of(policy, contracts.get(policy.details().externalContractId()), programs)));
+                policy -> RelativePolicy.of(policy, contracts.get(policy.details().externalContractId()), programs)));
     }
 
     private Map<UUID, InsuranceContract> contractsOf(List<Policy> found) {

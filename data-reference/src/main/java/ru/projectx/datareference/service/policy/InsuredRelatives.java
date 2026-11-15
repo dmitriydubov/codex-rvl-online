@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.UUID;
 import ru.projectx.datareference.dto.InsuredRelativesResponse;
 import ru.projectx.datareference.dto.InsuredRelativesResponse.Relative;
-import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.dto.RelativePolicy;
 
 final class InsuredRelatives {
@@ -19,10 +18,10 @@ final class InsuredRelatives {
     private InsuredRelatives() {
     }
 
-    static InsuredRelativesResponse of(List<RelationLink> links, Map<UUID, PolicyResponse> policies) {
+    static InsuredRelativesResponse of(List<RelationLink> links, Map<UUID, RelativePolicy> policies) {
         return new InsuredRelativesResponse(links.stream()
                 .filter(link -> policies.containsKey(link.relatedPolicy()))
-                .map(link -> new Relative(link.relationType(), RelativePolicy.of(policies.get(link.relatedPolicy()))))
+                .map(link -> new Relative(link.relationType(), policies.get(link.relatedPolicy())))
                 .sorted(ORDER)
                 .toList());
     }

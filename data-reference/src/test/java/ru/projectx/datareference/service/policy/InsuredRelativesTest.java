@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import ru.projectx.datareference.dto.InsuredRelativesResponse;
 import ru.projectx.datareference.dto.InsuredRelativesResponse.Relative;
-import ru.projectx.datareference.dto.PolicyResponse;
+import ru.projectx.datareference.dto.RelativePolicy;
 import ru.projectx.datareference.service.ReadFixtures;
 
 class InsuredRelativesTest {
@@ -61,7 +61,7 @@ class InsuredRelativesTest {
                         tuple(SAME_NUMBER, LOW_TYPE));
     }
 
-    private static PolicyResponse policy(UUID externalId, String number) {
-        return PolicyResponse.of(ReadFixtures.policy(externalId, number, CONTRACT, List.of(), List.of()), null, Map.of());
+    private static RelativePolicy policy(UUID externalId, String number) {
+        return RelativePolicy.of(ReadFixtures.policy(externalId, number, CONTRACT, List.of(), List.of()), null, Map.of());
     }
 }

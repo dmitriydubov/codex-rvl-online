@@ -33,17 +33,7 @@ public record PolicyResponse(
     public static PolicyResponse of(
             Policy policy, @Nullable InsuranceContract contract, Map<UUID, Program> rvlPrograms) {
 
-        List<ProgramLine> programs = policy.programs().stream()
-                .filter(row -> rvlPrograms.containsKey(row.externalProgramId()))
-                .map(row -> ProgramLine.of(row, rvlPrograms.get(row.externalProgramId()), policy.serviceLines()))
-                .toList();
-        Policy.Details details = policy.details();
-        return new PolicyResponse(
-                policy.id(), policy.externalId(), details.number(),
-                details.lastName(), details.firstName(), details.middleName(),
-                details.dateOfBirth(), details.gender(), details.email(),
-                details.beginDate(), details.endDate(), details.availability(), policy.isArchive(),
-                policy.personalDataErased(), contract == null ? null : ContractRef.of(contract), programs);
+        return RelativePolicy.of(policy, contract, rvlPrograms).withEmail(policy.details().email());
     }
 
     public record ContractRef(UUID id, UUID externalId, String number) {

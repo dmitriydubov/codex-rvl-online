@@ -19,7 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.InsuredRelativesResponse;
-import ru.projectx.datareference.dto.PolicyResponse;
+import ru.projectx.datareference.dto.RelativePolicy;
 import ru.projectx.datareference.entity.policy.InsuredAssociation;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
@@ -63,7 +63,7 @@ class InsuredRelativesServiceTest {
         when(policies.findByExternalId(INSURED)).thenReturn(Optional.of(insured));
         linksOfInsured(row(SPOUSE, LocalDate.of(2026, 11, 15)), row(FORMER, LocalDate.of(2026, 11, 16)));
         when(relativePolicies.byExternalIds(List.of(SPOUSE))).thenReturn(Map.of(SPOUSE,
-                PolicyResponse.of(
+                RelativePolicy.of(
                         ReadFixtures.policy(SPOUSE, "СТЕНД-0002", CONTRACT, List.of(), List.of()), null, Map.of())));
 
         InsuredRelativesResponse response = service.ofPolicy(INSURED);

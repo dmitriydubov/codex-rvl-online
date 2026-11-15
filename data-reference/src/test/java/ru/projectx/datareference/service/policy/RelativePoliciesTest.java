@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.dto.PolicyResponse;
+import ru.projectx.datareference.dto.RelativePolicy;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.catalog.ProgramRepository;
@@ -66,7 +67,7 @@ class RelativePoliciesTest {
         when(programs.findAllByExternalIdIn(Set.of(RVL_PROGRAM, CHILD_PROGRAM)))
                 .thenReturn(List.of(ReadFixtures.program(RVL_PROGRAM, false), ReadFixtures.program(CHILD_PROGRAM, false)));
 
-        Map<UUID, PolicyResponse> found = relativePolicies.byExternalIds(ids);
+        Map<UUID, RelativePolicy> found = relativePolicies.byExternalIds(ids);
 
         verify(policies).findAllWithServiceLinesByExternalIdIn(ids);
         assertThat(found).containsOnlyKeys(SPOUSE, CHILD);
