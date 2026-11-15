@@ -52,6 +52,15 @@ public class OneCInsuredAssociationSteps {
         inbox.receive(rows(UUID.fromString(messageId), UUID.fromString(cid), filter, rows));
     }
 
+    @Дано("1С:УСК прислала строки {string} передачи связей застрахованных {string} с отбором {string}, где в поле {string} записано {string}:")
+    public void rowsWithFieldSent(String messageId, String cid, String filter, String field, String value,
+            List<Map<String, String>> rows) {
+        List<Map<String, String>> edited = rows.stream()
+                .map(row -> OneCInsuredAssociationMessages.withRowField(row, field, value))
+                .toList();
+        rowsSent(messageId, cid, filter, edited);
+    }
+
     @Дано("1С:УСК прислала финальное сообщение {string} передачи связей застрахованных {string} с отбором {string}: сообщений {int}, строк {int}")
     public void finalSent(String messageId, String cid, String filter, int messages, int rows) {
         inbox.receive(OneCInsuredAssociationMessages.finalMessage(
@@ -74,6 +83,15 @@ public class OneCInsuredAssociationSteps {
     public void finalPublished(String messageId, String cid, String filter, int messages, int rows) {
         publish(FINAL_QUEUE, OneCInsuredAssociationMessages.finalMessage(
                 UUID.fromString(messageId), UUID.fromString(cid), filter, messages, rows));
+    }
+
+    @Тогда("сырьё передачи связей застрахованных {string} в порядке приёма — сообщения {string}")
+    public void transferRawInOrder(String cid, String messageIds) {
+        List<UUID> expected = Stream.of(messageIds.split("\\s*,\\s*")).map(UUID::fromString).toList();
+
+        assertThat(inbox.transferMessageIds(UUID.fromString(cid)))
+                .as("message-id сырья передачи %s в порядке приёма", cid)
+                .containsExactlyElementsOf(expected);
     }
 
     @Тогда("связи застрахованного {string} в базе Дата-референса:")

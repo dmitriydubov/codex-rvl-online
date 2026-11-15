@@ -1,8 +1,12 @@
 package ru.projectx.datareference.acceptance;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.entity.inbound.OneCStream;
 import tools.jackson.databind.json.JsonMapper;
@@ -16,9 +20,22 @@ final class OneCInsuredAssociationMessages {
     private static final String ROWS_QUEUE = "1c-usk_to_rvl-online_insured-association-changes";
     private static final String FINAL_QUEUE = "1c-usk_to_rvl-online_insured-association-changes-final";
     private static final String OTHER_SIDE = "otherSide";
+    private static final String PERIOD = "period";
     private static final String VALUE = "value";
     private static final String INACTIVE = " (неактивен)";
+    private static final String FILTER_SEPARATOR = "; ";
     private static final String POLICY_REFERENCE = "CatalogRef.ПолисаЗастрахованных";
+    private static final String START_OF_DAY = "T00:00:00+03:00";
+    private static final Pattern DATE_WITHOUT_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final Map<String, String> TIME_BY_DATE_KIND = Map.of(
+            "момент со смещением", START_OF_DAY,
+            "момент со смещением в конце дня", "T23:59:59+03:00",
+            "момент без смещения", "T00:00:00",
+            "дата", "");
+    private static final Map<String, String> COLUMN_BY_ROW_FIELD = Map.of(
+            "idInsured", "застрахованный",
+            "otherSide.value", "связанный полис",
+            "relationType", "тип связи");
 
     private static final JsonMapper JSON = JsonMapper.shared();
 
@@ -40,6 +57,14 @@ final class OneCInsuredAssociationMessages {
         return new OneCMessage(OneCStream.INSURED_ASSOCIATIONS, FINAL_QUEUE, data, InboundStatus.PROCESSED, messageId);
     }
 
+    static Map<String, String> withRowField(Map<String, String> row, String field, String value) {
+        String column = Optional.ofNullable(COLUMN_BY_ROW_FIELD.get(field)).orElseThrow(() -> new IllegalArgumentException(
+                "поле строки связи — не из " + new TreeSet<>(COLUMN_BY_ROW_FIELD.keySet()) + ": " + field));
+        Map<String, String> edited = new HashMap<>(row);
+        edited.put(column, value);
+        return edited;
+    }
+
     private static ObjectNode transfer(UUID cid, String filter) {
         ObjectNode data = JSON.createObjectNode();
         data.set("filter", filter(filter));
@@ -48,19 +73,27 @@ final class OneCInsuredAssociationMessages {
 
     private static ObjectNode row(int rowNumber, Map<String, String> row) {
         ObjectNode data = JSON.createObjectNode()
-                .put("periodTo", StepTables.required(row, "окончание"))
+                .put("periodTo", dateOf(row, "окончание", "вид окончания"))
                 .put("relationType", StepTables.required(row, "тип связи"))
                 .put("idInsured", StepTables.required(row, "застрахованный"))
-                .put("period", StepTables.required(row, "начало"))
+                .put(PERIOD, dateOf(row, "начало", "вид начала"))
                 .put("rowNumber", rowNumber);
         data.set(OTHER_SIDE, policyReference(StepTables.required(row, "связанный полис")));
         return data;
     }
 
+    private static String dateOf(Map<String, String> row, String dateColumn, String kindColumn) {
+        String date = StepTables.required(row, dateColumn);
+        if (!row.containsKey(kindColumn)) {
+            return date;
+        }
+        return date + TIME_BY_DATE_KIND.get(StepTables.oneOf(row, kindColumn, TIME_BY_DATE_KIND.keySet()));
+    }
+
     private static ArrayNode filter(String spec) {
         ArrayNode elements = JSON.createArrayNode();
-        for (String element : spec.split(";")) {
-            elements.add(element(element.strip()));
+        for (String element : spec.split(FILTER_SEPARATOR)) {
+            elements.add(element(element));
         }
         return elements;
     }
@@ -73,9 +106,14 @@ final class OneCInsuredAssociationMessages {
             element.set(VALUE, policyReference(parts[1]));
         }
         else {
-            element.put(VALUE, parts[1]);
+            element.put(VALUE, filterValue(parts[0], parts[1]));
         }
         return element.put("isActive", !inactive).put("fieldName", parts[0]);
+    }
+
+    private static String filterValue(String field, String value) {
+        boolean periodWithoutTime = PERIOD.equals(field) && DATE_WITHOUT_TIME.matcher(value).matches();
+        return periodWithoutTime ? value + START_OF_DAY : value;
     }
 
     private static ObjectNode policyReference(String policy) {

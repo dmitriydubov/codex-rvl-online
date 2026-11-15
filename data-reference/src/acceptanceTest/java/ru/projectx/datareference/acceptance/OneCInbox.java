@@ -28,6 +28,9 @@ public class OneCInbox {
     private static final String TRANSFER_STATUSES = """
             select status from inbound_message where payload -> 'data' ->> 'cid' = :cid order by received_at
             """;
+    private static final String TRANSFER_MESSAGE_IDS = """
+            select message_id from inbound_message where payload -> 'data' ->> 'cid' = :cid order by received_at
+            """;
     private static final String MESSAGE_IDS = "select message_id from inbound_message order by received_at";
     private static final String STORED = "select exists(select 1 from inbound_message where message_id = :messageId)";
     private static final String ROW = """
@@ -221,6 +224,10 @@ public class OneCInbox {
 
     public List<String> transferStatuses(UUID cid) {
         return jdbc.sql(TRANSFER_STATUSES).param("cid", cid.toString()).query(String.class).list();
+    }
+
+    public List<UUID> transferMessageIds(UUID cid) {
+        return jdbc.sql(TRANSFER_MESSAGE_IDS).param("cid", cid.toString()).query(UUID.class).list();
     }
 
     public List<String> statuses() {
