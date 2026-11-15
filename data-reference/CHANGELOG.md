@@ -27,7 +27,11 @@
   `projectx.import.payload-ttl` при любом статусе. Новая таблица `insured_associations` и таблица применённых передач
   `insured_association_finalization`. Новый показатель `onec_insured_association_transfers_stuck` — передачи связей,
   ждущие частей дольше `projectx.import.stuck-transfer-threshold`; проверка зависших передач называет их в журнале.
-  REST для связей не добавлен.
+- Родственники застрахованного для сервиса Заявок — `GET /internal/v1/policies/relatives` по GUID полиса сотрудника
+  (`external_id`) или по номеру полиса вместе с GUID договора (`number`, `contract_external_id`). Отдаёт связи из 1С:УСК,
+  действующие сегодня по московскому дню: GUID типа связи и полис родственника, как у полиса по ключу, но без e-mail.
+  Связей нет — пустой список, полиса сотрудника нет — 404 `POLICY_NOT_FOUND`. Ответ не кэшируется. Описание —
+  `docs/openapi.yaml`.
 
 ### Изменено
 

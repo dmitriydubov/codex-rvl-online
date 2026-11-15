@@ -65,7 +65,13 @@ public final class ReadFixtures {
     }
 
     public static Policy policy(UUID externalContractId, List<UUID> programIds, List<UUID> serviceLineProgramIds) {
-        var details = new Policy.Details(externalContractId, "П-0001", "Петров", "Иван", null,
+        return policy(UUID.randomUUID(), "П-0001", externalContractId, programIds, serviceLineProgramIds);
+    }
+
+    public static Policy policy(UUID externalId, String number, UUID externalContractId, List<UUID> programIds,
+            List<UUID> serviceLineProgramIds) {
+
+        var details = new Policy.Details(externalContractId, number, "Петров", "Иван", null,
                 LocalDate.of(1984, 3, 11), null, null, BEGIN, null, true, false);
         List<PolicyProgram.Row> programs = programIds.stream()
                 .map(id -> new PolicyProgram.Row(id, BEGIN, null, null, null, null, null, BigDecimal.TEN, true))
@@ -73,6 +79,6 @@ public final class ReadFixtures {
         List<PolicyServiceLine.Row> lines = serviceLineProgramIds.stream()
                 .map(id -> new PolicyServiceLine.Row(id, 1, BigDecimal.ONE, BEGIN, null, true))
                 .toList();
-        return Policy.create(UUID.randomUUID(), new Policy.Snapshot(details, programs, lines), NOW);
+        return Policy.create(externalId, new Policy.Snapshot(details, programs, lines), NOW);
     }
 }
