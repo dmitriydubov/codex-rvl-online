@@ -5125,6 +5125,9 @@ REST.
   типов связи), классы сборки ТЗ-9, очереди `projectx.onec.queues.*`, ожидание родителя, `payload-ttl` для тел с ФИО;
   описание потока пишет сессия — `project_files/data-reference/edited/ТЗ-11 Связи застрахованных.md` и `.docx`; README и
   `data-reference/CLAUDE.md` — координатор после мержа; `openapi.yaml` не меняется.
+  Решение владельца по смыслу «связь действует на дату» (вход Ш92, к сведению Ш91): «учитывать все интервалы и включать
+  сам день» — связь действует на дату D, если есть её запись с `period` ≤ D ≤ `periodTo` (последний день включительно),
+  без среза последних. Справочник `relationType` — вопрос повторно у 1С (нужен к Ш92).
 - 2026-11-11, **записка координатора contract-service (по решению владельца 2026-11-11, пришла плановой задачей):
   правки набора в `main`.** PR #292 (`e4469926`) — `acceptance.inputs` (у data-reference пусто); PR #294 (`3b8c3247`) —
   `test.inputs`: в `gauntlet/config/data-reference/gauntlet.properties` — `test.inputs=docs/openapi.yaml` (его читает
