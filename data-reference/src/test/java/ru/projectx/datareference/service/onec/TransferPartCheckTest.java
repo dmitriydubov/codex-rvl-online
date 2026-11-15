@@ -11,6 +11,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
@@ -61,6 +63,56 @@ class TransferPartCheckTest {
         assertThatThrownBy(() -> check.check(SELF, markupOf(data), data, List.of()))
                 .isInstanceOf(OneCFieldException.class)
                 .hasMessage("в строке прайса нет цены");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", ",\"recordSet\":null"})
+    void batchWithoutRowsArray_isRejectedAsMissingField_ratherThanBatchWithoutRows(String recordSet) {
+        ObjectNode data = batchWith(recordSet);
+
+        assertThatThrownBy(() -> check.check(SELF, markupOf(data), data, List.of()))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля recordSet");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"rowNumber\":1}", "{}", "\"[]\""})
+    void batchWithRowsNotInArray_isRejected_beforeAnyRowIsChecked(String recordSet) {
+        ObjectNode data = batchWith(",\"recordSet\":" + recordSet);
+
+        assertThatThrownBy(() -> check.check(SELF, markupOf(data), data, List.of()))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("поле recordSet не является массивом");
+        verifyNoInteractions(priceList);
+    }
+
+    @Test
+    void batchWithEmptyRowsArray_passes() {
+        ObjectNode data = batch();
+
+        assertThatCode(() -> check.check(SELF, markupOf(data), data, List.of(part(true))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void batchWithoutRowsArray_ofAppliedTransfer_isRejectedWithItsOwnDefect_ratherThanAsSurplus() {
+        ObjectNode data = batchWith("");
+
+        assertThatThrownBy(() -> check.check(SELF, markupOf(data), data, List.of(part(true), processedPart())))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля recordSet");
+    }
+
+    @Test
+    void batchWithoutRowsArray_ofRejectedOrSkippedTransfer_isNotChecked() {
+        ObjectNode data = batchWith("");
+        InboundMessage rejected = part(true);
+        rejected.markFailed("счётчики не сошлись");
+        InboundMessage skipped = part(true);
+        skipped.markSkipped("прайс по услуге вне справочника", NOW);
+
+        assertThatCode(() -> check.check(SELF, markupOf(data), data, List.of(rejected))).doesNotThrowAnyException();
+        assertThatCode(() -> check.check(SELF, markupOf(data), data, List.of(skipped))).doesNotThrowAnyException();
     }
 
     @Test
@@ -168,6 +220,10 @@ class TransferPartCheckTest {
 
     private static ObjectNode batch(String... rows) {
         return (ObjectNode) JSON.readTree("{\"cid\":\"%s\",\"recordSet\":[%s]}".formatted(CID, String.join(",", rows)));
+    }
+
+    private static ObjectNode batchWith(String recordSet) {
+        return (ObjectNode) JSON.readTree("{\"cid\":\"%s\"%s}".formatted(CID, recordSet));
     }
 
     private static ObjectNode finalData() {

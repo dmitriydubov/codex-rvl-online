@@ -3,10 +3,10 @@ package ru.projectx.datareference.service.onec;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.entity.inbound.InboundStatus;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -32,7 +32,7 @@ final class TransferPartCheck {
     }
 
     private void checkBatch(TransferMarkup markup, ObjectNode data, List<InboundMessage> parts) {
-        StreamSupport.stream(data.path(RECORD_SET).spliterator(), false).forEach(this::checkRow);
+        OneCRequiredValues.array(data, RECORD_SET).valueStream().forEach(this::checkRow);
         if (isApplied(parts)) {
             throw new OneCFieldException("лишний пакет: передача %s уже применена".formatted(markup.cid()));
         }
