@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.OTHER_RELATED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.row;
 
 import java.time.LocalDate;
@@ -28,16 +28,16 @@ class InsuredAssociationRowsTest {
 
     @Test
     void row_readsBothPoliciesTypeAndCalendarDaysAsWritten() {
-        JsonNode row = JSON.readTree(row(1, INSURED, RELATED, SPOUSE, "2026-11-13T00:00:00+03:00",
+        JsonNode row = JSON.readTree(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13T00:00:00+03:00",
                 "2027-03-31T00:00:00+03:00"));
 
         assertThat(InsuredAssociationRows.rowOf(row)).isEqualTo(
-                new InsuredAssociation.Row(INSURED, RELATED, SPOUSE, START, LocalDate.of(2027, 3, 31)));
+                new InsuredAssociation.Row(INSURED, RELATED, RELATION_TYPE, START, LocalDate.of(2027, 3, 31)));
     }
 
     @Test
     void openEnd_meansNoEndDate() {
-        JsonNode row = JSON.readTree(row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01T00:00:00+03:00"));
+        JsonNode row = JSON.readTree(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01T00:00:00+03:00"));
 
         assertThat(InsuredAssociationRows.rowOf(row).validTo()).isNull();
     }
@@ -50,7 +50,7 @@ class InsuredAssociationRowsTest {
             "period":"2026-11-13"                                 | "period":"0001-01-01"                               | нет обязательной даты в поле period
             """)
     void brokenRequiredValue_rejectsTheRow_namingTheFieldOnly(String good, String broken, String reason) {
-        String text = row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01").replace(good, broken);
+        String text = row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01").replace(good, broken);
 
         assertThatThrownBy(() -> InsuredAssociationRows.rowOf(JSON.readTree(text)))
                 .isInstanceOf(OneCFieldException.class)
@@ -78,7 +78,7 @@ class InsuredAssociationRowsTest {
     @Test
     void twoRowsWithTheSameDimensions_rejectTheTransfer() {
         InsuredAssociation.Row open = association(RELATED, START);
-        InsuredAssociation.Row closed = new InsuredAssociation.Row(INSURED, RELATED, SPOUSE, START, START.plusDays(9));
+        InsuredAssociation.Row closed = new InsuredAssociation.Row(INSURED, RELATED, RELATION_TYPE, START, START.plusDays(9));
 
         assertThatThrownBy(() -> InsuredAssociationRows.requireConsistent(byInsured(), List.of(open, closed)))
                 .isInstanceOf(OneCFieldException.class)
@@ -90,6 +90,6 @@ class InsuredAssociationRowsTest {
     }
 
     private static InsuredAssociation.Row association(UUID related, LocalDate start) {
-        return new InsuredAssociation.Row(INSURED, related, SPOUSE, start, null);
+        return new InsuredAssociation.Row(INSURED, related, RELATION_TYPE, start, null);
     }
 }

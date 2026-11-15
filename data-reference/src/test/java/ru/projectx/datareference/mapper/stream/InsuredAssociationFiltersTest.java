@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.element;
 import static ru.projectx.datareference.support.InsuredAssociationData.filter;
 
@@ -27,10 +27,10 @@ class InsuredAssociationFiltersTest {
                 element("period", "2026-11-13T00:00:00+03:00", true),
                 element("idInsured", INSURED.toString(), true),
                 element("otherSide", RELATED.toString(), true),
-                element("relationType", SPOUSE.toString(), true)));
+                element("relationType", RELATION_TYPE.toString(), true)));
 
         assertThat(InsuredAssociationFilters.of(data))
-                .isEqualTo(new InsuredAssociationFilter(LocalDate.of(2026, 11, 13), INSURED, RELATED, SPOUSE));
+                .isEqualTo(new InsuredAssociationFilter(LocalDate.of(2026, 11, 13), INSURED, RELATED, RELATION_TYPE));
     }
 
     @Test
@@ -60,13 +60,27 @@ class InsuredAssociationFiltersTest {
     }
 
     @Test
-    void unknownActiveElement_isRejected_namingTheField() {
+    void unknownActiveElement_isRejected_withoutQuotingTheName() {
         JsonNode data = data(filter(element("idInsured", INSURED.toString(), true),
                 element("anotherDimension", "значение", true)));
 
         assertThatThrownBy(() -> InsuredAssociationFilters.of(data))
                 .isInstanceOf(OneCFieldException.class)
-                .hasMessage("в отборе передачи неизвестное поле anotherDimension");
+                .hasMessage("в отборе передачи неизвестное поле");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+            {"value":"11111111-2222-4333-8444-555555555501","fieldName":"idInsured"}
+            {"value":"11111111-2222-4333-8444-555555555501","isActive":"true","fieldName":"idInsured"}
+            {"value":"11111111-2222-4333-8444-555555555501","isActive":1,"fieldName":"idInsured"}
+            """)
+    void elementWithoutBooleanActivity_isRejected_ratherThanWideningTheFilter(String element) {
+        JsonNode data = data(filter(element("idInsured", INSURED.toString(), true), element));
+
+        assertThatThrownBy(() -> InsuredAssociationFilters.of(data))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("в отборе передачи у элемента нет признака isActive");
     }
 
     @Test

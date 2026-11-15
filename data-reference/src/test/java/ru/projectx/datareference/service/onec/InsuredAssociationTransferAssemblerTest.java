@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.batch;
 import static ru.projectx.datareference.support.InsuredAssociationData.byInsured;
 import static ru.projectx.datareference.support.InsuredAssociationData.element;
@@ -53,7 +53,7 @@ class InsuredAssociationTransferAssemblerTest {
 
     private static final UUID CID = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01");
     private static final Instant NOW = Instant.parse("2026-11-15T09:00:00Z");
-    private static final String ROW = row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01");
+    private static final String ROW = row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01");
 
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<InboundMessage> correlated = new ArrayList<>();
@@ -93,7 +93,7 @@ class InsuredAssociationTransferAssemblerTest {
 
     @Test
     void partWithBrokenRow_isRejected() {
-        InboundMessage part = message(batch(CID, byInsured(INSURED), ROW.replace(SPOUSE.toString(), "1-2-3-4-5")));
+        InboundMessage part = message(batch(CID, byInsured(INSURED), ROW.replace(RELATION_TYPE.toString(), "1-2-3-4-5")));
 
         assertThatThrownBy(() -> receive(part))
                 .isInstanceOf(OneCFieldException.class)

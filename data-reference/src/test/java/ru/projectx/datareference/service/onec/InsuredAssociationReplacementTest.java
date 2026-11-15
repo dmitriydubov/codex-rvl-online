@@ -8,11 +8,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.support.InsuredAssociationData.CHILD;
+import static ru.projectx.datareference.support.InsuredAssociationData.OTHER_RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.OTHER_RELATED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.batch;
 import static ru.projectx.datareference.support.InsuredAssociationData.byInsured;
 import static ru.projectx.datareference.support.InsuredAssociationData.finalPart;
@@ -51,8 +51,8 @@ class InsuredAssociationReplacementTest {
 
     @Test
     void transferIsAppliedInOrderOfItsFinalMessage_withRowsOfAllPartsByRowNumber() {
-        String second = row(2, INSURED, OTHER_RELATED, CHILD, "2026-11-13", "3000-01-01");
-        String first = row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01");
+        String second = row(2, INSURED, OTHER_RELATED, OTHER_RELATION_TYPE, "2026-11-13", "3000-01-01");
+        String first = row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01");
         CorrelatedTransfer.Assembled transfer = new CorrelatedTransfer.Assembled(
                 part(finalPart(CID, byInsured(INSURED), 2, 2)),
                 List.of(part(batch(CID, byInsured(INSURED), second)), part(batch(CID, byInsured(INSURED), first))));
@@ -73,7 +73,7 @@ class InsuredAssociationReplacementTest {
     void partsNamingDifferentFilters_rejectTheTransfer() {
         CorrelatedTransfer.Assembled transfer = new CorrelatedTransfer.Assembled(
                 part(finalPart(CID, byInsured(INSURED), 1, 1)),
-                List.of(part(batch(CID, byInsured(RELATED), row(1, RELATED, INSURED, SPOUSE, "2026-11-13",
+                List.of(part(batch(CID, byInsured(RELATED), row(1, RELATED, INSURED, RELATION_TYPE, "2026-11-13",
                         "3000-01-01")))));
 
         assertThatThrownBy(() -> replacement().replace(transfer, ParsedTransferParts.NONE))

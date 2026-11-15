@@ -89,3 +89,20 @@ databaseChangeLog:
               where payload is not null
                 and (stream in ('POLICIES', 'INSURANCE_CONTRACTS') or status = 'SKIPPED'
                      or (status = 'FAILED' and parent_wait_since is not null))
+
+  - changeSet:
+      id: 021-awaiting-parent-index
+      author: rvl-online
+      comment: >
+        Применённый полис возвращает в разбор сообщения, которые ждали именно его: ищет ожидающие строки по виду и GUID
+        родителя. Частичный индекс по GUID ожидаемого родителя среди ожидающих строк, чтобы этот поиск на каждом полисе
+        не перебирал все ожидающие сообщения. Сырым sql: у createIndex в Liquibase нет условия частичного индекса
+        (docs.liquibase.com, change-types/create-index).
+      changes:
+        - sql:
+            sql: >
+              create index idx_inbound_message_awaited_parent on inbound_message (awaited_parent_id)
+              where status = 'AWAITING_PARENT'
+      rollback:
+        - sql:
+            sql: drop index idx_inbound_message_awaited_parent

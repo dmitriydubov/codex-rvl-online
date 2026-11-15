@@ -40,7 +40,8 @@ public interface InboundMessageRepository extends JpaRepository<InboundMessage, 
                              or exists (select stranger.externalId
                                           from ForeignReference stranger
                                          where stranger.externalId = message.awaitedParentId
-                                           and stranger.kind = message.awaitedParentKind))))
+                                           and stranger.kind = message.awaitedParentKind
+                                           and message.awaitedParentKind <> POLICY))))
                and not exists (select earlier.messageId
                                  from InboundMessage earlier
                                 where earlier.stream = message.stream

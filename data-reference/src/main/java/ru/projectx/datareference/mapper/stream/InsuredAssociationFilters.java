@@ -40,11 +40,19 @@ final class InsuredAssociationFilters {
 
     private static Map<Dimension, JsonNode> activeElements(JsonNode filter) {
         return StreamSupport.stream(filter.spliterator(), false)
-                .filter(element -> OneCValues.flag(element, "isActive"))
+                .filter(InsuredAssociationFilters::isActive)
                 .collect(Collectors.toMap(element -> Dimension.of(OneCValues.requiredText(element, "fieldName")),
                         Function.identity(), (first, repeated) -> {
                             throw new OneCFieldException("в отборе передачи одно поле задано дважды");
                         }, () -> new EnumMap<>(Dimension.class)));
+    }
+
+    private static boolean isActive(JsonNode element) {
+        JsonNode active = element.path("isActive");
+        if (!active.isBoolean()) {
+            throw new OneCFieldException("в отборе передачи у элемента нет признака isActive");
+        }
+        return active.booleanValue();
     }
 
     private static <T> @Nullable T valueOf(Map<Dimension, JsonNode> active, Dimension dimension,
@@ -69,7 +77,7 @@ final class InsuredAssociationFilters {
             return Arrays.stream(values())
                     .filter(dimension -> dimension.fieldName.equals(fieldName))
                     .findFirst()
-                    .orElseThrow(() -> new OneCFieldException("в отборе передачи неизвестное поле " + fieldName));
+                    .orElseThrow(() -> new OneCFieldException("в отборе передачи неизвестное поле"));
         }
     }
 }

@@ -7,11 +7,11 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static ru.projectx.datareference.support.InsuredAssociationData.CHILD;
+import static ru.projectx.datareference.support.InsuredAssociationData.OTHER_RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.OTHER_RELATED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.byInsured;
 import static ru.projectx.datareference.support.InsuredAssociationData.row;
 
@@ -55,8 +55,8 @@ class InsuredAssociationMapperTest {
         when(policies.existsByExternalId(any())).thenReturn(true);
 
         ImportResult result = mapper().apply(BY_INSURED, List.of(
-                json(row(1, INSURED, RELATED, SPOUSE, "2026-11-13T00:00:00+03:00", "3000-01-01")),
-                json(row(2, INSURED, OTHER_RELATED, CHILD, "2026-11-13", "2027-03-31"))));
+                json(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13T00:00:00+03:00", "3000-01-01")),
+                json(row(2, INSURED, OTHER_RELATED, OTHER_RELATION_TYPE, "2026-11-13", "2027-03-31"))));
 
         assertThat(result).isEqualTo(ImportResult.applied());
         InOrder replacement = inOrder(associations);
@@ -64,8 +64,8 @@ class InsuredAssociationMapperTest {
         ArgumentCaptor<List<InsuredAssociation>> saved = ArgumentCaptor.captor();
         replacement.verify(associations).saveAll(saved.capture());
         assertThat(saved.getValue()).extracting(InsuredAssociation::row).containsExactly(
-                new InsuredAssociation.Row(INSURED, RELATED, SPOUSE, START, null),
-                new InsuredAssociation.Row(INSURED, OTHER_RELATED, CHILD, START, LocalDate.of(2027, 3, 31)));
+                new InsuredAssociation.Row(INSURED, RELATED, RELATION_TYPE, START, null),
+                new InsuredAssociation.Row(INSURED, OTHER_RELATED, OTHER_RELATION_TYPE, START, LocalDate.of(2027, 3, 31)));
     }
 
     @Test
@@ -81,7 +81,7 @@ class InsuredAssociationMapperTest {
     void missingPolicyOfTheInsured_isAwaitedFirst_andNothingIsReplaced() {
         when(policies.existsByExternalId(INSURED)).thenReturn(false);
 
-        ImportResult result = mapper().apply(BY_INSURED, List.of(json(row(1, INSURED, RELATED, SPOUSE, "2026-11-13",
+        ImportResult result = mapper().apply(BY_INSURED, List.of(json(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13",
                 "3000-01-01"))));
 
         assertThat(result).isEqualTo(ImportResult.awaitingParent(new AwaitedParent(ParentKind.POLICY, INSURED)));
@@ -94,7 +94,7 @@ class InsuredAssociationMapperTest {
         when(policies.existsByExternalId(INSURED)).thenReturn(true);
         when(policies.existsByExternalId(RELATED)).thenReturn(false);
 
-        ImportResult result = mapper().apply(BY_INSURED, List.of(json(row(1, INSURED, RELATED, SPOUSE, "2026-11-13",
+        ImportResult result = mapper().apply(BY_INSURED, List.of(json(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13",
                 "3000-01-01"))));
 
         assertThat(result).isEqualTo(ImportResult.awaitingParent(new AwaitedParent(ParentKind.POLICY, RELATED)));
@@ -105,7 +105,7 @@ class InsuredAssociationMapperTest {
     void rowOutsideTheFilter_isRejectedBeforeAnyChange() {
         InsuredAssociationFilter byRelated = new InsuredAssociationFilter(null, INSURED, OTHER_RELATED, null);
 
-        assertThatThrownBy(() -> mapper().apply(byRelated, List.of(json(row(1, INSURED, RELATED, SPOUSE, "2026-11-13",
+        assertThatThrownBy(() -> mapper().apply(byRelated, List.of(json(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13",
                 "3000-01-01")))))
                 .isInstanceOf(OneCFieldException.class);
         verify(associations, never()).deleteCoveredBy(any());
@@ -113,8 +113,8 @@ class InsuredAssociationMapperTest {
 
     @Test
     void checkRow_rejectsABrokenRow() {
-        JsonNode broken = json(row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01")
-                .replace(SPOUSE.toString(), "1-2-3-4-5"));
+        JsonNode broken = json(row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01")
+                .replace(RELATION_TYPE.toString(), "1-2-3-4-5"));
 
         assertThatThrownBy(() -> mapper().checkRow(broken))
                 .isInstanceOf(OneCFieldException.class)

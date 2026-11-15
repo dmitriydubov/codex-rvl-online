@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static ru.projectx.datareference.support.InsuredAssociationData.INSURED;
 import static ru.projectx.datareference.support.InsuredAssociationData.RELATED;
-import static ru.projectx.datareference.support.InsuredAssociationData.SPOUSE;
+import static ru.projectx.datareference.support.InsuredAssociationData.RELATION_TYPE;
 import static ru.projectx.datareference.support.InsuredAssociationData.batch;
 import static ru.projectx.datareference.support.InsuredAssociationData.byInsured;
 import static ru.projectx.datareference.support.InsuredAssociationData.element;
@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 class InsuredAssociationTransferRejectionTest {
 
     private static final UUID CID = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01");
-    private static final String ROW = row(1, INSURED, RELATED, SPOUSE, "2026-11-13", "3000-01-01");
+    private static final String ROW = row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01");
 
     private final InboundMessageRepository repository = mock(InboundMessageRepository.class);
     private final InsuredAssociationTransferRejection rejection = new InsuredAssociationTransferRejection(repository,
@@ -48,7 +48,7 @@ class InsuredAssociationTransferRejectionTest {
     @Test
     void partWithBrokenRow_keepsItsOwnReason_andTheBufferedPartsPointToIt() {
         InboundMessage finalMessage = buffered(finalPart(CID, byInsured(INSURED), 1, 1), 1);
-        InboundMessage broken = received(batch(CID, byInsured(INSURED), ROW.replace(SPOUSE.toString(), "1-2-3-4-5")));
+        InboundMessage broken = received(batch(CID, byInsured(INSURED), ROW.replace(RELATION_TYPE.toString(), "1-2-3-4-5")));
         when(repository.findByCorrelationId(CID)).thenReturn(List.of(finalMessage));
 
         List<InboundMessage> rejected = rejection.reject(broken, "поле relationType не является GUID");

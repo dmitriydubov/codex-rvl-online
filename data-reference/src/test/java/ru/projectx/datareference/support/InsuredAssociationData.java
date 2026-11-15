@@ -9,8 +9,8 @@ public final class InsuredAssociationData {
     public static final UUID INSURED = UUID.fromString("11111111-2222-4333-8444-555555555501");
     public static final UUID RELATED = UUID.fromString("11111111-2222-4333-8444-555555555502");
     public static final UUID OTHER_RELATED = UUID.fromString("11111111-2222-4333-8444-555555555503");
-    public static final UUID SPOUSE = UUID.fromString("797093be-2c51-11e8-8123-005056b43f21");
-    public static final UUID CHILD = UUID.fromString("4b4e0f45-2c50-11e8-8123-005056b43f21");
+    public static final UUID RELATION_TYPE = UUID.fromString("797093be-2c51-11e8-8123-005056b43f21");
+    public static final UUID OTHER_RELATION_TYPE = UUID.fromString("4b4e0f45-2c50-11e8-8123-005056b43f21");
     public static final String REPRESENTATION = "Тестов Пётр Иванович";
 
     private InsuredAssociationData() {
