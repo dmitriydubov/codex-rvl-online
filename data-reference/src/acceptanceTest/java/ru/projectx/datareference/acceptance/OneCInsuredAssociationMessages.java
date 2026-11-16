@@ -32,6 +32,12 @@ final class OneCInsuredAssociationMessages {
             "момент со смещением в конце дня", "T23:59:59+03:00",
             "момент без смещения", "T00:00:00",
             "дата", "");
+    private static final Map<String, String> SINGLE_ROW = Map.of(
+            "застрахованный", "11111111-2222-4333-8444-555555555501",
+            "связанный полис", "11111111-2222-4333-8444-555555555502",
+            "тип связи", "4b4e0f45-2c50-11e8-8123-005056b43f21",
+            "начало", "2026-11-13T00:00:00+03:00",
+            "окончание", "3000-01-01T00:00:00+03:00");
     private static final Map<String, String> COLUMN_BY_ROW_FIELD = Map.of(
             "idInsured", "застрахованный",
             "otherSide.value", "связанный полис",
@@ -50,6 +56,11 @@ final class OneCInsuredAssociationMessages {
         ObjectNode data = transfer(cid, filter);
         data.set("recordSet", recordSet);
         return new OneCMessage(OneCStream.INSURED_ASSOCIATIONS, ROWS_QUEUE, data, InboundStatus.PROCESSED, messageId);
+    }
+
+    static OneCMessage withoutRowsArray(UUID messageId, UUID cid, String filter, String defect) {
+        ObjectNode data = RecordSetDefects.withoutRowsArray(transfer(cid, filter), defect, row(1, SINGLE_ROW));
+        return new OneCMessage(OneCStream.INSURED_ASSOCIATIONS, ROWS_QUEUE, data, InboundStatus.FAILED, messageId);
     }
 
     static OneCMessage finalMessage(UUID messageId, UUID cid, String filter, int messages, int rows) {

@@ -30,6 +30,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.projectx.datareference.config.InboundRetryProperties;
@@ -54,6 +56,7 @@ class InsuredAssociationTransferAssemblerTest {
     private static final UUID CID = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01");
     private static final Instant NOW = Instant.parse("2026-11-15T09:00:00Z");
     private static final String ROW = row(1, INSURED, RELATED, RELATION_TYPE, "2026-11-13", "3000-01-01");
+    private static final String ABSENT = "absent";
 
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<InboundMessage> correlated = new ArrayList<>();
@@ -125,6 +128,69 @@ class InsuredAssociationTransferAssemblerTest {
         verify(replacement).replace(any(CorrelatedTransfer.Assembled.class), any());
         assertThat(List.of(part, finalMessage)).extracting(message -> message.outcome().status())
                 .containsOnly(InboundStatus.PROCESSED);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+            absent | нет обязательного поля recordSet
+            null   | нет обязательного поля recordSet
+            {}     | поле recordSet не является массивом
+            "[]"   | поле recordSet не является массивом
+            """)
+    void partWithoutRowsArray_afterFinalOfOneEmptyPart_isRejected_andAssociationsAreNotReplaced(
+            String recordSet, String reason) {
+
+        bufferedFinalOfOneEmptyPart();
+        InboundMessage part = message(withRecordSet(recordSet));
+
+        assertThatThrownBy(() -> receive(part))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage(reason);
+        verify(replacement, never()).replace(any(), any());
+    }
+
+    @Test
+    void partWithoutRowsArray_ofRejectedTransfer_isRejectedAsLatePart() {
+        bufferedFinalOfOneEmptyPart().markFailed("счётчики передачи не сошлись");
+
+        ImportOutcome outcome = receive(message(withRecordSet(ABSENT)));
+
+        assertThat(outcome).isEqualTo(ImportOutcome.rejected("передача " + CID + " уже отклонена"));
+    }
+
+    @Test
+    void partWithoutRowsArray_ofSkippedTransfer_isSkippedAsLatePart() {
+        bufferedFinalOfOneEmptyPart().markSkipped("по отбору передачи уже применена более новая передача", NOW);
+
+        ImportOutcome outcome = receive(message(withRecordSet(ABSENT)));
+
+        assertThat(outcome).isEqualTo(ImportOutcome.skipped("передача " + CID + " уже пропущена"));
+    }
+
+    @Test
+    void partWithoutRowsArray_ofAppliedTransfer_isRejectedWithItsOwnDefect() {
+        bufferedFinalOfOneEmptyPart().markProcessed(NOW);
+
+        assertThatThrownBy(() -> receive(message(withRecordSet(ABSENT))))
+                .isInstanceOf(OneCFieldException.class)
+                .hasMessage("нет обязательного поля recordSet");
+        verify(replacement, never()).replace(any(), any());
+    }
+
+    private InboundMessage bufferedFinalOfOneEmptyPart() {
+        InboundMessage finalMessage = message(finalPart(CID, byInsured(INSURED), 1, 0));
+        finalMessage.markBuffered(CID, 1, 0);
+        correlated.add(finalMessage);
+        return finalMessage;
+    }
+
+    private String withRecordSet(String recordSet) {
+        ObjectNode data = (ObjectNode) json.readTree(batch(CID, byInsured(INSURED)));
+        data.remove("recordSet");
+        if (!ABSENT.equals(recordSet)) {
+            data.set("recordSet", json.readTree(recordSet));
+        }
+        return data.toString();
     }
 
     private ImportOutcome receive(InboundMessage message) {

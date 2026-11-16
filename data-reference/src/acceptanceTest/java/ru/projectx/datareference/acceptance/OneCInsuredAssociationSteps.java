@@ -61,6 +61,17 @@ public class OneCInsuredAssociationSteps {
         rowsSent(messageId, cid, filter, edited);
     }
 
+    @Дано("1С:УСК прислала сообщение со строками {string} передачи связей застрахованных {string} с отбором {string} без массива строк: {string}")
+    public void rowsMessageWithoutRowsArraySent(String messageId, String cid, String filter, String defect) {
+        inbox.receive(OneCInsuredAssociationMessages.withoutRowsArray(
+                UUID.fromString(messageId), UUID.fromString(cid), filter, defect));
+    }
+
+    @Дано("1С:УСК прислала сообщение со строками {string} передачи связей застрахованных {string} с отбором {string} с пустым массивом строк")
+    public void rowsMessageWithEmptyRowsArraySent(String messageId, String cid, String filter) {
+        rowsSent(messageId, cid, filter, List.of());
+    }
+
     @Дано("1С:УСК прислала финальное сообщение {string} передачи связей застрахованных {string} с отбором {string}: сообщений {int}, строк {int}")
     public void finalSent(String messageId, String cid, String filter, int messages, int rows) {
         inbox.receive(OneCInsuredAssociationMessages.finalMessage(

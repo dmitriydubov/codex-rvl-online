@@ -3,9 +3,9 @@ package ru.projectx.datareference.service.onec;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import ru.projectx.datareference.entity.inbound.InboundMessage;
 import ru.projectx.datareference.exception.OneCFieldException;
+import ru.projectx.datareference.mapper.value.OneCRequiredValues;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -33,6 +33,6 @@ final class TransferRows {
     }
 
     private static Stream<JsonNode> rowsOf(ObjectNode data) {
-        return StreamSupport.stream(data.path(RECORD_SET).spliterator(), false);
+        return OneCRequiredValues.array(data, RECORD_SET).valueStream();
     }
 }
