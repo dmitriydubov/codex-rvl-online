@@ -45,8 +45,8 @@ class InsuredRelativesTest {
     @Test
     void relatives_goByPolicyNumber_thenByTypeGuidText_thenByPolicyGuidText() {
         InsuredRelativesResponse response = InsuredRelatives.of(List.of(
-                        new RelationLink(SECOND, LOW_TYPE),
                         new RelationLink(SAME_NUMBER, LOW_TYPE),
+                        new RelationLink(SECOND, LOW_TYPE),
                         new RelationLink(FIRST, HIGH_TYPE),
                         new RelationLink(FIRST, LOW_TYPE)),
                 Map.of(FIRST, policy(FIRST, "СТЕНД-0002"), SECOND, policy(SECOND, "СТЕНД-0003"),
