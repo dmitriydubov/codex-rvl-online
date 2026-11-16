@@ -358,7 +358,7 @@ paths:
         включительно, пустое окончание — бессрочно) и которые сами действуют сегодня: не в архиве, `begin_date <= сегодня`
         и (`end_date` пустая или `end_date >= сегодня`). Учитываются только связи, где этот полис — застрахованный;
         обратные не отдаются. Полис самого застрахованного не отбирается: его родственники отдаются и когда он в архиве,
-        закончился или ещё не начался. Один элемент на полис родственника: `relation_type_external_id` — GUID типа связи
+        закончился или ещё не начался. Один элемент на полис родственника: `relationship` — GUID типа связи
         в 1С:УСК, если у полиса сегодня один действующий тип связи, и `null`, если их несколько. Порядок — по номеру
         полиса родственника, затем по GUID полиса (строки сравниваются по кодам символов, не по алфавиту). Родственников нет — `{"items": []}`.
 
@@ -957,8 +957,7 @@ components:
           items: {$ref: '#/components/schemas/FamilyMember'}
     FamilyMember:
       type: object
-      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender,
-                 relation_type_external_id]
+      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender, relationship]
       properties:
         id: {type: string, format: uuid, description: 'наш id полиса родственника, как в `/internal/v1/policies/{id}`'}
         external_id: {type: string, format: uuid}
@@ -968,7 +967,7 @@ components:
         middle_name: {type: string, nullable: true}
         date_of_birth: {type: string, format: date, nullable: true}
         gender: {type: string, nullable: true, description: 'как в 1С:УСК (`М`, `Ж`)'}
-        relation_type_external_id:
+        relationship:
           type: string
           format: uuid
           nullable: true

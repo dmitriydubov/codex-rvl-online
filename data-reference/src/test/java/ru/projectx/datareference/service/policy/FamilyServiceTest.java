@@ -65,7 +65,7 @@ class FamilyServiceTest {
         when(policies.findAllByExternalIdIn(Set.of(SPOUSE))).thenReturn(List.of(policy(SPOUSE, "СТЕНД-0002")));
 
         assertThat(service.family(INSURED_ID).items()).singleElement()
-                .satisfies(member -> assertThat(member.relationTypeExternalId()).isEqualTo(TYPE));
+                .satisfies(member -> assertThat(member.relationship()).isEqualTo(TYPE));
     }
 
     @Test
