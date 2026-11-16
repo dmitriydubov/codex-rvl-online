@@ -36,6 +36,7 @@ BOM Spring Boot.
 | GET | `/internal/v1/mkb10?query=&limit=` или `?codes=` | подсказку по МКБ-10 или перечень кодов разом |
 | GET | `/internal/v1/policies/search?contract_external_id=&query=&limit=` | подсказку по части ФИО или номера среди действующих полисов договора |
 | GET | `/internal/v1/policies/{id}`, `/internal/v1/policies?external_id=` или `?number=&contract_external_id=` | полис целиком, с персональными данными |
+| GET | `/internal/v1/policies/{id}/family`, `?number=` | полисы родственников застрахованного по связям из 1С:УСК, действующие сегодня; с `number` — один родственник |
 | GET | `/internal/v1/policies/{id}/contract-view`, `/internal/v1/policies/contract-view?external_id=` | полис для сервиса Договоров, без персональных данных |
 | GET | `/internal/v1/insurance-contracts/{id}`, `/internal/v1/insurance-contracts?external_id=` | договор страхования со страхователем |
 | GET | `/internal/v1/insurance-contracts?insurer_external_id=` | единственный действующий сегодня договор страхования страхователя по его GUID в 1С:УСК; нет такого — 404 `INSURANCE_CONTRACT_NOT_FOUND`, несколько — 409 `AMBIGUOUS_INSURANCE_CONTRACT` с `insurance_contract_id` кандидатов |
@@ -574,9 +575,9 @@ namespace `rvl-test`. Docker на машине стенда нет: `nerdctl` с
   образа (75 %). При 75 % и лимите 1 ГБ перегрузка REST доводила память до лимита, и ядро убивало процесс; при 60 % сервис
   отвечал 503 и сразу восстанавливался ([load-testing.md](load-testing.md)).
 - Ingress стенда (`ingress.resources` в `values.yaml`) публикует снаружи `/internal/v1/lpu…`,
-  `/internal/v1/insurance-contracts…` и `/internal/v1/policies…`: к ручкам полисов через ingress обращается BFF сервиса
-  Заявок. Своей авторизации у ручек нет, а журнал доступа ingress-nginx пишет строку запроса целиком, поэтому строки
-  поиска полисов с ФИО на стенде в нём остаются. Сервис Заявок обращается к сервису внутри кластера, по адресу
+  `/internal/v1/insurance-contracts…`, `/internal/v1/policies…` и `/internal/v1/mkb10…`: к ручкам полисов через ingress
+  обращается BFF сервиса Заявок, МКБ-10 опубликован по запросу сервиса Заявок. Своей авторизации у ручек нет, а журнал
+  доступа ingress-nginx пишет строку запроса целиком, поэтому строки поиска полисов с ФИО на стенде в нём остаются. Сервис Заявок обращается к сервису внутри кластера, по адресу
   `http://data-reference:8080`, ingress ему не нужен.
 - Резервные копии файлов (`*.bak`, `*.orig`, `*.swp`, `*~` и подобные), оставленные редактором рядом с `values.yaml`,
   Helm в чарт не берёт: их исключает `.helmignore` чарта.
