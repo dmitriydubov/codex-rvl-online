@@ -24,7 +24,7 @@ info:
 
     Номера R-01…R-10 в названиях ручек — нумерация «ТЗ API Data-reference» и журнала решений REST. В исходном ТЗ
     ручек восемь (R-01…R-08); R-09 — программа страхования для сервиса Договоров, R-05д — полис без персональных
-    данных для сервиса Договоров (проекция R-05), R-10 — застрахованные родственники по полису сотрудника. У R-08 три способа найти договор: по `id`, по `external_id` и
+    данных для сервиса Договоров (проекция R-05), R-10 — застрахованные родственники застрахованного. У R-08 три способа найти договор: по `id`, по `external_id` и
     действующий договор страхователя по `insurer_external_id`.
 
     ## X-Request-Id
@@ -347,6 +347,59 @@ paths:
         '400': {$ref: '#/components/responses/ValidationError'}
         '404': {$ref: '#/components/responses/PolicyNotFound'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /internal/v1/policies/{id}/family:
+    get:
+      tags: [Полисы]
+      operationId: policyFamily
+      summary: R-10. Застрахованные родственники застрахованного (для сервиса Заявок)
+      description: |
+        Родственники застрахованного по связям застрахованных из 1С:УСК. Отдаются полисы родственников, связь с которыми
+        действует сегодня (московский день; связь покрывает хотя бы одна запись 1С, первый и последний день
+        включительно, пустое окончание — бессрочно) и которые сами действуют сегодня: не в архиве, `begin_date <= сегодня`
+        и (`end_date` пустая или `end_date >= сегодня`). Учитываются только связи, где этот полис — застрахованный;
+        обратные не отдаются. Полис самого застрахованного не отбирается: его родственники отдаются и когда он в архиве,
+        закончился или ещё не начался. Один элемент на полис родственника: `relation_type_external_id` — GUID типа связи
+        в 1С:УСК, если у полиса сегодня один действующий тип связи, и `null`, если их несколько. Порядок — по номеру
+        полиса родственника, затем по GUID полиса (сравнение строк). Родственников нет — `{"items": []}`.
+
+        С параметром `number` — поиск среди этих же родственников: найден — один элемент того же вида без обёртки
+        `items`; не найден (в том числе номер чужого полиса или самого застрахованного) — 404 `POLICY_NOT_FOUND`; два
+        родственника с таким номером (номер уникален только в договоре) — 409 `AMBIGUOUS_POLICY`. Не кэшируется.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - name: id
+          in: path
+          required: true
+          description: |
+            Внутренний id полиса застрахованного в data-reference (UUID, поле `id` ответов), как в
+            `/internal/v1/policies/{id}`; не GUID 1С.
+          schema: {type: string, format: uuid}
+        - name: number
+          in: query
+          required: false
+          description: номер полиса родственника; пустой — 400
+          schema: {type: string}
+      responses:
+        '200':
+          description: без `number` — список родственников (`FamilyList`), с `number` — один родственник (`FamilyMember`)
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Family'}
+        '400': {$ref: '#/components/responses/ValidationError'}
+        '404':
+          description: '`POLICY_NOT_FOUND` — нет полиса застрахованного или, с `number`, родственника с таким номером'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '409':
+          description: '`AMBIGUOUS_POLICY` — с `number`: два родственника с таким номером; `details`: `{policy_id}`'
+          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /internal/v1/policies:
     get:
       tags: [Полисы]
@@ -381,55 +434,6 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Policy'}
-        '400': {$ref: '#/components/responses/ValidationError'}
-        '404': {$ref: '#/components/responses/PolicyNotFound'}
-        '409':
-          description: '`AMBIGUOUS_POLICY` — по номеру в договоре больше одного полиса; `details`: `{policy_id}`'
-          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
-        '503': {$ref: '#/components/responses/ServiceUnavailable'}
-  /internal/v1/policies/relatives:
-    get:
-      tags: [Полисы]
-      operationId: insuredRelatives
-      summary: R-10. Застрахованные родственники по полису сотрудника (для сервиса Заявок)
-      description: |
-        Связи застрахованных из 1С:УСК, действующие сегодня (московский день), у полиса сотрудника. Связь действует, если
-        её покрывает хотя бы одна запись 1С: начало не позже сегодня, окончание пустое или не раньше сегодня (оба дня
-        включительно). В ответ идут только связи, где полис сотрудника — застрахованный (`idInsured`); обратные связи не
-        отдаются. Элемент — пара «полис родственника и тип связи»: тип — GUID 1С как есть, наименование и сопоставление
-        с кодами заявки сервис не ведёт. Полис родственника — как у R-05, но без e-mail; отдаётся и архивный, и
-        закончившийся, со стёртыми персональными данными — с `null` и `personal_data_erased: true`. Связь, полиса
-        родственника по которой ещё нет в справочнике, не отдаётся. Порядок: номер полиса родственника, затем GUID
-        типа связи, затем GUID полиса (сравнение строк). Связей нет — пустой `items`. Ключ — как у R-05: ровно один из
-        `external_id` или `number` вместе с `contract_external_id`; полиса нет — 404, полис сотрудника в архиве — связи
-        отдаются. Не кэшируется.
-      parameters:
-        - $ref: '#/components/parameters/RequestId'
-        - name: external_id
-          in: query
-          required: false
-          description: GUID полиса сотрудника в 1С:УСК
-          schema: {type: string, format: uuid}
-        - name: number
-          in: query
-          required: false
-          description: номер полиса сотрудника; только вместе с `contract_external_id`
-          schema: {type: string}
-        - name: contract_external_id
-          in: query
-          required: false
-          description: GUID договора страхования в 1С:УСК; только вместе с `number`
-          schema: {type: string, format: uuid}
-      responses:
-        '200':
-          description: действующие связи с полисами родственников
-          headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/InsuredRelatives'}
         '400': {$ref: '#/components/responses/ValidationError'}
         '404': {$ref: '#/components/responses/PolicyNotFound'}
         '409':
@@ -939,26 +943,24 @@ components:
         programs:
           type: array
           items: {$ref: '#/components/schemas/PolicyProgram'}
-    InsuredRelatives:
+    Family:
+      description: ответ о родственниках — список без `number`, один родственник с `number`
+      oneOf:
+        - $ref: '#/components/schemas/FamilyList'
+        - $ref: '#/components/schemas/FamilyMember'
+    FamilyList:
       type: object
       required: [items]
       properties:
         items:
           type: array
-          items: {$ref: '#/components/schemas/InsuredRelative'}
-    InsuredRelative:
+          items: {$ref: '#/components/schemas/FamilyMember'}
+    FamilyMember:
       type: object
-      required: [relation_type_external_id, policy]
+      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender,
+                 relation_type_external_id]
       properties:
-        relation_type_external_id: {type: string, format: uuid, description: 'GUID типа связи в 1С:УСК'}
-        policy: {$ref: '#/components/schemas/RelativePolicy'}
-    RelativePolicy:
-      type: object
-      description: полис родственника — поля полиса R-05 без `email`
-      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender, begin_date, end_date,
-                 availability, is_archive, personal_data_erased, contract, programs]
-      properties:
-        id: {type: string, format: uuid}
+        id: {type: string, format: uuid, description: 'наш id полиса родственника, как в `/internal/v1/policies/{id}`'}
         external_id: {type: string, format: uuid}
         number: {type: string}
         last_name: {type: string, nullable: true}
@@ -966,19 +968,11 @@ components:
         middle_name: {type: string, nullable: true}
         date_of_birth: {type: string, format: date, nullable: true}
         gender: {type: string, nullable: true, description: 'как в 1С:УСК (`М`, `Ж`)'}
-        begin_date: {type: string, format: date}
-        end_date: {type: string, format: date, nullable: true}
-        availability: {type: boolean, description: 'признак доступности полиса из 1С:УСК'}
-        is_archive: {type: boolean}
-        personal_data_erased: {type: boolean, description: 'ФИО и дата рождения стёрты по сроку'}
-        contract:
-          type: object
+        relation_type_external_id:
+          type: string
+          format: uuid
           nullable: true
-          description: договор страхования полиса; `null`, если его нет в справочнике
-          allOf: [{$ref: '#/components/schemas/ContractRef'}]
-        programs:
-          type: array
-          items: {$ref: '#/components/schemas/PolicyProgram'}
+          description: GUID типа связи в 1С:УСК; `null`, если у полиса сегодня несколько действующих типов связи
     ContractRef:
       type: object
       required: [id, external_id, number]

@@ -1,6 +1,5 @@
 package ru.projectx.datareference.repository.catalog;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,8 +12,6 @@ import ru.projectx.datareference.entity.catalog.InsuranceContract;
 public interface InsuranceContractRepository extends JpaRepository<InsuranceContract, UUID> {
 
     Optional<InsuranceContract> findByExternalId(UUID externalId);
-
-    List<InsuranceContract> findAllByExternalIdIn(Collection<UUID> externalIds);
 
     List<InsuranceContract> findAllByExternalInsurerId(UUID externalInsurerId);
 

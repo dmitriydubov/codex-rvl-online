@@ -20,12 +20,7 @@ public class InsuredRelativesSteps {
 
     @Тогда("полисы родственников в ответе по порядку — {string}")
     public void relativePolicyNumbersInOrder(String numbers) {
-        assertThat(itemValues("policy/number")).as("номера полисов родственников").containsExactlyElementsOf(listed(numbers));
-    }
-
-    @Тогда("типы связи в ответе по порядку — {string}")
-    public void relationTypesInOrder(String types) {
-        assertThat(itemValues("relation_type_external_id")).as("типы связи").containsExactlyElementsOf(listed(types));
+        assertThat(itemValues("number")).as("номера полисов родственников").containsExactlyElementsOf(listed(numbers));
     }
 
     @Тогда("поле {string} ответа состоит ровно из полей {string}")

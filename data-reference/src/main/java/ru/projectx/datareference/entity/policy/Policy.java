@@ -113,6 +113,10 @@ public class Policy extends OneCEntity {
         }
     }
 
+    public boolean isActiveOn(LocalDate day) {
+        return !isArchive() && !beginDate.isAfter(day) && !endedBefore(day);
+    }
+
     public boolean personalDataErased() {
         return personalDataErasedAt != null;
     }
