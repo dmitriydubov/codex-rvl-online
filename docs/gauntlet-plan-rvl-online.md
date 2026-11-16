@@ -5311,6 +5311,24 @@ REST.
   Ш92 этот файл не трогает; README, сборка «Не выпущено» в `[1.0.0-rc.3]` и `internal/v1/mkb10` в чарте — PR
   координатора после мержа. (4) Письмо с контрактом владелец отправил разработчице Заявок до мержа; её ответ: `null` в
   `relation_type_external_id` при двух действующих типах связи — подходит (вариант «б» остаётся).
+  **Allowlist Ш92 — сверка координатора (2026-11-16).** Чат сессии координатору не виден (`get_session` — только сводка,
+  `ListAgents` сессию не видит), поэтому список собран заново по отчёту PIT. Прогон `mutationGate` координатора на
+  2e7e0d9 (отдельная копия ветки) **красный**: 3 RUN_ERROR, `Row#dimensions` в allowlist есть, двух
+  `InsuredAssociation$Row#validOn RemoveConditionalMutator_EQUAL_ELSE` нет; в итоговом прогоне сессии RUN_ERROR не было —
+  падение JVM на записях от прогона к прогону разное. По правилу Ш91 (каждый мутант PIT в записях) — 11 строк:
+  `FamilyMember#of` Null; `InsuredAssociation$Row#validOn` BooleanTrue и EQUAL_ELSE; `Policy$Details#toString`
+  EmptyObject; `RelationTypes#activeOn` Null, `#lambda$activeOn$*` BooleanFalse, BooleanTrue и EQUAL_ELSE,
+  `#lambda$new$*` EmptyObject, `#relatedPolicies` EmptyObject, `#soleTypeOf` EQUAL_ELSE. Тесты — `InsuredAssociationTest.
+  row_isValidOnDay_fromItsFirstToItsLastDayInclusive`, `RelationTypesTest` (`linkOfTheInsuredPolicyToItself_isLeftOut`,
+  `activeOn_keepsRelatedPoliciesOfRowsValidThatDayOnly`, `soleType_isTheOnlyTypeValidThatDay_howeverManyRowsCoverIt`),
+  `FamilyMembersTest.member_carriesRequisitesOfThePolicyAndTheSoleTypeOfItsLink`, `PolicyTest.
+  detailsText_leavesOutPersonalData_butNamesTheContract`. Проверка: каждая строка совпадает с мутантом отчёта, мутантов
+  записей без строки нет; 14 вариантов (три перехода `validOn`, обе лямбды под `lambda$activeOn$*`, в том числе
+  BooleanFalse лямбды связи с собой, которого PIT не делает) применены вручную — названные тесты падают, контрольный
+  прогон без мутаций зелёный; `PitSummary` набора на том же отчёте с черновиком — exit 0, с allowlist из `main` — exit 1.
+  EQUAL_ELSE заменяет переход на `GOTO` (исходник PIT 1.22.1, `RemoveConditionalMutator.visitJumpInsn`); номер вызова
+  параметризованного теста в `killingTest` ненадёжен (BooleanTrue `validOn` «убит» вызовом #5, который он проходит).
+  Строки — на «да» владельца, вносятся PR'ом координатора после мержа #306; мержу не мешают: тесты эти мутанты убивают.
 - 2026-11-15, **Ш92 открыт: session_01MHdnEtxdDCiMShdb3pmYM9** (окружение `default`, Opus 5.5 — решение владельца «Опус
   5.5 на все», ветка `claude/sh92-insured-relatives`). В задании: утверждённый текст с правками владельца (ФИО в ответе,
   тип связи — GUID 1С), ответы Заявок (вход — GUID и номер полиса, поля — «все, что понадобится», «на сегодня»,
