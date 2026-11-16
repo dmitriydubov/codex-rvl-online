@@ -67,7 +67,7 @@ servers:
   - url: http://localhost:8080
     description: экземпляр сервиса (порт API)
   - url: https://s00-0000-rvl8.sogaz.ru/data-reference
-    description: тестовый стенд через ingress; снаружи доступны только /internal/v1/lpu…, /internal/v1/insurance-contracts… и /internal/v1/policies…
+    description: тестовый стенд через ingress; снаружи доступны только /internal/v1/lpu…, /internal/v1/insurance-contracts…, /internal/v1/policies… и /internal/v1/mkb10…
 tags:
   - name: ЛПУ
     description: каталог санаториев, карточка, услуги и цены

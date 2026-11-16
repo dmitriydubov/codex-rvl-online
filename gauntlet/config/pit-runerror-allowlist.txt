@@ -120,3 +120,25 @@ ru.projectx.datareference.service.metrics.InboundBacklog#lambda$oldestPending$* 
 ru.projectx.datareference.service.onec.TransferRejection$TransferPart#markup                         EmptyObjectReturnValsMutator  # rejectedPart_remembersItsTransfer: transferPart().batchCount() isEqualTo(1) gets null
 ru.projectx.datareference.service.onec.TransferRejection$TransferPart#markupOrTransferOnly           NullReturnValsMutator         # rejectedPart_remembersItsTransfer: reject() throws NPE on applyTo of null
 ru.projectx.datareference.service.onec.TransferRejection$TransferPart#lambda$markupOrTransferOnly$*  NullReturnValsMutator         # finalMessageWithCounterBeyondInt_keepsItsOwnReason_andBufferedBatchPointsToIt: NPE on applyTo of null
+
+# Ш92 (PR #306): records of the insured's family reply (FamilyMember, RelationTypes) and the new Row#validOn of the
+# insured-association row; Policy$Details#toString is mutated whenever Policy changes. As for Ш91, every mutant PIT
+# makes in these records is listed: the step's final run crashed on none of them, the coordinator's run and CI on
+# 2e7e0d9 crashed on Row#dimensions and on two Row#validOn EQUAL_ELSE. EQUAL_ELSE replaces the jump with GOTO (PIT 1.22.1
+# RemoveConditionalMutator): in Row#validOn the isAfter jump always gives false, the ifnull jump gives true from the
+# first day on, the isBefore jump gives false whenever the end is set; in lambda$activeOn$* the equals jump always
+# gives false; in soleTypeOf the size jump always gives null. Checked by the coordinator on 2e7e0d9: every line
+# matches a mutant of the PIT report (BooleanFalse of the self-link lambda is not made by PIT and was checked by hand
+# for the wildcard), no record mutant is left without a line, and every mutant was applied by hand and the named tests
+# failed. Verified by the coordinator 2026-11-16.
+ru.projectx.datareference.dto.FamilyMember#of                                      NullReturnValsMutator                # FamilyMembersTest.member_carriesRequisitesOfThePolicyAndTheSoleTypeOfItsLink: containsExactly(member) gets [null]
+ru.projectx.datareference.entity.policy.InsuredAssociation$Row#validOn             BooleanTrueReturnValsMutator         # InsuredAssociationTest.row_isValidOnDay_fromItsFirstToItsLastDayInclusive: isEqualTo(false) gets true (day before the first, after the last, not started)
+ru.projectx.datareference.entity.policy.InsuredAssociation$Row#validOn             RemoveConditionalMutator_EQUAL_ELSE  # row_isValidOnDay_...: isAfter and isBefore jumps - isEqualTo(true) gets false; ifnull jump - day after the last, isEqualTo(false) gets true
+ru.projectx.datareference.entity.policy.Policy$Details#toString                    EmptyObjectReturnValsMutator         # PolicyTest.detailsText_leavesOutPersonalData_butNamesTheContract: contains(contract id) gets ""
+ru.projectx.datareference.service.policy.RelationTypes#activeOn                    NullReturnValsMutator                # RelationTypesTest.linkOfTheInsuredPolicyToItself_isLeftOut: relatedPolicies() on null
+ru.projectx.datareference.service.policy.RelationTypes#lambda$activeOn$*           BooleanFalseReturnValsMutator        # linkOfTheInsuredPolicyToItself_isLeftOut: containsExactly(SPOUSE) gets [] (either filter)
+ru.projectx.datareference.service.policy.RelationTypes#lambda$activeOn$*           BooleanTrueReturnValsMutator         # day filter: activeOn_keepsRelatedPoliciesOfRowsValidThatDayOnly containsExactly(SPOUSE) gets [FORMER, SPOUSE]; self-link filter: linkOfTheInsuredPolicyToItself_isLeftOut gets [INSURED, SPOUSE]
+ru.projectx.datareference.service.policy.RelationTypes#lambda$activeOn$*           RemoveConditionalMutator_EQUAL_ELSE  # linkOfTheInsuredPolicyToItself_isLeftOut: containsExactly(SPOUSE) gets []
+ru.projectx.datareference.service.policy.RelationTypes#lambda$new$*                EmptyObjectReturnValsMutator         # soleType_isTheOnlyTypeValidThatDay_howeverManyRowsCoverIt: isEqualTo(TYPE) gets null
+ru.projectx.datareference.service.policy.RelationTypes#relatedPolicies             EmptyObjectReturnValsMutator         # linkOfTheInsuredPolicyToItself_isLeftOut: containsExactly(SPOUSE) gets []
+ru.projectx.datareference.service.policy.RelationTypes#soleTypeOf                  RemoveConditionalMutator_EQUAL_ELSE  # soleType_isTheOnlyTypeValidThatDay_howeverManyRowsCoverIt: isEqualTo(TYPE) gets null
