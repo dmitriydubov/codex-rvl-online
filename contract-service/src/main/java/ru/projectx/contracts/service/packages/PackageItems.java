@@ -1,17 +1,13 @@
 package ru.projectx.contracts.service.packages;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import ru.projectx.contracts.dto.DocumentState;
 import ru.projectx.contracts.dto.PackageItem;
 import ru.projectx.contracts.dto.PackageItem.PackageAcceptance;
 import ru.projectx.contracts.dto.PackageItem.PackageDocument;
-import ru.projectx.contracts.dto.PackageItem.PackagePayment;
-import ru.projectx.contracts.dto.PackageItem.PaymentState;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractAcceptance;
 import ru.projectx.contracts.entity.contract.ContractRegistration;
@@ -22,6 +18,7 @@ import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.service.status.IssuanceSnapshot;
+import ru.projectx.contracts.service.status.PaymentOffer;
 
 final class PackageItems {
 
@@ -41,14 +38,15 @@ final class PackageItems {
     private static PackageItem contract(RequestParticipant participant, IssuanceSnapshot snapshot,
             Map<UUID, ContractAcceptance> acceptances) {
         Contract contract = snapshot.contractOf(participant.participantId());
-        DocumentState state = PackageStates.of(contract.status());
+        PaymentOffer offer = snapshot.paymentOf(contract);
+        DocumentState state = PackageStates.shown(contract.status(), offer);
         Optional<IssueError> error = shownError(contract, state);
         List<PackageDocument> documents = PackageDocuments.of(snapshot.formsOf(contract));
         return new PackageItem(participant.participantId(), DocumentKind.KM_CONTRACT, contract.id(), contract.number(),
                 contract.state().entityVersion(), state, contract.premiumAmount(),
                 contract.progress().registration().map(ContractRegistration::issuedPolicyNumber).orElse(null),
                 Optional.ofNullable(acceptances.get(contract.id())).map(PackageItems::acceptance).orElse(null),
-                payment(state, contract.premiumAmount()), documents, error.map(IssueError::code).orElse(null),
+                PackagePayments.of(contract, state, offer), documents, error.map(IssueError::code).orElse(null),
                 error.map(IssueError::message).orElse(null));
     }
 
@@ -63,10 +61,6 @@ final class PackageItems {
 
     private static PackageAcceptance acceptance(ContractAcceptance acceptance) {
         return new PackageAcceptance(acceptance.offer().acceptedAt(), acceptance.offer().contractVersion());
-    }
-
-    private static @Nullable PackagePayment payment(DocumentState state, BigDecimal premium) {
-        return state == DocumentState.ACCEPTED ? new PackagePayment(PaymentState.PENDING, premium) : null;
     }
 
     private static Optional<IssueError> shownError(IssuanceRecord record, DocumentState state) {

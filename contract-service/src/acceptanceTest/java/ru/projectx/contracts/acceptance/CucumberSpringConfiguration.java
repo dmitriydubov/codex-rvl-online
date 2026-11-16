@@ -16,8 +16,10 @@ import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import ru.projectx.contracts.config.broker.InternalBrokerProperties;
+import ru.projectx.contracts.config.broker.MarketingBrokerProperties;
 import ru.projectx.contracts.config.broker.OneCBrokerProperties;
 import ru.projectx.contracts.service.integration.broker.InternalBroker;
+import ru.projectx.contracts.service.integration.broker.MarketingBroker;
 import ru.projectx.contracts.service.integration.broker.OneCBroker;
 import ru.projectx.contracts.service.leadership.LeaderLockConnections;
 
@@ -37,7 +39,24 @@ import ru.projectx.contracts.service.leadership.LeaderLockConnections;
         "projectx.storage.timeouts.connect=1s",
         "projectx.storage.timeouts.read=2s",
         "projectx.storage.timeouts.write=2s",
-        "projectx.storage.timeouts.call=3s"})
+        "projectx.storage.timeouts.call=3s",
+        "projectx.payment.enabled=true",
+        "projectx.ordering.product=rvl",
+        "projectx.ordering.channel=rvl-lk",
+        "projectx.ordering.cancel-reason=notActual",
+        "projectx.ordering.connect-timeout=1s",
+        "projectx.ordering.read-timeout=1s",
+        "projectx.ordering.retry.attempts=3",
+        "projectx.ordering.retry.delay=0s",
+        "projectx.ordering.token.client-id=contracts-stand",
+        "projectx.ordering.token.client-secret=stand-token-secret-5b2e",
+        "projectx.ordering.token.connect-timeout=1s",
+        "projectx.ordering.token.read-timeout=1s",
+        "projectx.brokers.marketing.connection.tls.enabled=false",
+        "projectx.brokers.marketing.document-fixes.exchange=rvl.exchange",
+        "projectx.brokers.marketing.document-fixes.routing-key=rvl-contract-fixed",
+        "projectx.brokers.marketing.listener-auto-startup=true",
+        "projectx.brokers.marketing.order-events.queue=order.event.rvl.topic"})
 @Import(CucumberSpringConfiguration.Stand.class)
 public class CucumberSpringConfiguration {
 
@@ -69,21 +88,36 @@ public class CucumberSpringConfiguration {
         }
 
         @Bean
+        OrderingStub orderingStub(StandClock clock) throws IOException {
+            return new OrderingStub(clock);
+        }
+
+        @Bean
+        DynamicPropertyRegistrar orderingUrls(OrderingStub stub) {
+            return registry -> {
+                registry.add("projectx.ordering.url", stub::orderingUrl);
+                registry.add("projectx.ordering.token.uri", stub::tokenUri);
+            };
+        }
+
+        @Bean
         RabbitMQContainer rabbitContainer() {
             return new RabbitMQContainer(RABBITMQ_IMAGE);
         }
 
         @Bean
         DynamicPropertyRegistrar standBrokers(RabbitMQContainer container) throws IOException, InterruptedException {
-            container.execInContainer("rabbitmqctl", "add_vhost", "onec");
-            container.execInContainer("rabbitmqctl", "set_permissions", "-p", "onec", container.getAdminUsername(),
-                    ".*", ".*", ".*");
+            for (String virtualHost : new String[] {"onec", "marketing"}) {
+                container.execInContainer("rabbitmqctl", "add_vhost", virtualHost);
+                container.execInContainer("rabbitmqctl", "set_permissions", "-p", virtualHost,
+                        container.getAdminUsername(), ".*", ".*", ".*");
+            }
             return registry -> {
-                for (String broker : new String[] {"internal", "onec"}) {
+                for (String broker : new String[] {"internal", "onec", "marketing"}) {
                     String prefix = "projectx.brokers." + broker + ".connection.";
                     registry.add(prefix + "host", container::getHost);
                     registry.add(prefix + "port", container::getAmqpPort);
-                    registry.add(prefix + "virtual-host", () -> "internal".equals(broker) ? "/" : "onec");
+                    registry.add(prefix + "virtual-host", () -> "internal".equals(broker) ? "/" : broker);
                     registry.add(prefix + "username", container::getAdminUsername);
                     registry.add(prefix + "password", container::getAdminPassword);
                 }
@@ -143,6 +177,19 @@ public class CucumberSpringConfiguration {
         @Bean
         OneCQueue kmContractRegistrationQueue(@OneCBroker ConnectionFactory connections, OneCBrokerProperties broker) {
             return new OneCQueue(connections, KM_CONTRACT_REGISTRATIONS, broker.queues().kmContractRegistrations());
+        }
+
+        @Bean
+        DocumentFixQueue documentFixQueue(@MarketingBroker ConnectionFactory connections,
+                MarketingBrokerProperties broker) {
+            return new DocumentFixQueue(connections, broker.documentFixes().exchange(),
+                    broker.documentFixes().routingKey());
+        }
+
+        @Bean
+        OrderEventQueue orderEventQueue(@MarketingBroker ConnectionFactory connections,
+                MarketingBrokerProperties broker) {
+            return new OrderEventQueue(connections, broker.orderEvents().queue());
         }
 
         @Bean

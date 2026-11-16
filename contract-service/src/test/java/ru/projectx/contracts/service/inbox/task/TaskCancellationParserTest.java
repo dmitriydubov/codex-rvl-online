@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.task.ContractTaskCancellation;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
@@ -37,6 +39,14 @@ class TaskCancellationParserTest {
         assertThatThrownBy(() -> parser.parse(TaskBodies.cancelled("EXPIRED").withoutDataField("cancel_reason").toJson()))
                 .isInstanceOf(ContractViolationException.class)
                 .hasMessage("нет обязательного поля data.cancel_reason");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"individual_request_id", "cancelled_at"})
+    void missingRequiredField_isViolationNamingTheField(String field) {
+        assertThatThrownBy(() -> parser.parse(TaskBodies.cancelled("EXPIRED").withoutDataField(field).toJson()))
+                .isInstanceOf(ContractViolationException.class)
+                .hasMessage("нет обязательного поля data." + field);
     }
 
     @Test

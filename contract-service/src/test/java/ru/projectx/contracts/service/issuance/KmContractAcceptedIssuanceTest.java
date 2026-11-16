@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.issuance.TripPeriod;
 import ru.projectx.contracts.message.task.ContractTask;
@@ -137,7 +138,7 @@ class KmContractAcceptedIssuanceTest {
     private static Contract accepted() {
         Contract contract = existing("34000.00");
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         return contract;
     }
 

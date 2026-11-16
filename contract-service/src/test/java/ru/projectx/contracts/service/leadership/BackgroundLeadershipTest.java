@@ -121,6 +121,7 @@ class BackgroundLeadershipTest {
         });
 
         assertThat(counted).isZero();
+        assertThat(leadership.leader()).isFalse();
         verify(election).yield();
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);
@@ -140,6 +141,7 @@ class BackgroundLeadershipTest {
         });
 
         assertThat(ran).containsExactly("первое сообщение");
+        assertThat(leadership.leader()).isFalse();
         verify(election).yield();
         assertThat(logged.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.INFO);

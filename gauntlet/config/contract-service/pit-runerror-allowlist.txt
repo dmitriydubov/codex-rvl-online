@@ -49,3 +49,25 @@ ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThan
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_EQUAL_ELSE  # null check forced to the else branch -> always false: ttlCheck_... row "PT30S, PT1S, true" isEqualTo(true) fails; completeConfiguration_bindsGroupTtlAndHeartbeat context fails validation
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  RemoveConditionalMutator_ORDER_ELSE  # compareTo > 0 forced to the else branch -> always false: same two tests fail
 ru.projectx.contracts.config.leadership.LeadershipProperties#isLockTtlLongerThanHeartbeat  BooleanTrueReturnValsMutator         # always true: ttlCheck_holdsOnlyWhenTtlStrictlyExceedsHeartbeat row "PT1S, PT1S, false" isEqualTo(false) fails; ttlCheck_isFalseWhileAValueIsMissing isFalse() fails; heartbeatNotShorterThanTtl_failsValidation hasFailed() fails
+
+# OrderingPropertiesTest: tokenSettings_neverPrintTheSecret - Token (nested record of OrderingProperties) prints the token
+# endpoint and the client id, never the secret. Its hand-written toString() is the only mutant of the file: PIT's record
+# filter drops the accessors, the canonical constructors and the generated equals/hashCode/toString. A toString() that
+# returns "" passes doesNotContain(secret) but fails contains(...). Verified by the coordinator 2026-11-09 on the Ordering
+# order branch (e88314e; manual mutation, the test fails at the contains(...) line), owner "1) да".
+ru.projectx.contracts.config.payment.OrderingProperties$Token#toString       EmptyObjectReturnValsMutator         # tokenSettings_neverPrintTheSecret: contains("contracts-stand", "http://keycloak.test/token") fails on ""
+
+# RecordOutcomeTest: outcome of a record together with its payment offer (record RecordOutcome after the payment invoice
+# step). resumedSince() - a new task lifted the deferred termination of a contract with an invoice; looksLike() and
+# sameOutcomeAs() - the same status, error and presence of the payment link; awaitsPaymentAgain() - neither deferred nor
+# stopped. The step's final run had no RUN_ERROR only thanks to the PIT history: the first redefineClasses of this record
+# (annotations on its components) breaks the class in the test JVM. The step loaded each mutant as a class and saw the
+# named assertion fail; the coordinator read the tests and assertions in RecordOutcomeTest on the payment invoice branch
+# (84a0ae3) on 2026-11-10, owner "да".
+ru.projectx.contracts.service.status.RecordOutcome#awaitsPaymentAgain        RemoveConditionalMutator_EQUAL_ELSE  # outcome_isResumedWhenTheEarlierOneWasDeferredAndThisOneIsNeitherDeferredNorStopped: resumedSince(deferred) isTrue() fails; outcome_isNotResumed...: deferred.resumedSince(deferred) isFalse() fails
+ru.projectx.contracts.service.status.RecordOutcome#awaitsPaymentAgain        BooleanTrueReturnValsMutator         # outcome_isNotResumedWithoutAnEarlierDeferredOneOrWhileStillDeferredOrOnceStopped: deferred.resumedSince(deferred) isFalse() fails
+ru.projectx.contracts.service.status.RecordOutcome#looksLike                 RemoveConditionalMutator_EQUAL_ELSE  # outcome_looksLikeAnEarlierOneWithTheSameStatusErrorAndPresenceOfTheLink: looksLike(same) isTrue() fails; outcome_doesNotLookLike...: linked.looksLike(null) isFalse() fails or throws NPE
+ru.projectx.contracts.service.status.RecordOutcome#resumedSince              RemoveConditionalMutator_EQUAL_ELSE  # outcome_isResumedWhenTheEarlierOneWasDeferredAndThisOneIsNeitherDeferredNorStopped: resumedSince(deferred) isTrue() fails; outcome_isNotResumed...: running.resumedSince(null) throws NPE
+ru.projectx.contracts.service.status.RecordOutcome#resumedSince              BooleanTrueReturnValsMutator         # outcome_isNotResumedWithoutAnEarlierDeferredOneOrWhileStillDeferredOrOnceStopped: running.resumedSince(null) isFalse() fails
+ru.projectx.contracts.service.status.RecordOutcome#sameOutcomeAs             RemoveConditionalMutator_EQUAL_ELSE  # outcome_looksLikeAnEarlierOneWithTheSameStatusErrorAndPresenceOfTheLink: looksLike(same) isTrue() fails
+ru.projectx.contracts.service.status.RecordOutcome#sameOutcomeAs             BooleanTrueReturnValsMutator         # outcome_doesNotLookLikeNothingOrAnEarlierOneThatDiffersInStatusErrorOrPresenceOfTheLink: unlinked.looksLike(accepted) and failed.looksLike(failedOtherwise) isFalse() fail

@@ -75,6 +75,11 @@ public final class LmPolicyResultBodies {
         return this;
     }
 
+    public LmPolicyResultBodies withoutPolicyField(String name) {
+        ((ObjectNode) data().get("policy")).remove(name);
+        return this;
+    }
+
     public LmPolicyResultBodies withDocumentField(int index, String name, String value) {
         ((ObjectNode) data().get("documents").get(index)).put(name, value);
         return this;

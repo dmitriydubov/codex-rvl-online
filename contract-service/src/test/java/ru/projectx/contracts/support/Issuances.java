@@ -7,6 +7,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.issuance.IssuanceTerms;
 import ru.projectx.contracts.entity.issuance.IssuedPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicy;
@@ -38,10 +39,21 @@ public final class Issuances {
         return policy;
     }
 
-    public static Contract paidContract(String id, UUID participant, String number, Instant paidAt) {
+    public static Contract acceptedContract(String id, UUID participant, String number) {
         Contract contract = contract(id, participant, number);
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
+        return contract;
+    }
+
+    public static Contract invoicedContract(String id, UUID participant, String number) {
+        Contract contract = acceptedContract(id, participant, number);
+        contract.advance(ContractStep.INVOICE_ISSUED);
+        return contract;
+    }
+
+    public static Contract paidContract(String id, UUID participant, String number, Instant paidAt) {
+        Contract contract = acceptedContract(id, participant, number);
         contract.markPaid(paidAt, paidAt);
         return contract;
     }

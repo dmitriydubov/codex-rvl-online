@@ -25,6 +25,11 @@ public class AcceptanceSteps {
     private static final String SAME_AS_PATH = "как в пути";
     private static final String ABSENT = "нет";
     private static final String NOT_A_GUID = "not-a-guid";
+    private static final String EMAIL = "email";
+    private static final String STAND_EMAIL = "insured@example.test";
+    private static final String TOO_LONG_EMAIL = "payer-" + "a".repeat(58) + "@stand-" + "b".repeat(55) + ".stand-"
+            + "c".repeat(55) + ".stand-" + "d".repeat(55) + ".test";
+    private static final int TOO_LONG = 255;
     private static final String NOT_JSON = "{\"contract_version\": 1, \"channel\": \"WEB\"";
     private static final Map<String, UnaryOperator<ObjectNode>> DEFECTS = Map.ofEntries(
             Map.entry("нет поля contract_version", body -> body.without(CONTRACT_VERSION)),
@@ -37,6 +42,18 @@ public class AcceptanceSteps {
             Map.entry("accepted_at — не дата и время", body -> body.put(ACCEPTED_AT, "вчера")),
             Map.entry("channel вне перечня", body -> body.put("channel", "SMS")),
             Map.entry("ip_address — не IP-адрес", body -> body.put("ip_address", "999.1.1.1")),
+            Map.entry("нет поля email", body -> body.without(EMAIL)),
+            Map.entry("email — пустая строка", body -> body.put(EMAIL, "")),
+            Map.entry("email — число", body -> body.put(EMAIL, 42)),
+            Map.entry("email без @", body -> body.put(EMAIL, "insured.example.test")),
+            Map.entry("email без домена", body -> body.put(EMAIL, "insured@")),
+            Map.entry("email с пробелом", body -> body.put(EMAIL, "insured @example.test")),
+            Map.entry("email с кириллицей в имени", body -> body.put(EMAIL, "страхователь@example.test")),
+            Map.entry("email с кириллицей в домене", body -> body.put(EMAIL, "insured@пример.тест")),
+            Map.entry("email с доменом без точки", body -> body.put(EMAIL, "insured@localhost")),
+            Map.entry("email в кавычках", body -> body.put(EMAIL, "\"insured\"@example.test")),
+            Map.entry("email с IP-адресом вместо домена", body -> body.put(EMAIL, "insured@[192.0.2.1]")),
+            Map.entry("email длиннее 254 символов", body -> body.put(EMAIL, TOO_LONG_EMAIL)),
             Map.entry("идентификатор договора в пути — не GUID", UnaryOperator.identity()),
             Map.entry("тело не JSON", UnaryOperator.identity()));
 
@@ -77,6 +94,7 @@ public class AcceptanceSteps {
             throws IOException, InterruptedException {
         UnaryOperator<ObjectNode> change = Optional.ofNullable(DEFECTS.get(defect))
                 .orElseThrow(() -> new AssertionError("неизвестный дефект запроса акцепта: " + defect));
+        assertThat(TOO_LONG_EMAIL).as("адрес стенда длиннее предела").hasSize(TOO_LONG);
         String contract = defect.startsWith("идентификатор договора") ? NOT_A_GUID
                 : records.latestContractId(participant, request).toString();
         String body = "тело не JSON".equals(defect) ? NOT_JSON : change.apply(intactBody()).toString();
@@ -154,6 +172,7 @@ public class AcceptanceSteps {
         body.put("accepted_by", "b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45");
         body.put(ACCEPTED_AT, "2026-02-10T10:04:58+03:00");
         body.put("channel", "WEB");
+        body.put(EMAIL, STAND_EMAIL);
         body.put("ip_address", "10.20.30.40");
         body.put("user_agent", "Mozilla/5.0 (Стенд; вымышленный браузер)");
         return body;

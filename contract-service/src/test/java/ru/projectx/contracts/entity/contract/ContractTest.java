@@ -22,6 +22,8 @@ import ru.projectx.contracts.entity.issuance.TripPeriod;
 
 class ContractTest {
 
+    private static final UUID CONTRACT_ID = UUID.fromString("3d9b2f71-6c4e-4a8b-9f15-27e0c8a4b6d2");
+
     private static final Instant OPENED = Instant.parse("2026-02-10T07:05:00Z");
     private static final Instant LATER = Instant.parse("2026-02-10T07:35:00Z");
     private static final TripPeriod PERIOD = new TripPeriod(LocalDate.parse("2026-04-10"), LocalDate.parse("2026-04-24"));
@@ -173,7 +175,7 @@ class ContractTest {
     void accept_turnsContractReadyForAcceptanceIntoAcceptedWithoutNewVersion() {
         contract.offerDraft();
 
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         assertThat(contract.status()).isEqualTo(ContractStatus.ACCEPTED);
         assertThat(contract.state().entityVersion()).isEqualTo(1);
@@ -183,7 +185,7 @@ class ContractTest {
 
     @Test
     void accept_isRefusedOutsideReadyForAcceptanceAndChangesNothing() {
-        assertThatThrownBy(() -> contract.accept()).isInstanceOf(IllegalStateException.class)
+        assertThatThrownBy(() -> contract.advance(ContractStep.OFFER_ACCEPTED)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("NEW");
 
         assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
@@ -208,7 +210,7 @@ class ContractTest {
     @Test
     void markPaid_turnsAcceptedContractIntoPaidWithTheMomentOfPaymentAndNextVersion() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
 
         contract.markPaid(PAID_AT, LATER);
 
@@ -266,6 +268,14 @@ class ContractTest {
     }
 
     @Test
+    void submit_refusalNamesTheContractItsStatusAndTheExpectedOne() {
+        ReflectionTestUtils.setField(contract, "id", CONTRACT_ID);
+
+        assertThatThrownBy(() -> contract.submit(LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("договор КМ 3d9b2f71-6c4e-4a8b-9f15-27e0c8a4b6d2 в статусе NEW, а не PAID");
+    }
+
+    @Test
     void markIssued_storesTheRegistrationAndFinishesTheSubmittedContract() {
         paid();
         contract.submit(LATER);
@@ -291,6 +301,14 @@ class ContractTest {
                 .hasMessageContaining(status.name()).hasMessageContaining("SUBMITTED");
         assertThat(contract.progress().registration()).isEmpty();
         assertThat(contract.state().entityVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void markIssued_refusalNamesTheContractItsStatusAndTheExpectedOne() {
+        ReflectionTestUtils.setField(contract, "id", CONTRACT_ID);
+
+        assertThatThrownBy(() -> contract.markIssued(ISSUED, LATER)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("договор КМ 3d9b2f71-6c4e-4a8b-9f15-27e0c8a4b6d2 в статусе NEW, а не SUBMITTED");
     }
 
     @Test
@@ -320,7 +338,7 @@ class ContractTest {
 
     private void paid() {
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(PAID_AT, LATER);
     }
 

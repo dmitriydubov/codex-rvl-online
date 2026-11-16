@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
@@ -86,6 +88,39 @@ class UskResultParserTest {
             assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.failed().withoutDataField("error_code").toJson()))
                     .isInstanceOf(ContractViolationException.class)
                     .hasMessage("нет обязательного поля data.error_code");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"id", "status"})
+        void missingRequiredFieldOfIssuedResult_isViolationNamingTheField(String field) {
+            assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.issued().withoutDataField(field).toJson()))
+                    .isInstanceOf(ContractViolationException.class)
+                    .hasMessage("нет обязательного поля data." + field);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"external_id", "number"})
+        void missingRequiredPolicyField_isViolationNamingTheField(String field) {
+            assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.issued().withoutPolicyField(field).toJson()))
+                    .isInstanceOf(ContractViolationException.class)
+                    .hasMessage("нет обязательного поля data.policy." + field);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"id", "error_message"})
+        void missingRequiredFieldOfFailedResult_isViolationNamingTheField(String field) {
+            assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.failed().withoutDataField(field).toJson()))
+                    .isInstanceOf(ContractViolationException.class)
+                    .hasMessage("нет обязательного поля data." + field);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"doc_type", "file_url"})
+        void documentWithoutRequiredField_isViolationNamingTheField(String field) {
+            assertThatThrownBy(() -> parser.parse(LmPolicyResultBodies.issued().withoutDocumentField(0, field)
+                    .toJson()))
+                    .isInstanceOf(ContractViolationException.class)
+                    .hasMessage("нет обязательного поля data.documents[0]." + field);
         }
 
         @Test

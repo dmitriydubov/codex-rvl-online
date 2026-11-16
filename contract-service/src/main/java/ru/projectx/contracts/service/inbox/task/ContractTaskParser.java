@@ -23,10 +23,10 @@ public class ContractTaskParser implements PayloadParser<ContractTask> {
     public ContractTask parse(String payload) {
         JsonFields body = bodies.body(payload);
         JsonFields data = body.requiredObject(MessageBodies.DATA);
-        int entityVersion = body.requiredObject(MessageBodies.META).integer("entity_version");
-        ContractTask task = new ContractTask(entityVersion, data.uuid("individual_request_id"),
-                data.uuid("insurance_contract_id"),
-                data.uuid("insurer_policy_id"), data.date("date_from"), data.date("date_to"),
+        int entityVersion = body.requiredObject(MessageBodies.META).field("entity_version").integer();
+        ContractTask task = new ContractTask(entityVersion, data.field("individual_request_id").uuid(),
+                data.field("insurance_contract_id").uuid(),
+                data.field("insurer_policy_id").uuid(), data.field("date_from").date(), data.field("date_to").date(),
                 participants(data.requiredArray("participants")));
         requireSingleInsured(task.participants());
         return task;

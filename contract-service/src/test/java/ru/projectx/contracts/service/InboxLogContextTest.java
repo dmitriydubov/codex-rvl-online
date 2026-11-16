@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import ru.projectx.contracts.entity.inbox.InboxReceipt;
 
@@ -29,6 +31,39 @@ class InboxLogContextTest {
         assertThat(messageId.get()).isEqualTo("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11");
         assertThat(requestId.get()).isEqualTo("61a7982c-a0b4-4bbf-9527-60b40b752803");
         assertThat(MDC.get(InboxLogContext.MESSAGE_ID)).isNull();
+        assertThat(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID)).isNull();
+    }
+
+    @Test
+    void run_forAnOrderEventKeepsTheDocumentIdentifierOutOfTheRequestKeyButSetsTheMessageKeys() {
+        InboxReceipt orderEvent = new InboxReceipt(UUID.fromString("d1a0c001-5e2f-4a3b-8c4d-000000000001"),
+                UUID.fromString("0196f0a2-0000-7000-8000-000000000011"), "ordering.order.events", "PaymentOrderEvent", 0);
+        AtomicReference<String> messageId = new AtomicReference<>();
+        AtomicReference<String> requestId = new AtomicReference<>();
+        AtomicReference<String> traceId = new AtomicReference<>();
+
+        InboxLogContext.run(orderEvent, () -> {
+            messageId.set(MDC.get(InboxLogContext.MESSAGE_ID));
+            requestId.set(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID));
+            traceId.set(RequestIds.current());
+        });
+
+        assertThat(messageId.get()).isEqualTo("d1a0c001-5e2f-4a3b-8c4d-000000000001");
+        assertThat(requestId.get()).isNull();
+        assertThat(traceId.get()).isEqualTo("d1a0c001-5e2f-4a3b-8c4d-000000000001");
+        assertThat(MDC.get(InboxLogContext.MESSAGE_ID)).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"KmContractRegistered", "LmPolicyIssued", "ContractTaskRenamed"})
+    void run_forARegistryReplyOrAnUnknownKindNamesTheRequestOfItsCorrelation(String eventType) {
+        InboxReceipt receipt = new InboxReceipt(UUID.fromString("b81f0f3a-1c44-4f2a-9a1e-5a0e2f7c9d11"),
+                UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"), "topic", eventType, 0);
+        AtomicReference<String> requestId = new AtomicReference<>();
+
+        InboxLogContext.run(receipt, () -> requestId.set(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID)));
+
+        assertThat(requestId.get()).isEqualTo("61a7982c-a0b4-4bbf-9527-60b40b752803");
         assertThat(MDC.get(InboxLogContext.INDIVIDUAL_REQUEST_ID)).isNull();
     }
 

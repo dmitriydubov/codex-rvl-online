@@ -1,5 +1,6 @@
 package ru.projectx.contracts.entity.policy;
 
+import ru.projectx.contracts.entity.issuance.IssuanceFlow;
 import ru.projectx.contracts.entity.issuance.IssuanceOutcome;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 
@@ -9,6 +10,9 @@ public enum LmPolicyStatus implements IssuanceStatus {
     ISSUED(IssuanceOutcome.ISSUED),
     ERROR(IssuanceOutcome.ERROR),
     CANCELLED(IssuanceOutcome.CANCELLED);
+
+    public static final IssuanceFlow<LmPolicyStatus> ISSUANCE_FLOW =
+            new IssuanceFlow<>(NEW, SUBMITTED, ERROR, CANCELLED, "полис ЛМ");
 
     private final IssuanceOutcome outcome;
 

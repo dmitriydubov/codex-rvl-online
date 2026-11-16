@@ -4,6 +4,7 @@ import java.util.List;
 import ru.projectx.contracts.exception.ContractViolationException;
 import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
+import ru.projectx.contracts.service.inbox.parse.JsonField;
 import ru.projectx.contracts.service.inbox.parse.JsonFields;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
 import ru.projectx.contracts.service.inbox.parse.PayloadParser;
@@ -27,21 +28,23 @@ public class UskResultParser implements PayloadParser<UskResult> {
     @Override
     public UskResult parse(String payload) {
         JsonFields data = bodies.data(payload);
-        String status = data.text(STATUS);
+        JsonField statusField = data.field(STATUS);
+        String status = statusField.text();
         if (layout.issuedStatus().equals(status)) {
             return issued(data);
         }
         if (ERROR.equals(status)) {
-            return new UskResult.Failed(data.uuid(ID), data.text("error_code"), data.text("error_message"));
+            return new UskResult.Failed(data.field(ID).uuid(), data.field("error_code").text(),
+                    data.field("error_message").text());
         }
-        throw ContractViolationException.invalidValue(data.pathOf(STATUS));
+        throw ContractViolationException.invalidValue(statusField.path());
     }
 
     private UskResult.Issued issued(JsonFields data) {
         JsonFields policy = data.requiredObject("policy");
-        return new UskResult.Issued(data.uuid(ID), data.uuid(layout.uskIdField()),
-                layout.uskNumber().textOf(data, layout.uskNumberField()), policy.uuid("external_id"),
-                policy.text("number"), documents(data));
+        return new UskResult.Issued(data.field(ID).uuid(), data.field(layout.uskIdField()).uuid(),
+                layout.uskNumber().textOf(data, layout.uskNumberField()), policy.field("external_id").uuid(),
+                policy.field("number").text(), documents(data));
     }
 
     private List<IssuedDocument> documents(JsonFields data) {

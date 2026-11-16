@@ -4,10 +4,15 @@ name: gauntlet
 
 on:
   pull_request:
-    paths-ignore:                           # documents never change what the gates check; CI minutes are metered
-      - 'docs/**'
-      - 'project_files/**'
-      - '**.md'
+    paths:                                  # documents never change what the gates check; CI minutes are metered
+      - '**'
+      - '!docs/**'
+      - '!project_files/**'
+      - '!**.md'
+      # except files the tests read (acceptance.inputs and test.inputs of the modules): listed by name, so no exclusion
+      # above, today's or a later one, makes CI skip a change to them
+      - 'contract-service/docs/operations.md'
+      - 'data-reference/docs/openapi.yaml'
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +23,7 @@ jobs:
   gauntlet:
     name: gauntlet
     runs-on: ubuntu-24.04                   # pinned: ubuntu-latest moves to Ubuntu 26 from 2026-10-19
-    timeout-minutes: 90
+    timeout-minutes: 150                    # a large change runs about 100 minutes: mutation and Gherkin mutation
     env:
       ORG_GRADLE_PROJECT_publicRepositories: "true"   # outside the corporate network: public repositories
     steps:

@@ -16,7 +16,7 @@ class MessageBodiesTest {
         JsonFields data = bodies.data("{\"meta\":{},\"data\":{\"individual_request_number\":\"IZ-1\"}}");
 
         assertThat(data.path()).isEqualTo("data");
-        assertThat(data.text("individual_request_number")).isEqualTo("IZ-1");
+        assertThat(data.field("individual_request_number").text()).isEqualTo("IZ-1");
     }
 
     @Test

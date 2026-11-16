@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class BrokerPublisherTest {
                     new BrokerConnectionProperties("localhost", 5675, "/", "user", "secret", Duration.ofSeconds(10),
                             new BrokerConnectionProperties.Tls(false, true, true)),
                     true, new OneCBrokerProperties.Queues("km-submissions", "km-registrations", "lm-requests",
-                            "lm-issues"))),
+                            "lm-issues")), List.of()),
             new OutboxProperties(new OutboxProperties.Publishing(Duration.ofSeconds(5), 100), CONFIRM_TIMEOUT,
                     new OutboxProperties.Retry(List.of(Duration.ofMinutes(1))),
                     new OutboxProperties.Retention(Duration.ofDays(30), Duration.ofHours(1), 500)));
@@ -141,6 +142,12 @@ class BrokerPublisherTest {
         assertThat(publisher.publish(new OutboundMessage(MESSAGE_ID, REQUEST, "SomethingElse", "{}")))
                 .isEqualTo(new PublishOutcome.Refused("для типа события SomethingElse нет очереди"));
         verifyNoInteractions(template);
+    }
+
+    @Test
+    void eventTypesByBroker_areThoseOfTheRoutes() {
+        assertThat(publisher.eventTypesByBroker()).containsExactlyInAnyOrder(Set.of("ContractStatusChanged"),
+                Set.of("KmContractSubmitted", "LmPolicyRequested"));
     }
 
     private void brokerAnswers(Consumer<CorrelationData> broker) {

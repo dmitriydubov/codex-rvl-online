@@ -115,6 +115,7 @@
     И сервис Заявок передаёт акцепт договора КМ участника "9275471c-d2fe-484f-97a6-d6d7b1267b5e" заявки "61a7982c-a0b4-4bbf-9527-60b40b752803":
       | contract_version | 1                                    |
       | accepted_by      | b0a1c7e4-52d9-4f31-8c06-7e3a9b1d2f45 |
+      | email            | insured@example.test                 |
       | accepted_at      | 2026-02-10T10:04:58+03:00            |
       | channel          | WEB                                  |
     И Договоры ответили на акцепт 200:

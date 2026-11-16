@@ -10,6 +10,7 @@ public final class IssueErrors {
     static final String KM_CONTRACT_SUBMISSION_UNDELIVERED = "KM_CONTRACT_SUBMISSION_UNDELIVERED";
     static final String KM_CONTRACT_SUBMISSION_PREPARATION_FAILED = "KM_CONTRACT_SUBMISSION_PREPARATION_FAILED";
     static final String LM_POLICY_REQUEST_PREPARATION_FAILED = "LM_POLICY_REQUEST_PREPARATION_FAILED";
+    static final String KM_CONTRACT_PAID_AFTER_CANCELLATION = "KM_CONTRACT_PAID_AFTER_CANCELLATION";
     static final String INTERNAL_FAILURE = ": внутренняя ошибка сервиса Договоров";
 
     private IssueErrors() {
@@ -48,5 +49,10 @@ public final class IssueErrors {
     public static IssueError lmPolicyRequestPreparationFailed() {
         return new IssueError(LM_POLICY_REQUEST_PREPARATION_FAILED,
                 "запрос на выпуск полиса ЛМ в 1С:УСК не подготовлен" + INTERNAL_FAILURE);
+    }
+
+    public static IssueError kmContractPaidAfterCancellation() {
+        return new IssueError(KM_CONTRACT_PAID_AFTER_CANCELLATION,
+                "оплата поступила после прекращения работы по договору");
     }
 }

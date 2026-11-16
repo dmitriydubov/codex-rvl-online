@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.usk;
 
 import java.util.UUID;
 import java.util.function.Function;
+import ru.projectx.contracts.entity.issuance.IssuanceFlow;
 import ru.projectx.contracts.entity.issuance.IssuanceRecord;
 import ru.projectx.contracts.entity.issuance.IssuanceStatus;
 import ru.projectx.contracts.entity.party.PersonOwner;
@@ -12,18 +13,25 @@ public record IssuanceKind<R extends IssuanceRecord, S extends IssuanceStatus>(
         String aggregateType,
         String requestEventType,
         String resultEventType,
-        S readyForUsk,
-        S awaitingUsk,
+        IssuanceFlow<S> flow,
         IssuanceErrors errors,
         Function<UUID, PersonOwner> owner,
         IssuanceCompletion<R> completion) {
 
+    public S readyForUsk() {
+        return flow.submittedFrom();
+    }
+
+    public S awaitingUsk() {
+        return flow.submitted();
+    }
+
     public boolean ready(R record) {
-        return readyForUsk.equals(record.status());
+        return readyForUsk().equals(record.status());
     }
 
     public boolean awaiting(R record) {
-        return awaitingUsk.equals(record.status());
+        return awaitingUsk().equals(record.status());
     }
 
     public boolean requested(R record) {

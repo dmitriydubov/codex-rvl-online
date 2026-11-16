@@ -3,10 +3,15 @@ package ru.projectx.contracts.service.packages;
 import ru.projectx.contracts.dto.DocumentState;
 import ru.projectx.contracts.entity.contract.ContractStatus;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
+import ru.projectx.contracts.service.status.PaymentOffer;
 
 final class PackageStates {
 
     private PackageStates() {
+    }
+
+    static DocumentState shown(ContractStatus status, PaymentOffer offer) {
+        return offer.cancellationDeferred() ? DocumentState.CANCELLED : of(status);
     }
 
     static DocumentState of(ContractStatus status) {

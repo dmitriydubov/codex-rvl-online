@@ -2,6 +2,7 @@ package ru.projectx.datareference.repository.policy;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,10 @@ import ru.projectx.datareference.repository.ReferenceId;
 public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySearchRepository, ActivePolicyProgramsRepository {
 
     Optional<Policy> findByExternalId(UUID externalId);
+
+    boolean existsByExternalId(UUID externalId);
+
+    List<Policy> findAllByExternalIdIn(Collection<UUID> externalIds);
 
     List<Policy> findAllByNumberAndExternalContractId(String number, UUID externalContractId);
 

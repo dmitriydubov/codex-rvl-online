@@ -73,8 +73,8 @@ public class Contract extends IssuanceRecord {
         }
     }
 
-    public void accept() {
-        this.status = status.next(ContractStatus.DRAFT_READY, ContractStatus.ACCEPTED, id());
+    public void advance(ContractStep step) {
+        this.status = step.after(status, id());
     }
 
     public void markPaid(Instant paidAt, Instant now) {
@@ -95,7 +95,7 @@ public class Contract extends IssuanceRecord {
 
     @Override
     protected void enter(IssuanceTransition transition) {
-        this.status = status.after(transition, id());
+        this.status = transition.after(ContractStatus.ISSUANCE_FLOW, status, id());
     }
 
     public String number() {

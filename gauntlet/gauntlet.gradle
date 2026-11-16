@@ -13,8 +13,9 @@
  *  acceptance.glue, exclude.classes, the architecture...) in gauntlet/config/<module>/ - a file there
  *  replaces the common one of the same name, gauntlet.properties there is an overlay of the common one.
  *
- *  The script does not change what ./gradlew build does (it only adds jacoco to the test task); every
- *  check runs through the gauntlet tasks below.
+ *  The script adds no task to ./gradlew build, but changes two things there: the test task gets jacoco and the
+ *  test.inputs files as inputs (a missing one fails the build), and every task waits for the build-directory
+ *  lock (end of this file). Every check runs through the gauntlet tasks below.
  *
  *  Tasks (group "gauntlet"):
  *      gauntletFast     integrity -> checkstyle -> PMD (anti-patterns) -> unit tests -> architecture ->
@@ -56,6 +57,27 @@ def baseRef = (findProperty('gauntlet.baseRef') ?: setting('baseRef', 'origin/ma
 def featuresPath = setting('acceptance.features', 'src/acceptanceTest/resources/features')
 def featuresDir = file(featuresPath)
 def glue = setting('acceptance.glue', '')
+// files outside the source sets that tests read (acceptance.inputs, test.inputs): the Stop hook and CI look for them
+// under the module, so an entry must stay inside it
+def moduleFiles = { String key ->
+    def entries = listSetting(key, '')
+    entries.each { path ->
+        if (path.startsWith('/') || path.split('/').contains('..')) {
+            throw new GradleException("gauntlet: ${key} entry '${path}' must be a file inside the module " +
+                    '(a relative path without ..)')
+        }
+    }
+    entries
+}
+def acceptanceInputs = moduleFiles('acceptance.inputs')
+def testInputs = moduleFiles('test.inputs')
+// a change to one of these files must rerun the tests, and a missing one fails the build - a renamed or deleted file
+// must not switch this protection off without a word
+def declareInputs = { Task task, List<String> files, String property ->
+    files.eachWithIndex { path, i ->
+        task.inputs.file(path).withPropertyName("${property}.${i}").withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+}
 def basePackage = setting('basePackage', '')
 def excludedClassGlobs = listSetting('exclude.classes', '*Application,*MapperImpl')  // not 'excludedClasses': a local of that name would shadow pitest.excludedClasses
 def tools = gauntletFile('tools').absolutePath
@@ -164,7 +186,9 @@ tasks.register('gauntletInfo') {
                     "${gauntletDir.toPath().relativize(configFile('pit-runerror-allowlist.txt').toPath())}",
             "basePackage  : ${basePackage ?: '(not set)'}    glue: ${glue ?: '(not set)'}",
             "cucumber     : ${setting('cucumber.version', '7.23.0')}    scope: ${scope}    baseRef: ${baseRef}",
-            "features     : ${featuresPath}"].collect { it.toString() }
+            "features     : ${featuresPath}",
+            "acc. inputs  : ${acceptanceInputs ? acceptanceInputs.join(', ') : '(none)'}",
+            "test inputs  : ${testInputs ? testInputs.join(', ') : '(none)'}"].collect { it.toString() }
     doLast { lines.each { println it } }
 }
 
@@ -293,6 +317,7 @@ tasks.register('pmdGate', JavaExec) {
 
 tasks.named('test') {
     mustRunAfter 'checkstyleGate', 'pmdGate'
+    declareInputs(it, testInputs, 'testInputs')
 }
 
 tasks.register('archTest', Test) {
@@ -302,6 +327,10 @@ tasks.register('archTest', Test) {
     classpath = sourceSets.archTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty 'gauntlet.architecture', configFile('architecture.properties').absolutePath
+    // the test reads the policy by its path, so Gradle would see only the path: the file itself is an input, or a
+    // narrowed policy would leave the task up to date and green
+    inputs.file(configFile('architecture.properties')).withPropertyName('architecturePolicy')
+            .withPathSensitivity(PathSensitivity.NONE)
     testLogging { events 'failed'; exceptionFormat = 'full'; showStandardStreams = true }
     jacoco { enabled = false }
     mustRunAfter 'test'
@@ -325,6 +354,7 @@ tasks.register('acceptanceTest', Test) {
     configureCucumber(it, featuresDir)
     testLogging { events 'failed'; exceptionFormat = 'full' }
     onlyIf { hasFeatures(featuresDir) }
+    declareInputs(it, acceptanceInputs, 'acceptanceInputs')
     mustRunAfter 'archTest'
     finalizedBy 'acceptanceCheck'
     // acceptanceCheck must judge this run only, never results a previous run left behind

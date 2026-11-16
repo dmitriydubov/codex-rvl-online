@@ -18,7 +18,7 @@ public final class InboxLogContext {
 
     public static <E extends Exception> void run(InboxReceipt receipt, Action<E> action) throws E {
         MDC.put(MESSAGE_ID, receipt.messageId().toString());
-        MDC.put(INDIVIDUAL_REQUEST_ID, receipt.correlationId().toString());
+        InboxCorrelation.of(receipt.eventType()).put(receipt.correlationId());
         MDC.put(RequestIds.MDC_KEY, receipt.messageId().toString());
         try {
             action.run();

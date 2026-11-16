@@ -23,6 +23,7 @@ import ru.projectx.contracts.entity.issuance.Cancellation;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.contract.ContractDraft;
 import ru.projectx.contracts.entity.contract.ContractStatus;
+import ru.projectx.contracts.entity.contract.ContractStep;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
@@ -32,6 +33,7 @@ import ru.projectx.contracts.entity.issuance.RequestParticipant;
 import ru.projectx.contracts.message.task.ContractTask;
 import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.LmPolicyRepository;
+import ru.projectx.contracts.service.payment.cancellation.ContractStops;
 import ru.projectx.contracts.support.Issuances;
 import ru.projectx.contracts.support.Tasks;
 
@@ -43,7 +45,9 @@ class IssuanceServiceTest {
     private final LmPolicyRepository policies = mock();
     private final KmContractIssuance kmContracts = mock();
     private final LmPolicyIssuance lmPolicies = mock();
-    private final IssuanceService service = new IssuanceService(contracts, policies, kmContracts, lmPolicies);
+    private final ContractStops contractStops = mock();
+    private final IssuanceService service =
+            new IssuanceService(contracts, policies, kmContracts, lmPolicies, contractStops);
 
     @Test
     void firstTask_reconcilesEachPayingOrRelativeParticipantAndSkipsInsuredWithoutPayment() {
@@ -176,27 +180,26 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void paidContractInError_ofParticipantMissingFromTask_isCancelledAsExcludedFromTrip() {
+    void paidContractInError_ofParticipantMissingFromTask_isStoppedAsExcludedFromTrip() {
         Contract failed = paidAndFailed();
         active(List.of(failed), List.of());
 
         service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
 
-        assertThat(failed.status()).isEqualTo(ContractStatus.CANCELLED);
-        assertThat(failed.state().cancellation()).contains(
-                new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW));
+        verify(contractStops).stop(failed,
+                new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW), NOW);
     }
 
     @Test
-    void paidContractInError_ofRelativeWhoStopsPaying_isCancelledAsKindChangedAndPolicyOpened() {
+    void paidContractInError_ofRelativeWhoStopsPaying_isStoppedAsKindChangedAndPolicyOpened() {
         Contract failed = paidAndFailed();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("0.00"));
         active(List.of(failed), List.of());
 
         service.apply(task, NOW);
 
-        assertThat(failed.status()).isEqualTo(ContractStatus.CANCELLED);
-        assertThat(failed.state().cancellation()).map(Cancellation::comment).contains("вид документа по участнику изменён");
+        verify(contractStops).stop(failed,
+                new Cancellation(CancelReason.OTHER, "вид документа по участнику изменён", NOW), NOW);
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
         verifyNoInteractions(kmContracts);
     }
@@ -241,6 +244,20 @@ class IssuanceServiceTest {
         assertThat(policy.status()).isEqualTo(LmPolicyStatus.CANCELLED);
         assertThat(policy.state().cancellation()).contains(
                 new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW));
+        verify(contractStops, never()).stop(any(), any(), any());
+    }
+
+    @Test
+    void contractOfParticipantMissingFromTask_isHandedToTheContractStopAndNotCancelledHere() {
+        Contract contract = contract();
+        active(List.of(contract), List.of());
+
+        service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
+
+        verify(contractStops).stop(contract,
+                new Cancellation(CancelReason.OTHER, "участник исключён из состава поездки", NOW), NOW);
+        assertThat(contract.status()).isEqualTo(ContractStatus.NEW);
+        assertThat(contract.state().cancellation()).isEmpty();
     }
 
     @Test
@@ -259,28 +276,29 @@ class IssuanceServiceTest {
     }
 
     @Test
-    void relativeWhoStopsPaying_hasContractCancelledAsKindChangedAndPolicyOpened() {
+    void relativeWhoStopsPaying_hasContractStoppedAsKindChangedAndPolicyOpened() {
         Contract contract = contract();
         ContractTask task = Tasks.task(Tasks.insured("0.00"), Tasks.spouse("0.00"));
         active(List.of(contract), List.of());
 
         service.apply(task, NOW);
 
-        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
-        assertThat(contract.state().cancellation()).map(Cancellation::comment).contains("вид документа по участнику изменён");
+        verify(contractStops).stop(contract,
+                new Cancellation(CancelReason.OTHER, "вид документа по участнику изменён", NOW), NOW);
         verify(lmPolicies).reconcile(new Issue(task, task.participants().get(1)), Optional.empty(), NOW);
         verifyNoInteractions(kmContracts);
     }
 
     @Test
-    void insuredWhoStopsPaying_hasContractCancelledAndNothingOpened() {
+    void insuredWhoStopsPaying_hasContractStoppedAndNothingOpened() {
         Contract contract = Contract.open(new ContractDraft("DKM-2026-000001", Issuances.TERMS, Tasks.INSURED,
                 new BigDecimal("12500.00")), NOW);
         active(List.of(contract), List.of());
 
         service.apply(Tasks.task(Tasks.insured("0.00")), NOW);
 
-        assertThat(contract.status()).isEqualTo(ContractStatus.CANCELLED);
+        verify(contractStops).stop(contract,
+                new Cancellation(CancelReason.OTHER, "вид документа по участнику изменён", NOW), NOW);
         verifyNoInteractions(kmContracts, lmPolicies);
     }
 
@@ -299,7 +317,7 @@ class IssuanceServiceTest {
     private static Contract paid() {
         Contract contract = contract();
         contract.offerDraft();
-        contract.accept();
+        contract.advance(ContractStep.OFFER_ACCEPTED);
         contract.markPaid(Issuances.OPENED, NOW);
         return contract;
     }

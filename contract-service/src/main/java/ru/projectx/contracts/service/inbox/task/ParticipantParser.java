@@ -12,9 +12,9 @@ final class ParticipantParser {
     }
 
     static TaskParticipant parse(JsonFields participant, int index) {
-        TaskParticipant parsed = new TaskParticipant(index, participant.uuid("id"), participant.bool("is_relative"),
-                participant.decimal("amount_due"), participant.uuidOrNull("program_id"),
-                person(participant.requiredObject("personal_data")));
+        TaskParticipant parsed = new TaskParticipant(index, participant.field("id").uuid(),
+                participant.field("is_relative").bool(), participant.field("amount_due").decimal(),
+                participant.field("program_id").optional().uuid(), person(participant.requiredObject("personal_data")));
         if (parsed.amountDue().signum() < 0) {
             throw new ContractViolationException("поле " + participant.path() + ".amount_due отрицательное");
         }
@@ -22,14 +22,15 @@ final class ParticipantParser {
     }
 
     private static ParticipantPerson person(JsonFields person) {
-        return new ParticipantPerson(person.text("last_name"), person.text("first_name"),
-                person.textOrNull("middle_name"), person.date("birth_date"), person.text("gender"),
-                person.textOrNull("relation_type"), document(person.requiredObject("document")),
-                person.textOrNull("address"));
+        return new ParticipantPerson(person.field("last_name").text(), person.field("first_name").text(),
+                person.field("middle_name").optional().text(), person.field("birth_date").date(),
+                person.field("gender").text(), person.field("relation_type").optional().text(),
+                document(person.requiredObject("document")), person.field("address").optional().text());
     }
 
     private static ParticipantDocument document(JsonFields document) {
-        return new ParticipantDocument(document.text("type"), document.textOrNull("series"), document.text("number"),
-                document.textOrNull("issued_by"), document.dateOrNull("issued_at"), document.textOrNull("division_code"));
+        return new ParticipantDocument(document.field("type").text(), document.field("series").optional().text(),
+                document.field("number").text(), document.field("issued_by").optional().text(),
+                document.field("issued_at").optional().date(), document.field("division_code").optional().text());
     }
 }

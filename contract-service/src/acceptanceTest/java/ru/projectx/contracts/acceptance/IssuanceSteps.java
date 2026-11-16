@@ -18,10 +18,12 @@ import org.jspecify.annotations.Nullable;
 
 public class IssuanceSteps {
 
+    private static final String DEFERRED_REASON = "отложенное прекращение";
+    private static final String DEFERRED_MOMENT = "момент отложенного прекращения";
     private static final Set<String> KNOWN = Set.of("документ", "статус", "номер", "начало", "окончание", "премия",
             "страхователь", "договор страхования", "полис страхователя", "программа", "версия", "причина прекращения",
             "комментарий", "момент прекращения", "код ошибки", "текст ошибки", "идентификатор в 1С", "номер в 1С",
-            "номер полиса", "выпущенный полис");
+            "номер полиса", "выпущенный полис", DEFERRED_REASON, DEFERRED_MOMENT);
 
     private final IssuanceRecords records;
 
@@ -75,7 +77,7 @@ public class IssuanceSteps {
         softly.assertThat(person.documentNumber()).isEqualTo(expected.get("номер документа"));
     }
 
-    private static void check(Map<String, String> expected, Optional<IssuanceRecords.Record> record) {
+    private void check(Map<String, String> expected, Optional<IssuanceRecords.Record> record) {
         StepTables.onlyKnown(expected, KNOWN);
         String document = StepTables.required(expected, "документ");
         if ("ничего".equals(document)) {
@@ -87,6 +89,7 @@ public class IssuanceSteps {
         SoftAssertions softly = new SoftAssertions();
         softly.assertThat(record.get().document()).isEqualTo(document);
         requisites(softly, expected, record.get());
+        deferredCancellation(softly, expected, record.get());
         softly.assertAll();
     }
 
@@ -120,6 +123,19 @@ public class IssuanceSteps {
             softly.assertThat(record.cancelledAt()).as("момент прекращения")
                     .isEqualTo(moment(blankAsNull(expected.get("момент прекращения"))));
         }
+    }
+
+    private void deferredCancellation(SoftAssertions softly, Map<String, String> expected,
+            IssuanceRecords.Record record) {
+        if (!expected.containsKey(DEFERRED_REASON) && !expected.containsKey(DEFERRED_MOMENT)) {
+            return;
+        }
+        Optional<IssuanceRecords.DeferredCancellation> deferred = records.deferredCancellationOf(record.id());
+        requisite(softly, expected, DEFERRED_REASON,
+                () -> deferred.map(IssuanceRecords.DeferredCancellation::reason).orElse(null));
+        StepTables.cellOrBlank(expected, DEFERRED_MOMENT).ifPresent(moment ->
+                softly.assertThat(deferred.map(IssuanceRecords.DeferredCancellation::cancelledAt).orElse(null))
+                        .as(DEFERRED_MOMENT).isEqualTo(moment(blankAsNull(moment))));
     }
 
     private static void issuedRequisites(SoftAssertions softly, Map<String, String> expected,
