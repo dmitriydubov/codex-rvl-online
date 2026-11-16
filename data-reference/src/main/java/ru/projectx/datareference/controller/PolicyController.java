@@ -17,9 +17,9 @@ import ru.projectx.datareference.service.policy.PolicyReads;
 @InternalApi
 public class PolicyController {
 
-    private static final String EXTERNAL_ID = "external_id";
-    private static final String NUMBER = "number";
-    private static final String CONTRACT_EXTERNAL_ID = "contract_external_id";
+    private static final String EXTERNAL_ID = PolicyNumberKey.EXTERNAL_ID;
+    private static final String NUMBER = PolicyNumberKey.NUMBER;
+    private static final String CONTRACT_EXTERNAL_ID = PolicyNumberKey.CONTRACT_EXTERNAL_ID;
     private static final String LEGACY_CONTRACT_ID = "contract_id";
 
     private final PolicyReads policies;
@@ -63,8 +63,7 @@ public class PolicyController {
 
     @GetMapping(path = "/policies", params = EXTERNAL_ID)
     public PolicyResponse policyByConflictingKeys() {
-        throw new InvalidRequestException(EXTERNAL_ID,
-                "external_id не передаётся вместе с number или contract_external_id");
+        throw new InvalidRequestException(EXTERNAL_ID, PolicyNumberKey.CONFLICTING_KEYS);
     }
 
     @GetMapping(path = "/policies", params = {LEGACY_CONTRACT_ID, "!" + EXTERNAL_ID})
@@ -75,7 +74,7 @@ public class PolicyController {
 
     @GetMapping("/policies")
     public PolicyResponse policyWithoutKey() {
-        throw new InvalidRequestException(EXTERNAL_ID, "нужен external_id либо number вместе с contract_external_id");
+        throw new InvalidRequestException(EXTERNAL_ID, PolicyNumberKey.NO_KEY);
     }
 
     @GetMapping("/policies/{id}/contract-view")

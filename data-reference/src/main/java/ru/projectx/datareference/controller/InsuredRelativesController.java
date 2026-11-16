@@ -39,7 +39,6 @@ public class InsuredRelativesController {
 
     @GetMapping(path = RELATIVES, params = EXTERNAL_ID)
     public InsuredRelativesResponse relativesByConflictingKeys() {
-        throw new InvalidRequestException(EXTERNAL_ID,
-                "external_id не передаётся вместе с number или contract_external_id");
+        throw new InvalidRequestException(EXTERNAL_ID, PolicyNumberKey.CONFLICTING_KEYS);
     }
 }

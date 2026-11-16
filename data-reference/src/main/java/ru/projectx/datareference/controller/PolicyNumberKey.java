@@ -11,6 +11,7 @@ record PolicyNumberKey(String number, UUID contractExternalId) {
     static final String NUMBER = "number";
     static final String CONTRACT_EXTERNAL_ID = "contract_external_id";
     static final String NO_KEY = "нужен external_id либо number вместе с contract_external_id";
+    static final String CONFLICTING_KEYS = "external_id не передаётся вместе с number или contract_external_id";
 
     static PolicyNumberKey of(@Nullable String number, @Nullable UUID contractExternalId) {
         if (number == null && contractExternalId == null) {

@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.jspecify.annotations.Nullable;
@@ -43,6 +44,7 @@ class InsuredRelativesApiTest {
     private static final UUID PARENT = UUID.fromString("5a1e0000-0000-4000-8000-000000000004");
     private static final UUID FORMER = UUID.fromString("5a1e0000-0000-4000-8000-000000000005");
     private static final UUID NOT_ARRIVED = UUID.fromString("5a1e0000-0000-4000-8000-000000000006");
+    private static final UUID SECOND_PROGRAM = UUID.fromString("5a1e0000-0000-4000-8000-0000000000b2");
     private static final UUID TYPE = UUID.fromString("797093be-2c51-11e8-8123-005056b43f21");
 
     @Autowired
@@ -68,6 +70,8 @@ class InsuredRelativesApiTest {
         contracts.save(InsuranceContract.create(CONTRACT, new InsuranceContract.Details("26 LM 0002",
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), null, false), NOW));
         programs.save(Program.create(PROGRAM, new Program.Details(null, null, "Санаторно-курортное лечение", "СКЛ",
+                false), NOW));
+        programs.save(Program.create(SECOND_PROGRAM, new Program.Details(null, null, "Реабилитация", "РВЛ",
                 false), NOW));
         savePolicy(INSURED, "СТЕНД-0001");
         statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
@@ -114,6 +118,25 @@ class InsuredRelativesApiTest {
         assertThat(forThree).isEqualTo(forOne);
     }
 
+    @Test
+    void relativeWithSeveralProgramsAndServiceLines_comesOnce_withEachProgramAndLineOnce() {
+        savePolicy(SPOUSE, "СТЕНД-0002", List.of(PROGRAM, SECOND_PROGRAM), 2);
+        savePolicy(CHILD, "СТЕНД-0003", List.of(PROGRAM, SECOND_PROGRAM), 2);
+        link(SPOUSE, TODAY, null);
+        link(CHILD, TODAY, null);
+
+        MvcTestResult result = mvc.get().uri(RELATIVES, INSURED).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.items[*].policy.number").asArray()
+                .containsExactly("СТЕНД-0002", "СТЕНД-0003");
+        assertThat(result).bodyJson().extractingPath("$.items[0].policy.programs[*].program.external_id").asArray()
+                .containsExactlyInAnyOrder(PROGRAM.toString(), SECOND_PROGRAM.toString());
+        assertThat(result).bodyJson().extractingPath("$.items[0].policy.programs[0].services").asArray().hasSize(2);
+        assertThat(result).bodyJson().extractingPath("$.items[0].policy.programs[1].services").asArray().hasSize(2);
+        assertThat(result).bodyJson().extractingPath("$.items[1].policy.programs").asArray().hasSize(2);
+    }
+
     private long statementsToRead() {
         statistics.clear();
         MvcTestResult result = mvc.get().uri(RELATIVES, INSURED).exchange();
@@ -128,12 +151,17 @@ class InsuredRelativesApiTest {
     }
 
     private void savePolicy(UUID externalId, String number) {
+        savePolicy(externalId, number, List.of(PROGRAM), 1);
+    }
+
+    private void savePolicy(UUID externalId, String number, List<UUID> programIds, int layers) {
+        LocalDate begin = LocalDate.of(2026, 1, 1);
         var details = new Policy.Details(CONTRACT, number, "Тестова", "Проба", null, LocalDate.of(2015, 1, 1), "Ж",
-                "relative@example.test", LocalDate.of(2026, 1, 1), null, true, false);
-        var programs = List.of(new PolicyProgram.Row(PROGRAM, LocalDate.of(2026, 1, 1), null, null, null, null, null,
-                new BigDecimal("150000.00"), true));
-        var lines = List.of(new PolicyServiceLine.Row(PROGRAM, 1, new BigDecimal("20.00"), LocalDate.of(2026, 1, 1),
-                null, true));
+                "relative@example.test", begin, null, true, false);
+        var programs = programIds.stream().map(program -> new PolicyProgram.Row(program, begin, null, null, null, null,
+                null, new BigDecimal("150000.00"), true)).toList();
+        var lines = programIds.stream().flatMap(program -> IntStream.rangeClosed(1, layers).mapToObj(layer ->
+                new PolicyServiceLine.Row(program, layer, new BigDecimal("20.00"), begin, null, true))).toList();
         policies.save(Policy.create(externalId, new Policy.Snapshot(details, programs, lines), NOW));
     }
 }
