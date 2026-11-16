@@ -68,6 +68,10 @@ public class InsuredAssociation {
             return List.of(insuredPolicy, relatedPolicy);
         }
 
+        public boolean validOn(LocalDate day) {
+            return !validFrom.isAfter(day) && (validTo == null || !validTo.isBefore(day));
+        }
+
         public InsuredAssociationFilter dimensions() {
             return new InsuredAssociationFilter(validFrom, insuredPolicy, relatedPolicy, relationType);
         }
