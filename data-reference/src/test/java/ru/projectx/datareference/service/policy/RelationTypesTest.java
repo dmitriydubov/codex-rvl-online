@@ -1,6 +1,7 @@
 package ru.projectx.datareference.service.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static ru.projectx.datareference.service.policy.FamilyFixtures.INSURED;
 import static ru.projectx.datareference.service.policy.FamilyFixtures.OTHER_TYPE;
 import static ru.projectx.datareference.service.policy.FamilyFixtures.TODAY;
 import static ru.projectx.datareference.service.policy.FamilyFixtures.TYPE;
@@ -44,6 +45,15 @@ class RelationTypesTest {
 
         assertThat(types.soleTypeOf(SPOUSE)).isNull();
         assertThat(types.soleTypeOf(CHILD)).isEqualTo(TYPE);
+    }
+
+    @Test
+    void linkOfTheInsuredPolicyToItself_isLeftOut() {
+        RelationTypes types = RelationTypes.activeOn(List.of(
+                link(INSURED, TYPE, TODAY, null),
+                link(SPOUSE, TYPE, TODAY, null)), TODAY);
+
+        assertThat(types.relatedPolicies()).containsExactly(SPOUSE);
     }
 
     @Test
