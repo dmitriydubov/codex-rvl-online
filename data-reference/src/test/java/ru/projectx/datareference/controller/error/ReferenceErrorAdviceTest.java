@@ -19,7 +19,7 @@ import ru.projectx.datareference.controller.StandaloneMvc;
 import ru.projectx.datareference.controller.request.RequestIdFilter;
 import ru.projectx.datareference.exception.AmbiguousPolicyNumberException;
 import ru.projectx.datareference.exception.AmbiguousPriceException;
-import ru.projectx.datareference.exception.ContractPolicy;
+import ru.projectx.datareference.exception.PolicyNumberCandidate;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.PriceNotCoveredException;
@@ -97,7 +97,7 @@ class ReferenceErrorAdviceTest {
             CapturedOutput output) throws UnsupportedEncodingException {
 
         controller.failWith(AmbiguousPolicyNumberException.of(List.of(
-                new ContractPolicy(FIRST, SECOND), new ContractPolicy(SECOND, FIRST))));
+                new PolicyNumberCandidate(FIRST, SECOND), new PolicyNumberCandidate(SECOND, FIRST))));
 
         MvcTestResult result = request();
 
@@ -107,7 +107,7 @@ class ReferenceErrorAdviceTest {
                 + "\"details\":[{\"policyId\":\"" + FIRST + "\",\"contractExternalId\":\"" + SECOND + "\"},"
                 + "{\"policyId\":\"" + SECOND + "\",\"contractExternalId\":\"" + FIRST + "\"}],"
                 + "\"requestId\":\"" + REQUEST_ID + "\"}}");
-        assertThat(output).contains("WARN", "неоднозначные данные 1С: AMBIGUOUS_POLICY",
+        assertThat(output).contains("WARN", "по номеру полиса найдено несколько полисов: AMBIGUOUS_POLICY",
                 "PolicyCandidate[policyId=" + FIRST + ", contractExternalId=" + SECOND + "]",
                 "request_id=" + REQUEST_ID).doesNotContain("ERROR");
     }

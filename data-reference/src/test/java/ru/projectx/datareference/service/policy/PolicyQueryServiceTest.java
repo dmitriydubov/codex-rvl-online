@@ -21,7 +21,7 @@ import ru.projectx.datareference.dto.PolicyResponse;
 import ru.projectx.datareference.entity.policy.Policy;
 import ru.projectx.datareference.exception.AmbiguousPolicyNumberException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
-import ru.projectx.datareference.exception.ContractPolicy;
+import ru.projectx.datareference.exception.PolicyNumberCandidate;
 import ru.projectx.datareference.exception.ReferenceNotFoundException;
 import ru.projectx.datareference.repository.catalog.InsuranceContractRepository;
 import ru.projectx.datareference.repository.policy.PolicyRepository;
@@ -186,8 +186,8 @@ class PolicyQueryServiceTest {
                 .isInstanceOfSatisfying(AmbiguousPolicyNumberException.class, ambiguous -> {
                     assertThat(ambiguous.code()).isEqualTo("AMBIGUOUS_POLICY");
                     assertThat(ambiguous.candidates()).containsExactly(
-                            new ContractPolicy(first.id(), CONTRACT_EXTERNAL_ID),
-                            new ContractPolicy(second.id(), otherContract));
+                            new PolicyNumberCandidate(first.id(), CONTRACT_EXTERNAL_ID),
+                            new PolicyNumberCandidate(second.id(), otherContract));
                     assertThat(ambiguous.getMessage()).isNotBlank().doesNotContain(NUMBER);
                 });
         verifyNoInteractions(insuranceContracts);

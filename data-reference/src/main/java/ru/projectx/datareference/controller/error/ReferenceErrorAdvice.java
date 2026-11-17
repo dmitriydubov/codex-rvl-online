@@ -22,6 +22,8 @@ import ru.projectx.datareference.exception.ReferenceNotFoundException;
 public class ReferenceErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(ReferenceErrorAdvice.class);
+    private static final String AMBIGUOUS_DATA = "неоднозначные данные 1С";
+    private static final String SEVERAL_POLICIES_WITH_NUMBER = "по номеру полиса найдено несколько полисов";
 
     @ExceptionHandler(ReferenceNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -32,13 +34,14 @@ public class ReferenceErrorAdvice {
     @ExceptionHandler(AmbiguousReferenceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse ambiguousReference(AmbiguousReferenceException ambiguous) {
-        return ambiguousData(ambiguous.code(), ambiguous.getMessage(), AmbiguityDetails.of(ambiguous));
+        return conflict(AMBIGUOUS_DATA, ambiguous.code(), ambiguous.getMessage(), AmbiguityDetails.of(ambiguous));
     }
 
     @ExceptionHandler(AmbiguousPolicyNumberException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse ambiguousPolicyNumber(AmbiguousPolicyNumberException ambiguous) {
-        return ambiguousData(ambiguous.code(), ambiguous.getMessage(), AmbiguityDetails.of(ambiguous));
+        return conflict(SEVERAL_POLICIES_WITH_NUMBER, ambiguous.code(), ambiguous.getMessage(),
+                AmbiguityDetails.of(ambiguous));
     }
 
     @ExceptionHandler(IncompleteReferenceException.class)
@@ -71,10 +74,10 @@ public class ReferenceErrorAdvice {
         return ErrorResponse.of(notCovered.code(), notCovered.getMessage(), intervals, CurrentRequest.id());
     }
 
-    private static ErrorResponse ambiguousData(
-            String code, String message, List<? extends ErrorResponse.Detail> candidates) {
+    private static ErrorResponse conflict(
+            String journalText, String code, String message, List<? extends ErrorResponse.Detail> candidates) {
 
-        log.warn("неоднозначные данные 1С: {} {}, request_id={}", code, candidates, CurrentRequest.id());
+        log.warn("{}: {} {}, request_id={}", journalText, code, candidates, CurrentRequest.id());
         return ErrorResponse.of(code, message, candidates, CurrentRequest.id());
     }
 }

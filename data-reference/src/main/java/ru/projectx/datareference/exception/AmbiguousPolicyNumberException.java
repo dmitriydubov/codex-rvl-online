@@ -10,14 +10,14 @@ public final class AmbiguousPolicyNumberException extends RuntimeException {
 
     private static final String AMBIGUOUS_POLICY = "AMBIGUOUS_POLICY";
 
-    private final transient List<ContractPolicy> candidates;
+    private final transient List<PolicyNumberCandidate> candidates;
 
-    private AmbiguousPolicyNumberException(List<ContractPolicy> candidates) {
+    private AmbiguousPolicyNumberException(List<PolicyNumberCandidate> candidates) {
         super("по номеру полиса найдено больше одной записи");
         this.candidates = List.copyOf(candidates);
     }
 
-    public static AmbiguousPolicyNumberException of(List<ContractPolicy> candidates) {
+    public static AmbiguousPolicyNumberException of(List<PolicyNumberCandidate> candidates) {
         return new AmbiguousPolicyNumberException(candidates);
     }
 
@@ -25,7 +25,7 @@ public final class AmbiguousPolicyNumberException extends RuntimeException {
         return AMBIGUOUS_POLICY;
     }
 
-    public List<ContractPolicy> candidates() {
+    public List<PolicyNumberCandidate> candidates() {
         return candidates;
     }
 }

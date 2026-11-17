@@ -23,7 +23,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.AmbiguousPolicyNumberException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
-import ru.projectx.datareference.exception.ContractPolicy;
+import ru.projectx.datareference.exception.PolicyNumberCandidate;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
 import ru.projectx.datareference.exception.InvalidRequestException;
 import ru.projectx.datareference.exception.MissingReference;
@@ -47,7 +47,7 @@ final class ErrorCatalog {
     private static Exception[] referenceFailures() {
         return Stream.concat(Arrays.stream(MissingReference.values()).map(missing -> missing.notFound(ID)), Stream.of(
                         AmbiguousReferenceException.policy(List.of(ID)),
-                        AmbiguousPolicyNumberException.of(List.of(new ContractPolicy(ID, ID))),
+                        AmbiguousPolicyNumberException.of(List.of(new PolicyNumberCandidate(ID, ID))),
                         AmbiguousReferenceException.priceContract(ID, List.of(ID)),
                         AmbiguousReferenceException.insuranceContract(ID, List.of(ID)),
                         IncompleteReferenceException.noActivePriceContract(ID),

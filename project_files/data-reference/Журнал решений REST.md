@@ -318,7 +318,7 @@
   ли во вход архивный или закончившийся полис, кабинет решает сам по полям ответа.
 - **Где в коде.** `controller/PolicyController.policyByNumberInAnyContract` (маршрут `params` с `!contract_external_id`),
   `controller/RequiredText`, `service/policy/PolicyQueryService.byNumberInAnyContract` (за `PolicyReads`),
-  `repository/policy/PolicyRepository.findAllByNumber`, `exception/AmbiguousPolicyNumberException`, `ContractPolicy`,
+  `repository/policy/PolicyRepository.findAllByNumber`, `exception/AmbiguousPolicyNumberException`, `PolicyNumberCandidate`,
   `ReferenceNotFoundException.policyWithRequestedNumber`, `dto/ErrorResponse.PolicyCandidate` (`contract_external_id`
   не пишется, когда его нет), `controller/error/ReferenceErrorAdvice.ambiguousPolicyNumber`. Спецификация:
   `policy_by_number_without_contract.feature`, `exclusive_lookup_keys.feature`,

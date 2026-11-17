@@ -49,7 +49,7 @@ info:
     | 404 | `INSURANCE_CONTRACT_NOT_FOUND`, `POLICY_NOT_FOUND`, `LPU_NOT_FOUND`, `SERVICE_NOT_FOUND`, `PROGRAM_NOT_FOUND` | записи нет (или она не подходит ручке) |
     | 405 | `METHOD_NOT_ALLOWED` | метод, кроме `GET`, `HEAD` и `OPTIONS`; заголовок `Allow` |
     | 406 | `NOT_ACCEPTABLE` | `Accept` не допускает JSON |
-    | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны; в `details` — кандидаты |
+    | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны, у полиса по номеру без договора — полисов с таким номером несколько; в `details` — кандидаты |
     | 422 | `NO_ACTIVE_PRICE_CONTRACT`, `PRICE_NOT_COVERED` | данных 1С не хватает для ответа |
     | 500 | `INTERNAL_ERROR` | необработанная ошибка сервиса |
     | 503 | `SERVICE_UNAVAILABLE` | база недоступна или не ответила за 3 с (`API_READ_TIMEOUT_SECONDS`), либо сервис перегружен — запрос пришёл сверх предела одновременно обрабатываемых (`API_MAX_CONCURRENT_REQUESTS`) и отклонён сразу; повторить позже с паузой, ограниченное число раз; `message` не разбирать |
