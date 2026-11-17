@@ -33,6 +33,23 @@ public class InsuranceContractCandidateSteps {
         assertCandidates(field, list, ourId(POLICY_ID_BY_EXTERNAL_ID, first), ourId(POLICY_ID_BY_EXTERNAL_ID, second));
     }
 
+    @Тогда("элементы {string} ответа — полис {string} с договором {string} и полис {string} с договором {string} в любом порядке")
+    public void candidatesArePoliciesWithContracts(
+            String list, String firstPolicy, String firstContract, String secondPolicy, String secondContract) {
+
+        JsonNode elements = contracts.lastResponse().field(list);
+        assertThat(elements.isArray()).as("поле %s — список: %s", list, elements).isTrue();
+
+        List<List<String>> candidates = elements.valueStream()
+                .map(element -> List.of(element.path("policy_id").asString(),
+                        element.path("contract_external_id").asString()))
+                .toList();
+
+        assertThat(candidates).as("полисы и договоры элементов %s", list).containsExactlyInAnyOrder(
+                List.of(ourId(POLICY_ID_BY_EXTERNAL_ID, firstPolicy), firstContract),
+                List.of(ourId(POLICY_ID_BY_EXTERNAL_ID, secondPolicy), secondContract));
+    }
+
     private void assertCandidates(String field, String list, String first, String second) {
         JsonNode elements = contracts.lastResponse().field(list);
         assertThat(elements.isArray()).as("поле %s — список: %s", list, elements).isTrue();

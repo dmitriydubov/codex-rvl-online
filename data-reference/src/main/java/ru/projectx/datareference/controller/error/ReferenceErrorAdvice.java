@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import ru.projectx.datareference.controller.request.CurrentRequest;
 import ru.projectx.datareference.dto.ErrorResponse;
+import ru.projectx.datareference.exception.AmbiguousPolicyNumberException;
 import ru.projectx.datareference.exception.AmbiguousPriceException;
 import ru.projectx.datareference.exception.AmbiguousReferenceException;
 import ru.projectx.datareference.exception.IncompleteReferenceException;
@@ -31,9 +32,13 @@ public class ReferenceErrorAdvice {
     @ExceptionHandler(AmbiguousReferenceException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse ambiguousReference(AmbiguousReferenceException ambiguous) {
-        List<ErrorResponse.Detail> candidates = AmbiguityDetails.of(ambiguous);
-        log.warn("неоднозначные данные 1С: {} {}, request_id={}", ambiguous.code(), candidates, CurrentRequest.id());
-        return ErrorResponse.of(ambiguous.code(), ambiguous.getMessage(), candidates, CurrentRequest.id());
+        return ambiguousData(ambiguous.code(), ambiguous.getMessage(), AmbiguityDetails.of(ambiguous));
+    }
+
+    @ExceptionHandler(AmbiguousPolicyNumberException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse ambiguousPolicyNumber(AmbiguousPolicyNumberException ambiguous) {
+        return ambiguousData(ambiguous.code(), ambiguous.getMessage(), AmbiguityDetails.of(ambiguous));
     }
 
     @ExceptionHandler(IncompleteReferenceException.class)
@@ -64,5 +69,12 @@ public class ReferenceErrorAdvice {
         log.warn("прайс услуги не покрывает период: {}, service_id={}, {}, request_id={}",
                 notCovered.code(), notCovered.serviceId(), intervals, CurrentRequest.id());
         return ErrorResponse.of(notCovered.code(), notCovered.getMessage(), intervals, CurrentRequest.id());
+    }
+
+    private static ErrorResponse ambiguousData(
+            String code, String message, List<? extends ErrorResponse.Detail> candidates) {
+
+        log.warn("неоднозначные данные 1С: {} {}, request_id={}", code, candidates, CurrentRequest.id());
+        return ErrorResponse.of(code, message, candidates, CurrentRequest.id());
     }
 }

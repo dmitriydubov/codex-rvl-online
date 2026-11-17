@@ -404,12 +404,19 @@ paths:
     get:
       tags: [Полисы]
       operationId: policyByKey
-      summary: R-05. Полис по GUID 1С или по номеру в договоре
+      summary: R-05. Полис по GUID 1С или по номеру
       description: |
-        Ровно один способ: `external_id`, или `number` вместе с `contract_external_id`. Другие сочетания — 400, в том
-        числе с пустым `external_id=` рядом с `number`: параметр считается переданным и без значения;
-        параметр `contract_id` не принимается (договор передаётся `contract_external_id`). Ответ — как у
+        Ровно один способ: `external_id`, или `number` — вместе с `contract_external_id` или без него. Другие
+        сочетания — 400, в том числе с пустым `external_id=` рядом с `number`: параметр считается переданным и без
+        значения; параметр `contract_id` не принимается (договор передаётся `contract_external_id`). Ответ — как у
         `/internal/v1/policies/{id}`.
+
+        По номеру без договора полис ищется среди полисов всех договоров. Номер сравнивается точно: регистр и пробелы
+        значимы, пустой номер или номер из пробелов — 400 по полю `number`. Архивные, закончившиеся и обезличенные
+        полисы находятся так же, как с договором: решать по `is_archive`, датам и `personal_data_erased` — вызывающему.
+        Полисов с таким номером несколько — 409, и ни один полис не отдаётся. Без договора ищется только тогда, когда
+        параметра `contract_external_id` в запросе нет вовсе: пустой или из пробелов — 400 по полю
+        `contract_external_id`. Номера полиса нет ни в тексте ошибки, ни в журнале сервиса.
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - name: external_id
@@ -420,12 +427,12 @@ paths:
         - name: number
           in: query
           required: false
-          description: номер полиса; только вместе с `contract_external_id`
+          description: номер полиса, точное совпадение; с `contract_external_id` — в этом договоре, без него — среди всех полисов
           schema: {type: string}
         - name: contract_external_id
           in: query
           required: false
-          description: GUID договора страхования в 1С:УСК; только вместе с `number`
+          description: GUID договора страхования в 1С:УСК; только вместе с `number`, необязателен
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -437,7 +444,9 @@ paths:
         '400': {$ref: '#/components/responses/ValidationError'}
         '404': {$ref: '#/components/responses/PolicyNotFound'}
         '409':
-          description: '`AMBIGUOUS_POLICY` — по номеру в договоре больше одного полиса; `details`: `{policy_id}`'
+          description: >-
+            `AMBIGUOUS_POLICY` — по номеру больше одного полиса; `details`: с `contract_external_id` — `{policy_id}`,
+            без него — `{policy_id, contract_external_id}`, где `contract_external_id` — GUID договора 1С:УСК из полиса
           headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
           content:
             application/json:
@@ -1095,6 +1104,11 @@ components:
           required: [policy_id]
           properties:
             policy_id: {type: string, format: uuid}
+            contract_external_id:
+              type: string
+              format: uuid
+              description: >-
+                GUID договора страхования в 1С:УСК из полиса; только в R-05 по номеру без `contract_external_id`
         - title: кандидат-договор ЛПУ (AMBIGUOUS_PRICE_CONTRACT)
           type: object
           required: [lpu_contract_id]

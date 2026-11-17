@@ -35,7 +35,7 @@ BOM Spring Boot.
 | GET | `/internal/v1/services/{id}/price?date_from=&date_to=` | стоимость услуги за период проживания |
 | GET | `/internal/v1/mkb10?query=&limit=` или `?codes=` | подсказку по МКБ-10 или перечень кодов разом |
 | GET | `/internal/v1/policies/search?contract_external_id=&query=&limit=` | подсказку по части ФИО или номера среди действующих полисов договора |
-| GET | `/internal/v1/policies/{id}`, `/internal/v1/policies?external_id=` или `?number=&contract_external_id=` | полис целиком, с персональными данными |
+| GET | `/internal/v1/policies/{id}`, `/internal/v1/policies?external_id=`, `?number=&contract_external_id=` или `?number=` | полис целиком, с персональными данными; по номеру без договора — среди всех полисов, несколько с таким номером — 409 `AMBIGUOUS_POLICY` с `policy_id` и `contract_external_id` кандидатов |
 | GET | `/internal/v1/policies/{id}/family`, `?number=` | полисы родственников застрахованного по связям из 1С:УСК, действующие сегодня; с `number` — один родственник |
 | GET | `/internal/v1/policies/{id}/contract-view`, `/internal/v1/policies/contract-view?external_id=` | полис для сервиса Договоров, без персональных данных |
 | GET | `/internal/v1/insurance-contracts/{id}`, `/internal/v1/insurance-contracts?external_id=` | договор страхования со страхователем |
