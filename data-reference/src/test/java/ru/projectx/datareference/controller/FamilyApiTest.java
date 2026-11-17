@@ -78,9 +78,10 @@ class FamilyApiTest {
 
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.items[*].number").asArray().containsExactly("СТЕНД-0002");
-        assertThat(result).bodyJson().extractingPath("$.items[0].relation_type_external_id").isEqualTo(TYPE.toString());
+        assertThat(result).bodyJson().extractingPath("$.items[0].relationship").isEqualTo(TYPE.toString());
         assertThat(result).bodyJson().extractingPath("$.items[0].date_of_birth").isEqualTo("2015-01-01");
-        assertThat(result).bodyJson().extractingPath("$.items[0]").asMap().doesNotContainKey("email");
+        assertThat(result).bodyJson().extractingPath("$.items[0]").asMap()
+                .doesNotContainKeys("email", "relation_type_external_id");
     }
 
     @Test

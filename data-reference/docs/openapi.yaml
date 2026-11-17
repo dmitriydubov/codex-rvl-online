@@ -49,7 +49,7 @@ info:
     | 404 | `INSURANCE_CONTRACT_NOT_FOUND`, `POLICY_NOT_FOUND`, `LPU_NOT_FOUND`, `SERVICE_NOT_FOUND`, `PROGRAM_NOT_FOUND` | записи нет (или она не подходит ручке) |
     | 405 | `METHOD_NOT_ALLOWED` | метод, кроме `GET`, `HEAD` и `OPTIONS`; заголовок `Allow` |
     | 406 | `NOT_ACCEPTABLE` | `Accept` не допускает JSON |
-    | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны; в `details` — кандидаты |
+    | 409 | `AMBIGUOUS_POLICY`, `AMBIGUOUS_PRICE_CONTRACT`, `AMBIGUOUS_INSURANCE_CONTRACT`, `AMBIGUOUS_PRICE` | данные 1С неоднозначны, у полиса по номеру без договора — полисов с таким номером несколько; в `details` — кандидаты |
     | 422 | `NO_ACTIVE_PRICE_CONTRACT`, `PRICE_NOT_COVERED` | данных 1С не хватает для ответа |
     | 500 | `INTERNAL_ERROR` | необработанная ошибка сервиса |
     | 503 | `SERVICE_UNAVAILABLE` | база недоступна или не ответила за 3 с (`API_READ_TIMEOUT_SECONDS`), либо сервис перегружен — запрос пришёл сверх предела одновременно обрабатываемых (`API_MAX_CONCURRENT_REQUESTS`) и отклонён сразу; повторить позже с паузой, ограниченное число раз; `message` не разбирать |
@@ -358,7 +358,7 @@ paths:
         включительно, пустое окончание — бессрочно) и которые сами действуют сегодня: не в архиве, `begin_date <= сегодня`
         и (`end_date` пустая или `end_date >= сегодня`). Учитываются только связи, где этот полис — застрахованный;
         обратные не отдаются. Полис самого застрахованного не отбирается: его родственники отдаются и когда он в архиве,
-        закончился или ещё не начался. Один элемент на полис родственника: `relation_type_external_id` — GUID типа связи
+        закончился или ещё не начался. Один элемент на полис родственника: `relationship` — GUID типа связи
         в 1С:УСК, если у полиса сегодня один действующий тип связи, и `null`, если их несколько. Порядок — по номеру
         полиса родственника, затем по GUID полиса (строки сравниваются по кодам символов, не по алфавиту). Родственников нет — `{"items": []}`.
 
@@ -404,12 +404,19 @@ paths:
     get:
       tags: [Полисы]
       operationId: policyByKey
-      summary: R-05. Полис по GUID 1С или по номеру в договоре
+      summary: R-05. Полис по GUID 1С или по номеру
       description: |
-        Ровно один способ: `external_id`, или `number` вместе с `contract_external_id`. Другие сочетания — 400, в том
-        числе с пустым `external_id=` рядом с `number`: параметр считается переданным и без значения;
-        параметр `contract_id` не принимается (договор передаётся `contract_external_id`). Ответ — как у
+        Ровно один способ: `external_id`, или `number` — вместе с `contract_external_id` или без него. Другие
+        сочетания — 400, в том числе с пустым `external_id=` рядом с `number`: параметр считается переданным и без
+        значения; параметр `contract_id` не принимается (договор передаётся `contract_external_id`). Ответ — как у
         `/internal/v1/policies/{id}`.
+
+        По номеру без договора полис ищется среди полисов всех договоров. Номер сравнивается точно: регистр и пробелы
+        значимы, пустой номер или номер из пробелов — 400 по полю `number`. Архивные, закончившиеся и обезличенные
+        полисы находятся так же, как с договором: решать по `is_archive`, датам и `personal_data_erased` — вызывающему.
+        Полисов с таким номером несколько — 409, и ни один полис не отдаётся. Без договора ищется только тогда, когда
+        параметра `contract_external_id` в запросе нет вовсе: пустой или из пробелов — 400 по полю
+        `contract_external_id`. Номера полиса нет ни в тексте ошибки, ни в журнале сервиса.
       parameters:
         - $ref: '#/components/parameters/RequestId'
         - name: external_id
@@ -420,12 +427,12 @@ paths:
         - name: number
           in: query
           required: false
-          description: номер полиса; только вместе с `contract_external_id`
+          description: номер полиса, точное совпадение; с `contract_external_id` — в этом договоре, без него — среди всех полисов
           schema: {type: string}
         - name: contract_external_id
           in: query
           required: false
-          description: GUID договора страхования в 1С:УСК; только вместе с `number`
+          description: GUID договора страхования в 1С:УСК; только вместе с `number`, необязателен
           schema: {type: string, format: uuid}
       responses:
         '200':
@@ -437,7 +444,9 @@ paths:
         '400': {$ref: '#/components/responses/ValidationError'}
         '404': {$ref: '#/components/responses/PolicyNotFound'}
         '409':
-          description: '`AMBIGUOUS_POLICY` — по номеру в договоре больше одного полиса; `details`: `{policy_id}`'
+          description: >-
+            `AMBIGUOUS_POLICY` — по номеру больше одного полиса; `details`: с `contract_external_id` — `{policy_id}`,
+            без него — `{policy_id, contract_external_id}`, где `contract_external_id` — GUID договора 1С:УСК из полиса
           headers: {X-Request-Id: {$ref: '#/components/headers/RequestId'}}
           content:
             application/json:
@@ -957,8 +966,7 @@ components:
           items: {$ref: '#/components/schemas/FamilyMember'}
     FamilyMember:
       type: object
-      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender,
-                 relation_type_external_id]
+      required: [id, external_id, number, last_name, first_name, middle_name, date_of_birth, gender, relationship]
       properties:
         id: {type: string, format: uuid, description: 'наш id полиса родственника, как в `/internal/v1/policies/{id}`'}
         external_id: {type: string, format: uuid}
@@ -968,7 +976,7 @@ components:
         middle_name: {type: string, nullable: true}
         date_of_birth: {type: string, format: date, nullable: true}
         gender: {type: string, nullable: true, description: 'как в 1С:УСК (`М`, `Ж`)'}
-        relation_type_external_id:
+        relationship:
           type: string
           format: uuid
           nullable: true
@@ -1096,6 +1104,11 @@ components:
           required: [policy_id]
           properties:
             policy_id: {type: string, format: uuid}
+            contract_external_id:
+              type: string
+              format: uuid
+              description: >-
+                GUID договора страхования в 1С:УСК из полиса; только в R-05 по номеру без `contract_external_id`
         - title: кандидат-договор ЛПУ (AMBIGUOUS_PRICE_CONTRACT)
           type: object
           required: [lpu_contract_id]

@@ -14,12 +14,12 @@ public record FamilyMember(
         @Nullable String middleName,
         @Nullable LocalDate dateOfBirth,
         @Nullable String gender,
-        @Nullable UUID relationTypeExternalId) implements FamilyAnswer {
+        @Nullable UUID relationship) implements FamilyAnswer {
 
-    public static FamilyMember of(Policy policy, @Nullable UUID relationTypeExternalId) {
+    public static FamilyMember of(Policy policy, @Nullable UUID relationship) {
         Policy.Details details = policy.details();
         return new FamilyMember(policy.id(), policy.externalId(), details.number(),
                 details.lastName(), details.firstName(), details.middleName(), details.dateOfBirth(), details.gender(),
-                relationTypeExternalId);
+                relationship);
     }
 }
