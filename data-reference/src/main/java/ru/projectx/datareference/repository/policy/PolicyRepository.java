@@ -26,6 +26,8 @@ public interface PolicyRepository extends JpaRepository<Policy, UUID>, PolicySea
 
     List<Policy> findAllByNumberAndExternalContractId(String number, UUID externalContractId);
 
+    List<Policy> findAllByNumber(String number);
+
     @Query(nativeQuery = true, value = """
             select count(*)
               from policies
