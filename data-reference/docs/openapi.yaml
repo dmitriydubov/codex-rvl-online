@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: data-reference REST API
-  version: 1.0.0-rc.3
+  version: 1.0.0-rc.4
   description: |
     Справочники и полисы РВЛ ОНЛАЙН для сервисов Заявок и Договоров. Данные приходят из 1С:УСК; REST только читает,
     в 1С сервис ничего не пишет.
