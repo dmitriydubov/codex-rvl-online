@@ -54,7 +54,7 @@ if ! kubectl -n "$NAMESPACE" get secret "$SECRET" >/dev/null 2>&1; then
     exit 1
 fi
 
-helm template "$APP" "$SCRIPT_DIR/helm" --namespace "$NAMESPACE" --set TAG="$TAG" >/dev/null \
+helm template "$APP" "$SCRIPT_DIR/helm" --namespace "$NAMESPACE" --set namespace="$NAMESPACE" --set TAG="$TAG" >/dev/null \
     || fail "The chart does not render: fill in the missing values in $SCRIPT_DIR/helm/values.yaml."
 
 CURRENT=$(kubectl -n "$NAMESPACE" get deploy "$APP" \
@@ -82,7 +82,7 @@ sudo nerdctl build \
     -t "$APP:$TAG" .
 
 echo "== Deploy to cluster =="
-helm upgrade --install "$APP" "$SCRIPT_DIR/helm" --namespace "$NAMESPACE" --set TAG="$TAG"
+helm upgrade --install "$APP" "$SCRIPT_DIR/helm" --namespace "$NAMESPACE" --set namespace="$NAMESPACE" --set TAG="$TAG"
 kubectl -n "$NAMESPACE" rollout status deploy/"$APP" --timeout=10m
 
 echo
