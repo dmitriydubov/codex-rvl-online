@@ -332,7 +332,7 @@ namespace `rvl-test`, одной репликой. Docker на машине ст
 sudo ./devops/test/deploy.sh v1
 ```
 
-**Перед первой выкаткой** нужны четыре вещи:
+**Перед первой выкаткой** нужны три вещи:
 
 1. Значения базы в `devops/test/helm/values.yaml`: `postgres.host`, `postgres.port`, `postgres.database`,
    `postgres.username` (из них собираются `DB_URL` и `DB_USERNAME`). Пока они пусты, чарт не рисуется и называет первое
@@ -364,7 +364,6 @@ sudo ./devops/test/deploy.sh v1
    ```
 
    Без него соединение с брокером 1С:УСК не устанавливается (`onecBroker` в `DOWN`).
-4. Адрес S3 `s3.endpoint` в `values.yaml` сверить с настоящим: в нём нет порта и домена, он годится, только если хранилище отвечает по `http://s00-0000-s301`.
 
 На машину стенда копируется весь каталог модуля, а не только jar: jar собирается внутри образа (`JAR_SOURCE=build`).
 Базовые образы и дистрибутив Gradle скрипт берёт из реестра и зеркала Nexus (`IMAGE_REGISTRY`, `GRADLE_MIRROR`; отдельный
@@ -383,7 +382,7 @@ LF, доступ `helm` к кластеру, наличие Secret и то, чт
 | Метрики | аннотации Prometheus на порт 8081, `/actuator/prometheus` |
 | Брокер 1С:УСК | `s00-0000-rt14.sogaz.ru:5671`, virtual host `/`, пользователь `rvl-online`, TLS, проверка сертификата и имени хоста включены |
 | Справочный сервис | `REFERENCE_URL=http://data-reference:8080/internal/v1`: внутри кластера, тот же namespace; базовый путь `/internal/v1` обязателен, без него запросы справочника уходят на несуществующие адреса |
-| S3 | `S3_ENDPOINT=http://s00-0000-s301` (без TLS), `S3_BUCKET=00-0000-edo-bucket`, `S3_REGION=us-east-1`; `S3_INN` и `S3_KPP` не заданы, ключ объекта собирается с заглушками из `application.yml` |
+| S3 | `S3_ENDPOINT=http://s00-0000-s301:9000` (без TLS), `S3_BUCKET=00-0000-edo-bucket`, `S3_REGION=us-east-1`; `S3_INN` и `S3_KPP` не заданы, ключ объекта собирается с заглушками из `application.yml` |
 | Оплата | `PAYMENT_ENABLED=false` (ровно `false`); Ordering и брокер маркетинга не настраиваются |
 | JVM | `-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError` через `JDK_JAVA_OPTIONS`, память пода 512 МиБ — 1 ГиБ, процессор 100 мс — 1 ядро; каждая одновременная загрузка справки держит в памяти до 10 МБ, для нагрузочной проверки загрузок лимит памяти поднимают |
 

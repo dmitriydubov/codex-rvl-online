@@ -49,7 +49,7 @@ reference:
   url: http://data-reference:8080/internal/v1
 
 s3:
-  endpoint: http://s00-0000-s301
+  endpoint: http://s00-0000-s301:9000
   region: us-east-1
   bucket: 00-0000-edo-bucket
 
