@@ -54,6 +54,16 @@ public class StatusMessageSteps {
         Envelopes.check(body(ordinal).path("meta"), expected);
     }
 
+    @Тогда("в сообщении о состоянии выпуска №{int} у участника {string} код ошибки {string} и текст {string}")
+    public void participantError(int ordinal, String participantId, String errorCode, String errorMessage) {
+        var participants = body(ordinal).path("data").path("participants");
+        assertThat(participants).filteredOn(person -> participantId.equals(person.path("id").stringValue()))
+                .singleElement().satisfies(person -> {
+                    assertThat(person.path("error_code").stringValue()).isEqualTo(errorCode);
+                    assertThat(person.path("error_message").stringValue()).isEqualTo(errorMessage);
+                });
+    }
+
     @Тогда("сообщение о состоянии выпуска №{int}: заявка {string}, статус {string}, участники:")
     public void state(int ordinal, String requestId, String status, List<Map<String, String>> participants) {
         JsonNode data = body(ordinal).path("data");

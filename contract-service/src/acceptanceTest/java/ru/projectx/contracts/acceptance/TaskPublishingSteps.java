@@ -99,7 +99,7 @@ public class TaskPublishingSteps {
         return text.getBytes(StandardCharsets.UTF_8);
     }
 
-    private void publish(String messageId, ObjectNode body) {
+    void publish(String messageId, ObjectNode body) {
         byte[] bytes = messages.bytes(body);
         published.remember(messageId, bytes);
         published.rememberQueued(queue.alias(), messageId);

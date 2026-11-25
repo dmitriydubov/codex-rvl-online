@@ -14,23 +14,49 @@ import ru.projectx.contracts.message.usk.IssuedDocument;
 import ru.projectx.contracts.message.usk.UskResult;
 import ru.projectx.contracts.service.inbox.parse.FieldPresence;
 import ru.projectx.contracts.service.inbox.parse.MessageBodies;
+import ru.projectx.contracts.service.lm.LmPolicyTexts;
 import ru.projectx.contracts.service.usk.UskResultLayout;
 import ru.projectx.contracts.support.LmPolicyResultBodies;
 import ru.projectx.contracts.support.UskResultBodies;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class UskResultParserTest {
 
-    private static final MessageBodies BODIES = new MessageBodies(JsonMapper.builder().build());
-    private static final UskResultLayout LM_POLICY = new UskResultLayout("ISSUED", "policy_usk_id",
-            "policy_usk_number", FieldPresence.OPTIONAL, FieldPresence.OPTIONAL);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final MessageBodies BODIES = new MessageBodies(JSON);
     private static final UskResultLayout KM_CONTRACT = new UskResultLayout("REGISTERED", "contract_usk_id",
             "contract_usk_number", FieldPresence.REQUIRED, FieldPresence.REQUIRED);
+
+    @Test
+    void nonStringUskNumber_rejectsIssuedPolicyWithoutTheValue() {
+        UskResultParser parser = new UskResultParser(BODIES, LmPolicyTexts.LAYOUT);
+        String payload = withNonStringNumber(LmPolicyResultBodies.issued());
+
+        assertThatThrownBy(() -> parser.parse(payload)).isInstanceOf(ContractViolationException.class)
+                .hasMessage("недопустимое значение поля data.policy_usk_number").hasNoCause();
+    }
+
+    @Test
+    void nonStringUskNumber_doesNotAffectFailedPolicyResult() {
+        UskResultParser parser = new UskResultParser(BODIES, LmPolicyTexts.LAYOUT);
+        String payload = withNonStringNumber(LmPolicyResultBodies.failed());
+
+        assertThat(parser.parse(payload)).isEqualTo(new UskResult.Failed(UUID.fromString(LmPolicyResultBodies.POLICY_ID),
+                "INSURED_NOT_COVERED", "Стенд: застрахованный не входит в корпоративный договор"));
+    }
+
+    private static String withNonStringNumber(LmPolicyResultBodies response) {
+        JsonNode payload = JSON.readTree(response.toJson());
+        ((ObjectNode) payload.path("data")).put("policy_usk_number", false);
+        return JSON.writeValueAsString(payload);
+    }
 
     @Nested
     class LmPolicyIssued {
 
-        private final UskResultParser parser = new UskResultParser(BODIES, LM_POLICY);
+        private final UskResultParser parser = new UskResultParser(BODIES, LmPolicyTexts.LAYOUT);
 
         @Test
         void issuedResult_isParsedWithUskIdentifiersPolicyAndDocuments() {

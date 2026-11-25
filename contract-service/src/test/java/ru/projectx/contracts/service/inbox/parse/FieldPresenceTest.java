@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import ru.projectx.contracts.exception.ContractViolationException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -13,8 +15,9 @@ class FieldPresenceTest {
             {"data": {"number": "LM-000012204", "count": 5, "documents": [], "nothing": null}}
             """;
 
-    private final JsonFields data = new JsonFields(JsonMapper.builder().build().readTree(BODY), "")
-            .requiredObject("data");
+    private static final MessageBodies BODIES = new MessageBodies(JsonMapper.builder().build());
+
+    private final JsonFields data = BODIES.data(BODY);
 
     @Test
     void requiredText_isReadAndItsAbsenceIsAViolation() {
@@ -26,11 +29,19 @@ class FieldPresenceTest {
     }
 
     @Test
-    void optionalText_isNullWhenAbsentOrNotText() {
+    void optionalText_isNullWhenAbsentOrNull() {
         assertThat(FieldPresence.OPTIONAL.textOf(data, "number")).isEqualTo("LM-000012204");
         assertThat(FieldPresence.OPTIONAL.textOf(data, "missing")).isNull();
         assertThat(FieldPresence.OPTIONAL.textOf(data, "nothing")).isNull();
-        assertThat(FieldPresence.OPTIONAL.textOf(data, "count")).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5", "false", "[]", "{}"})
+    void optionalText_rejectsOtherJsonTypes(String value) {
+        JsonFields fields = BODIES.data("{\"data\":{\"number\":" + value + "}}");
+
+        assertThatThrownBy(() -> FieldPresence.OPTIONAL.textOf(fields, "number"))
+                .isInstanceOf(ContractViolationException.class).hasMessage("недопустимое значение поля data.number");
     }
 
     @Test

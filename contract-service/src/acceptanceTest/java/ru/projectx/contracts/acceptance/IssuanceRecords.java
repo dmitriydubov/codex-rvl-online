@@ -71,6 +71,9 @@ public class IssuanceRecords {
             @Nullable String documentSeries, String documentNumber) {
     }
 
+    record PartyOptionalFields(String role, boolean allAbsent) {
+    }
+
     List<Record> of(String participantId, String requestId) {
         return jdbc.sql(RECORDS).param("request", UUID.fromString(requestId))
                 .param("participant", UUID.fromString(participantId)).query(this::record).list();
@@ -88,6 +91,27 @@ public class IssuanceRecords {
 
     List<Person> personsOf(UUID owner) {
         return jdbc.sql(PERSONS).param("owner", owner).query(this::person).list();
+    }
+
+    List<PartyOptionalFields> optionalPartyFields(String participantId) {
+        return jdbc.sql("""
+                select person.role::text as role,
+                       (person.middle_name is null and person.address is null and person.document_series is null
+                        and person.document_issued_by is null and person.document_issued_at is null
+                        and person.document_division_code is null) as all_absent
+                  from contract_persons person join contracts contract on contract.id = person.contract_id
+                 where contract.insured_participant_id = :participantId
+                """).param("participantId", UUID.fromString(participantId))
+                .query((row, index) -> new PartyOptionalFields(row.getString("role"), row.getBoolean("all_absent"))).list();
+    }
+
+    List<String> lmPolicyRows(String participantId, String requestId) {
+        return jdbc.sql("""
+                select to_jsonb(policy)::text from lm_policies policy
+                 where participant_id = :participant and individual_request_id = :request
+                 order by id
+                """).param("participant", UUID.fromString(participantId))
+                .param("request", UUID.fromString(requestId)).query(String.class).list();
     }
 
     UUID latestLmPolicyId(String participantId, String requestId) {

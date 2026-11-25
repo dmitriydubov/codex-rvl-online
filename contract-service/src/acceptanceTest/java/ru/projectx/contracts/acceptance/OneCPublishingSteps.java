@@ -29,6 +29,15 @@ public class OneCPublishingSteps {
                 fields));
     }
 
+    @Когда("1С:УСК публикует результат выпуска {string} по полису ЛМ участника {string} заявки {string} с полем policy_usk_number вида {string}:")
+    public void resultWithOptionalNumberPublished(String messageId, String participantId, String requestId,
+            String kind, Map<String, String> fields) {
+        ObjectNode body = messages.issued(messageId, requestId, records.latestLmPolicyId(participantId, requestId),
+                fields);
+        OptionalFieldValues.put(body, "policy_usk_number", kind);
+        publish(messageId, body);
+    }
+
     @Когда("1С:УСК публикует в свою очередь результат выпуска {string} по заявке {string} для полиса ЛМ с идентификатором {string}:")
     public void resultPublishedForPolicy(String messageId, String requestId, String policyId,
             Map<String, String> fields) {
