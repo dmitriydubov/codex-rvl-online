@@ -1,8 +1,11 @@
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -17,11 +20,14 @@ import org.w3c.dom.NodeList;
 /**
  * DRY gate: reads a PMD CPD XML report and fails on duplicated code.
  *
- * <p>With {@code --only}, only duplications that touch at least one of the listed (changed)
- * files count, so an existing codebase can adopt the gate without fixing history first.
+ * <p>With {@code --only-file}, only duplications that touch at least one of the listed (changed)
+ * files count, so an existing codebase can adopt the gate without fixing history first. The file lists their
+ * paths relative to the project directory, each ended by a NUL character as {@code git diff --name-only -z}
+ * writes them (a comma or a line break stays part of its name); an empty file = none; a listed path that names
+ * no file is an error (exit 2) - the scope would otherwise match nothing and pass.
  *
  * <pre>
- * java DryGate.java --report build/reports/cpd/cpd.xml --project-dir . [--only a.java,b.java] [--max 0]
+ * java DryGate.java --report build/reports/cpd/cpd.xml --project-dir . [--only-file changed-sources] [--max 0]
  * </pre>
  * Exit codes: 0 = OK, 1 = too many duplications, 2 = usage or input error.
  */
@@ -55,7 +61,7 @@ public class DryGate {
                 switch (args[i]) {
                     case "--report" -> report = value;
                     case "--project-dir" -> projectDir = value;
-                    case "--only" -> only = csv(value);
+                    case "--only-file" -> only = pathList(value);
                     case "--max" -> max = Integer.parseInt(value);
                     default -> throw new IllegalArgumentException("unknown option " + args[i]);
                 }
@@ -65,12 +71,20 @@ public class DryGate {
             }
         } catch (RuntimeException e) {
             err.println("DryGate: " + e.getMessage());
-            err.println("usage: java DryGate.java --report <cpd.xml> [--project-dir dir] [--only f1,f2] [--max 0]");
+            err.println("usage: java DryGate.java --report <cpd.xml> [--project-dir dir] [--only-file list] [--max 0]");
             return 2;
         }
         if (only != null && only.isEmpty()) {
             out.println("DRY gate: no changed Java sources in scope - nothing to check.");
             return 0;
+        }
+        if (only != null) {
+            Path root = Path.of(projectDir);
+            List<String> missing = only.stream().filter(f -> !Files.exists(root.resolve(f))).sorted().toList();
+            if (!missing.isEmpty()) {
+                err.println("DryGate: the scope names no file under " + projectDir + ": " + missing);
+                return 2;
+            }
         }
         File xml = new File(report);
         if (!xml.isFile()) {
@@ -109,10 +123,29 @@ public class DryGate {
         return 1;
     }
 
+    /**
+     * JDK 24 and newer count every reference to a built-in entity ({@code &lt;}, {@code &quot;}) against
+     * jdk.xml.maxGeneralEntitySizeLimit, 100,000 per document: a large report full of escaped names stopped the tool.
+     * The report declares no entity of its own (a DOCTYPE is refused), so only the size limits are lifted.
+     */
+    static void liftSizeLimits(DocumentBuilderFactory f) {
+        for (String limit : List.of("maxGeneralEntitySizeLimit", "totalEntitySizeLimit")) {
+            try {
+                f.setAttribute("http://www.oracle.com/xml/jaxp/properties/" + limit, "0");
+            } catch (IllegalArgumentException olderParser) {   // a parser without the limit needs no lifting
+            }
+        }
+    }
+
     static List<Duplication> parse(File xml, Path projectDir) throws Exception {
         DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
         f.setNamespaceAware(false);
         f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        // CPD writes its XML report without a DOCTYPE. The feature above skips only an external DTD: the declarations
+        // of a DOCTYPE in the report still loaded an external parameter entity, which put a file's content into an
+        // entity, and the gate printed it as a path (XXE). A report with a DOCTYPE is not read.
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        liftSizeLimits(f);
         Document doc = f.newDocumentBuilder().parse(xml);
         List<Duplication> list = new ArrayList<>();
         NodeList dups = doc.getElementsByTagName("duplication");
@@ -158,12 +191,17 @@ public class DryGate {
         return v.isEmpty() ? 0 : Integer.parseInt(v);
     }
 
-    static Set<String> csv(String value) {
+    /** The paths of a list file, each ended by a NUL character ({@code git diff --name-only -z}), exactly as written. */
+    static Set<String> pathList(String file) {
         Set<String> set = new HashSet<>();
-        for (String s : value.split(",")) {
-            if (!s.isBlank()) {
-                set.add(s.trim());
+        try {
+            for (String path : Files.readString(Path.of(file), StandardCharsets.UTF_8).split("\0")) {
+                if (!path.isEmpty()) {
+                    set.add(path);
+                }
             }
+        } catch (IOException e) {
+            throw new UncheckedIOException("cannot read the list " + file, e);
         }
         return set;
     }

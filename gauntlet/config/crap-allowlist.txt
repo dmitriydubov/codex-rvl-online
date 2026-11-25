@@ -3,4 +3,11 @@
 # above the limit - do not split it into helpers that take booleans the caller already knew".
 # Class#* allows every method of a class. Agents cannot edit this file.
 #
+# Overloads: a name-only Class#method entry exempts the method only when that name is unique in
+# the class. If the class has several overloads of the name, the entry is ambiguous and exempts
+# NOTHING (the gate prints the descriptors and fails) - a later overload must not inherit an
+# exception approved for an older one. Pick the exact overload with its JVM descriptor:
+#   Class#method(I)D            # quote(int)
+#   Class#method(Ljava/lang/String;)D   # quote(String)
+#
 # com.example.service.domain.DeliveryZone#forRegionCode   # one switch over 12 region codes

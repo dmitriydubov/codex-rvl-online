@@ -32,7 +32,9 @@ import org.w3c.dom.NodeList;
  * with it the mutation gate: a human verifies by reading the tests that the mutant would be killed and
  * adds {@code Class#method Mutator # which test} to the allowlist. MEMORY_ERROR and NON_VIABLE are
  * reported only: the first is PIT's own verdict on a runaway mutant, the second is bytecode the JVM
- * rejected, not a code change.
+ * rejected, not a code change. TIMED_OUT is deliberately NOT unverified: the tests ran against the
+ * mutant and it hung them (an infinite loop), so PIT counts it as a real kill ({@code TIMED_OUT(true)});
+ * it is a detection, not a crash that skipped the tests.
  *
  * <pre>
  * java PitSummary.java --report build/reports/pitest/mutations.xml [--max-per-file 100]
@@ -114,9 +116,27 @@ public class PitSummary {
         return gate(mutants, allowed, allowlist, out) ? 0 : 1;
     }
 
+    /**
+     * JDK 24 and newer count every reference to a built-in entity ({@code &lt;}, {@code &quot;}) against
+     * jdk.xml.maxGeneralEntitySizeLimit, 100,000 per document: a large report full of escaped names stopped the tool.
+     * The report declares no entity of its own (a DOCTYPE is refused), so only the size limits are lifted.
+     */
+    static void liftSizeLimits(DocumentBuilderFactory f) {
+        for (String limit : List.of("maxGeneralEntitySizeLimit", "totalEntitySizeLimit")) {
+            try {
+                f.setAttribute("http://www.oracle.com/xml/jaxp/properties/" + limit, "0");
+            } catch (IllegalArgumentException olderParser) {   // a parser without the limit needs no lifting
+            }
+        }
+    }
+
     static List<Mutant> parse(File xml) throws Exception {
         DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
         f.setNamespaceAware(false);
+        // PIT writes mutations.xml without a DOCTYPE. A DOCTYPE in the report could declare an external entity, and
+        // the summary printed the file it named as a mutant's description (XXE): such a report is not read.
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        liftSizeLimits(f);
         Document doc = f.newDocumentBuilder().parse(xml);
         List<Mutant> list = new ArrayList<>();
         NodeList nodes = doc.getElementsByTagName("mutation");

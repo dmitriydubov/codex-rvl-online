@@ -14,30 +14,33 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 ## Gather evidence first
 - The whole change, committed or not: `git diff $(git merge-base <base> HEAD)` (working tree against the
   merge base) plus the untracked files from `git ls-files --others --exclude-standard` - read those files
-  directly. Base is given in your prompt; default `origin/main`.
+  directly. Base is given in your prompt; default `origin/main`. Where your tools have no git (an external route
+  that closes it), the diff and the file list of M are in your prompt.
 - The approved feature files touched by the change, and the module's architecture policy `gauntlet/config/<module>/architecture.properties` (fallback: the common
-  template `gauntlet/config/architecture.properties`; `./gradlew gauntletInfo` shows which applies). Exceptions the
-  policy declares (temporary edges, lifted `forbidden`) are debt: new code that widens them is a finding.
+  template `gauntlet/config/architecture.properties`; `./gradlew gauntletInfo` shows which applies).
 - When the change relies on framework behaviour, property names or an API contract: the official
-  reference for the versions the build resolves (Spring Boot 4.0 / Framework 7.0 / Spring AMQP 4.0 /
-  Hibernate 7.2 / Jackson 3 / Java 21 - docs.spring.io, docs.hibernate.org, docs.oracle.com, Javadoc), or offline `META-INF/spring-configuration-metadata.json` and `javap` on the
-  jars in the Gradle cache. Do not review API use from memory. Allowed sources are listed in
+  reference for the `project.*` versions recorded by start in `gauntlet/config/gauntlet.properties`
+  (`./gradlew gauntletInfo` prints them) and for the versions the build actually resolves. Use the matching
+  official documentation, or offline metadata and `javap` on the jars in the build cache. Do not review API use
+  from memory or inherit the reference project's versions. Allowed sources are listed in
   gauntlet/CLAUDE.md, section «Источники документации». A decision that depends on framework, library
   or protocol behaviour without a cited official source of the resolved version in the report's
   «Сверка по документации» (the code carries no comments or Javadoc, so a source cited only in the code
   does not count and is itself a finding under item 10), or backed by a source outside that list, is a
-  **major** finding: name the decision and the source it needs. Rule 12 fixes the order: the official sites
-  first, then the fallback paths, and only then model memory, marked «память + тест» and backed by a test in
-  the same change that pins the behaviour. A «память + тест» entry without such a test, or used while a
-  source of steps (1)-(2) was reachable, is also **major**.
-- The module's own rules (for `data-reference` - `data-reference/CLAUDE.md`: packages, transactions,
-  broker acknowledgements, personal data, tests) and the domain specifications in `project_files/`.
+  **major** finding: name the decision and the source it needs.
+- The module's own rules (its `CLAUDE.md`: packages, transactions, broker acknowledgements, personal data,
+  tests) and the domain documents listed in gauntlet/CLAUDE.md, «Предметная область».
 - You may run `./gradlew gauntletFast --continue` from the module's directory to confirm the gates; you
   must not change files or git state (a hook enforces it).
 
 ## Look for
 1. **Behaviour vs spec**: cases the scenarios imply but nothing tests; step definitions that ignore a
-   parameter or assert on something weaker than the observable result.
+   parameter or assert on something weaker than the observable result. Classify every behavioural finding:
+   **«дефект»** — the behaviour contradicts the approved spec or an owner decision (fixable in code);
+   **«правило»** — the spec does not define the behaviour the code decides (version selection, ordering,
+   refusal fate, a cleared field versus an absent one). A «правило» finding names the rule, the observable
+   outcomes and the variants with a recommendation; it goes to the human, never into another fix round —
+   patching one case of an undefined rule invites the next case as a new finding.
 2. **Security & data protection**: missing authorisation checks, injection (SQL/JPQL, log, header),
    personal or other sensitive data in logs, errors or test fixtures, secrets in code, unsafe deserialisation,
    SSRF in outbound calls, overly broad CORS.
@@ -62,15 +65,16 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
    a hard-coded image registry or repository URL; a change to the repository switch in `settings.gradle`;
    an artifact the company Nexus is known not to serve (`spring-boot-starter-webmvc*`); a change to the Gradle
    Wrapper (`distributionUrl`, `gradlew*`, `gradle/wrapper/`) without the owner's agreement; deleted or renamed
-   files missing from the report's transfer list; Claude, Anthropic or other traces of development outside the
-   contour (PR numbers, GitHub, branches, gauntlet and its gates, sessions and roles, «решение владельца», plan
-   step numbers) in transferred files - run the check commands of «Рабочий контур» and compare their output with
-   the base branch: any new line is a **major** finding.
+   files missing from the report's transfer list; Claude, Anthropic, Antigravity, Gemini, Codex, Grok, Kimi, Qwen
+   or other traces of development outside the contour (PR numbers, GitHub, branches, gauntlet and its gates,
+   sessions and roles, «решение владельца», plan step numbers) in transferred files - run the check commands of
+   «Рабочий контур» and compare their output with the base branch: any new line is a **major** finding.
 9. **Anti-patterns and readability the tools cannot measure**: boolean flag parameters, null instead
    of Optional or an empty collection, a catch-all outside a system boundary or without a decision
    (log + reject/requeue/retry/rethrow), swallowed failures, mutable shared state, names that do not
-   say what the thing is in the domain, mixed levels of abstraction in one method, a new integration path
-   without idempotency, timeouts or limits, a cheaper or safer design the author did not consider.
+   say what the thing is in the domain, mixed levels of abstraction in one method, comments that
+   explain bad code, a new integration path without idempotency, timeouts or limits, a cheaper or
+   safer design the author did not consider.
 10. **No comments and no Javadoc** (owner's rule of 2026-10-12; module `CLAUDE.md`, «Комментарии и Javadoc»): flag
    every comment or Javadoc in Java, `application.yml`, `#`-comments of Liquibase changeSets, `build.gradle`,
    `settings.gradle`, `Dockerfile`, `docker-compose.yml` and stand scripts, except the listed exceptions (feature
@@ -91,8 +95,25 @@ coder/reviewer loop of Robert C. Martin's swarm-forge "adversaries" branch.)
 ## Output (exactly this shape)
 ```
 VERDICT: APPROVED | CHANGES REQUESTED
-1. [blocker|major|minor] path/File.java:123 - problem - risk - expected correction
+1. [blocker|major|minor] [дефект|правило] path/File.java:123 «<verbatim line>» - problem - risk - expected correction
 2. ...
-Residual risks: <what you could not verify>
+Осмотрено: файлы диффа N из M — <path>, <path>, …
+Residual risks: <what — why (нет доступа: what you tried | вне карточки | исчерпан бюджет) — what it risks>
 ```
-Every item must be actionable. No praise, no restating the diff.
+Every item must be actionable. For a «правило» item the expected correction is a spec decision for the
+human, not a code edit. No praise, no restating the diff.
+
+Evidence is part of the shape (gauntlet/subagents.md, section 1 and card 4.5); the main agent opens every
+`file:line` and compares the quote:
+- Right after `file:line` every finding carries either the verbatim text of that line in «…» (one «…» group per
+  consecutive line when you quote more) or, instead, the reproduction:
+  `` `<command>` (код <N>) → «<output line>» `` - the command, its exit code and the output line that shows the
+  problem. A finding you cannot back this way is not a finding: name it under Residual risks.
+- M is the number of files in the change: `git diff --name-only $(git merge-base <base> HEAD)` plus
+  `git ls-files --others --exclude-standard`. A path that no longer exists (deleted, or the old name of a file
+  moved without `git mv`) is read as its deletion: `git diff $(git merge-base <base> HEAD) -- <path>`; list it in
+  «Осмотрено» too. «Осмотрено» lists every file you read. APPROVED only with N из N: a file you did not read cannot
+  be approved. The main agent counts M with the same commands and sends back an APPROVED whose list is not the
+  whole change.
+- Residual risks is the honest remainder: each item says what, why (only the three reasons above; «no time» is
+  not one) and what it risks; «нет» only when nothing is left.

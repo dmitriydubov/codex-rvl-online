@@ -10,6 +10,13 @@ build/
 
 # Локальные переменные docker compose: шаблон — data-reference/.env.example
 .env
+!.qwen/.env
+!gauntlet/adapters/qwen/overlay/.qwen/.env
+
+# Локальные временные файлы агентных оболочек
+.kimi-code/local.toml
+.qwen/QWEN.local.md
+.qwen/worktrees/
 
 # Аварийные журналы JVM (минионы PIT оставляют их в каталоге модуля)
 hs_err_pid*.log
