@@ -56,11 +56,11 @@
 
 ---
 
-## 1. Облачное окружение Claude Code
+## 1. Облачные окружения (Claude Code и Antigravity)
 
-Окружений два:
-- **Default** (`env_011KhGJ5hPyZ2jaWNeQYEh4A`) — для задач;
-- **gauntlet-admin** (`env_013PC74pJafEbrLaF8A6CVYY`) — для правок набора (раздел 2).
+Окружений Claude Code два (актуализировано по реестру плана от 2026-10-20 и `scan` 2026-11-24):
+- **default** (`env_01YVg9QhVoXA1mAduxrH5NH4`) — охраняемое окружение для сессий задач (`guard: on`, без `GAUNTLET_GUARD=off`);
+- **gauntlet-admin** (`env_013PC74pJafEbrLaF8A6CVYY`; прежний `env_011KhGJ5hPyZ2jaWNeQYEh4A` также несёт `GAUNTLET_GUARD=off`, поэтому для сессий задач не используется) — для координаторов и правок набора (раздел 2).
 
 **Где правится.** Окружение правится на claude.ai/code:
 1. Нажмите значок облака с именем окружения над полем ввода (в открытой сессии — меню окружения в заголовке).
@@ -96,6 +96,9 @@ tomcat.apache.org
 www.slf4j.org
 logback.qos.ch
 docs.micrometer.io
+min.io
+www.min.io
+docs.min.io
 docs.junit.org
 assertj.github.io
 site.mockito.org
@@ -110,7 +113,7 @@ docs.pmd-code.org
 www.jacoco.org
 ```
 
-- В `gauntlet-admin` все эти домены отвечают 200, а `example.com` — 403. Значит, там уже Custom с этим списком.
+- В `gauntlet-admin` все эти домены отвечают 200, а `example.com` — 403. Значит, там уже Custom с этим списком. `min.io/docs/…` перенаправляет на `docs.min.io` (проверено 2026-11-24) — нужны все три домена MinIO.
 - Список окружения **Default** из сессии не виден. Сессия установки, работавшая в Default, записала «закрыт» для
   `docs.junit.org`, `site.mockito.org` и `rabbitmq.github.io` (`gauntlet/CLAUDE.md`, README, раздел 6). Сравните Allowed
   domains двух окружений и выровняйте их. Решение 3 PR #1 — открыть `docs.junit.org`.
@@ -132,14 +135,14 @@ www.jacoco.org
 
 | Переменная | Default | gauntlet-admin | Зачем |
 |---|---|---|---|
-| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` | да | да | Образы Testcontainers пойдут с `mirror.gcr.io` вместо Docker Hub (там 429). Слеш в конце обязателен. Testcontainers 2.0.5 читает свойство `hub.image.name.prefix` из этой переменной и применяет префикс только к образам Docker Hub (сверено: `docs/features/image_name_substitution.md` по тегу 2.0.5, `javap` `PrefixingImageNameSubstitutor`). На зеркале есть `postgres:16.10-alpine`, `rabbitmq:4.1-alpine` (с Ш6 — `rabbitmq:4.1.2-alpine`, тоже есть) и `testcontainers/ryuk:0.14.0` и по короткому пути, и по пути с `library/`; digest совпадает с Docker Hub. Зонд на префиксе прошёл. Код не меняется, и правило набора «реестр в коде не хардкодится» не нарушается |
+| `TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/` | да | да | Образы Testcontainers пойдут с `mirror.gcr.io` вместо Docker Hub (там 429). Слеш в конце обязателен. Testcontainers 2.0.5 читает свойство `hub.image.name.prefix` из этой переменной и применяет префикс только к образам Docker Hub (сверено: `docs/features/image_name_substitution.md` по тегу 2.0.5, `javap` `PrefixingImageNameSubstitutor`). На зеркале есть `postgres:16.10-alpine`, `rabbitmq:4.1.2-alpine`, `testcontainers/ryuk:0.14.0` и закреплённый по SHA-256 `chainguard/minio@sha256:ad134b2dd572ae0d989d6807c3e45516cc75a34883a8021db2ff04be5d1d496a` для `contract-service`. Код не меняется, и правило набора «реестр в коде не хардкодится» не нарушается |
 | `GAUNTLET_GUARD=off` | **нет** | да (уже задана) | Выключает guard целиком (раздел 2) |
 | `GAUNTLET_STOP_HOOK` | нет | нет | Stop-хук нужен и в админ-окружении |
 
 **Не задавать ни в одном окружении:**
-- `TEST_POSTGRES_URL`, `TEST_POSTGRES_USERNAME`, `TEST_POSTGRES_PASSWORD`, `TEST_RABBITMQ_URL`. С ними Testcontainers не
-  поднимается, а `DatabaseCleaner` делает `TRUNCATE` всех таблиц указанной базы.
-- `DB_*`, `RABBITMQ_*`, `ONEC_QUEUE_*` и учётные данные брокера 1С. Тестам они не нужны, а тесты приёма публикуют и читают
+- `TEST_POSTGRES_URL`, `TEST_POSTGRES_USERNAME`, `TEST_POSTGRES_PASSWORD`, `TEST_RABBITMQ_URL`, `TEST_MINIO_IMAGE`. С ними Testcontainers не
+  поднимается (или меняет образ S3), а `DatabaseCleaner` делает `TRUNCATE` всех таблиц указанной базы.
+- `DB_*`, `RABBITMQ_*`, `ONEC_QUEUE_*`, `PAYMENT_ENABLED`, `S3_*`, `ORDERING_*` и учётные данные брокеров. Тестам они не нужны, а тесты приёма публикуют и читают
   очереди с именами контура (`TestBroker.java`), то есть на настоящем брокере забрали бы настоящие сообщения. Таймауты
   `DB_LOCK_TIMEOUT`, `DB_STATEMENT_TIMEOUT`, `DB_IDLE_IN_TRANSACTION_TIMEOUT`, `DB_SOCKET_TIMEOUT_SECONDS` к тому же дошли
   бы до тестов: значение, отличное от умолчания, уронит `DatabaseTimeoutsTest` (Ш4) — `PostgresTestcontainer` подменяет
@@ -164,10 +167,12 @@ www.jacoco.org
 - процессы в снимок не попадают, поэтому Docker-демон по-прежнему поднимает SessionStart-хук.
 
 Сейчас прогрева нет: кэш Gradle появился в 09:55 внутри сессии, стартовавшей в 09:48, а образы тянулись уже в сессии.
+С 2026-11-24 в предзагрузку включён образ S3 `chainguard/minio@sha256:…` для `contract-service` и повтор `pull_retry` при
+кратковременном срабатывании минутной квоты `mirror.gcr.io` на холодных тегах (`Read requests to external upstream hosts`).
 
 ```bash
 #!/bin/bash
-# rvl-online: setup script облачного окружения (Default и gauntlet-admin). Должен закончиться кодом 0 и уложиться в ~5 минут.
+# rvl-online: setup script облачного окружения (default и gauntlet-admin). Должен закончиться кодом 0 и уложиться в ~5 минут.
 set -u
 export DEBIAN_FRONTEND=noninteractive
 
@@ -177,7 +182,13 @@ export DEBIAN_FRONTEND=noninteractive
 ( apt-get update -qq || true; apt-get install -y -qq poppler-utils ) > /tmp/setup-apt.log 2>&1 &
 apt_pid=$!
 
-# 2. Образы Testcontainers под теми именами, которые спросит Testcontainers при
+pull_retry() {
+  local img="$1"
+  for _ in 1 2 3; do docker pull -q "$img" && return 0; sleep 15; done
+  return 1
+}
+
+# 2. Образы Testcontainers обоих модулей под теми именами, которые спросит Testcontainers при
 #    TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX=mirror.gcr.io/ (иначе он скачает их заново).
 (
   started=0
@@ -186,13 +197,18 @@ apt_pid=$!
     started=1
     for _ in $(seq 1 30); do docker info > /dev/null 2>&1 && break; sleep 1; done
   fi
-  for image in postgres:16.10-alpine rabbitmq:4.1.2-alpine testcontainers/ryuk:0.14.0; do
-    docker pull -q "mirror.gcr.io/${image}" || true
+  for image in \
+    "postgres:16.10-alpine" \
+    "rabbitmq:4.1.2-alpine" \
+    "testcontainers/ryuk:0.14.0" \
+    "chainguard/minio@sha256:ad134b2dd572ae0d989d6807c3e45516cc75a34883a8021db2ff04be5d1d496a"
+  do
+    pull_retry "mirror.gcr.io/${image}" || true
   done
   # 3. Образы docker compose (стенд Ш2a и профиль app) — под исходными именами: на compose и Dockerfile
   #    префикс Testcontainers не действует. JAR_SOURCE=host, поэтому eclipse-temurin:21.0.12.1_1-jdk в облаке не нужен.
   for image in postgres:16.10-alpine eclipse-temurin:21.0.12.1_1-jre; do
-    docker pull -q "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}" || true
+    pull_retry "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}" || true
   done
   if [ "$started" = 1 ] && [ -f /var/run/docker.pid ]; then
     kill "$(cat /var/run/docker.pid)" 2> /dev/null || true
@@ -208,7 +224,7 @@ exit 0
 **Не проверено в этой сессии.** Сам setup script виден только в диалоге окружения, а запуск `dockerd` внутри setup script
 документацией не описан. Вторая новая сессия после сохранения скрипта должна показать:
 - `which pdftoppm` → путь;
-- в `docker images` образы `mirror.gcr.io/postgres`, `mirror.gcr.io/rabbitmq` и `mirror.gcr.io/testcontainers/ryuk`, а также
+- в `docker images` образы `mirror.gcr.io/postgres`, `mirror.gcr.io/rabbitmq`, `mirror.gcr.io/testcontainers/ryuk` и `mirror.gcr.io/chainguard/minio`, а также
   `postgres:16.10-alpine` и `eclipse-temurin:21.0.12.1_1-jre` под исходными именами (для docker compose);
 - строку статуса `docker: up`.
 
@@ -244,6 +260,31 @@ exit 0
 - **Параллельные прогоны.** Два прогона гейтов в одном каталоге сборки не запускать: отчёты побьются. Параллельные
   Testcontainers-прогоны в нескольких копиях дерева на 4 vCPU конкурируют за CPU и память.
 
+### 1.5. Облачная VM Antigravity (при работе в связке Gemini 4 Carbon / Neon)
+
+Проверено сессией `scan` 2026-11-24:
+- **Ресурсы и ПО:** 2 vCPU, 7,8 GiB RAM + 8,0 GiB Swap, 98 ГБ диска (85 ГБ свободно), `nofile` 1024 / 4096, OpenJDK `21.0.13.0.3`, Python `3.12.16`, `gh 2.103.3` (GraphQL и REST работают), `dockerd` уже запущен при старте VM.
+- **Три обязательные настройки при старте VM (вне git, без изменения файлов репозитория):**
+  1. Установить `poppler-utils` (`sudo apt-get update -qq || true && sudo apt-get install -y -qq poppler-utils`) для чтения PDF из `project_files/`.
+  2. Прописать `publicRepositories=true` в `~/.gradle/gradle.properties` (переменной `CLAUDE_CODE_REMOTE` в Antigravity нет — без этого сборка идёт в недоступный `nexus.sogaz.ru` и не подключает `gauntlet`).
+  3. Положить `~/.gradle/init.d/gcs-maven-mirror.gradle`, подменяющий `https://repo.maven.apache.org/maven2/` на официальное зеркало Google `https://maven-central.storage-download.googleapis.com/maven2/`: с общих IP GCP прямой `repo.maven.apache.org` и редиректы с `plugins.gradle.org/m2/` стабильно отвечают `429 Too Many Requests`, а зеркало GCS отдаёт `200 OK` без лимитов:
+     ```groovy
+     def mirrorUrl = uri('https://maven-central.storage-download.googleapis.com/maven2/')
+     def patchRepos = { RepositoryHandler repos ->
+         def existing = new ArrayList(repos)
+         repos.clear()
+         repos.maven { name = 'GcsMavenCentralMirror'; url = mirrorUrl }
+         existing.each { repo ->
+             if (!(repo instanceof MavenArtifactRepository && repo.url.toString().startsWith('https://repo.maven.apache.org/maven2'))) {
+                 repos.add(repo)
+             }
+         }
+     }
+     settingsEvaluated { s -> patchRepos(s.pluginManagement.repositories); patchRepos(s.dependencyResolutionManagement.repositories) }
+     beforeProject { p -> patchRepos(p.buildscript.repositories); p.afterEvaluate { patchRepos(p.repositories) } }
+     ```
+- На 2 vCPU прогоны обоих модулей запускать последовательно.
+
 ---
 
 ## 2. Админ-окружение `gauntlet-admin`
@@ -257,10 +298,10 @@ exit 0
     затронутых модулей пуст (`stop_gate.py:110-112`).
 - **Порядок работы.**
   - Только правки набора (`gauntlet/`, `.claude/`, `CLAUDE.md`, workflow) и утверждённой спецификации, по решению владельца.
-  - После каждой правки вручную: `python3 gauntlet/hooks/selftest.py` (ожидается 714/0 или больше) и
-    `cd data-reference && ./gradlew gauntlet --continue`. Затем PR.
+  - После каждой правки вручную: `python3 gauntlet/hooks/selftest.py` (ожидается 954/0 сейчас или ≥ 4898/0 после обновления до ревизии 4.5) и
+    `./gradlew gauntlet --continue` в `data-reference` и `contract-service`. Затем PR.
 - **Сеть, переменная зеркала и setup script** — те же, что в Default (раздел 1).
-- **Сессии задач.** Не открывать сессии задач в `gauntlet-admin`. Координатор создаёт их с явным ID окружения Default: сессия,
+- **Сессии задач.** Не открывать сессии задач в `gauntlet-admin`. Координатор создаёт их с явным ID окружения `default` (`env_01YVg9QhVoXA1mAduxrH5NH4`): сессия,
   созданная другой сессией без явного окружения, наследует окружение создавшей.
 
 ---
@@ -272,7 +313,7 @@ exit 0
 - **Workflow `gauntlet`.** Активен, секретов не использует.
   - Сейчас:
     - запуск на `pull_request` и `workflow_dispatch`;
-    - полная история (`fetch-depth: 0`), JDK Temurin 21, все модули из `module=`, таймаут 90 мин;
+    - полная история (`fetch-depth: 0`), JDK Temurin 21, все модули из `module=`, таймаут 90 мин (с 2026-11 — 150 мин, только затронутые модули, входы `contract-service/docs/operations.md` и `data-reference/docs/openapi.yaml` не пропускаются);
     - артефакт `gauntlet-reports` хранится 90 дней;
     - прогон на PR #1 — success за 3 мин 05 с.
   - Замечания, правка — в админ-окружении:
@@ -282,8 +323,8 @@ exit 0
     2. **Нет блока `permissions:`.** Рекомендуется `contents: read`. Actions закреплены мажорными тегами (`@v4`), а не SHA.
     3. **Нет job сборки в режиме контура** (`-PpublicRepositories=false` с Maven Central вместо Nexus). Её можно добавить
        информационной проверкой.
-    4. **Ночной прогон `scope=all`** до адаптации кода всегда будет красным (раздел 7). Если его добавлять, то только
-       информационным.
+    4. **Ночной прогон `scope=all`** (на `35a7c64` оба модуля проходят статические и архитектурные гейты со `scope=all` с нулём нарушений — раздел 10).
+    5. **С ревизии набора 4.5** добавляется второй workflow `.github/workflows/gauntlet-kit.yml` (`pull_request_target` на копии из `main`: красная проверка при изменении `HUMAN_OWNED`-путей набора и конфигураций агентных инструментов).
 - **Защита `main`.**
   - Репозиторий приватный, тариф Free. Rulesets и защита веток для приватных репозиториев на Free недоступны: API отвечает 403
     «Upgrade to GitHub Pro».
@@ -294,40 +335,43 @@ exit 0
        `gauntlet/README.md`.
   - Публичный репозиторий не рассматривать: в `project_files/` ПДн и внутренние адреса (раздел 8).
 - **Что guard не защищает.** Решать в админ-окружении, с кейсами в `selftest.py`.
-  - `data-reference/CLAUDE.md` (правила data-reference), будущий `contract-service/CLAUDE.md` и любые
-    `.github/workflows/*.yml`, кроме `gauntlet.yml`, агент может править через Edit и Bash. Новый workflow из ветки агента
+  - `data-reference/CLAUDE.md` (правила data-reference), `contract-service/CLAUDE.md` и любые
+    `.github/workflows/*.yml`, кроме `gauntlet.yml` (и `gauntlet-kit.yml` с рев. 4.5), агент может править через Edit и Bash. Новый workflow из ветки агента
     исполнится в Actions до ревью человека.
   - Запись в GitHub через MCP-инструменты (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`,
     `enable_pr_auto_merge`) и через `curl` к `api.github.com` хук не проверяет. Запрет `gh pr merge` их не покрывает.
-- **Как открывать PR.** `gh` в VM нет. Даже если его поставить, `gh pr create` не сработает: GitHub-прокси отвечает на GraphQL
-  403 «GitHub GraphQL is not available from Claude Code sessions; use the REST API».
-  - В облачной сессии PR открывается MCP-инструментом `create_pull_request` или кнопкой Create PR.
+- **Как открывать PR.** В облачной VM Claude Code `gh` нет, и GitHub-прокси отвечает на GraphQL
+  403 «GitHub GraphQL is not available from Claude Code sessions; use the REST API» (в облачной VM Antigravity `gh` установлен и GraphQL работает).
+  - В облачной сессии Claude Code PR открывается MCP-инструментом `create_pull_request` или кнопкой Create PR.
   - Шаг 8 `gauntlet/CLAUDE.md` и разрешения `gh pr …` в `.claude/settings.json` стоит поправить (владелец).
-  - Учесть: `guard.py` запрещает любой `gh api` с подстрокой «merge» в аргументах, в том числе в тексте тела PR.
+  - Учесть: `guard.py` проверяет merge-эндпоинты REST/GraphQL (`MERGE_API`).
 
 ---
 
 ## 4. Закладки с промптами
 
 `claude.ai/code` принимает параметры `repositories`, `environment` (имя или ID окружения, предвыбор), `prompt` (или `q`) и
-`prompt_url`. Для задач указывайте `environment` Default: так задача случайно не стартует в `gauntlet-admin`. Промпт
+`prompt_url`. Для задач указывайте охраняемый `environment` `default` (`env_01YVg9QhVoXA1mAduxrH5NH4`): так задача случайно не стартует в `gauntlet-admin`. Промпт
 открывается в поле ввода, его можно дописать перед отправкой.
 
 | Закладка | Окружение | Текст промпта |
 |---|---|---|
-| Новая задача | Default | Новая задача в data-reference от свежего main. Работай по CLAUDE.md и gauntlet/CLAUDE.md буквально. Первым сообщением приведи строку статуса SessionStart. Задача: … |
-| Шаг плана | Default | Шаг Ш<N> плана docs/gauntlet-plan-rvl-online.md: <название>. Задача для Jira согласована, заново не пиши. Работай по gauntlet/CLAUDE.md буквально; первым сообщением приведи строку статуса SessionStart. |
-| Разбор инцидента | Default | Разбор инцидента в data-reference: только чтение, ничего не коммить и не пушить. Симптом: … |
-| Правка набора | gauntlet-admin | Правка набора gauntlet по решению владельца (админ-окружение). После правок: python3 gauntlet/hooks/selftest.py и cd data-reference && ./gradlew gauntlet --continue, затем PR. Что меняем: … |
+| Новая задача (`data-reference`) | default | Новая задача в data-reference от свежего main. Работай по CLAUDE.md, gauntlet/CLAUDE.md и data-reference/CLAUDE.md буквально. Первым сообщением приведи строку статуса SessionStart. Задача: … |
+| Новая задача (`contract-service`) | default | Новая задача в contract-service от свежего main. Работай по CLAUDE.md, gauntlet/CLAUDE.md и contract-service/CLAUDE.md буквально. Первым сообщением приведи строку статуса SessionStart. Задача: … |
+| Шаг плана | default | Шаг Ш<N> плана docs/gauntlet-plan-rvl-online.md: <название>. Задача для Jira согласована, заново не пиши. Работай по gauntlet/CLAUDE.md буквально; первым сообщением приведи строку статуса SessionStart. |
+| Разбор инцидента | default | Разбор инцидента в data-reference: только чтение, ничего не коммить и не пушить. Симптом: … |
+| Правка набора | gauntlet-admin | Правка набора gauntlet по решению владельца (админ-окружение). После правок: python3 gauntlet/hooks/selftest.py и ./gradlew gauntletFast --continue в обоих модулях, затем PR. Что меняем: … |
 
 Готовые адреса:
 
 ```
-https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_011KhGJ5hPyZ2jaWNeQYEh4A&prompt=%D0%9D%D0%BE%D0%B2%D0%B0%D1%8F%20%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%20%D0%B2%20data-reference%20%D0%BE%D1%82%20%D1%81%D0%B2%D0%B5%D0%B6%D0%B5%D0%B3%D0%BE%20main.%20%D0%A0%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B9%20%D0%BF%D0%BE%20CLAUDE.md%20%D0%B8%20gauntlet/CLAUDE.md%20%D0%B1%D1%83%D0%BA%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE.%20%D0%9F%D0%B5%D1%80%D0%B2%D1%8B%D0%BC%20%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D0%BC%20%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D0%B4%D0%B8%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81%D0%B0%20SessionStart.%20%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%3A%20
+https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_01YVg9QhVoXA1mAduxrH5NH4&prompt=%D0%9D%D0%BE%D0%B2%D0%B0%D1%8F%20%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%20%D0%B2%20data-reference%20%D0%BE%D1%82%20%D1%81%D0%B2%D0%B5%D0%B6%D0%B5%D0%B3%D0%BE%20main.%20%D0%A0%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B9%20%D0%BF%D0%BE%20CLAUDE.md%20%D0%B8%20gauntlet/CLAUDE.md%20%D0%B1%D1%83%D0%BA%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE.%20%D0%9F%D0%B5%D1%80%D0%B2%D1%8B%D0%BC%20%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D0%BC%20%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D0%B4%D0%B8%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81%D0%B0%20SessionStart.%20%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%3A%20
 
-https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_011KhGJ5hPyZ2jaWNeQYEh4A&prompt=%D0%A8%D0%B0%D0%B3%20%D0%A8%3CN%3E%20%D0%BF%D0%BB%D0%B0%D0%BD%D0%B0%20docs/gauntlet-plan-rvl-online.md%3A%20%3C%D0%BD%D0%B0%D0%B7%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5%3E.%20%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%20%D0%B4%D0%BB%D1%8F%20Jira%20%D1%81%D0%BE%D0%B3%D0%BB%D0%B0%D1%81%D0%BE%D0%B2%D0%B0%D0%BD%D0%B0%2C%20%D0%B7%D0%B0%D0%BD%D0%BE%D0%B2%D0%BE%20%D0%BD%D0%B5%20%D0%BF%D0%B8%D1%88%D0%B8.%20%D0%A0%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B9%20%D0%BF%D0%BE%20gauntlet/CLAUDE.md%20%D0%B1%D1%83%D0%BA%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE%3B%20%D0%BF%D0%B5%D1%80%D0%B2%D1%8B%D0%BC%20%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D0%BC%20%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D0%B4%D0%B8%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81%D0%B0%20SessionStart.
+https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_01YVg9QhVoXA1mAduxrH5NH4&prompt=%D0%9D%D0%BE%D0%B2%D0%B0%D1%8F%20%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%20%D0%B2%20contract-service%20%D0%BE%D1%82%20%D1%81%D0%B2%D0%B5%D0%B6%D0%B5%D0%B3%D0%BE%20main.%20%D0%A0%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B9%20%D0%BF%D0%BE%20CLAUDE.md%2C%20gauntlet/CLAUDE.md%20%D0%B8%20contract-service/CLAUDE.md%20%D0%B1%D1%83%D0%BA%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE.%20%D0%9F%D0%B5%D1%80%D0%B2%D1%8B%D0%BC%20%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D0%BC%20%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D0%B4%D0%B8%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81%D0%B0%20SessionStart.%20%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%3A%20
 
-https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_011KhGJ5hPyZ2jaWNeQYEh4A&prompt=%D0%A0%D0%B0%D0%B7%D0%B1%D0%BE%D1%80%20%D0%B8%D0%BD%D1%86%D0%B8%D0%B4%D0%B5%D0%BD%D1%82%D0%B0%20%D0%B2%20data-reference%3A%20%D1%82%D0%BE%D0%BB%D1%8C%D0%BA%D0%BE%20%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D0%B5%2C%20%D0%BD%D0%B8%D1%87%D0%B5%D0%B3%D0%BE%20%D0%BD%D0%B5%20%D0%BA%D0%BE%D0%BC%D0%BC%D0%B8%D1%82%D1%8C%20%D0%B8%20%D0%BD%D0%B5%20%D0%BF%D1%83%D1%88%D0%B8%D1%82%D1%8C.%20%D0%A1%D0%B8%D0%BC%D0%BF%D1%82%D0%BE%D0%BC%3A%20
+https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_01YVg9QhVoXA1mAduxrH5NH4&prompt=%D0%A8%D0%B0%D0%B3%20%D0%A8%3CN%3E%20%D0%BF%D0%BB%D0%B0%D0%BD%D0%B0%20docs/gauntlet-plan-rvl-online.md%3A%20%3C%D0%BD%D0%B0%D0%B7%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5%3E.%20%D0%97%D0%B0%D0%B4%D0%B0%D1%87%D0%B0%20%D0%B4%D0%BB%D1%8F%20Jira%20%D1%81%D0%BE%D0%B3%D0%BB%D0%B0%D1%81%D0%BE%D0%B2%D0%B0%D0%BD%D0%B0%2C%20%D0%B7%D0%B0%D0%BD%D0%BE%D0%B2%D0%BE%20%D0%BD%D0%B5%20%D0%BF%D0%B8%D1%88%D0%B8.%20%D0%A0%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B9%20%D0%BF%D0%BE%20gauntlet/CLAUDE.md%20%D0%B1%D1%83%D0%BA%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D0%BE%3B%20%D0%BF%D0%B5%D1%80%D0%B2%D1%8B%D0%BC%20%D1%81%D0%BE%D0%BE%D0%B1%D1%89%D0%B5%D0%BD%D0%B8%D0%B5%D0%BC%20%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D0%B4%D0%B8%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D1%81%D1%82%D0%B0%D1%82%D1%83%D1%81%D0%B0%20SessionStart.
+
+https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_01YVg9QhVoXA1mAduxrH5NH4&prompt=%D0%A0%D0%B0%D0%B7%D0%B1%D0%BE%D1%80%20%D0%B8%D0%BD%D1%86%D0%B8%D0%B4%D0%B5%D0%BD%D1%82%D0%B0%20%D0%B2%20data-reference%3A%20%D1%82%D0%BE%D0%BB%D1%8C%D0%BA%D0%BE%20%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D0%B5%2C%20%D0%BD%D0%B8%D1%87%D0%B5%D0%B3%D0%BE%20%D0%BD%D0%B5%20%D0%BA%D0%BE%D0%BC%D0%BC%D0%B8%D1%82%D1%8C%20%D0%B8%20%D0%BD%D0%B5%20%D0%BF%D1%83%D1%88%D0%B8%D1%82%D1%8C.%20%D0%A1%D0%B8%D0%BC%D0%BF%D1%82%D0%BE%D0%BC%3A%20
 
 https://claude.ai/code?repositories=dmitriydubov/rvl-online&environment=env_013PC74pJafEbrLaF8A6CVYY&prompt=%D0%9F%D1%80%D0%B0%D0%B2%D0%BA%D0%B0%20%D0%BD%D0%B0%D0%B1%D0%BE%D1%80%D0%B0%20gauntlet%20%D0%BF%D0%BE%20%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D1%8E%20%D0%B2%D0%BB%D0%B0%D0%B4%D0%B5%D0%BB%D1%8C%D1%86%D0%B0%20%28%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD-%D0%BE%D0%BA%D1%80%D1%83%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5%29.%20%D0%9F%D0%BE%D1%81%D0%BB%D0%B5%20%D0%BF%D1%80%D0%B0%D0%B2%D0%BE%D0%BA%3A%20python3%20gauntlet/hooks/selftest.py%20%D0%B8%20cd%20data-reference%20%26%26%20./gradlew%20gauntlet%20--continue%2C%20%D0%B7%D0%B0%D1%82%D0%B5%D0%BC%20PR.%20%D0%A7%D1%82%D0%BE%20%D0%BC%D0%B5%D0%BD%D1%8F%D0%B5%D0%BC%3A%20
 ```
@@ -1141,3 +1185,20 @@ Nexus), `JAR_SOURCE`.
 координатами, удалённые и переименованные файлы, новые переменные и изменённые умолчания. Удалённые файлы в контуре удалять
 вручную, иначе останутся дубли классов и бинов. Первый такой случай — перенос `StreamMapper`, `ImportResult`, `OneCValues` в
 пакет `mapper`.
+
+---
+
+## 10. Ревизия `scan` от 2026-11-24 (`main` = `35a7c64`, метод ревизии 4.5)
+
+Повторный `scan` проведён с эталонными файлами `gauntlet-method-universal.md` и `gauntlet-kit-bundle.md` ревизии 4.5 (2026-11-24, `dmitriydubov/gauntlet-developer` `718b7e8`) после завершения обоих сервисов (`data-reference` `1.0.0-rc.4` и `contract-service` К1–К14):
+
+1. **Состояние обоих модулей против гейтов (`-Pgauntlet.scope=all`):**
+   - `data-reference` (367 main `.java`, 360 test `.java`, 68 фич / 844 сценария приёмки): `integrityCheck`, `checkstyleGate`, `pmdGate`, `dryGate`, `archTest` — **0 нарушений**; `README.md` — 3 498 символов (запас 2 символа до лимита 3 500).
+   - `contract-service` (530 main `.java`, 370 test `.java`, 46 фич / 483 сценария приёмки): `integrityCheck`, `checkstyleGate`, `pmdGate`, `dryGate`, `archTest` — **0 нарушений**; `README.md` — 3 439 символов.
+   - Сборка обоих модулей в режиме рабочего контура (`-PpublicRepositories=false`, без `gauntlet/` и без `src/acceptanceTest/`) — **BUILD SUCCESSFUL**.
+   - Активные строки `pit-runerror-allowlist.txt`: 76 (`data-reference`) + 23 (`contract-service`) = **99 записей**, все 99 сверены `javap -p` по байткоду `35a7c64`, мёртвых записей — **0**.
+   - Следы внешней разработки, секреты и ПДн в коде обоих модулей — **0 строк**.
+2. **Карта обновления набора `gauntlet/` до ревизии 4.5 (выполняется отдельным PR в `gauntlet-admin`):**
+   - **Перенести из бандла 4.5:** `gauntlet/subagents.md` (правило тщательности, карточки 4.1–4.13, `subagents.route=ask`), `gauntlet/tools/report_check.py`, `.claude/agents/checker.md`, `gauntlet/tools/TestCensus.java` (`testCensus` и проверка потока сообщений Cucumber `cN`/`zN`/`mN`), `.github/workflows/gauntlet-kit.yml` (`pull_request_target` против правки `HUMAN_OWNED`), `stop_gate.py --verify-ran`, защиту от петли «пробел спецификации» (4.2: «дефект»/«правило», таблица решений), правило внешнего независимого ревьюера без имени вендора, исправления хуков и инструментов 4.3–4.5 и исправление комментария над `TooManyMethods` в `pmd-ruleset.xml` — плюс адаптер Antigravity (`GEMINI.md`, `.agents/`, `gauntlet/adapters/antigravity/` без корневого `AGENTS.md`).
+   - **Обязательно сохранить из `rvl-online`:** `acceptance.inputs` и `test.inputs` (в `gauntlet.properties`, `gauntlet.gradle`, `stop_gate.py`, `selftest.py`, `gauntlet.yml`), запрет комментариев и Javadoc 2026-10-12 и лимит `README ≤ 3500` в `gauntlet/CLAUDE.md` и `reviewer.md`, PCRE-команду кириллицы, вход `architecture.properties` в `archTest`, оверлеи обоих модулей и 99 строк `pit-runerror-allowlist.txt`.
+3. **Список модулей для проверки в Nexus контура:** файл `docs/gauntlet-setup-rvl-online-nexus.txt` дополнен 44 разрешёнными артефактами (`data-reference` +16, `contract-service` +28 — всего 356 записей).
