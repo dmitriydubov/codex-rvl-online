@@ -1,0 +1,173 @@
+# Gauntlet kit check for pull requests. Installed to .github/workflows/gauntlet-kit.yml by gauntlet/install.sh.
+# The guard hook keeps agents out of the files that make up the gauntlet by reading their commands, and no reading of
+# commands is complete. This job judges the result: it fails when a pull request changes, relative to its merge base,
+# a path the guard protects as human-owned (HUMAN_OWNED in gauntlet/hooks/guard.py). Whether such a change goes in is
+# the human's decision: merge anyway when the change is theirs (a kit upgrade, a threshold changed on GitHub) - with
+# branch protection, an administrator bypasses the required check. There is deliberately no label or comment that
+# turns the check off: an agent acting with the human's GitHub credentials could set it.
+#
+# pull_request_target runs this file as the default branch has it, so a pull request cannot switch the check off by
+# editing it. The job holds the base repository's token, so it must not run code of the pull request, and it does
+# not: it checks out the default branch, fetches the pull request's base and head as git objects (a fork's head too,
+# through refs/pull/<n>/head) and lets only git compare them. No Gradle, no script of the project.
+#
+# The verdict is the check run "gauntlet kit unchanged" this job creates on the pull request's head commit. The job's
+# own check run belongs to the default branch's commit (pull_request_target), where branch protection does not look
+# for the pull request's required checks. Only a GitHub App - here the workflow's token - can create a check run; an
+# agent acting with the human's credentials cannot. Make that check required, with GitHub Actions as its source.
+# A pull request into another branch reports "gauntlet kit unchanged (<branch>)": a second pull request of the same
+# head into a branch without the kit must not post a later "success" under the name the default branch requires.
+name: gauntlet kit
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]   # edited: the pull request may now target another base branch
+
+permissions:
+  contents: read
+  checks: write                         # the verdict as a check run on the pull request's head commit
+
+concurrency:
+  group: gauntlet-kit-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  kit:
+    name: kit files                     # the verdict is the check run "gauntlet kit unchanged" it creates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4             # no ref: the default branch, never the pull request
+        with:
+          fetch-depth: 0                      # the merge base needs the whole history
+          persist-credentials: false          # the token stays out of .git/config
+
+      - name: Compare the pull request with its merge base
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          FETCH_TOKEN: ${{ github.token }}
+          REPORT_TOKEN: ${{ github.token }}
+        run: |
+          # What gauntlet/hooks/guard.py protects as human-owned (HUMAN_OWNED; .git/ never appears in a diff), matched
+          # the way the guard matches it: in any letter case, the path itself or anything under it. First the kit, then
+          # what the other agent tools (Codex, Antigravity, Grok Build, Kimi Code, Qwen Code) read as their
+          # instructions, roles, settings, hooks, rules and ignore files, and the project's MCP servers, whose commands
+          # an agent tool starts with a session.
+          owned=(gauntlet/ .claude/ CLAUDE.md .github/workflows/gauntlet.yml .github/workflows/gauntlet-kit.yml
+                 .github/CODEOWNERS .gitlab/CODEOWNERS CODEOWNERS
+                 AGENTS.md AGENTS.override.md .codex/ GEMINI.md .gemini/ .agents/ .grok/ .kimi-code/ QWEN.md .qwen/
+                 .qwenignore .agentignore .aiignore .mcp.json)
+          human_owned() {
+            local p hit=1
+            shopt -s nocasematch
+            for p in "${owned[@]}"; do
+              p=${p%/}
+              case $1 in "$p" | "$p"/*) hit=0; break ;; esac
+            done
+            shopt -u nocasematch
+            return $hit
+          }
+          # A file name on one line of the log: a line break in it must not start a workflow command.
+          shown() {
+            local s=${1//$'\n'/?}
+            printf '%s' "${s//$'\r'/?}"
+          }
+          # The verdict as the check run "gauntlet kit unchanged" on the head commit of the pull request: $2 is its
+          # title, the file $3 its summary. Without a token or gh it only warns: the required check then never
+          # reports, which blocks a merge where the check is required instead of passing it.
+          check="gauntlet kit unchanged"
+          [ "$BASE_BRANCH" = "$DEFAULT_BRANCH" ] || check="$check ($BASE_BRANCH)"
+          report() {
+            local sha=$HEAD_SHA
+            [ -n "$sha" ] || sha=$(git rev-parse refs/gauntlet/head)
+            if [ -z "$REPORT_TOKEN" ] || ! command -v gh > /dev/null; then
+              echo "::warning title=gauntlet kit::no token or no gh: the check run was not created on the pull request"
+              return 0
+            fi
+            GH_TOKEN=$REPORT_TOKEN gh api --silent -X POST "repos/$GITHUB_REPOSITORY/check-runs" \
+              -f name="$check" -f head_sha="$sha" -f status=completed -f conclusion="$1" \
+              -f "output[title]=$2" -F "output[summary]=@$3"
+          }
+          verdict=$(mktemp "${RUNNER_TEMP:-/tmp}/gauntlet-kit-verdict.XXXXXX")
+          # The token reaches git for this one fetch (a private repository needs it, a public one does not).
+          auth=()
+          if [ -n "$FETCH_TOKEN" ]; then
+            credential=$(printf 'x-access-token:%s' "$FETCH_TOKEN" | base64 | tr -d '\n')
+            echo "::add-mask::$credential"
+            auth=(-c "http.extraheader=AUTHORIZATION: basic $credential")
+          fi
+          # The base branch and the head of the pull request, as git objects only: neither is checked out or run.
+          git "${auth[@]}" fetch --no-tags --quiet origin "+refs/heads/$BASE_BRANCH:refs/gauntlet/base" \
+            "+refs/pull/$PR_NUMBER/head:refs/gauntlet/head"
+          head=refs/gauntlet/head
+          if [ -n "$HEAD_SHA" ] && git cat-file -e "$HEAD_SHA^{commit}" 2>/dev/null; then
+            head=$HEAD_SHA                    # the commit this run reports on, even when the branch moved since
+          fi
+          if ! git cat-file -e refs/gauntlet/base:gauntlet/config/gauntlet.properties 2>/dev/null; then
+            echo "::notice title=gauntlet kit::$BASE_BRANCH has no gauntlet/config/gauntlet.properties: the kit is not installed there (this pull request may install it), so there is nothing to compare with"
+            echo "$BASE_BRANCH has no gauntlet/config/gauntlet.properties: the kit is not installed there, nothing to compare with." > "$verdict"
+            report success "the kit is not installed on $BASE_BRANCH" "$verdict"
+            exit 0
+          fi
+          if ! base=$(git merge-base refs/gauntlet/base "$head"); then
+            echo "::error title=gauntlet kit::the pull request has no merge base with $BASE_BRANCH, so nothing tells which kit files it changes - the human decides"
+            echo "The pull request has no merge base with $BASE_BRANCH: nothing tells which kit files it changes. The human decides." > "$verdict"
+            report failure "no merge base with $BASE_BRANCH" "$verdict"
+            exit 1
+          fi
+          # Every path that differs, both ends of a rename, a deletion, a change of mode or type: --raw names them all.
+          diff=$(mktemp "${RUNNER_TEMP:-/tmp}/gauntlet-kit.XXXXXX")
+          git diff --raw -z -M --no-abbrev "$base" "$head" > "$diff"
+          changes=()
+          while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+            read -r old_mode new_mode _ <<< "${meta#:}"
+            status=${meta##* }
+            from=
+            if [[ $status == R* ]]; then
+              from=$path
+              IFS= read -r -d '' path
+            fi
+            if ! human_owned "$path" && { [ -z "$from" ] || ! human_owned "$from"; }; then
+              continue
+            fi
+            case $status in
+              A) line="added        $(shown "$path")" ;;
+              D) line="deleted      $(shown "$path")" ;;
+              R*) line="renamed      $(shown "$from") -> $(shown "$path")" ;;
+              T) line="type changed $(shown "$path")" ;;
+              *) line="modified     $(shown "$path")" ;;
+            esac
+            if [ "$old_mode" != "$new_mode" ] && [ "$status" != A ] && [ "$status" != D ]; then
+              line="$line (mode $old_mode -> $new_mode)"
+            fi
+            changes+=("$line")
+          done < "$diff"
+          if [ "${#changes[@]}" -eq 0 ]; then
+            echo "No gauntlet kit file changed relative to the merge base ${base:0:12} with $BASE_BRANCH." | tee "$verdict"
+            report success "no kit file changed" "$verdict"
+            exit 0
+          fi
+          echo "::error title=gauntlet kit changed::this pull request changes ${#changes[@]} path(s) that only the human changes - the list is in the log and the job summary"
+          echo "Changed relative to the merge base ${base:0:12} with $BASE_BRANCH:"
+          printf '  %s\n' "${changes[@]}"
+          echo "The human decides: merge anyway when the change is theirs (a kit upgrade, a threshold changed on GitHub)."
+          {
+            echo "### This pull request changes the gauntlet kit"
+            echo
+            echo "Relative to the merge base \`${base:0:12}\` with \`$BASE_BRANCH\` it changes paths that only the human changes:"
+            echo
+            echo '```'
+            printf '%s\n' "${changes[@]}"
+            echo '```'
+            echo
+            echo "**The human decides.** When the change is theirs - a kit upgrade, a threshold changed on GitHub - they"
+            echo "merge anyway; with branch protection an administrator bypasses this required check. When they did not make"
+            echo "it, an agent changed its own constraints: do not merge. No label or comment turns this check off, on"
+            echo "purpose: an agent acting with the human's GitHub credentials could set one."
+          } > "$verdict"
+          cat "$verdict" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          report failure "${#changes[@]} kit path(s) changed - the human decides" "$verdict"
+          exit 1

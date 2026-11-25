@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -24,6 +25,7 @@ import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -127,7 +129,7 @@ class ArchitectureTest {
         List<String> tooFar = new ArrayList<>();
         System.out.println("ARCH component          Ca   Ce      I      A      D");
         List<JavaPackage> components = base.getSubpackages().stream()
-                .sorted(Comparator.comparing(JavaPackage::getName)).toList();
+                .sorted(Comparator.comparing(JavaPackage::getName)).collect(Collectors.toList());
         for (JavaPackage p : components) {
             String id = p.getName();
             double d = metrics.getNormalizedDistanceFromMainSequence(id);
@@ -185,14 +187,14 @@ class ArchitectureTest {
     }
 
     private static Properties load() {
-        Path file = Path.of(System.getProperty("gauntlet.architecture", "gauntlet/config/architecture.properties"));
+        Path file = Paths.get(System.getProperty("gauntlet.architecture", "gauntlet/config/architecture.properties"));
         Properties p = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             p.load(in);
         } catch (IOException e) {
             throw new IllegalStateException("Cannot read architecture policy " + file.toAbsolutePath(), e);
         }
-        if (p.getProperty("base.package", "").isBlank()) {
+        if (p.getProperty("base.package", "").trim().isEmpty()) {
             throw new IllegalStateException("base.package is missing in " + file.toAbsolutePath());
         }
         return p;

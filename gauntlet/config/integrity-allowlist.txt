@@ -1,6 +1,10 @@
 # Human-approved integrity exceptions:   <path glob from project root>  <RULE-ID>   # reason
 # Rule IDs are printed by the integrity check (T1..T5 tests, M1..M3 main code, F1 features,
-# B1..B5 build scripts, P1 test properties). Agents cannot edit this file.
+# B1..B5 build scripts, P1 test properties), by the test census (T6: a test class that test or
+# archTest compiled but did not run; the path is its source file) and by acceptanceCheck (F2: a scenario
+# a feature file defines did not run; the path is the feature file). Agents cannot edit this file.
 #
 # src/main/java/**/entity/*.java          M1   # Hibernate @Generated on DB-generated columns
 # build.gradle.kts                        B2   # excludeTags("slow") reviewed by a human
+# src/test/java/**/*SlowTest.java         T6   # the same slow tests: they run in the nightly build
+# src/acceptanceTest/resources/features/reports.feature  F2   # its @slow scenarios: nightly, as above

@@ -3,16 +3,11 @@
 #  1. In a cloud session make sure the base branch is reachable: the scoped checks need the merge base,
 #     and a fresh clone may not have fetched it (or may be shallow).
 #  2. Record the working tree so the Stop gate knows what this session changed.
-#  3. In a cloud session switch the Gradle builds to public repositories: the modules' settings.gradle read the
-#     neutral property publicRepositories, set here once in the Gradle user home before any Gradle command.
-#  4. In a cloud session start the Docker daemon for Testcontainers.
-#  5. Print a one-line status that lands in the agent's context.
+#  3. Print a one-line status that lands in the agent's context.
 input=$(cat)
 
 # Appends publicRepositories=true to the user-level gradle.properties unless the key is already set there
 # (an explicit value is left as is, with a warning when the last one, which Gradle uses, is not true).
-# Other lines are kept.
-# A .properties key ends at '=', ':' or whitespace.
 public_key='^[[:space:]]*publicRepositories([[:space:]]*[=:]|[[:space:]]|$)'
 public_true='^[[:space:]]*publicRepositories([[:space:]]*[=:][[:space:]]*|[[:space:]]+)([Tt][Rr][Uu][Ee]|[Yy]|1)[[:space:]]*$'
 
@@ -34,8 +29,11 @@ if [ "$CLAUDE_CODE_REMOTE" = "true" ]; then
 fi
 
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
-props=gauntlet/config/gauntlet.properties
-base=$(sed -n 's/^[[:space:]]*baseRef[[:space:]]*=[[:space:]]*//p' "$props" 2>/dev/null | tail -1)
+# baseRef through the Stop hook's own reader of gauntlet.properties (`=`, `:` or blanks end the key, as for
+# java.util.Properties in gauntlet.gradle and in CI): a reader of its own took only `=`, and `baseRef: origin/x`
+# fetched and reported the wrong branch. -I keeps modules of the project directory out of the import, -B keeps
+# bytecode out of gauntlet/.
+base=$(python3 -I -B -c 'import sys; sys.path.insert(0, "gauntlet/hooks"); import stop_gate; print(stop_gate.properties().get("baseRef", ""))' 2>/dev/null)
 base=${base:-origin/main}
 remote=${base%%/*}
 branch=${base#*/}

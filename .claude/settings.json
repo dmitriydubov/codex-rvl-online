@@ -42,7 +42,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/gauntlet/hooks/stop_gate.py\" --task mutationGate --max-attempts 2 --timeout 3300",
-            "timeout": 3600,
+            "timeout": 7200,
             "statusMessage": "Gauntlet: running ./gradlew mutationGate for the hardener..."
           }
         ]
@@ -63,7 +63,32 @@
       "Bash(gh pr merge:*)",
       "Bash(git rebase:*)",
       "Bash(git filter-branch:*)",
-      "Bash(git filter-repo:*)"
+      "Bash(git filter-repo:*)",
+      "Bash(git update-ref:*)",
+      "Bash(git replace:*)",
+      "Bash(git revert:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(git push --all:*)",
+      "Bash(git checkout -B:*)",
+      "Bash(git switch -C:*)",
+      "Bash(git branch -f:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git branch -M:*)",
+      "Bash(git commit --am:*)",
+      "Bash(git push --m:*)",
+      "Bash(git push --al:*)",
+      "Bash(git push --b:*)",
+      "Bash(git branch --forc:*)",
+      "Bash(git branch --d:*)",
+      "Bash(git branch --mo:*)",
+      "Bash(git branch --cop:*)",
+      "Bash(git switch --force-:*)",
+      "Bash(gh workflow disable:*)"
     ]
   }
 }

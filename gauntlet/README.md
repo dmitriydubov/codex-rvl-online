@@ -1,10 +1,5 @@
 # gauntlet/ — работа «не читая код» для Java 21 + Gradle + Spring Boot + Claude Code в облаке
 
-Установлен в `rvl-online` 2026-09-30 по протоколу `start` метода Gauntlet (ревизия 2). Охраняемый
-модуль — `data-reference` (Spring Boot 4.0.7); `contract-service` подключается, когда у него появится
-своя сборка (`INSTALL.md`). Набор работает только во внешнем контуре — в облаке Claude Code и в GitHub;
-в рабочий контур компании он не переносится (раздел 9).
-
 Подход Роберта Мартина (Uncle Bob), переложенный на обычный Spring-сервис и веб-версию Claude Code
 (claude.ai/code): код пишет агент, человек читает **спецификации (Gherkin), отчёт о гейтах и
 изменения самого набора** — и принимает решение кнопкой merge. Терминал не нужен.
@@ -40,23 +35,33 @@ gauntlet/
   README.md               этот файл
   INSTALL.md              что делает Claude в первой сессии, чтобы вживить набор в сервис
   install.sh              механическая часть установки (запускает Claude, шаг 7 INSTALL.md)
+  subagents.md            правило тщательности, приёмка отчётов сабагентов, формат отчёта, карточки, маршрут
   gauntlet.gradle         все гейты (скрипт-плагин; build.gradle(.kts) сборки подключает его последней строкой)
   config/                 пороги (gauntlet.properties), архитектура, checkstyle.xml, pmd-ruleset.xml, allowlist'ы;
-                          config/<module>/ — то, что у модуля своё (config/data-reference/: basePackage,
-                          glue, исключения из мутаций, архитектура)
-  tools/                  IntegrityCheck, CrapGate, DryGate, GherkinMutator, PitSummary (single-file Java)
+                          config/<module>/ — то, что у модуля монорепо своё
+  tools/                  IntegrityCheck, TestCensus, CrapGate, DryGate, GherkinMutator, PitSummary (single-file
+                          Java); report_check.py (Python 3 — механическая сверка отчёта сабагента, subagents.md
+                          п. 2.2)
   archtest/               ArchUnit-тест, читающий config/architecture.properties
   hooks/                  guard.py (PreToolUse), stop_gate.py (Stop; SubagentStop hardener'а — matcher в
-                          .claude/settings.json), session_start.sh (SessionStart),
-                          selftest.py (проверки хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
+                          .claude/settings.json), session_start.sh (SessionStart; в облаке поднимает dockerd),
+                          selftest.py (4898 проверок хуков в трёх раскладках: python3 gauntlet/hooks/selftest.py)
   templates/              конфигурация Cucumber+Spring, пример фичи на русском
   claude/, ci/            только до установки: install.sh переносит их в .claude/ и .github/workflows/
 ```
 
-После установки в корне появляются `CLAUDE.md` (описание модулей и строка `@gauntlet/CLAUDE.md`), `.claude/settings.json`
-(хуки и права), `.claude/agents/{specifier,hardener,reviewer}.md` и `.github/workflows/gauntlet.yml`.
+После установки в корне появляются `CLAUDE.md` (одна строка `@gauntlet/CLAUDE.md`), `.claude/settings.json`
+(хуки и права), `.claude/agents/{specifier,hardener,reviewer,checker}.md`, `.github/workflows/gauntlet.yml` и
+`.github/workflows/gauntlet-kit.yml`. `checker` — роль только для чтения: по вызову координатора или основного
+агента она исполняет одну карточку сабагента (`subagents.md`: карта кода, сверка фреймворка, критик, опровергатель,
+проверка после мержа).
 Роли живут в `.claude/agents/` репозитория: только они доходят до облачной сессии, пользовательские
-`~/.claude/agents/` остаются на машине. Всё остальное — в `gauntlet/`. Хук защищает и то, и другое.
+`~/.claude/agents/` остаются на машине. Всё остальное — в `gauntlet/`. Хук защищает и то, и другое. С ревизии 4.5
+он охраняет и то, что другие агентные инструменты читают как свои инструкции, роли и настройки: `AGENTS.md`,
+`AGENTS.override.md`, `GEMINI.md`, `QWEN.md`, `.codex/`, `.gemini/`, `.agents/`, `.grok/`, `.kimi-code/`, `.qwen/`,
+`.qwenignore`, `.agentignore`, `.aiignore`, `.mcp.json` в корне репозитория, — и их настройки у пользователя
+(`~/.codex`, `~/.gemini`, `~/.agents`, `~/.grok`, `~/.kimi-code`, `~/.qwen`, `~/.env`, `/etc/codex`, `/etc/grok`,
+`/etc/qwen-code`). Если такие файлы уже есть в проекте, меняет их только человек.
 
 ## 3. Гейты
 
@@ -67,29 +72,35 @@ gauntlet/
 | `pmdGate` | PMD 7.27 (CLI) | 0 антипаттернов: god class, > 12 методов, cognitive complexity ≥ 10, сырые/проглоченные исключения, неиспользуемое, незакрытые ресурсы, потоки, крипто, именование | `config/pmd-ruleset.xml` |
 | `test` | JUnit, как у вас | — | — |
 | `archTest` | ArchUnit 1.5.1 | разрешённые рёбра, без циклов | `config/architecture.properties` |
-| `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное, **ни одного skipped**, при наличии фич исполнен хотя бы один сценарий; судятся только результаты этого прогона | — |
-| `crapGate` | свой (`CrapGate.java`) по JaCoCo XML, формула crap4java | **8** | `crap.threshold`, `config/crap-allowlist.txt` |
-| `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются; `dry.exclude` — пути вне поиска, у data-reference `entity/`) | `dry.*` |
+| `testCensus` | свой (`TestCensus.java`) по JUnit XML задач `test` и `archTest` | каждый тестовый класс, который они скомпилировали, есть в их результатах (прошёл, упал или пропущен); иначе находка T6 «compiled but not run» | `config/integrity-allowlist.txt`, правило T6 |
+| `acceptanceTest` + `acceptanceCheck` | Cucumber 7/8 | всё зелёное, **ни одного skipped**, при наличии фич исполнен хотя бы один сценарий, **исполнен каждый сценарий, который определяют фичи** (перепись по потоку сообщений Cucumber, иначе находка F2); судятся только результаты этого прогона | `config/integrity-allowlist.txt`, правило F2 |
+| `crapGate` | свой (`CrapGate.java`) по JaCoCo XML, формула crap4java | **8**; порог — конечное число ≥ 0, `NaN` и `Infinity` — ошибка, а не выключенный гейт | `crap.threshold`, `config/crap-allowlist.txt` |
+| `dryGate` | PMD CPD 7.27 | 0 дублей ≥ 60 токенов (имена и литералы игнорируются; `dry.exclude` — пути вне поиска, например каталог JPA-сущностей) | `dry.*` |
 | `mutationGate` | PIT 1.22 + gradle-pitest-plugin 1.19.0, свой `PitSummary.java` | **все покрытые мутанты убиты** (test strength 100 %), покрытие мутируемых классов ≥ 80 %; RUN_ERROR (JVM тестов упала на `redefineClasses`, PIT считает его обнаруженным) **не засчитывается убитым** — только строкой в allowlist, которую человек добавил, прочитав тесты | `pit.*`, `config/pit-runerror-allowlist.txt` |
-| `gherkinMutation` | свой (`GherkinMutator.java`) | 0 выживших мутантов значений Examples | — |
+| `gherkinMutation` | свой (`GherkinMutator.java`) | 0 выживших мутантов значений Examples; мутант убит, когда сценарий упал **в шаге**; контроль — каждая мутируемая строка без изменений в том же прогоне — обязан пройти | — |
 
 Значения Мартина и их источники — в комментариях `config/gauntlet.properties`
 (CRAP > 8 у crap4java, «ни один покрытый мутант не выживает» у mutate4java, DRY 0.82 у dry4java, CC < 4).
+Версии инструментов в таблице — примеры эталона. При `start` фактические версии языка, сборщика,
+фреймворков и тестовых библиотек определяются по файлам целевого проекта и записываются в `project.*`;
+совместимые версии инструментов фиксируются после реального прогона. `gate.java.version` задаёт JVM
+гейтов отдельно от Java приложения; локальный путь — только `GAUNTLET_GATE_JAVA_HOME` или
+`-Pgauntlet.gateJavaHome`, вне git. Минимум Java 17 проверяется и у них: набор спрашивает версию у `java`
+этого JDK, когда стартует первая задача гейта, и JDK ниже 17 или `java`, которая версию не назвала, — отказ
+каждой задачи гейта и `gauntletInfo`. CI и роли читают эту конфигурацию (`./gradlew gauntletInfo`).
+Если плагин или init-скрипт зафиксировал launcher задачи гейта раньше набора, задача при старте называет
+JVM, на которой пошла бы, и падает. На JVM проекта она молча не работает.
+Обновление зависимостей приложения — только отдельным решением
+владельца и отдельной задачей, не часть установки Gauntlet.
 
 **Монорепо.** Если в репозитории несколько независимых Gradle-сборок (у каждой свой `build.gradle` и
 `gradlew` в подкаталоге), в `config/gauntlet.properties` перечисляются охраняемые:
-`module=data-reference,contract-service`. Хуки запускают Gradle в каждом
-изменённом модуле, CI — в модулях, которых касается PR (все — когда менялись `gauntlet/` или `.github/`);
+`module=core,adapter`. Хуки запускают Gradle в каждом изменённом модуле, CI — во всех;
 `src/` и `build/` — каждого модуля, `gauntlet/` остаётся в корне, прочие модули не трогаются. Общие
-пороги — в `config/`, своё у модуля (`basePackage`, `acceptance.glue`, `acceptance.inputs`, `test.inputs`,
-`exclude.classes`, архитектура) — в `config/<module>/` (`gauntlet.properties` дополняет общий, остальные файлы
-заменяют одноимённые); `./gradlew gauntletInfo` в модуле показывает, что подхватилось. Спецификация одна на
-задачу: коммит фич любого модуля замораживает фичи всех. Groovy и Kotlin DSL поддерживаются одинаково.
-
-**Configuration cache.** В `data-reference/gradle.properties` включён `org.gradle.configuration-cache`.
-Задачи набора читают проект во время выполнения, поэтому помечены `notCompatibleWithConfigurationCache`:
-прогон гейтов идёт без кэша конфигурации (Gradle пишет «entry discarded because incompatible tasks were
-found» — это ожидаемо), обычный `./gradlew build` кэш сохраняет.
+пороги — в `config/`, своё у модуля (`basePackage`, `acceptance.glue`, `acceptance.inputs`, `test.inputs`, `exclude.classes`, архитектура) —
+в `config/<module>/` (`gauntlet.properties` дополняет общий, остальные файлы заменяют одноимённые);
+`./gradlew gauntletInfo` в модуле показывает, что подхватилось. Спецификация одна на задачу: коммит
+фич любого модуля замораживает фичи всех. Groovy и Kotlin DSL поддерживаются одинаково.
 
 `./gradlew gauntletFast` — всё, кроме мутаций (минуты); `./gradlew gauntlet` — целиком; `--continue`
 показывает все красные гейты за прогон. **Режим `scope=changed`** (по умолчанию): CRAP, DRY, Checkstyle, PMD
@@ -126,119 +137,788 @@ found» — это ожидаемо), обычный `./gradlew build` кэш с
 |---|---|
 | Утвердить спецификацию | ответить «да» в сессии |
 | Принять результат | merge PR в GitHub |
-| Изменить пороги, allowlist'ы, архитектуру, роли, CLAUDE.md, замороженную спеку | (а) отредактировать файл на GitHub в ветке; (б) **админ-окружение**: на claude.ai/code создайте второе cloud environment «gauntlet-admin» с переменной `GAUNTLET_GUARD=off` (и при желании `GAUNTLET_STOP_HOOK=off`); сессия, запущенная в нём, работает без guard-хука — просите Claude менять что угодно, изменения всё равно пройдут через PR и CI |
+| Изменить пороги, allowlist'ы, архитектуру, роли, CLAUDE.md, файлы других агентных инструментов (`AGENTS.md`, `.mcp.json` и др., ниже), замороженную спеку | (а) отредактировать файл на GitHub в ветке; (б) **админ-окружение**: на claude.ai/code создайте второе cloud environment «gauntlet-admin» с переменной `GAUNTLET_GUARD=off` (и при желании `GAUNTLET_STOP_HOOK=off`); сессия, запущенная в нём, работает без guard-хука — просите Claude менять что угодно, изменения всё равно пройдут через PR и CI |
+| Принять изменение самого набора или файлов других агентных инструментов: обновление набора, порог, allowlist, роль, `CLAUDE.md`, `AGENTS.md`, `.mcp.json` и т. п., изменённые в ветке PR | CI-проверка `gauntlet kit unchanged` на таком PR красная намеренно и перечисляет файлы в логе и в сводке job. Изменение ваше — мержите всё равно (с защитой ветки — админ-обходом). Не ваше — агент поменял свои ограничения: не мержите. Метки или комментария, выключающих проверку, нет: их мог бы поставить агент, действующий с вашими учётными данными GitHub |
+| Решить, кто исполняет карточки сабагентов только для чтения (карты кода, сверка фреймворка, критик, опровергатель, ревьюер) | ответить на вопрос о маршруте: при `subagents.route=ask` в `config/gauntlet.properties` (по умолчанию) он приходит один раз на задачу пунктом списка решений вместе с задачей для Jira, с рекомендацией и тем, что уйдёт наружу; пред-проверка ждёт ответа, и он действует и для ревьюера сессии. Постоянный ответ — `subagents.route=own` (только свои сабагенты) или имя CLI вендора (`codex`, `agy`, `grok`, `kimi`, `qwen`; `agy` — только с адаптером Antigravity, которого в наборе пока нет), одним из способов выше. Пишущие роли всегда свои. Ключ записывает решение, а код внутри держит окружение: без ключа вендора и его адреса в сети внешний маршрут не работает (`gauntlet/subagents.md`, раздел 5) |
 | Исключения: эквивалентный мутант, большой `switch`, легитимный `@Generated`, RUN_ERROR-мутант, который тесты убили бы | агент остановится и опишет (для RUN_ERROR — назовёт тест и ассерт, который упал бы на мутанте); вы проверяете и добавляете строку в `config/*-allowlist.txt` одним из способов выше |
-
-**Сеть окружения.** Network access — Custom с галкой «Also include default list of common package managers»
-(Maven Central, портал плагинов Gradle, Docker Hub, GitHub) и доменами документации из раздела «Источники
-документации» `gauntlet/CLAUDE.md`. По ревизии адресов 2026-10-05 в список окружения добавлены, среди прочих,
-docs.junit.org, site.mockito.org, rabbitmq.github.io и www.rabbitmq.com, закрытые на 2026-09-30; какие домены
-открыты сейчас и запасные пути для закрытых (исходники документации по тегу, javadoc-jar) — в той же таблице.
-Корпоративный Nexus в список не вносится.
-
-**Docker.** Приёмка и интеграционные тесты поднимают PostgreSQL и RabbitMQ через Testcontainers; без
-Docker они падают. Процессы в снимок окружения не попадают, поэтому демон поднимается в каждой сессии
-заново: это делает SessionStart-хук набора (`hooks/session_start.sh` запускает `dockerd` напрямую —
-`service docker start` в облачной VM падает на ulimit) и пишет `docker: up` в строке статуса. Вручную:
-`nohup dockerd --host=unix:///var/run/docker.sock > /tmp/dockerd.log 2>&1 &` и ждать `docker info`.
-
-**Локальная сессия** (не облако): набор подключается к сборке только при публичных репозиториях, поэтому
-перед запуском Claude Code впишите `publicRepositories=true` в `~/.gradle/gradle.properties` (в облаке это делает
-SessionStart-хук); иначе сборка пойдёт в Nexus контура, а Stop-хук не найдёт задач набора.
 
 Переменные окружения cloud environment попадают в процессы сессии, хуки их читают при запуске.
 Обычные фичи делайте в охраняемом окружении — там, где переменная `GAUNTLET_GUARD` не задана. Проверка —
 строка статуса SessionStart в начале сессии: `guard: on; stop hook: on`. Имя окружения ничего не гарантирует:
 переменную видно только в его настройках.
 
-**CI и защита ветки.** `.github/workflows/gauntlet.yml` гоняет `./gradlew gauntlet` на каждый PR с
+**CI и защита ветки.** `.github/workflows/gauntlet.yml` для каждой охраняемой сборки берёт её
+`project.java.version` и `gate.java.version` (оверлей `config/<module>/` перекрывает общий файл, пустая
+gate-версия — проектная), ставит все нужные JDK одним шагом и запускает wrapper сборки с её `JAVA_HOME` и
+`PATH`, а gate JDK передаёт инструментам через `GAUNTLET_GATE_JAVA_HOME`. Поэтому байткод приложения остаётся
+на его Java, и модули монорепо могут жить на разных версиях. Каталог из `module`, которого нет, — красный
+прогон, а не прогон корневой сборки под чужим именем. CI печатает
+`./gradlew --version` и `gauntletInfo`, затем гоняет `./gradlew gauntlet` на каждый PR с
 полной историей (`fetch-depth: 0`) — это проверка, которую агент не может обойти (хуки работают только
-внутри Claude Code). PR только с документами (`docs/**`, `project_files/**`, `*.md`) CI не запускает, кроме
-файлов, которые читают тесты модуля (`acceptance.inputs`, `test.inputs`): фильтр `paths` называет их по имени.
-Если репозиторий приватный на бесплатном плане GitHub, правила защиты веток недоступны; тогда гейт — это ваше
-правило не мержить красный PR. Агент мержить не может в любом случае.
+внутри Claude Code). Если репозиторий приватный на бесплатном плане GitHub, правила защиты веток
+недоступны; тогда гейт — это ваше правило не мержить красный PR. Агент мержить не может в любом случае.
+Зелёный код выхода CI, как и Stop-хук, проверяет по выводу Gradle: строка `> Task …` должна быть у каждой
+задачи гейта, иначе прогон красный. Иначе одна строка в `build.gradle`,
+`gradle.startParameter.excludedTaskNames << 'gauntlet'`, выключала все гейты, а Gradle печатал
+`BUILD SUCCESSFUL`.
+
+Второй workflow, `.github/workflows/gauntlet-kit.yml`, сравнивает каждый PR с его merge base в базовой ветке.
+Он красный, когда PR меняет путь, который guard охраняет как человеческий. Это файлы набора — `gauntlet/`,
+`.claude/`, корневой `CLAUDE.md`, оба workflow, `CODEOWNERS` в корне, в `.github/` и `.gitlab/`. Это и файлы других
+агентных инструментов — то, что Codex, Antigravity, Grok Build, Kimi Code и Qwen Code по своей документации
+читают как инструкции, роли, настройки, хуки, правила и ignore-файлы: `AGENTS.md`, `AGENTS.override.md`,
+`.codex/`, `GEMINI.md`, `.gemini/`, `.agents/`, `.grok/`, `.kimi-code/`, `QWEN.md`, `.qwen/`, `.qwenignore`,
+`.agentignore`, `.aiignore`, и `.mcp.json` — MCP-серверы, которые инструмент запускает вместе с сессией. Путь
+считается от корня репозитория, в любом регистре (`agents.md` — это `AGENTS.md`): сам путь или всё под ним;
+`AGENTS.md.bak`, `.mcp.json.example` и `docs/AGENTS.md` — файлы проекта. Учитываются добавление, правка,
+удаление, переименование (оба конца), смена режима и типа. Он
+запускается как `pull_request_target`: файл workflow берётся из основной ветки, поэтому PR не выключит
+проверку, поправив её. Код PR он не запускает: забирает базу и голову PR (и из форка) как объекты git и
+сравнивает их только git. Вердикт — check run `gauntlet kit unchanged` на голове PR; у PR в другую ветку —
+`gauntlet kit unchanged (<ветка>)`, чтобы второй PR той же головы в ветку без набора не перебил вердикт для
+основной. Собственный check run
+job'а при `pull_request_target` висит на коммите основной ветки, где защита ветки его не ищет. Создать check
+run может только GitHub App, здесь — токен workflow (`checks: write`). Со своими учётными данными
+пользователь, а значит и агент, его не создаст; workflow, добавленный в PR, — может (раздел 9). Сделайте
+обязательными обе проверки, `gauntlet` и `gauntlet kit unchanged`, с источником **GitHub Actions**. При
+«любом источнике» требование удовлетворит и commit status с тем же именем, а его ставит любой, у кого есть
+право записи. Где это задаётся:
+- Settings → Branches → правило базовой ветки → «Require status checks to pass before merging». Оставьте
+  выключенным «Do not allow bypassing the above settings», иначе админ не смержит изменение набора.
+- Или Settings → Rules → Rulesets: Repository admin — в списке обхода.
+
+GitHub предлагает проверку в этом списке, только когда она хоть раз отчиталась: после первого PR, когда в
+основной ветке уже есть `gauntlet-kit.yml`. PR установки и PR обновления, который впервые приносит этот
+workflow, такой проверки не показывают, а каждый следующий PR обновления набора красный на ней — так задумано.
 Auto-fix (кнопка в CI status bar сессии): на упавший CI или комментарий в PR Claude отвечает сам, в той же
 сессии, под теми же хуками.
 
 ## 6. Установка (одна сессия, без терминала)
 
-Набор ставится протоколом `start` метода Gauntlet — одной облачной сессией на целевом репозитории:
-к сессии прикрепляют инструкцию метода и бандл эталонного набора и пишут `start`. Claude задаёт вопросы
-(репозиторий и модули, стек, документация, рабочий контур и т. д.), распаковывает бандл, адаптирует набор,
-встраивает его в сборку, добивается зелёного `gauntlet` на текущем коде, запускает `install.sh` последним
-и открывает один PR с отчётом. Отдельной сессии установки нет. После мержа — сессия `scan` (контекст
-проекта, инструкция по настройке окружения, первая серия задач).
+1. Положите каталог `gauntlet/` в корень репозитория в новой ветке: на GitHub → *Add file → Upload files*,
+   перетащите папку целиком, commit в ветку `gauntlet-setup`.
+2. На claude.ai/code выберите репозиторий, ветку `gauntlet-setup`, режим **Accept edits**, окружение
+   без `GAUNTLET_GUARD`, сеть **Custom** с галкой «Also include default list of common package managers»
+   (Maven Central, Gradle Plugin Portal и GitHub приходят из этого списка) и ровно этим списком доменов
+   документации (он же — «Разрешённые домены окружения» в `gauntlet/CLAUDE.md`, правило 12 берёт их первыми):
+   `logback.qos.ch www.slf4j.org docs.gradle.org www.rabbitmq.com rabbitmq.github.io docs.micrometer.io pitest.org
+   cucumber.io min.io docs.spring.io docs.oracle.com javadoc.io docs.liquibase.com www.postgresql.org
+   jdbc.postgresql.org assertj.github.io site.mockito.org docs.junit.org java.testcontainers.org jspecify.dev
+   tomcat.apache.org www.archunit.org checkstyle.org docs.pmd-code.org www.jacoco.org
+   gradle-pitest-plugin.solidsoft.info docs.hibernate.org docs.jboss.org jakarta.ee prometheus.io docs.docker.com
+   git-scm.com docs.github.com code.claude.com`. Открыты уровнем Trusted и в список не вносятся: Maven Central,
+   портал плагинов Gradle, raw.githubusercontent.com, API Docker Hub (hub.docker.com), mirror.gcr.io.
+   По желанию можно добавить `www.min.io` (на него редиректит min.io), `wiremock.org`, `mapstruct.org`,
+   `projectlombok.org`, `www.instancio.org`, `kubernetes.io`, `search.maven.org`, `central.sonatype.com`,
+   `api.osv.dev` (проверка уязвимостей зависимостей); без них агент идёт
+   запасными путями (javadoc-jar и sources-jar с Maven Central, javadoc.io, исходники документации на
+   raw.githubusercontent.com, `javap`) и отмечает это в отчёте.
+3. Промпт: `Выполни gauntlet/INSTALL.md.` (в монорепо — `Выполни gauntlet/INSTALL.md для модулей core и adapter.`)
+   Claude определит по файлам проекта и зафиксирует версии языка, сборщика, фреймворков и тестовых
+   библиотек (`project.*`), подберёт и проверит совместимые инструменты, настроит `basePackage` и архитектуру,
+   подключит скрипт в `build.gradle.kts`, добьётся зелёного прогона на текущем коде,
+   подключит хуки и откроет PR с отчётом.
+4. Прочитайте отчёт (исключения для старого кода, рёбра архитектуры против направления) — merge.
 
-Окружение сессии: режим **Accept edits**, окружение без `GAUNTLET_GUARD`, сеть и Docker — как в разделе 5.
-
-`INSTALL.md` остаётся для подключения новых модулей (следующий — `contract-service`); это правка набора,
-поэтому её делает сессия в админ-окружении или человек на GitHub.
-
-Полезно завести закладки с готовым промптом:
-`https://claude.ai/code?repositories=dmitriydubov/rvl-online&prompt=...` (параметры `prompt` и `repositories`).
+Дальше — раздел 1. Полезно завести две закладки с готовым промптом:
+`https://claude.ai/code?repositories=<owner>/<repo>&prompt=...` (параметры `prompt` и `repositories`).
 
 ## 7. Почему агент не может «договориться» с гейтами
 
 | Лазейка | Что закрывает |
 |---|---|
-| поднять порог, выключить задачу, поправить роль | `gauntlet/`, `.claude/`, `CLAUDE.md`, workflow защищены guard-хуком; правки `build.gradle*`, `buildSrc/`, `gradle/*` вроде `enabled = false`, фильтров тестов, `afterEvaluate` находит `integrityCheck` (правила B1–B5) |
-| подогнать спецификацию под код | после коммита спецификации guard отклоняет её правку; `--amend`, `rebase`, `reset` на другую ревизию, `push --force` запрещены (хук + `permissions.deny`), так что коммит из ветки не исчезнет; PR показывает diff фич |
+| поднять порог, выключить задачу, поправить роль или инструкции другого агентного инструмента | `gauntlet/`, `.claude/`, `CLAUDE.md`, workflow и файлы других агентных инструментов (`AGENTS.md`, `.codex/`, `.gemini/`, `.agents/`, `.grok/`, `.kimi-code/`, `.qwen/`, `.mcp.json` и др., раздел 5) защищены guard-хуком; правки `build.gradle*`, `buildSrc/`, `gradle/*` вроде `enabled = false`, фильтров тестов, `afterEvaluate` находит `integrityCheck` (правила B1–B5); результат судит CI: `gauntlet kit unchanged` красный на любом PR, который меняет эти пути относительно merge base, — guard остаётся ранней растяжкой |
+| поправить в PR саму CI-проверку набора | `pull_request_target` исполняет копию workflow из основной ветки, а правка workflow в PR сама попадает в список изменённых файлов набора |
+| оставить гейты вне сборки: `gradle.startParameter.excludedTaskNames << 'gauntletFast'` (или любой задачи гейта) в `build.gradle`, сборка без набора — Gradle печатал `BUILD SUCCESSFUL`, не запустив ни одного гейта | Stop-хук и CI судят зелёный код выхода по тому, что Gradle выполнил: в выводе `--console=plain` обязана быть строка `> Task …` у каждой задачи гейта (`GATE_TASKS` в `hooks/stop_gate.py`), кроме тех, что хук сам исключил на время неутверждённой спецификации; иначе прогон красный и называет задачи |
+| выключить задачу гейта или сделать вид, что она прошла: `tasks.named('integrityCheck') { enabled = false }` после строки `apply` (выключенный `integrityCheck` не назовёт строку, которая его выключила), `onlyIf`, `enabled false`, пустой вход, который пропускает задачу, `ignoreExitValue = true` у задач `Exec` | гейты, которые набор не пропускает сам (`integrityCheck`, `testCensus`, `acceptanceCheck`, `crapGate`, `dryGate`, `gauntletScope`, Gherkin-мутации), засчитываются, только если Gradle их выполнил: SKIPPED, NO-SOURCE, UP-TO-DATE или FROM-CACHE у них — красный. Задача, которую набор пропускает, когда судить нечего, печатает `gauntlet: <задача> skipped by the kit - <причина>`; SKIPPED без этой строки — красный. Код выхода инструмента гейт сверяет после прогона, и `ignoreExitValue` его не скрывает |
+| подогнать спецификацию под код | после коммита спецификации guard отклоняет её правку; `--amend`, `rebase`, `revert`, `reset --hard`, `push --force`/`--mirror`/`--all`, `checkout -B`, `branch -f`/`-D` запрещены: guard ловит их семантически (в т. ч. внутри `bash -c`, `eval`, обёрток `sudo`/`env`, в сокращённой записи длинных опций, которую git принимает, — `commit --amen`, `push --mirro`, `branch --delet`, `switch --force-creat` — и за глобальной опцией вроде `git --namespace x …`), а `permissions.deny` дублирует прямые формы префиксом. Префиксный deny и эвристика guard обходятся хитрой командой — настоящая опора для базовой ветки: GitHub branch protection + CI + diff PR, который читает человек |
 | смержить самому | `gh pr merge` и API-merge запрещены; push в базовую ветку — тоже (и невозможен через GitHub-прокси облака) |
 | `@Disabled`, `@Ignore`, `assume*`, `disabledWithoutDocker` | `integrityCheck` T1–T5 |
+| dry run тестовой платформы (`junit.platform.execution.dryRun.enabled=true`): каждый тест «пропущен», ни один не запускался | `integrityCheck` P1 (`junit-platform.properties`) и B3 (скрипт сборки) |
 | спрятать код от JaCoCo и PIT через `@Generated` | `integrityCheck` M1 |
 | `CHECKSTYLE:OFF`, `NOPMD`, `@SuppressWarnings("checkstyle…")` | M2–M3; в checkstyle.xml нет фильтров подавления |
 | сценарий «skipped», а сборка зелёная | `acceptanceCheck` |
+| отфильтровать сценарии приёмки: `includeTags`/`excludeTags` тестовой платформы, более узкий `cucumber.features`, фильтр задачи | `acceptanceCheck` сверяет сценарии, которые определяют фичи (каждый Scenario, каждая строка Examples, и в Rule тоже), с потоком сообщений Cucumber этого прогона; неисполненные — находка F2 с файлом и строкой; поток пропал или не читается — ошибка, которую allowlist не принимает; `acceptanceTest` вне графа — отказ |
 | фичи есть, а не исполнено ни одного сценария; устаревшие результаты прошлого прогона | `acceptanceCheck` (результаты стираются перед прогоном) |
-| фича без значений «Примеров» проходит `gherkinMutation` вхолостую | `gherkinMutants`: «GHERKIN VACUOUS» |
+| фича без значений «Примеров» проходит `gherkinMutation` вхолостую | `gherkinMutants`: «GHERKIN VACUOUS» по каждому сценарию со своими шагами, но без значений «Примеров»; сценарий без собственных шагов освобождён — Cucumber компилирует для него пустой pickle (Gherkin `compilePickleSteps` не подмешивает Background при пустом списке шагов), исполнять и мутировать нечего |
 | два прогона Gradle в одном `build/` (фоновый прогон, Stop-хук, сабагент) | блокировка `.gradle/gauntlet-build.lock`: второй ждёт до 1500 с (`-Pgauntlet.lockWaitSeconds`) |
-| hardener заканчивает с выжившими мутантами | SubagentStop-хук в `.claude/settings.json` (matcher `^hardener$`) гоняет `mutationGate` |
+| hardener заканчивает с выжившими мутантами | SubagentStop-хук в `.claude/settings.json` (matcher `^hardener$`) гоняет `mutationGate`; без истории PIT: историю, которую задаёт проект, гейт отклоняет |
+| hardener «временно» правит продакшен-файлы ради ручных мутантов (PIT нечего мутировать) | правило роли: мутанты предлагает списком, применяет, гоняет тесты и откатывает кодер, перед коммитом `src/main` проверяется на чистоту; guard по `agent_type` — растяжка, обход через скрипт виден в diff |
+| мутант RUN_ERROR засчитан PIT как убитый, хотя тест не запускался | `PitSummary.java`: RUN_ERROR печатается `UNVERIFIED` и валит `mutationGate`, пока человек не впишет его в `config/pit-runerror-allowlist.txt` |
+| обход guard через ключевые слова shell (`for … do rm`, `if …; then git push --force`) | guard разбирает команду после `do`, `then`, `else`, `{`, `!` так же, как после `&&` |
+| обход human-only правил через обёртки и inline-код (`sudo git push --force`, `bash -c '…'`, `eval`, `echo '…' \| sh`, `echo git push --force \| bash` без кавычек, `python3 -c "os.system('…')"`, `python3.12 -c`, `node --eval "…"`, `perl -E '…'`, `subprocess.run(['git','push','--force'])`, `env -S 'git push --force'`, `"$(git push --force)"`, `"$(python3 -c 'print(")")'; git push --force)"`); оболочка с `-c` внутри кластера опций или за их значениями (`bash -lc '…'`, `sh -ec`, `bash -euo pipefail -c`, `dash -c`), обёртка под полным путём или с опцией-значением (`/usr/bin/env git …`, `nice -n 10 …`, `timeout -s KILL 60 …`, `xargs -n 1 …`), `su -c`, `find … -exec`, `env -S'…'`, конвейер, где перед `echo` стоит другая команда или между ним и оболочкой фильтр (`true && echo … \| bash`, `echo '…' \| cat \| bash`, `\|&`) | guard снимает обёртки (`sudo`/`env`/`exec`/`command`/`nohup`/`time` с их опциями, включая `env -S`/`--split-string`), рекурсивно проверяет код после `-c`/`-e` (и `--eval`/`--print` у node, `-E` у perl, версионные имена `python3.X`), `eval`/`source`, весь текст `echo`/`printf` через pipe (в кавычках и без), argv из отдельных кавычек (`subprocess`/`os.exec`/`execSync`) и тела подстановок `$(…)`/`` `…` `` вне одинарных кавычек — глубина учитывает кавычки, поэтому `)` внутри кавычек не обрывает тело; оболочки (`bash`, `sh`, `zsh`, `dash`, `ksh`) разбираются по своей грамматике опций — командная строка `-c` берётся как первый операнд после всех опций; обёртка узнаётся по имени программы, а не по написанию пути; тот же разбор применяется к правилам путей и ролей: `bash -lc 'rm -rf gauntlet'`, `echo 'rm -rf gauntlet' \| sh` и `echo "$(rm -rf gauntlet)"` отклоняются как сама команда, а чтение через ту же обёртку (`bash -lc 'cat gauntlet/README.md'`) разрешено; у подстановки свой контекст кавычек на каждом уровне вложенности |
+| удалить `.git`, чтобы снять заморозку и Stop-хук, или подделать зелёный статус | `.git/` — зона человека: guard отклоняет запись/удаление, в т. ч. `last-green-*` в `.git/gauntlet-hook/` |
+| `git push --mirror`/`--all`/`--branches`, `push HEAD`/`push origin @` (`@` — синоним HEAD) или push без refspec сидя на базовой ветке; `git -C <worktree> push` из feature-сессии, когда worktree на базовой ветке; `--no-verif` (сокращение); `core.hooksPath` через `-c`/`--config-env` перед любой подкомандой и записью `git config core.hooksPath …`; алиасы и `include.path` (`git config alias.fp 'push --force'`), прячущие любую из этих команд; пути в другом регистре (`GAUNTLET/…`) | guard ловит все эти формы (чтение конфигурации и `--unset` разрешены) (push без refspec на базовой ветке = push базовой ветки при `push.default=simple`; текущая ветка берётся с учётом `-C`/`--git-dir`); `HEAD:other`/`@:other` базовой веткой не считаются и разрешены; сравнение путей и `mentions` регистронезависимы (macOS/Windows) |
+| команда, которую guard читал иначе, чем оболочка: апостроф в комментарии или в теле heredoc (`# don't forget` и следующей строкой `git push --force`), перенос строки через `\` (`cp src/A.java \` + `gauntlet/config/`), `<<` в строке или в арифметике, программа через heredoc, here-string или pipe (`bash <<EOF`, `python3 - <<EOF`, `bash <<< '…'`, `echo '…' \| python3`), подстановка в теле heredoc, `find … -exec sed -i` | до правил команда читается одним проходом: комментарии убираются, строки с `\` склеиваются, тело heredoc выносится из командной строки и судится как программа того, кто его читает (для `cat` и `tee` это данные), шаблон `case` не закрывает подоболочку; чтение сверено с настоящим bash; скрипт `sed`, программа `awk` и условия `find` — не пути, а `find` пишет, когда пишет команда его `-exec` |
+| `cd` в каталог, который хук не вычислял (`cd "$(git rev-parse --show-toplevel)" && echo … >> gauntlet/config/gauntlet.properties`, `cd "$CLAUDE_PROJECT_DIR"`, `cd -`, `popd`), и перенаправление, принятое за аргумент (`git push origin 2>&1` на базовой ветке — «refspec» `2>`; `echo '…' \| bash 2>&1`) | каталог после `cd` вычисляется для `~`, `$HOME`, `$PWD`, `$CLAUDE_PROJECT_DIR` и корня git; после `cd -`, `popd` и неизвестной цели команда судится по всем каталогам, где она уже была, и по корню проекта; перенаправления и here-string не входят в аргументы команды |
+| цель перенаправления, склеенная из кусков или собранная глобом (`> 'gauntlet'/config/…`, `> gaunt\let/…`, `> "$CLAUDE_PROJECT_DIR"/gauntlet/…`, `> gauntle?/config/…`), запись через `>&файл` и `>\|` | цель судится как слово, которое из неё делает bash: кавычки и `\` сняты, куски склеены, известные хуку переменные раскрыты, глоб сопоставлен с файлами; `>&` и `1>&` со словом — запись, и с переменной тоже, `>\|` — запись; число и `-` после `>&` и любое слово после другого дескриптора (`2>&"$saved_stderr"`) — дескриптор; экранированный `\>` — символ, и `\|` и `&` после него — конвейер и конец команды; сверено с настоящим bash |
+| не запускать падающий тест фильтром задачи `Test` (`test { exclude '**/OrdersTest*' }`, `test { if (ci) { exclude … } }`, `filter { includePatterns = … }`, `includeEngines`, категории JUnit 4, группы TestNG) | для `test` и `archTest` результат судит `testCensus`: каждый тестовый класс, который задача скомпилировала, обязан быть в её JUnit XML (прошёл, упал или пропущен), иначе находка T6. Так видна любая форма фильтра в скрипте, который убирает класс целиком (фильтр метода — раздел 9), фильтр тестовой платформы вне скрипта (`PostDiscoveryFilter` через `META-INF/services` в тестовых ресурсах), движок, которого у задачи нет (тесты JUnit 4 без vintage), TestNG `@Test(enabled = false)`. Фильтр сценариев `acceptanceTest` ловит перепись сценариев (F2), `gherkinMutantsRun` судится по своему потоку; `integrityCheck` B2 остаётся ранним сигналом по тексту скрипта. B2 знает имена выбора тестов Gradle и узнаёт задачу по тексту скрипта. `exclude` и `include` — находка там, где они настраивают задачу `Test`, которую гоняет гейт (`test`, `archTest`, `acceptanceTest`, `gherkinMutantsRun`, `withType(Test)`), в том числе внутри `filter`, `doFirst`, `if` (условие на имя задачи выбирает её, только когда блок настраивает несколько задач `Test`); `includes`/`excludes` — когда их пишут, и со следующей строки тоже. Остальные имена — находка везде, кроме задачи `Test`, которую скрипт называет и гейт не запускает. Те же слова у `jar`, копирования, source set и зависимостей — не находка; чего B2 не видит — раздел 9 |
+| сузить `testClassesDirs` (отфильтрованное дерево файлов, `files()`, `sourceSets.test.output.classesDirs.setFrom(…)`) или оставить тестовый исходник вне компиляции (`sourceSets.test.java.exclude`, `compileTestJava { exclude }`, `srcDirs = []`) | `testCensus`: задача, которая запускает не все классы из каталогов, куда пишут задачи компиляции её source set, — отказ; исходник `.java` из каталогов source set и из `src/<set>/java`, который задача компиляции не получила, — находка T6 «not compiled» |
+| выключить исполнение шагов Cucumber (`cucumber.execution.dry-run`) или его поиск фич (`cucumber.junit-platform.discovery.as-root-engine=false`) | набор сам задаёт `dry-run=false` и `as-root-engine=true` провайдером аргументов `acceptanceTest` и `gherkinMutantsRun` и после прогона сверяет, с чем Gradle их запустил; `-Dcucumber.*` в `_JAVA_OPTIONS` окружения задачи (JVM читает его после командной строки) — отказ |
+| вывести задачу тестов из прогона, пропустить её или выключить её XML-отчёт (`-x test`, `gradle.startParameter.excludedTaskNames`, `onlyIf`, `enabled = false`, `reports.junitXml.required = false`) | `testCensus` отказывается («not part of this build», «switches them off») или при SKIPPED называет каждый класс; результаты прошлого прогона на диске он не судит: выполнена, UP-TO-DATE или FROM-CACHE — это результаты этих самых входов, а фильтры — входы |
 | step-определение игнорирует параметр | `gherkinMutation` |
+| мутант «убит» не изменённым значением, а сломанным стендом: упала фикстура, сценарий зависит от соседнего, строку нельзя прогнать дважды на одном стенде, параллельный прогон проекта поставил оба контроля раньше мутанта, значение отверг сам Cucumber | `gherkinMutation`: каждая мутируемая строка «Примеров» прогоняется без изменений дважды — до мутантов (`cN`) и после них (`zN`), оба контроля обязаны пройти; мутанты и контроли идут в одном JVM, по одному сценарию, в порядке имён файлов, как бы проект ни запускал свою приёмку (параллельный Cucumber в `junit-platform.properties` или в `tasks.withType(Test)`, `cucumber.execution.order`, `maxParallelForks`, `forkEvery`), а если `doFirst` проекта всё же перебил это, прогон после себя падает и называет настройку. Как прогон шёл на деле, судится по потоку сообщений Cucumber этого прогона (по файлу на JVM теста, и у каждого раунда повторных попыток свой): у каждой попытки каждого мутанта и контроля есть начало и конец, и их столько же, сколько в JUnit XML; в одном JVM два сценария не идут одновременно; каждый мутант начался после конца `cN` и кончился до начала `zN`, в том же JVM; нет потока, он пуст или не читается — ошибка, а не вердикт. Так закрыты и пути мимо аргументов JVM: `_JAVA_OPTIONS` в окружении задачи, файл аргументов, провайдер, который после прогона отвечает иначе, `doLast` проекта, вернувший настройки. kill — только падение, брошенное step-определением, на первом шаге, который использует мутированную колонку, или позже. Падение раньше этого шага, падение мутанта колонки, которую не использует ни один шаг, значение, которое Cucumber не смог конвертировать или которое отверг transformer (`@ParameterType` и т. п.), неудавшийся glue-объект, неоднозначный шаг, хук или фикстура — ошибка, а не kill |
+| область `changed` молча не увидела изменённый класс (кодировка исходников, второй корень main source set, необычное объявление типа) и гейт прошёл по пустому множеству | область строится по всем корням main source set, и Checkstyle, PMD, CPD получают их все; исходник читается как его читает javac (Unicode-escape, одиночный CR, `options.encoding` прежде `-encoding`); `gauntletScope` падает на изменённом исходнике, не читаемом в этой кодировке; перед PIT и CRAP каждый выведенный тип обязан существовать как класс, исходник с кодом обязан дать тип, а класс, чей атрибут `SourceFile` называет изменённый исходник, — быть среди выведенных |
+| имя с разделителем списка: изменённая `Скидка, рубли.feature` или `Ledger,Copy.java`, имя с кавычкой или переводом строки (git берёт его в кавычки), проект в каталоге `Acme, Inc` — путь распадался на имена, которых нет, и гейт проходил по пустому множеству (0 мутантов, «PMD: OK», «DRY gate: OK», PIT «No mutations found») | пути изменённых файлов читаются из `git … -z`; списки путей уходят инструментам набора файлом, где каждый путь кончается символом NUL (`--only-file`), корни исходников — по одному (`--sources`), classpath glue — тем же файлом-списком (`--glue-file`); путь из списка, который не называет файл, — ошибка, а не пустой прогон; PMD и CPD получают исходники позиционно после `--`, правила — путём от рабочего каталога; Cucumber — каталог фич относительно каталога проекта; PIT, который режет свои пути по запятой, в таком каталоге не запускается, а называет причину |
+| спрятать нарушение от `integrityCheck` за комментарием, строкой или именем параметра (`{ $/* … */ test -> /$`, вложенный комментарий Kotlin, `// tasks.named('jar') {`, `tasks.test.enabled = false` в блоке с параметром `test`), `@org.junit.jupiter.api.Disabled`, тестовое дерево в другой кодировке | `integrityCheck` читает скрипт и исходник как компилятор Groovy, Kotlin или javac: комментарии — не код, скобка в строке — не скобка, блок — тот, что действительно открыт; освобождение B1 — только когда получатель ровно параметр блока; аннотации с пакетом; каждое дерево исходников — в кодировке своей задачи компиляции, нечитаемый исходник — находка E1 |
+| выключить CI-гейт или защиту ветки через `gh` | `gh workflow disable`, не-GET `gh api` к `/protection`, `/rulesets`, `/actions/permissions`, `/actions/workflows/…/disable` и GraphQL-мутации защиты ветки запрещены; чтение разрешено |
 | слабые ассерты | `mutationGate` |
-| сабагент вышел за роль | guard по `agent_type`: specifier пишет только фичи, hardener — только тесты, reviewer — ничего |
+| сабагент вышел за роль | guard по `agent_type`: specifier пишет только фичи, hardener — только тесты, reviewer и checker — ничего |
+| сабагент подменяет работу: выдуманная цитата или вывод команды, узкий поиск под «ничего не найдено», «нет времени» в остатке | приёмка по `subagents.md`, раздел 2: `tools/report_check.py --run` сверяет каждую цитату с файлом на ревизии отчёта и повторяет команды чтения из разрешённого списка, сравнивая код выхода и строки вывода; утверждение об отсутствии принимающий перепроверяет более широким поиском; «нет времени» — не причина. Хук `SubagentStop` для `checker` (`report_check.py --hook`) написан, но не включён: сверку запускает принимающий (раздел 9) |
 | закончить работу с красным гейтом | Stop-хук возвращает падения; после 3 попыток отпускает с предупреждением «работа не сделана» |
 
-Проверка shell-команд в guard эвристическая: сознательный обход через хитрый Bash возможен. Опора —
-`integrityCheck`, CI и то, что любая попытка видна в diff PR. Это растяжка, а не сейф.
+Остаток `gherkinMutation` (честно): glue-код, читающий имя сценария, отличает мутант от контроля по заголовку;
+исключение без стека (`writableStackTrace=false`) не несёт кадра шага, и настоящий kill считается ошибкой;
+колонка, которую Cucumber конвертирует (enum, `@ParameterType`), даёт ошибку, а не kill, — гейту нужна вторая
+валидная величина колонки, которую он пока не подбирает; русское «Значения» инструмент считает ключевым словом
+«Примеров», а Gherkin Cucumber 7.23.0 — нет.
 
-## 8. Что проверено при установке в rvl-online (2026-09-30)
+Проверка shell-команд в guard эвристическая: сознательный обход через хитрый Bash возможен. Известный
+остаток — подстановка команды, порождающая имя бинарника (`$(which git) push --force`), разворачивание
+переменной (`G=git; $G push --force`), закодированные payload'ы, функция оболочки, определённая в той же
+команде, код из файла (скрипт, который запускает интерпретатор), `cd` внутри конвейера (`cd x | cat; …` — bash
+каталог не меняет, zsh меняет, хук считает, что сменился), конфигурация git через переменные окружения
+(`GIT_CONFIG_*`), алиасы, уже лежащие в глобальном конфиге, `push.default=upstream` с push без refspec и
+настройки репозитория через `gh api -X PATCH repos/…`, функции модулей perl (`File::Copy`), программа awk
+(`system()`, `print >` внутри неё) и команды записи, которых хук не знает (`sort -o`, `uniq`, `shuf -o`, `gzip`,
+`split`, `zip`, `mkfifo`, `javac -d`): статический разбор их не видит.
+`permissions.deny` тоже префиксный и обходится обёрткой. Опора — `integrityCheck`, CI, GitHub branch
+protection базовой ветки и то, что любая попытка видна в diff PR, который читает человек. Это растяжка,
+а не сейф. Запись в файлы самого набора, которую guard пропустил, CI судит по результату:
+`gauntlet kit unchanged` красный, если проверка обязательная. Она покрывает только человеческие пути в корне
+репозитория — набор и файлы других агентных инструментов; замороженную спецификацию и области ролей охраняют guard
+и diff PR, настройки агентов пользователя — только guard.
 
-Облачная сессия Claude Code, Gradle 8.14.3, Java 21.0.10, Docker 29, Maven Central через прокси:
-- `hooks/selftest.py` — 517 passed, 0 failed (хуки эталона без изменений: стек и пути те же). Guard
-  проверен и на раскладке этого репозитория: роли hardener, specifier, reviewer и их границы в
-  `data-reference/`, защита `gauntlet/`, `CLAUDE.md`, `.github/workflows/gauntlet.yml`, заморозка
-  спецификации коммитом в ветке и её снятие после мержа.
-- `./gradlew gauntlet --continue` в `data-reference` на текущем коде — зелёный: integrity, unit-тесты
-  (с Testcontainers), ArchUnit по `config/data-reference/architecture.properties`; остальные гейты
-  проверяют пустую область (изменённых main-классов нет).
-- Каждый гейт на намеренных нарушениях в копии репозитория: `@Disabled` → integrity T1; метод с CC 7 и
-  метод в 29 строк, магические числа → Checkstyle; вложенный if и `toUpperCase()` без Locale → PMD;
-  непокрытый метод с CC 3 и частично покрытый с CC 7 → CRAP 12.0 и 23.3; дубль → DRY; тест без
-  проверок → PIT (выжившие и непокрытые мутанты); step, игнорирующий параметр, → 6 выживших
-  Gherkin-мутантов; неопределённый step → красная приёмка. И на чистом примере: всё зелёное, PIT 6/6
-  убиты (test strength 100 %), Gherkin-мутанты 6/6 убиты. Cucumber 8.0.1 с `# language: ru`
-  работает на JUnit Platform, выровненной Gradle до 6.1.x в classpath приёмки; контекст приёмки
-  поднимает PostgreSQL в Testcontainers.
-- Сборка в режиме рабочего контура: копия `data-reference` без `gauntlet/` и `src/acceptanceTest`,
-  без `CLAUDE_CODE_REMOTE`, адрес Nexus подменён на Maven Central как на его прокси, чистый кэш Gradle —
-  `./gradlew build` зелёный вместе с тестами; единственный объявленный репозиторий — «Nexus», плагин PIT
-  не загружался, портал плагинов не нужен.
+## 8. Что проверено в этой версии, а что нет
 
-Не проверено: хуки в живой сессии после установки (проверяет первая сессия `scan`: строка статуса
-`guard: on; stop hook: on`), CI на GitHub (первый прогон — на PR установки).
+Ревизия 4.5 — сабагенты по доказательствам, роль `checker`, файлы и настройки других агентных инструментов —
+гейтов Gradle не касается и проверена здесь без Gradle, в обе стороны:
+- guard — `hooks/selftest.py`, 4898 проверок (ниже); на guard ревизии 4.4 те же проверки дают 1632 падения, и все
+  они — новые проверки, а прежние 2656 проходят на обоих.
+- `gauntlet-kit.yml` — каждая из 14 записей файлов других агентных инструментов: добавление, правка, удаление,
+  переименование в неё и из неё, другой регистр (`AGENTS.MD`, `.Qwen/x`) — красные; имена, которые только
+  начинаются так же (`AGENTS.md.bak`, `.codex-old/`), и код рядом — зелёные; на workflow ревизии 4.4 — 8 падений.
+- `tools/report_check.py` — 92 теста на временном git-репозитории: настоящие цитаты и команды проходят,
+  выдуманные — расхождение, сдвиг цитаты на две строки — поправка, на три — расхождение; 34 допустимые формы повтора
+  и 107 отказов; повтор только на ревизии отчёта и чистом дереве, с отключённым `textconv`, и он не меняет ни байта
+  репозитория; 103 мутации инструмента, каждую ловит названный тест.
+- `install.sh` ставит `.claude/agents/checker.md` вместе с остальными ролями; guard отказывает `checker` в записи
+  в проект, в соседний worktree и в `git worktree add`, а Gradle и запись в клон вне репозитория и в `/tmp` по пути,
+  который видит (абсолютному, `./имя` после `cd`, цели перенаправления), разрешает. Имя без каталога, которого
+  ещё нет, и путь из переменной в команде из каталога проекта получают отказ (раздел 9); обе стороны закреплены в
+  самопроверке.
+
+Вживую не запускались: CLI вендоров внешнего маршрута, хук `SubagentStop` с `report_check.py --hook` (не
+включён), сам GitHub — раздел 9.
+
+Ревизия 4.4 — проверки по результату — проверена на настоящем Gradle 8.14.3 (JDK 17, 21, 25; Cucumber 7.23.0 и
+8.0.1; Spring Boot 4.0.7 с `io.spring.dependency-management`), каждая в обе стороны — сценарий падает на ревизии
+до правки и проходит с ней:
+- `gauntlet-kit.yml` — на настоящих git-репозиториях (добавление, правка, удаление, переименование, режим, тип,
+  регистр, merge base, PR без merge base, база без набора, PR в другую ветку), шаг workflow — как на раннере;
+  сам GitHub (check run, защита ветки) здесь не исполняется.
+- `testCensus` — 30 форм фильтра Groovy и 9 Kotlin (лаборатории ревью), в регрессионном наборе — шесть форм
+  B2 и `PostDiscoveryFilter`, UP-TO-DATE и FROM-CACHE, SKIPPED, `-x`, `excludedTaskNames`, выключенный XML,
+  суженный `testClassesDirs` и `output.classesDirs`, исходник вне компиляции, общий каталог XML, раннеры TestNG
+  и JUnit 4, Kotlin в сборке модуля.
+- Поток сообщений Cucumber — порядок прогона мутантов против шести путей мимо аргументов JVM, перепись
+  сценариев в шести формах фильтра, dry run (скрипт, `junit-platform.properties`, `_JAVA_OPTIONS`), запятая в
+  конце списка плагинов, `as-root-engine=false`, повторные попытки test-retry.
+- Stop-хук и CI — сборка, которая оставляет гейты вне графа, выключает `integrityCheck` после `apply` или
+  своим `onlyIf`, выключает `crapGate` формой, которой B1 не читает, игнорирует коды выхода; зелёный
+  `gauntletFast` и вывод полного `gauntlet` с пропусками набора — без ложного красного.
+
+Проверено здесь (Gradle 8.14.3, Java 21):
+- Хуки, `hooks/selftest.py`, 4898 проверок в трёх раскладках (сборка в корне; модуль `core/`; два модуля
+  `core/` + `adapter/` — Gradle только в изменённом модуле, красный модуль блокирует, коммит
+  спецификации одного модуля замораживает фичи другого, чужая незакоммиченная работа не считается)
+  на временном git-репозитории с фиктивным `origin/main`:
+  guard — роли и их shell-границы, заморозка спецификации по коммиту в ветке и её снятие после merge,
+  `spec.approval=pr`, `--amend`/`rebase`/`revert`/`reset`/`checkout -B`/`branch -f`/`push --force`/push
+  в базовую ветку, detached HEAD, `gh pr merge` (включая `-R` и GraphQL auto-merge), редиректы в кавычках
+  и `2>`/`&>`, `rm -rf src` и `rm -rf *`, `cd … && cp`, `git -C`, `$PWD`/`$CLAUDE_PROJECT_DIR`, `xargs rm`,
+  `$(…)`, запись в `~/.claude` и в настройки других агентов (`~/.codex`, `~/.gemini`, `~/.agents`, `~/.grok`,
+  `~/.kimi-code`, `~/.qwen`, `~/.env`, `/etc/…`, каталоги из `CODEX_HOME`, `GROK_HOME`, `KIMI_CODE_HOME`,
+  `QWEN_HOME`) — и после `cd ~`, через `$HOME`, в другом регистре; файлы других агентов в проекте всеми формами
+  записи, ещё не существующие (`mv`, `dd of=`) и в соседнем worktree; `rm -rf "$CLAUDE_PROJECT_DIR"`/`$PWD`; роль
+  `checker` с правами `reviewer` и запись обоих в клон и в `/tmp`; ложные отказы сверки по тексту из раздела 9 и
+  их обходы; human-only правила внутри обёрток (`sudo`/`env`/`exec`/`command`/`nohup`,
+  включая `env -S`/`--split-string`), inline-кода (`bash -c`, `python3 -c`/`node -e`/`node --eval`/`--print`,
+  `perl -e`/`-E`, версионные `python3.X`, argv из отдельных кавычек `subprocess.run(['git','push',…])` с вложенным
+  `os.system`/`subprocess`/`execSync`, многострочный `bash -c 'echo ok; git push --force'` — разделители
+  в кавычках не режут payload), `eval`, pipe в интерпретатор (весь текст `echo`/`printf`, в кавычках и без)
+  и тела подстановок `$(…)`/`` `…` `` вне одинарных кавычек (в двойных и без кавычек shell их исполняет;
+  глубина учитывает кавычки — `)` внутри кавычек не обрывает тело); защита `.git/` (включая подделку
+  `last-green-*`); `push --mirror`/`--all`/`HEAD`/`@` и push без refspec на базовой ветке, push через
+  `-C`/`--git-dir` в worktree на базовой ветке (`HEAD:other`/`@:other` разрешены); сокращения
+  `--no-verif` и `core.hooksPath`; регистронезависимые пути (`GAUNTLET/…`,
+  `.Claude/…`); и отсутствие ложных срабатываний на `./gradlew gauntletFast`, `git add -A`,
+  `git commit` (в том числе с heredoc-сообщением и словами `--no-verify`/`push --force`/`core.hooksPath` в тексте сообщения),
+  `git stash push -m`, `tee build/…`, `rm -rf build`, `git push -u origin HEAD` на своей ветке,
+  `sudo ./gradlew`, `bash -c 'echo hello'`, Python-тесты с лямбдами через heredoc; stop_gate — ход только
+  со спецификацией не гоняет гейт (и после кодового хода тоже), незакоммиченные фичи исключают приёмку,
+  коммит спецификации возвращает приёмку, красный результат не перезапускается, пока не изменились дерево
+  или отчёты тестов, отпущенный красный напоминает о себе в следующих ходах, вопрос человеку проходит даже
+  после красного, лимит попыток (окно повторов покрывает весь бюджет прогона — `timeout × число модулей`
+  плюс запас; медленный двухмодульный `mutationGate` не сбрасывает счётчик), выключение переменной окружения;
+  SubagentStop hardener'а — повторы считаются до лимита и отпускают;
+  session_start — добывает `origin/main` в single-branch shallow-клоне.
+- Два прохода независимого агента-ревьюера по набору: 12 и 7 находок (обход заморозки через
+  `checkout -B` и `revert`, редиректы в кавычках, `disableAllHooks` через `~/.claude`, блокировка вопроса
+  человеку после красного и т. д.) — все закрыты и покрыты самопроверкой.
+- Ревью Kimi по PR: шесть функциональных находок подтверждены воспроизведением; пять закрыты, а правка
+  `GherkinMutator` (K2, «пустой сценарий при непустом Background») позже отменена ревью Grok (G6) — её посылка
+  оказалась неверной. Guard — тела подстановок `$(…)`/`` `…` `` в двойных кавычках и без кавычек,
+  `env -S`/`--split-string`, push без refspec на базовой ветке (+36 проверок самопроверки); `stop_gate` — окно
+  повторов на весь бюджет двух модулей (+15 проверок). `IntegrityCheck` (смешанная строка
+  `test.enabled = false; jar { }`) — целевая Java-регрессия. Итого 682 → 733 проверки.
+- Ревью Grok по PR: семь находок подтверждены воспроизведением и закрыты. Guard — некавыченный payload
+  `echo`/`printf` через pipe, глубина подстановок с учётом кавычек (`)` внутри кавычек не обрывает тело),
+  `@` как синоним HEAD (и `HEAD:other`/`@:other` не базовая ветка), push через `-C`/`--git-dir` в worktree на
+  базовой ветке, версионные интерпретаторы (`python3.X`)/`node --eval`/`--print`/`perl -E`/argv из отдельных
+  кавычек (+25 проверок × 3 раскладки = +75). `GherkinMutator` — отмена K2: пустой сценарий компилируется в
+  пустой pickle (Gherkin 42.0.1, `PickleCompiler.compilePickleSteps` не подмешивает Background при пустом
+  списке шагов; проверено на исходниках и прогоне — steps=0), поэтому всегда освобождён; ложный
+  `GHERKIN VACUOUS` снят, сценарий со своими шагами без «Примеров» по-прежнему vacuous. `IntegrityCheck` —
+  освобождение B1 проверяет получателя отключения: `test.enabled`/`tasks.test.enabled` внутри `jar { }` снова
+  B1, легитимное `jar { enabled = false }` свободно. Итого 733 → 808 проверок.
+- Ревью Codex по PR (полный прогон набора): находки V1–V7 подтверждены воспроизведением и закрыты;
+  поведение гейтов не ослаблено. `install.sh` — слияние 4.2 → 4.3 обновляет поля уже установленных
+  gauntlet-хуков (command/type/timeout/statusMessage/matcher), не теряет таймаут `SubagentStop`, масштабирует
+  внешний таймаут Gradle-хуков по числу модулей (`Stop` ≥ 1800, `SubagentStop` ≥ 7200, плюс `timeout × модули`),
+  объединяет права и пинит `disableAllHooks=false`; чужие хуки не трогает, дублей не плодит (идемпотентно).
+  `CrapGate` — запись allowlist `Class#method(desc)` освобождает ровно одну перегрузку, `Class#method` без
+  сигнатуры — только когда имя однозначно (при перегрузках не освобождает ничего и предупреждает); пустой
+  `sourcefilename` (debug=false) выводится из имени класса, метод не пропускается молча; область `--only`
+  сравнивает точный package-relative путь, а не суффикс. `IntegrityCheck` — получатель `delegate.enabled`/
+  `this.enabled` внутри безобидного блока свободен, многострочная скобка переносит проверку на следующую строку.
+  `GherkinMutator` — сценарий без собственных шагов (описание или пустой outline) не даёт мутантов и не vacuous
+  (`stepCount`, а не «есть тело»); `<error>` (исключение/crash) в verdict — ошибка, а не kill; отсутствующий
+  каталог фич в `no-skipped` — exit 1; перенос строки в тексте шага экранируется в литерал `\n` (без PARSE_ERROR).
+  guard — сняты over-block: push из worktree после `cd`/`pushd` на своей ветке, `print`/`console.log` с литералом
+  `git push`, pipe документа в `python3 script.py`/`node app.js`/`python3 -m json.tool` (stdin-код `bash -s`/
+  `python3 -` по-прежнему блокируется). `stop_gate` — негативный код Gradle (сигнал) считается красным (`worst`),
+  rename в `git status` разбирается по обоим концам, общий `gauntlet/config/` затрагивает все модули.
+  `gauntlet.gradle` — `acceptanceTest` объявляет каталог фич входом (`PathSensitivity.RELATIVE`), `mutationGate`
+  целит в скомпилированные типы (включая package-private и вложенные `Name$*`), а не в имена исходников.
+  Сборщик/распаковщик бандла — побайтный round-trip (тело файла пишется без снятия/добавления переноса строки).
+  Регрессии: guard print-литерал/stdin (+9) и cd-worktree push (+6) × 3 раскладки = +45; `stop_gate` —
+  негативные коды и область модулей (rename/общий config) +13 × 3 = +39; целевые harness'ы `CrapGate` (14),
+  `IntegrityCheck` (24), `GherkinMutator` (52), `install.sh` (29). Итого 808 → 892 проверки самопроверки.
+- Второй раунд ревью Codex по PR: находки F1–F14 подтверждены воспроизведением и закрыты; поведение гейтов
+  не ослаблено. `GherkinMutator` — сбой подготовки (`<failure>`/`<error>` в `@Before` до первого шага) считается
+  ошибкой мутанта, а не убийством (kill только когда упал сам шаг); замена одной ячейки «Примеров» сохраняет
+  outline и не портит соседнюю колонку (перенос строки в ячейке не превращается в два символа `\n`); неразрывный
+  пробел (U+00A0) в отступе шага не теряется при подсчёте (`stepCount`). `CrapGate` — пустой/несовпадающий
+  `sourcefilename` не пропускает метод молча; уникальность лямбд проверяется и по имени, принятому из allowlist.
+  `gauntlet.gradle` — regex поиска типов находит объявление с аннотацией на той же строке
+  (`@Deprecated final class X` в `Y.java`), `mutationGate` в режиме `changed` не даёт ложный «0 целей».
+  `stop_gate` — закоммиченный rename берёт оба пути из `git diff --name-status -M`; вложенные сборки
+  (`core,core/adapter`) — самый длинный совпавший префикс, а не первый; возраст отчётов сравнивается по модулю
+  (отчёт второго модуля не сбрасывает кэш первого), удалённый отслеживаемый файл не выпадает из области Git.
+  `install.sh` — команда узнаётся по запуску (интерпретатор + первый операнд-скрипт), а не по пути в любом
+  аргументе (`sha256sum …/guard.py` остаётся пользовательским хуком); `matcher` группы трогается только когда
+  все хуки в ней gauntlet'овские (соседний пользовательский хук не перестаёт запускаться). `IntegrityCheck` —
+  получатель `it.enabled`/именованный параметр замыкания (`archive -> archive.enabled`) внутри безобидного блока
+  свободен; `test.enabled`/чужое имя по-прежнему B1. guard — `cd` внутри подоболочки `( )`/`$( )` не утекает в
+  родительскую оболочку (стек cwd), push своей ветки после `( cd ../main && git status )` разрешён; argv-список
+  экранируется (`shlex.quote`), поэтому `subprocess.run(['echo', 'example; git rebase'])` — данные, а не команда
+  (реальный `git push --force` в argv по-прежнему блокируется). Сборщик бандла (§8.4) — распаковщик поставляется
+  вместе со сборщиком одной версии и встроенный round-trip сверяет побайтно (старый распаковщик добавлял LF).
+  Регрессии: guard F10/F14 (+12 сценариев × 3 раскладки = +36) и stop_gate F6/F7/F13 (+42); целевые harness'ы
+  `GherkinMutator` (12), `CrapGate` (8), `IntegrityCheck` (17), `stop_gate` (8), `install.sh` (19), guard (17),
+  сборщик (14), regex PIT (15) — 110/110. Итого 892 → 970 проверок самопроверки.
+- Третий раунд ревью Codex: `gherkinMutantsRun` закрепляет `cucumber.junit-platform.naming-strategy=long`,
+  поэтому ID из манифеста сохраняется в JUnit XML; kill требует assertion именно в кадре шага Cucumber (включая
+  Truth `ComparisonFailureWithFacts`), а `@Before` без кадра шага и `IOException("… is undefined")` — error.
+  NBSP учитывается и в заголовках `Scenario Outline`/`Examples`. PIT/CRAP разбирают объявленные top-level типы
+  с аннотациями, отступами и Unicode-именами; CRAP различает точный пакет и вложенный/верхнеуровневый тип.
+  `install.sh` не принимает `legacy-gauntlet` за штатный каталог и выносит свой хук из смешанной группы в группу
+  с эталонным matcher, не меняя пользовательскую. `IntegrityCheck` принимает `final Jar archive ->` и параметр
+  на следующей строке. Guard использует `event.cwd` для Git и не трактует `-e` после программы `python -c` как
+  новый код. Stop-gate проверяет и путь из начального dirty-списка, возвращённый к HEAD за сессию.
+  Регрессии: selftest 970 → 985; Java/XML harness 27/27; install 14/14; реальные Gradle 8.14.3/JDK 21 —
+  PIT 4/4 по `StandardPrices` и `Тариф`, CRAP 5 методов при debug=false, Cucumber 8.0.1 и 7.23.0 — 12/12 kill,
+  `@Before` → 12 errors, контрольный survivor отдельно.
+- Четвёртый раунд ревью Codex: PIT и CRAP используют объявленный Java-пакет и только объявленные типы,
+  а не каталог/имя файла — изменённый класс вне ожидаемого каталога не теряется, чужой одноимённый класс не
+  подключается. Установщик узнаёт только корневой `gauntlet/hooks` и одиночную управляемую команду, поэтому
+  `tools/gauntlet` и `guard.py && auditor` сохраняются. Truth `AssertionErrorWithFacts` (`isTrue()`) засчитывается
+  kill в шаге. Guard не исполняет аргументы после Python-скрипта/`-m`; `IntegrityCheck` принимает комментарий
+  после `{` перед параметром замыкания. Регрессии: selftest 985 → 994, Java/XML 32/32, install 16/16; реальные
+  PIT — `domain.Prices` найден, чужой `Rules` исключён; CRAP — 4 метода в changed и 2 для `Rules.java`;
+  Cucumber 7.23.0 + Truth `isTrue()` — 12/12 kill; Gradle-комментарий — только `jar`/`sourcesJar` выключены.
+- Управление версиями: на учебном проекте Java 17 + Gradle 8.14.3 + JUnit 5.12.2 + Cucumber 7.23.0
+  `gauntletInfo` показал отдельную JVM 21 гейта, реальный `gherkinMutation` дал 12/12 kill, а манифест
+  приложения не изменился. На втором проекте `gauntletInfo`/`integrityCheck` и PIT 8/8 прошли с той же настройкой.
+  Workflow распарсен как YAML (10 шагов), раздельное чтение project/gate Java для CI проверено; GitHub Actions
+  здесь не запускался. Дополнительно: `help`/`classes` проходят с отсутствующей gate-JDK 99; проектная JDK 17 +
+  gate 21 дают байткод 61 (контроль на 21 — 65); `archTest` с launcher 17/21 зелёный; ISO-8859-1 + debug=false —
+  PIT 2/2 и CRAP 2 метода для `Tarifé`; installer 20/20, standalone `//` перед closure-параметром не даёт B1.
+- Ревью `166287c` и независимое ревью набора (Gradle 8.14.3, JDK 21 и 25, Cucumber 7.23.0 и 8.0.1): все семь
+  находок раунда воспроизведены и закрыты. CI — отсутствующий модуль красный (регрессия `166287c`: `cd` внутри
+  `( … ) || status=1`), версии JVM и `PATH` по модулям с оверлеем, один шаг `setup-java` (workflow — 7 шагов).
+  `gauntlet.gradle` — кодировка из `options.compilerArgs`, нечитаемый изменённый исходник — ошибка
+  `gauntletScope`, страховка «выведенный тип существует как класс» (ловит `class Tarif\u00e9`: на `166287c`
+  `mutationGate` в `changed` был зелёным при четырёх мутантах в `all`), gate-launcher согласован с проектным
+  `Test.executable`. `CrapGate` — два `Rules.java` одного объявленного пакета не затирают друг друга, чужой
+  одноимённый файл другого корня исключается только доказанно. `IntegrityCheck` — не падает на не-UTF-8
+  исходниках (раньше exit 2 на первом ISO-8859-1 символе), `/* … */` перед параметром замыкания не даёт B1.
+  `GherkinMutator` — kill решает стадия, а не список типов исключений: `DataTable.diff` самого Cucumber
+  (`TableDiffException`), проверки Mockito/WireMock, Awaitility в шаге раньше давали «0 killed, N errors» и
+  красную сборку; контрольные сценарии закрывают обратную сторону — на `166287c` мутанты сценария, которому в
+  стенде не хватало предусловия, считались убитыми (`Gherkin mutation: OK`, BUILD SUCCESSFUL); мутант
+  повторяющегося заголовка меняет свою колонку. `install.sh` — второй `stop_gate.py` с другой `--task`
+  остаётся пользовательским. `stop_gate` — `buildSrc` отслеживается, вывод при таймауте не теряется. guard —
+  сокращения длинных опций (`--amen`, `--mirro`, `--al`, `branch --delet`, `switch --force-creat`),
+  `--branches`, кластеры `-qB`/`-Bname`, глобальные опции со значением (`--namespace x commit --amend`),
+  `core.hooksPath` для любой подкоманды и в `git config`, алиасы и `include.path`, `gh workflow disable` и
+  не-GET `gh api` к защите ветки; сняты ложные блокировки `commit -uno`, `branch --sort -committerdate` и
+  `branch --contains HEAD` у ревьюера. Оболочки и обёртки: на `166287c` правила не действовали внутри
+  `bash -lc '…'`, `sh -ec`, `bash -euo pipefail -c`, `dash -c`, под `/usr/bin/env …`, `nice -n 10 …`,
+  `timeout -s KILL 60 …`, `xargs -n 1 …`, `su -c`, `find … -exec`, `eval` — проходили и human-only команды, и
+  `bash -lc 'rm -rf gauntlet'`, и запись ревьюера или hardener'а вне своей роли. Оболочки теперь разбираются
+  по грамматике опций, обёртка узнаётся по имени программы, а вложенный shell-код (нагрузка другой оболочки,
+  текст через pipe, тело подстановки) судится теми же правилами путей, ролей и human-only, что и сама команда;
+  чтение через обёртку (`bash -c 'grep … gauntlet/config/…'`) больше не блокируется. Чтение командной строки:
+  на `166287c` апостроф в комментарии или в теле heredoc прятал следующую команду (`# don't forget` и строкой
+  ниже `git push --force origin main` проходил), перенос через `\` рвал её (`cp src/A.java \` + `gauntlet/config/`),
+  `<<` в строке или арифметике считался heredoc, а программа через heredoc, here-string или pipe
+  (`bash <<EOF`, `python3 - <<EOF`, `echo '…' | python3`) не судилась; теперь команда читается одним проходом,
+  сверенным с настоящим bash (119 команд: 35 расхождений на `166287c`, осталось одно — функция-обёртка из той
+  же команды). Скрипт `sed` и программа `awk` — не пути (specifier и hardener могут править свои файлы через
+  `sed -i`), `find … -exec sed -i` — запись, путь в соседнем worktree защищён как свой, вызовы вида
+  `system("git", "push", "--force")` и `os.execlp('git', 'git', …)` разбираются. Что команда делает (ревью
+  переблокировок): на `166287c` `cd "$(git rev-parse --show-toplevel)" && echo … >> gauntlet/config/gauntlet.properties`
+  и `cd - && rm -rf gauntlet/config` проходили — хук склеивал текст цели `cd` с текущим каталогом; `git push origin 2>&1`
+  на базовой ветке проходил — `2>` считался refspec. Теперь каталог после `cd` вычисляется, а перенаправления не
+  входят в аргументы. Сняты ложные отказы: `gh api` судится по адресу и методу, а не по словам `merge` и
+  `/protection` в тексте ответа ревьюеру; текстовое сопоставление смотрит на оператор, который пишет, и не считает
+  `gauntlet.log` набором; у ревьюера разрешены чтения с перенаправлением, `git branch --all`, `unzip -l`, `tar tf`,
+  `tee` и `mkdir` вне проекта; источники `cp` читаются, а не пишутся; `git restore --staged` и `git reset <путь>`
+  трогают только индекс; роли со своей зоной не блокируются на `2>/dev/null`. Самопроверка 997 → 2365 → 2431 → 2536
+  → 2623 → 2629 → 2650 → 2656 → 4898 (+456, +22, +35, +29, +2, +7 и +2 на раскладку и +2242 в ревизии 4.5 —
+  последние две до неё: второй workflow набора, `gauntlet-kit.yml`, — зона человека; файл настроек читается с
+  разделителями `java.util.Properties` —
+  `key: value`, `key value`; строка `$'…'` раскодируется, как в bash, а код perl в кавычках судится в том виде, как
+  написан; шаблон поиска perl — данные: ``perl -ne 'print if /`/'`` читает; `acceptance.features` с `./` или `/` на
+  конце замораживает тот же каталог; цель перенаправления — слово, которое из неё делает bash, `>&файл` и `>|` —
+  запись, а после экранированного `\>` `|` — конвейер и `&` — конец команды; после `>&` слово — файл так, как его
+  берёт bash: число и `-` — дескриптор, после дескриптора, отличного от 1 (`2>&"$saved_stderr"`), файла нет, а
+  `>&слово` и `1>&слово` пишут файл, и с переменной тоже; команда, которую хук не может прочитать (`$( … )` глубже
+  32 уровней, чтение дольше 20 с), — отказ; `readpipe` — запись perl; ревизия 4.5 — 1129 новых проверок файлов и
+  настроек других агентных инструментов и роли `checker`, с полной матрицей форм записи в раскладке «сборка в
+  корне» и выборкой в модулях, 243 — каждая проверка ревьюера ещё раз для `checker`, 303 — ложные отказы сверки
+  по тексту из раздела 9 с их обходами и запись ревьюера и `checker` вне проекта и 567 — plumbing git и запись по
+  пути с переменной у ревьюера и `checker`, переключение ветки по файлам, которые оно меняет, в трёх раскладках).
+  Независимое ревью этой же ревизии нашло дефекты и в её собственных правках — исправлены. `IntegrityCheck`:
+  вырезание комментариев выдумывало параметр замыкания (`{ $/* … */ test -> /$`, вложенный комментарий Kotlin) и
+  прятало `test.enabled = false`; теперь скрипт читается лексером языка, а 437 сниппетов, сверенных с настоящим
+  Gradle, дают 0 ложных зелёных и 0 ложных красных (было 40 и 18). `CrapGate` выкидывал изменённый класс второго
+  корня как «однофамильца»; `gauntlet.gradle` предпочитал `-encoding` полю `options.encoding` (Gradle — наоборот),
+  вычислял аргументы компилятора при конфигурации (`gradle build` падал на ленивом провайдере), требовал классы
+  от исходника, исключённого на задаче компиляции, и ломался на `javaLauncher`, заданном проектом позже набора.
+  `GherkinMutator`: контроль шёл только до мутантов, и строка, которую нельзя повторить на одном стенде, давала
+  «kill» каждому мутанту; падение без выполненного шага (конвертация аргумента, конструктор glue, неоднозначный
+  шаг) считалось kill. Старые дефекты, найденные тем же ревью: одиночный CR и Unicode-escape прятали тип от
+  области `changed`, второй корень main source set не видел ни один гейт, `module-info.java` валил Checkstyle,
+  без `git` не конфигурировался даже `gradle test`, `failFast` проекта обрывал прогон мутантов, правка одного
+  glue-кода не мутировала ни одной фичи, эмодзи в ячейке рвали суррогатную пару; CI принимал `21` и `21.0.2` как
+  один JDK, не понимал `17-ea`, `1.8`, `key: value` и модуль с пробелом в имени, `setup-java@v4` устарел (v5).
+  `install.sh` и хуки читают список модулей так же, как CI. Ревью головы PR после этих правок нашло ещё 11
+  дефектов, все исправлены:
+  - JVM гейтов. Плагин или init-скрипт, читающий launcher'ы JVM-задач после оценки проекта (модельный
+    билдер IDE), валил конфигурацию любой сборки (`javaLauncher is final`). `gate.java.version=21.0.2` валил
+    её даже при `GAUNTLET_GATE_JAVA_HOME`. Теперь launcher назначается при создании задачи и после оценки,
+    задача гейта сверяет свою JVM при старте, а toolchain запрашивается по major.
+  - guard: `bash -c $'git push --force …'`, `$'git' push`, `rm -rf $'gauntlet'` и ``perl -e '`rm -rf
+    gauntlet`'`` проходили.
+  - `GherkinMutator`: transformer с не-ASCII именем не находился. Мутант с падением и успехом (повторный
+    прогон) считался убитым.
+  - Область `changed`: удалённый glue-файл не мутировал ни одной фичи.
+
+  Повторное ревью той же головы нашло ещё 8 дефектов, все исправлены:
+  - `GherkinMutator`, повторные попытки сценария (плагин test-retry, `reports.junitXml.mergeReruns`).
+    Контроль, упавший и прошедший на повторе, в объединённом `testcase` считался прошедшим. Из двух падений
+    мутанта оставалось первое, и вердикт зависел от порядка попыток. Теперь каждая попытка судится правилами
+    одиночного прогона; разные вердикты попыток — ошибка.
+  - `GherkinMutator`, transformer. Он искался по исходникам в UTF-8 и по имени «Файл.java#метод», а теперь —
+    по скомпилированному glue, как его узнаёт Cucumber: класс и метод на classpath прогона мутантов. Исходник не
+    в UTF-8 и сборка без debug-информации давали ложный kill, однофамилец в другом классе — ложную ошибку.
+  - Запятая в пути. `Скидка, рубли.feature`, `Ledger,Copy.java` и каталог `Acme, Inc` давали 0 мутантов,
+    «PMD: OK», «DRY gate: OK» и PIT без мутантов. Теперь списки путей — файлом через NUL, пути из `git -z`.
+  - JVM гейтов.
+    - Launcher, закреплённый проектом в `afterEvaluate` и прочитанный слушателем `projectsEvaluated` (init-скрипт,
+      IDE), оставался JVM проекта. Теперь набор назначает свой и после `afterEvaluate`.
+    - После смены JVM гейта задача шла UP-TO-DATE на старом результате. Теперь запрошенная JVM — вход задачи.
+  - ArchUnit-тест набора был написан для Java 16, и компилятор проекта на Java 8 или 11 его не собирал. Теперь
+    это код Java 8, его по-прежнему собирает компилятор проекта. Гейт ниже Java 17 назван сразу. Смена
+    `architecture.properties` больше не оставляет `archTest` UP-TO-DATE на результате прежней политики.
+  - guard. Шаблон поиска perl — данные: ``perl -ne 'print if /`/'`` читает. Слитный `perl '-esystem(...)'` —
+    отказ.
+
+  Ревью головы `2b5ccf7` нашло ещё три старых дефекта, все исправлены; остальные находки ушли в ограничения по
+  правилу: исправлять только ложный зелёный в документированной конфигурации и ложный красный на обычном проекте
+  без обходного пути.
+  - guard. Цель перенаправления судилась по тексту: `> 'gauntlet'/config/…`, `> gaunt\let/…`, глоб, `>&файл` и
+    `>|` писали в набор мимо хука. Теперь цель — слово, которое из неё делает bash. Команда после `\>&` (`&` после
+    экранированного `>`) тоже больше не проходит.
+  - guard. `perl -e 'readpipe(…)'` — то же, что `qx`, — проходил.
+  - `integrityCheck`. `test { exclude '**/OrdersTest*' }` не был находкой B2, как и остальной выбор тестов Gradle:
+    шаблоны `filter`, `includeEngines`, категории JUnit 4, группы TestNG.
+
+  Ревью головы `efa4c50` нашло ещё девять дефектов набора, исправлены все:
+  - `gherkinMutation`. Параллельный Cucumber проекта (или `cucumber.execution.order=random`) ставил оба контроля
+    строки раньше мутанта, и изношенный стенд давал kill. Прогон мутантов теперь в одном JVM, по одному сценарию, в
+    порядке имён; приёмка проекта сохраняет свой режим.
+  - `gherkinMutation`. Значение с переводом строки в тексте шага прятало номер строки кадра, и падение раньше
+    первого использования колонки считалось kill.
+  - Хуки. С `module=./core` Stop-хук не запускал Gradle, а guard не защищал спецификацию модуля от main. Хуки
+    читают `module`, как CI.
+  - PIT. Инкрементальный анализ держал устаревшие вердикты, и хук hardener'а пропускал выжившего. Анализ выключен.
+  - `integrityCheck`. Новая часть B2 блокировала независимые `smokeTest` и `componentTest` и чтение `includes`;
+    `exclude` внутри `if` в блоке `test` и `configureEach() { }` не была находкой.
+  - guard. Ревьюеру отказывалось в `2>&"$saved_stderr"`.
+
+  Ревью головы `7061885` нашло шесть дефектов в правках предыдущего раунда. Исправлены они и два давних ложных
+  зелёных — только ужесточением, а где можно, проверкой того, с чем прогон действительно шёл; остальное — в разделе 9:
+  - guard. Правка для `2>&"$saved_stderr"` считала дескриптором любое слово, которое хук не вычислит, и ревьюер
+    писал через `>&"$f"`. Теперь как в bash: после `>&` и `1>&` слово — файл, после другого дескриптора — нет.
+  - guard. Команду, которую хук не может прочитать (`$( … )` глубже 32 уровней, чтение дольше 20 с, переполнение
+    стека), он отклоняет: упавший или не успевший хук её пропускал.
+  - `integrityCheck`. Запись в `excludes`/`includes` со следующей строки и условие на чужое имя (`project.name`,
+    `'os.name'`, переменная цикла) внутри блока задачи гейта не были находкой B2.
+  - PIT. История, которую задаёт сам проект (`historyInputLocation`, `historyOutputLocation`,
+    `enableDefaultIncrementalAnalysis`), включала инкрементальный анализ. Теперь такая настройка останавливает гейт.
+  - `gherkinMutation`. `doFirst` проекта, зарегистрированный раньше набора, возвращал прогону мутантов параллель и
+    форки. Теперь после прогона набор сверяет форки задачи и последние `-D` Cucumber в аргументах JVM, которые
+    называет Gradle, и падает, если они не те, что он ставил.
+  - `gherkinMutation`. Падение мутанта колонки, которую не использует ни один шаг, считалось kill.
+
+  Регрессии инструментов, установщика и CI лежат в `tests/` репозитория набора и гоняются по распакованному
+  бандлу.
+- `install.sh` на демо-проекте: чистая установка; слияние с существующим `.claude/settings.json`
+  (хуки и права добавлены, `disableAllHooks=false`); обновление 4.2 → 4.3 освежает поля gauntlet-хуков и
+  масштабирует таймауты по модулям, чужие хуки и роль/`CLAUDE.md` не перезаписаны; идемпотентно (без дублей);
+  отказ до любых изменений при битом JSON.
+- Скрипт Gradle: конфигурация проекта, `integrityCheck`, `gauntletScope`, `gauntletInfo` — из корня
+  (Kotlin DSL) и из двух модулей монорепо (Groovy DSL, `apply from: '../gauntlet/gauntlet.gradle'`,
+  оверлей `config/adapter/` подхватывается); single-file Java-инструменты компилируются.
+- Пороги и правила гейтов (Checkstyle, JaCoCo/CRAP, CPD, integrity, Gherkin-мутатор) не ослаблены: ни один
+  порог, тест или правило не сняты. Правки инструментов закрывали обходы и проверялись на внесённом нарушении.
+
+В эталонном проекте (Spring Boot 4.0, Gradle 8.14.3, Java 21, облачные сессии Claude Code) набор с ревизии 2
+прошёл серию задач: реальные PIT, Cucumber-JVM с `# language: ru`, ArchUnit, хуки в облачной сессии
+(`.claude/settings.json` и `.claude/agents/` из репозитория подхватываются в сессии с одним репозиторием),
+CI на GitHub. Оттуда — правки ревизии 3: RUN_ERROR в `mutationGate`, SubagentStop для hardener'а,
+блокировка одного прогона Gradle на `build/`, Docker из SessionStart, закрытые обходы guard. Ревизия 4 (ещё
+десять задач серии): роль hardener при пустой области PIT, правка замороженной спецификации только человеком или
+его делегатом, строки allowlist RUN_ERROR через PR владельца набора после его собственного прогона, правило «без
+следов внешнего контура» в коде и документах, ревизия источников документации по фактической доступности.
 
 ## 9. Ограничения
+- `integrityCheck` B2 узнаёт фильтр по тексту скрипта в известных формах, и список ниже не исчерпывающий. Для
+  `test` и `archTest` каждую из этих форм ловит `testCensus` по результату, находкой T6: проверено на Gradle
+  на 30 формах Groovy и 9 формах Kotlin, из которых B2 не видит 21 и 4, и на `PostDiscoveryFilter`. У
+  `acceptanceTest` переписи тестовых классов нет, но `acceptanceCheck` сверяет сценарии с потоком сообщений
+  Cucumber: фильтр, убравший сценарии, и там находка F2. `gherkinMutantsRun` судится по порядку и числу попыток в
+  своём потоке. B2 не видит фильтр:
+  - через переменную или псевдоним (`def t = tasks.test; t.exclude …`, `def e = test.excludes; e << …`), через
+    геттер и `setProperty` (`getIncludes().add(…)`, `filter.getIncludePatterns().add(…)`,
+    `test.setProperty('excludes', …)`);
+  - в `configure(test) { }` и `with(test) { }`, в замыкании в скобках (`withType(Test, { … })`,
+    `named('test', { … })`, `configureEach({ … })`);
+  - по ключу контейнера (`tasks['test'].exclude`, `tasks.getAt('test')`) и в Kotlin через приведение
+    `(tasks["test"] as Test)`;
+  - в коллекции с предикатом (`tasks.matching { it.name == 'test' }.all { … }`, `tasks.findAll { … }.each { … }`),
+    в `tasks.configureEach { }` и `tasks.all { }` с проверкой типа (`if (it instanceof Test)`);
+  - под условием на имя задачи внутри `withType(Test)` или `tasks.configureEach`: `if (name == 'integrationTest')
+    { include … }` выбирает задачу и находкой не считается, поэтому не считается и
+    `if (name != 'integrationTest') { exclude … }`, хотя оно касается гейта; так же в `testTask` набора `test`, в
+    `withType(Test).each { if (name == …) }` (там `name` — имя проекта), в `for (t in [name])` и при переменной
+    скрипта с именем `name`;
+  - в параметре внутреннего замыкания (`test { doFirst { t -> t.exclude … } }`), за собственным параметром задачи
+    (`test { t -> t.doFirst { exclude … } }`), в ветке `case X:`, в ветке Kotlin `when` в фигурных скобках, в
+    замыканиях `each`, `with`, `run`, `apply`, `also` и Kotlin `let`/`takeIf` внутри блока задачи.
+
+  Такой фильтр виден в diff скрипта сборки, который читает человек.
+- `testCensus` судит класс, а не метод. Фильтр, после которого у класса запускается хоть один тест
+  (`excludeTestsMatching '*.OrdersTest.slowCase'`, тег на одном методе), он не видит. Исходники вне компиляции он
+  сверяет только для `.java`: тест на Kotlin или Groovy, исключённый из компиляции, не виден.
+- Для `testCensus` пропущенный тест считается запущенным. Класс, все тесты которого пропущены (`@Disabled`,
+  условие, `assume*`), судят только T1–T5, по тексту. Dry run JUnit Platform
+  (`junit.platform.execution.dryRun.enabled=true` в тестовых ресурсах или системным свойством) отчитывается о
+  каждом тесте как о пропущенном, не запустив ни одного (проверено на JUnit 5.12.2). Его ключ
+  `integrityCheck` находит по тексту: P1 в `junit-platform.properties` ресурсов `main`, `test` и `acceptanceTest`,
+  B3 в скрипте сборки; в файле, которого он не читает (свой каталог ресурсов), — нет.
+- `testCensus` не распознаёт, и потому никогда не находка:
+  - свои мета-аннотации (`@MyTest`, помеченная `@Test`);
+  - классы-наборы JUnit Platform (`@Suite`): классы, которые набор запускает, судятся под своими именами;
+  - Spock, JUnit 3 `TestCase`, Cucumber в `test`;
+  - тесты TestNG из суперкласса, нестатические внутренние классы под TestNG и JUnit 4;
+  - методы из суперкласса вне каталогов тестовых классов (jar тестовых фикстур);
+  - методы, которые JUnit не находит (private, static, `@Test` с возвращаемым значением): они не
+    запускаются никогда, и об этом не сообщает никто.
+- Пока `test` UP-TO-DATE, `TEST-*.xml`, вписанный в каталог результатов вручную между прогонами, считается
+  результатом: Gradle удаляет такие файлы, только когда выполняет `test` снова. CI начинает с чистой копии.
+- `testCensus`, как любую задачу гейта, скрипт сборки может перенастроить в формах, которых B4 не читает:
+  B4 видит только `tasks.named`, `getByName` и `register('testCensus')`.
+- `testCensus` находит класс и там, где его не запускают нарочно, и тогда помогает строка
+  `<glob пути исходника> T6 # причина` в `config/integrity-allowlist.txt`. Такие случаи:
+  - тесты, которые гоняет другая задача `Test` над тем же source set (`test { exclude '**/*IT*' }` и задача
+    `integrationTest`), тег-фильтр на `test`; тесты из `src/test/java`, которые компилирует другой source set
+    (`integrationTest` с `srcDir 'src/test/java'`, `include '**/*IT.java'`), — T6 «not compiled for test»;
+  - `@TestFactory` без динамических тестов, `@ParameterizedTest(allowZeroInvocations = true)` с пустым источником;
+  - TestNG `@Test(enabled = false)`;
+  - тесты фреймворка или движка, которого у задачи нет (JUnit 4 без vintage);
+  - выборочный запуск плагином (Develocity predictive test selection, шардинг).
+
+  `gradle test --tests X gauntletFast` одним вызовом даёт T6 у каждого класса вне фильтра: запускайте
+  отфильтрованный `test` отдельно. `-x test`, `-x archTest`, `reports.junitXml.required = false` и один каталог
+  JUnit XML у `test` и `archTest` (`tasks.withType(Test) { reports.junitXml.outputLocation = … }`: прогон
+  `archTest` удаляет результаты `test`) — отказ: уберите их или дайте каждой задаче свой каталог.
+- Проверка «Gradle выполнил каждую задачу гейта» читает строки `> Task` в выводе Gradle и строки набора
+  `skipped by the kit`. Обойти её можно только сознательно, и это видно в diff скрипта сборки: задачи-заглушки с
+  именами гейтов в сборке, которая не подключает набор, напечатанные строки `> Task …` или `skipped by the kit`.
+  Исход `test`, `archTest` и `jacocoTestReport` она не судит: их судят перепись тестов и CRAP-гейт. Компиляцию (`compileJava`, `compileTestJava`)
+  она не требует: сборка, которая её исключает, локально судит классы прошлого прогона, а CI начинает с
+  чистой копии. Прогон станет красным при уровне лога, скрывающем строки задач
+  (`org.gradle.logging.level=quiet` или `warn` в `gradle.properties`, `-q` в `GAUNTLET_GRADLE_ARGS`), и при
+  `-x` задачи гейта в `GAUNTLET_GRADLE_ARGS` — уберите их.
+- `gauntlet kit unchanged` повторяет список guard'а, поэтому ни один из них не покрывает:
+  - `docs/CODEOWNERS` (GitHub читает первый из `.github/`, корня и `docs/`);
+  - `CLAUDE.md` модуля (`core/CLAUDE.md`);
+  - вложенные файлы инструкций других агентных инструментов (`core/AGENTS.md`, `docs/AGENTS.md`,
+    `core/.kimi-code/AGENTS.md`, `core/.grok/agents/x.md`): по документации вендоров Codex и Kimi Code читают
+    `AGENTS.md` в каталогах от корня до рабочего, Grok — `.grok/agents/` от рабочего каталога до корня, а список
+    охраняет только пути от корня, как с `core/CLAUDE.md`; такой файл видит только человек в diff PR;
+  - цель ссылки вне списка: при `CLAUDE.md -> docs/agents-guide.md` правка `docs/agents-guide.md` проходит оба.
+
+  Запись в такие файлы по пути guard пропускает. Но там, где он сверяет инструкцию как текст (пункты ниже), их
+  имя в любом каталоге и регистре даёт отказ: `cd docs && touch agents.md`, пока `docs/agents.md` нет;
+  `git restore docs/agents.md`, `git rm --cached core/AGENTS.md`, `git checkout -- core/CLAUDE.md`; код
+  интерпретатора `perl -pi -e 's/a/b/' docs/agents.md`; у hardener'а — `git restore` ресурса промпта Spring AI
+  `src/test/resources/prompts/agents.md`. Отказ называет защищённый файл в корне («could modify AGENTS.md»,
+  «… CLAUDE.md»), которого команда не трогает. В одномодульном проекте такой отказ редок (документация об агентах в
+  `docs/`, ресурс промпта), в монорепозитории с `AGENTS.md` или `CLAUDE.md` в модулях — обычен. Обход — путь с
+  каталогом (`touch docs/agents.md`, `cd docs && touch ./agents.md`), Write и Edit, `sed -i` вместо `perl -pi`; для
+  git — обходы из пункта о сверке как текста, а вместо `git rm --cached core/AGENTS.md` —
+  `git update-index --force-remove core/AGENTS.md`.
+
+  Проверка работает только на pull request'ах. Триггера `merge_group` нет, и в очереди слияния обязательная
+  проверка не отчитается. Порог, закоммиченный прямо в базовую ветку, она не видит.
+- Настройки агентов пользователя (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.agents`, `~/.grok`, `~/.kimi-code`,
+  `~/.qwen`, `~/.env`, `/etc/codex`, `/etc/grok`, `/etc/qwen-code`) guard охраняет по пути, CI их не видит.
+  `~/.kimi-code/sessions/`, `~/.grok/sessions/` и `~/.grok/worktrees/` — данные сессий этих агентов (файл плана,
+  рабочие копии), а не настройки, и запись туда разрешена. Путь из переменной (`CODEX_HOME`, `GROK_HOME`,
+  `KIMI_CODE_HOME`, `QWEN_HOME`, `QWEN_CODE_SYSTEM_SETTINGS_PATH` и т. п.) guard видит, только если переменная есть
+  в окружении, с которым запущен Claude Code; значение, которое содержит домашний каталог или проект, не
+  охраняется, иначе закрылся бы весь проект. Команды агентов, которые сами пишут свои настройки
+  (`claude mcp add --scope project`, `codex mcp add`), guard не распознаёт: файл в репозитории ловит CI, файл
+  пользователя — никто. Не охраняются и `CLAUDE.local.md`, `/etc/claude-code/managed-settings.json`, каталог из
+  `CLAUDE_CONFIG_DIR`, а удаление каталогов над проектом (`rm -rf ..`, `rm -rf ~`) guard не судит.
+- Инструкцию, в которой хотя бы один записываемый операнд guard не видит как путь, он сверяет как текст: так он
+  закрывает запись, пути которой не знает (`mv /tmp/x AGENTS.md`, `git checkout REV -- :/CLAUDE.md`). Такой
+  операнд — имя без каталога, которого ещё нет (у любой команды записи: `touch`, `cp`, `mv`, `mkdir`, `tee` …),
+  любое `of=` у `dd`, режим или значение опции отдельным словом (`chmod 755`, `chmod +x`, `truncate -s 0`,
+  `touch -d …`) и подкоманда git-команды, которая пишет рабочее дерево (`checkout` с путями, `restore`, `rm`, `mv`,
+  `stash`, `merge`, `pull` …; `switch` и `checkout` без путей — пункт ниже). Защищённое имя целым сегментом в такой
+  инструкции — отказ, даже если путь только читается или имя — часть незащищённого пути или имени ветки:
+  `dd if=CLAUDE.md of=/tmp/copy.md`, `mv /tmp/gauntlet/report.txt notes.txt`, `chmod 755 /tmp/gauntlet/run.sh`,
+  `truncate -s 0 /tmp/gauntlet/x.log`, `git rm src/main/java/com/example/gauntlet/Probe.java` (а `rm` того же
+  файла проходит), `git merge origin/fix/gauntlet`. Это редкость: нужно защищённое имя (`gauntlet`, `CLAUDE.md`,
+  `AGENTS.md`, `CODEOWNERS`, `.claude` …) сегментом незащищённого пути или имени ветки — пакет
+  `com.example.gauntlet`, ветка `fix/gauntlet`, каталог `/tmp/gauntlet/`. Отказ называет найденное имя
+  («could modify gauntlet»), хотя команда его не пишет; по правилу 1 `gauntlet/CLAUDE.md` агент останавливается и
+  объясняет, а человек отвечает ему обходом:
+  - `mv`, `cp`, `touch` — имя с каталогом (`mv /tmp/gauntlet/report.txt ./notes.txt`);
+  - `dd` — каталог не помогает (`of=./copy.md` — тоже отказ): читайте через `cp` или `cat`
+    (`cp CLAUDE.md /tmp/copy.md`, `cat CLAUDE.md > /tmp/copy.md`);
+  - `chmod` и `truncate`, когда защищённое имя — каталог на пути, — по имени из этого каталога
+    (`cd /tmp/gauntlet && chmod 755 run.sh`); `truncate` можно заменить на `: > /tmp/gauntlet/x.log`;
+  - git — `git show :путь > путь` вместо `git restore` (файл из индекса) и `git show REV:путь > путь` вместо
+    `git checkout REV -- путь`; `rm` или `mv` и затем `git add` вместо `git rm` и `git mv`; каталог вместо файла
+    (`git stash push -- docs/`); `git fetch origin fix/gauntlet` и `git merge FETCH_HEAD` вместо `git merge` и
+    `git pull`.
+- `git switch` и `git checkout` без путей — на ветку, тег, коммит, `-`, с `--detach`, на новую ветку (`-c`, `-b`,
+  `-t`) от её точки старта, `--orphan` — guard судит не по тексту, а по файлам, которые переключение меняет: по
+  разнице HEAD и коммита, куда оно ведёт (`git diff --name-only HEAD <коммит>`; у `git switch --orphan` — все файлы),
+  а с `-f` (и у `git checkout -f` без ветки) — и по локальным правкам, которые оно выбросит. Имя ветки роли не играет:
+  `git switch fix/gauntlet` и `git switch -c fix/gauntlet` проходят, если файлы человека там те же. Отказ — файл
+  человека (`gauntlet/`, `.claude/`, `CLAUDE.md`, `AGENTS.md` …) или защищённый файл спецификации, который у этого
+  коммита не такой, как у HEAD и у базовой ветки (`baseRef`), и локальная правка такого файла, которую выбросит `-f`;
+  возврат к набору базовой ветки — не смена набора, кроме активных хуков и настроек (`.claude/`, `gauntlet/hooks/`),
+  добавленных или изменённых на самой этой ветке, и замороженной спецификации у specifier. Так же судятся файл
+  настроек агентов пользователя и, у specifier и hardener, любой файл вне их зоны. Переключение в клоне вне проекта
+  свободно, в соседнем worktree судится так же. Ложный отказ бывает, когда агент переходит на ветку, где набор сменил
+  человек (порог в `gauntlet.properties` правят на GitHub), или на старый коммит до обновления набора. Обход — файл
+  ревизии через `git show <ревизия>:<путь>` или ревизия вне проекта (`git worktree add --detach /tmp/<каталог>
+  <ревизия>`); на такую ветку переключает человек, или сессия начинается на ней. Что guard не разрешает, он, как
+  раньше, сверяет как текст (пункт выше): ветку, которой нет ни здесь, ни ровно в одном удалённом (`git switch
+  nope/gauntlet` — отказ), переменную (`git switch $B`), глобальную опцию git, кроме `-C`
+  (`git -c advice.detachedHead=false checkout fix/gauntlet` — отказ, обход — без `-c`), опцию, которой guard не
+  разбирает (сокращение `--det`), `GIT_DIR` и подобные переменные окружения, переключение с путями
+  (`git checkout REV -- путь`).
+- `.`, `./`, `$PWD`, `${PWD}` и `"$CLAUDE_PROJECT_DIR"` как каталог, где команда пишет или удаляет, в корне
+  проекта guard судит как весь корень с `gauntlet/`: отказ. Для `rm -rf "$CLAUDE_PROJECT_DIR"` это и нужно, для
+  `tar -x` и `unzip` без названных файлов тоже: что лежит в архиве, guard не знает. Ложным отказ бывает у копии
+  одного незащищённого файла и у поиска с `-name`: `cp /tmp/Makefile .` (и `./`, `${PWD}`, `"$CLAUDE_PROJECT_DIR"`),
+  `cp /tmp/Makefile "$PWD"`, `mv /tmp/Makefile $PWD`, `find "$CLAUDE_PROJECT_DIR" -name "*.orig" -delete`. Это
+  редкость. Обход — назвать файл (`cp /tmp/Makefile ./Makefile`, `cp /tmp/Makefile "$PWD/Makefile"`) или
+  подкаталог без защищённых путей (`find "$CLAUDE_PROJECT_DIR/build" …`, `find "$CLAUDE_PROJECT_DIR/src/main" …`,
+  `tar -xzf /tmp/fixtures.tgz -C src/test/resources`); не `src/` целиком — в нём спецификация, и
+  `find "$CLAUDE_PROJECT_DIR/src" … -delete` тоже отказ. Ниже корня (`cd src/main/resources && cp /tmp/x.yml .`)
+  отказа нет.
+- Если в команде записи есть переменная или подстановка — и в кавычках тоже (`cp $HOME/.env …`,
+  `mkdir -p "$TMPDIR/x"`), — guard сверяет как текст всю командную строку, кроме текста в кавычках: значение могло
+  быть задано в любом её месте. Защищённое имя или настройки агентов пользователя в любой части строки — отказ,
+  даже если там только чтение: `cp $HOME/.env .env.local`, `cp $HOME/.codex/config.toml /tmp/codex.toml`,
+  `ls ~/.codex 2>/dev/null; mkdir -p "$TMPDIR/x"` (два последних — «could modify .codex», о `.codex` проекта). Это
+  редкость. Обход — `~` или `$HOME` в кавычках (`cp ~/.env .env.local`, `cp "$HOME/.env" .env.local`), путь без
+  переменной (`mkdir -p /tmp/x`) или чтение отдельным вызовом Bash.
+- Запись ревьюера и `checker` вне проекта — в клон из карточки и в `/tmp` — guard пропускает, только если видит её
+  путь таким, как он написан: абсолютный (`cp /tmp/R.java <клон>/src/test/java/…/R.java`,
+  `mkdir -p /tmp/checker-scratch`), `./имя` после `cd` (`cd <клон>/… && cp /tmp/R.java ./R.java`) или цель
+  перенаправления (`cd <клон>/… && cat > R.java <<'EOF'`, `cd <клон> && ./gradlew test > /tmp/test.log 2>&1`).
+  Отказ «The checker is read-only» получают:
+  - имя без каталога, которого ещё нет, после `cd` в клон или в `/tmp` (`touch R.java`, `mkdir repro`,
+    `cp /tmp/R.java R.java`; `cd /tmp && touch notes.txt`): куда пишет такая команда, guard не знает; в каталоге
+    проекта такое имя рядом с путём вне его — тоже (`mv /tmp/a notes.txt`, `touch /tmp/a notes.txt`): оно
+    создаётся в проекте;
+  - путь с переменной, подстановкой или `~`, где бы ни шла команда (`CLONE=…; cp /tmp/R.java $CLONE/src/…`,
+    `"$tmp/x"` после `tmp=$(mktemp -d)`, `git log -p > "${TMPDIR:-/tmp}/log.txt"`,
+    `> /tmp/run-$(date +%s).log`, `cp /tmp/x $(echo <клон>)/…`, `> ~/notes.txt`): значение задаёт сама строка —
+    после `cd /tmp` путь `$P/src/…` при `P=<проект>` ведёт в проект, `$PWD` и `~` строка переопределяет (`PWD=…`,
+    `HOME=…`), а `/tmp/$X` уходит из `/tmp` при `X=../<проект>/…`. Исключения для `/tmp` или для клона, названного
+    в той же строке, нет: правилу 5 `.claude/agents/checker.md` (полный путь) оно не нужно.
+
+  В карточках, где нужна запись вне проекта, это частый отказ: путь клона в переменной — обычный приём агентов.
+  Обход — тот же путь без переменной (`git log -p > /tmp/log.txt`; файл каждой ревизии — своей командой) или
+  `./имя`. Значение опции — не путь (`chmod +x /tmp/r.sh`, `touch -d … /tmp/x`, `mkdir -m 700 /tmp/x`), и
+  переменная в том, что команда только читает, отказа не даёт (`cp "$f" /tmp/`,
+  `git diff $(git merge-base origin/main HEAD) > /tmp/review.diff`). Git-команда, которая меняет состояние, —
+  отказ и в клоне (`git -C <клон> commit`), так и задумано: `.claude/agents/checker.md`, правило 5. Это и plumbing,
+  которое пишет индекс, ссылки, объекты или файлы: `update-index`, `read-tree`, `write-tree`, `symbolic-ref` с
+  новым значением или `-d`, `hash-object -w`, `mktree`, `mktag`, `commit-tree`, `checkout-index` (и с `--prefix`
+  вне проекта), `merge-file`, `sparse-checkout`, `bisect`; проходят формы, которые только печатают:
+  `symbolic-ref <имя>`, `hash-object` без `-w`, `read-tree -n`, `merge-file -p`, `sparse-checkout list`,
+  `bisect log`. Обход для `checkout-index --prefix` — `git archive <ревизия> | tar -x -C /tmp/<каталог>`, для
+  `sparse-checkout` частичного клона — `git -C <клон> show <ревизия>:<путь>`. Пишущие git-команды, которых guard у
+  этих ролей не судит: `fetch`, `remote`, `config` (кроме ключей человека), `gc`, `prune`, `reflog expire`,
+  `format-patch`, `bundle create`, `archive -o`, `diff --output`.
+- Внешний маршрут сабагентов (`subagents.md`, раздел 5) и списки файлов и настроек других агентных инструментов
+  взяты из документации и исходников названных версий вендоров; ни один CLI вендора здесь вживую не запускался.
+  Флаг или форма вывода живой версии могут отличаться: первую карточку на каждом внешнем маршруте считайте
+  пробной. У Antigravity (`agy`) без адаптера механизма только чтения нет: агент карточки — файл адаптера, а без
+  него агент по умолчанию правит файлы. Поэтому маршрута `agy` нет, пока нет адаптера, и вопрос о маршруте его не
+  предлагает (`subagents.md`, раздел 5). Полных адаптеров вендоров в наборе нет: они появятся после живого пилота.
+- Прочие типы сабагентов (`general-purpose`, `Explore`, форк, свои роли) guard судит как основного агента:
+  карточку только для чтения, отданную им, а не `checker`, от записи кода ничто не держит (`subagents.md`, п. 0.1).
+- `tools/report_check.py --hook` — хук `SubagentStop` для `checker`: форма и цитаты без повтора команд, не больше
+  двух возвратов, затем отпуск со сводкой — написан и проверен тестами, но не включён. Включение — запись в
+  `.claude/settings.json` вместе с правкой `install.sh` (иначе каждое обновление набора добавит копию хука) и один
+  живой пилот. До тех пор сверку запускает принимающий: `python3 gauntlet/tools/report_check.py --run <отчёт>`;
+  сдвинулась база — с `--rev <новая база>` (`subagents.md`, п. 2.8).
+  Пределы сверки: команду она повторяет, только если HEAD — ревизия отчёта и дерево чистое, без оболочки и не
+  дольше 60 с, а общего бюджета на отчёт нет; что не повторено, она перечисляет отдельной строкой и выходит с кодом 3
+  («не всё перепроверено»), а не 0; сборку, тесты и источники в сети не повторяет; число K в «… опущено K строк …» не
+  сверяет; конфигурация git для неё доверенная (например, `filter.<driver>.clean` из `.git/config` или `~/.gitconfig`;
+  `core.fsmonitor`, `log.showSignature`, `log.diffMerges` и `--no-textconv` у `show`, `log`, `blame` и `grep` она задаёт
+  сама); отказы списка составлены по
+  GNU, на BSD (macOS) возможны ложные расхождения. Файл вне репозитория она читает с диска, а его строки — в цитате
+  и в выводе повторённой команды — не выводит, только путь; FIFO, устройство, `/proc` и `/sys` — расхождение без
+  чтения.
+- Обязательные проверки `gauntlet` и `gauntlet kit unchanged` защита ветки узнаёт по имени check run'а и
+  источнику GitHub Actions. Workflow, добавленный в PR, запускается на `pull_request` со своим текстом и может
+  создать check run с тем же именем. Из файлов `.github/workflows/` guard и `gauntlet kit unchanged` охраняют
+  только два файла набора. Новый или изменённый workflow в diff PR — повод прочитать его перед merge.
+- Stop-хук вне git-репозитория (или без `.git/gauntlet-hook`) гейт не запускает и говорит об этом на каждой
+  остановке. Вывод Gradle в кодировке не UTF-8 доходит до агента с символами U+FFFD; вердикт — код выхода
+  Gradle и строки задач.
+- B2 находит фильтр там, где его нет, и тогда помогает правка скрипта: локальная переменная с именем `includes` или
+  `excludes` (`def includes = getIncludes().join(', ')`) — переименуйте её; выбор с получателем в задаче, которую
+  гейт не запускает (`smoke.useJUnitPlatform { includeEngines … }`), — уберите получатель; ветка с условием на
+  чужое имя внутри одной задачи гейта, которая никогда не выполняется (`test { if (name == 'integrationTest')
+  { exclude … } }`), — уберите её; `getName ( )` с пробелами, `if` без фигурных скобок, Kotlin `when` без
+  субъекта или получатель, которого B2 не знает (`this@withType.name`, `getDelegate().name`, `it['name']`,
+  `(it as Test).name`, `"$name"`), в условии на имя внутри `withType(Test)` — напишите `getName()`, скобки,
+  `when (name)` или просто `name`.
+- Glue (step-классы) — только в `src/acceptanceTest/java`. Правку glue в отдельном модуле или в общем source set
+  шагов область `changed` не видит: `gherkinMutation` проверит пустое множество.
+- Transformer (`@ParameterType` и т. п.) читается из базовой копии класса. В multi-release JAR, где аннотация есть
+  только в версионной копии, отвергнутое значение засчитается как kill. Glue набора — каталог классов, и в
+  экосистеме Cucumber такие JAR не встречаются.
+- JVM гейта должна быть не ниже Java, под которую компилируется проект: `archTest`, `acceptanceTest` и PIT
+  загружают классы проекта на ней. Gate 17 при проекте на 21 — `UnsupportedClassVersionError` в `archTest`.
+- `PitSummary`, `DryGate`, `TestCensus` и `GherkinMutator` (файл `TEST-*.xml`) не читают отчёт с DOCTYPE — это
+  ошибка, а не вердикт (PIT 1.22.1, PMD 7.27.0 и Gradle его не пишут). `CrapGate` читает DOCTYPE JaCoCo без внешних
+  сущностей; внутренняя сущность подложенного отчёта им читается. Лимиты
+  размера JAXP в JDK 24+ (каждое `&lt;` или `&quot;` в атрибуте идёт в счёт 100 000 на документ) инструменты
+  снимают: большой отчёт JaCoCo или JUnit XML на JVM гейта 25 читается (проверено на `CrapGate` и `TestCensus`).
+- Инструменты запускаются как исходники с `-Dfile.encoding=UTF-8`: Java 17 читает исходник в кодировке платформы,
+  и в локали POSIX (как в облачной сессии) `GherkinMutator.java` с кириллицей не компилировался. Запуск
+  `java GherkinMutator.java` вручную на Java 17 без UTF-8 локали по-прежнему падает — добавьте тот же флаг.
+- Исходники не в UTF-8 требуют явного `options.encoding`: без него гейт читает их как UTF-8 и падает с находкой E1
+  (INSTALL, раздел 4).
+- Прогон мутантов сверяется с точными значениями: `-Dcucumber.execution.parallel.enabled=FALSE`, `forkEvery = 100`
+  или удалённые провайдеры аргументов JVM в `doFirst` проекта гейт отклоняет, хотя прогон шёл последовательно, —
+  держите такой `doFirst` в стороне от `gherkinMutantsRun`.
+- Гейты задают `cucumber.plugin` у `acceptanceTest` и `gherkinMutantsRun`, сохраняя плагины проекта из
+  `systemProperty` задачи (туда же Gradle кладёт `-D` из `jvmArgs`) и `junit-platform.properties`. Провайдер
+  аргументов проекта с `-Dcucumber.plugin` набор перекрывает, и плагин проекта молча пропадает. Поток заменяют
+  только `_JAVA_OPTIONS` и провайдер, который добавил `doFirst` проекта, зарегистрированный раньше набора, — тогда
+  гейт красный. Задавайте плагины в `junit-platform.properties` или `systemProperty`.
+- `acceptanceTest` идёт по одному форку: параллельные форки Cucumber не делят сценарии, каждый гонял все, и вместе
+  они портили один поток. `doFirst` проекта, который снова включает параллельные форки, может сделать поток
+  нечитаемым — красный прогон, который зависит от времени.
+- Cucumber 8 пишет поток только с Jackson. Набор добавляет `tools.jackson.core:jackson-databind` в свои
+  зависимости приёмки по умолчанию без версии: её задаёт BOM или плагин dependency-management (Spring Boot),
+  согласованно с `jackson-core` и `jackson-annotations`. `jackson.version` (по умолчанию 3.2.1) — версия, которую
+  набор предпочитает, только когда версию не называет никто. Проверено на Spring Boot 4.0.7 с
+  `io.spring.dependency-management`. Сборка, которая настраивает source set `acceptanceTest` раньше строки `apply`,
+  добавляет Jackson сама (INSTALL, раздел 5).
+- Перепись сценариев читает фичи на английском и русском сама; на другом языке — по сценариям, которые перечислил
+  Cucumber, когда он загрузил файл, иначе F2 «неизвестно, какие сценарии он определяет». Фильтр, который должен
+  остаться (`excludeTags` на `acceptanceTest`, `--tests` в ручном прогоне), даёт F2 у каждой фичи — помогает строка
+  `<glob пути фичи> F2 # причина` в `config/integrity-allowlist.txt`. `gradle acceptanceCheck` отдельно или
+  `-x acceptanceTest` — отказ: запускайте их вместе, как `gauntletFast`.
+- Одновременность сценариев судится по меткам времени стенных часов: шаг часов назад (коррекция NTP) во время
+  прогона мутантов мог бы дать ложное «шли одновременно» — повторите прогон. Поток на JVM опирается на то, что
+  Gradle сообщает каждый JVM теста отдельным набором под корнем прогона; без этого раунды повторных попыток
+  перезаписали бы один поток, и вердикт был бы ошибкой (число попыток не сходится), а не зелёным.
+- Колонка, которая попадает в шаг только через значение другой колонки той же строки (`| x<b>y | 5 |`), для набора
+  не используется: падение её мутанта — ошибка, а не kill. Не вкладывайте плейсхолдер в значение.
+- Stop-хук следит за `src/`, `gradle/`, `buildSrc/` и файлами сборки; правку в другом корне main source set
+  (`sourceSets.main.java.srcDir 'legacy/java'`) проверяет только CI.
+- Команду, которую guard не может прочитать (`$( … )` глубже 32 уровней или чтение дольше 20 с), он отклоняет —
+  разбейте её на несколько.
+- Чтение от записи в коде интерпретатора хук не отличает (`python3 -c`, `node -e`, `ruby -e`) или отличает только
+  по словам (perl), поэтому может принять чтение за запись. Код python, node и ruby считается записью всегда. Код
+  perl — когда в командной строке perl есть слово записи (`system`, `open`, `unlink` и т. п.) не в шаблоне поиска:
+  в строке, комментарии, heredoc, имени переменной или файла, в `open` на чтение; если в коде есть комментарий,
+  heredoc, `?` или сравнение `<`, считается и слово в шаблоне. У ревьюера и `checker` такая команда отклоняется
+  всегда, у остальных ролей — когда в её тексте назван защищённый путь, в любом регистре, хотя бы отдельным словом
+  или сегментом другого пути (`print("Gauntlet")`, `docs/agents.md`): файлы набора (`gauntlet/`, `.claude/`,
+  `CLAUDE.md`, workflow `gauntlet.yml`), `CODEOWNERS`, `.git/`, файлы других агентных инструментов (`AGENTS.md`,
+  `.mcp.json` …), настройки агентов пользователя (`~/.env`, `~/.codex` …) и спецификация (у specifier'а — после
+  её коммита), у hardener'а — ещё и `src/main`. Так отклоняются и чтения:
+  `perl -ne 'print "system: $_"' gauntlet/config/gauntlet.properties`,
+  `python3 -c 'print(open("gauntlet/config/gauntlet.properties").read())'`. Это ошибка в безопасную сторону:
+  такие файлы читаются через `cat`, `grep`, `sed -n` или perl без слова записи.
 - Метрики не ловят уязвимости и ошибки бизнес-логики, которых нет в спецификации. Для регулируемого
   контура стоит добавить SAST (SpotBugs+FindSecBugs или Semgrep) и проверку зависимостей.
 - Хуки читаются только в сессии с одним репозиторием; в сессии с несколькими репозиториями и в тредах
   Projects они не работают. Одна сессия — один сервис.
-- Облачная VM: ~4 vCPU, 16 ГБ, 30 ГБ; PIT на Spring-коде бывает медленным — помогают `scope=changed`,
-  инкрементальный анализ и `@Tag("no-mutate")` для тяжёлых тестов.
+- Облачная VM: ~4 vCPU, 16 ГБ, 30 ГБ; PIT на Spring-коде бывает медленным — помогают `scope=changed` и
+  `@Tag("no-mutate")` для тяжёлых тестов. Инкрементального анализа PIT нет: его история оставляла тесту,
+  ослабленному через вспомогательный класс или тестовый ресурс, прежних убитых мутантов, и хук hardener'а
+  пропускал выжившего; каждый прогон заново мутирует все изменённые классы. Историю, которую задаёт сборка
+  проекта (`historyInputLocation`, `historyOutputLocation`, `enableDefaultIncrementalAnalysis`/`withHistory` в
+  `pitest { }` или у задачи), гейт отклоняет, как только запускает PIT, — уберите её. Мимо настроек плагина
+  (`--historyInputLocation` в `argumentProviders` задачи `pitest`, сторонний плагин истории PIT) набор историю
+  не видит.
 - `pit.testStrengthThreshold=100` будет упираться в эквивалентных мутантов: агент остановится и покажет
   мутанта, решение за вами.
 - Внутренние зависимости (общая библиотека из корпоративного Nexus) из облака недоступны: библиотека
   должна лежать в репозитории или тянуться из GitHub.
-- Рабочий контур: набор, `.claude/`, корневой `CLAUDE.md`, `.github/`, каталоги приёмки и `project_files/`
-  туда не переносятся; сборка модуля сама выбирает Nexus вне облака и GitHub Actions и без `gauntlet/`
-  набор не подключает (`data-reference/settings.gradle`, там же закомментированный вариант «только Nexus»).
-  Спецификации и приёмочные тесты в контуре не работают — это инструмент внешнего контура.
 - Лицензии в swarm-forge нет, промпты ролей написаны заново по мотивам.

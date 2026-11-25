@@ -19,7 +19,7 @@
  *
  *  Tasks (group "gauntlet"):
  *      gauntletFast     integrity -> checkstyle -> PMD (anti-patterns) -> unit tests -> architecture ->
- *                       acceptance (Cucumber) -> CRAP -> DRY
+ *                       test census -> acceptance (Cucumber) -> CRAP -> DRY
  *      mutationGate     PIT on the classes in scope, no surviving mutants (+ agent-friendly summary)
  *      gherkinMutation  mutate Examples values one at a time; every mutant must fail a scenario
  *      gauntlet         all of the above
@@ -31,6 +31,8 @@
  */
 
 import java.nio.file.Files
+import java.util.regex.Pattern
+import org.gradle.api.tasks.PathSensitivity
 
 // gauntlet/ is wherever this script lives (repository root, or one level above a module's build)
 def gauntletDir = buildscript.sourceFile.parentFile
@@ -81,26 +83,70 @@ def declareInputs = { Task task, List<String> files, String property ->
 def basePackage = setting('basePackage', '')
 def excludedClassGlobs = listSetting('exclude.classes', '*Application,*MapperImpl')  // not 'excludedClasses': a local of that name would shadow pitest.excludedClasses
 def tools = gauntletFile('tools').absolutePath
-def javaBin = "${System.getProperty('java.home')}/bin/java"
+// The tools run as source files, and Java 17 reads a source file in the platform's charset: under a POSIX locale (the
+// cloud session's) GherkinMutator.java, whose Russian keywords are not ASCII, did not compile. From Java 18 on UTF-8
+// is the default; this makes 17 read the sources - and default to - the same.
+def sourceUtf8 = '-Dfile.encoding=UTF-8'
+// A gate the kit skips itself says why, in the build's output: the Stop hook and CI count a SKIPPED gate as run only
+// with this line. A project's enabled = false, or an onlyIf of its own, skips the task without one.
+def skippedByTheKit = { Task task, String reason ->
+    task.logger.lifecycle("gauntlet: ${task.path} skipped by the kit - ${reason}")
+    return false
+}
 def buildDirFile = { String path -> layout.buildDirectory.file(path).get().asFile }
 
 // ------------------------------------------------------------------------------ changed files
 
-def git = { List<String> args ->
-    providers.exec {
-        commandLine(['git', '-c', 'core.quotePath=false'] + args)
-        workingDir = projectDir
-        ignoreExitValue = true
-    }.standardOutput.asText.get().readLines()*.trim().findAll { it }
+// Nothing in this section runs while the build is configured. An ordinary `./gradlew test` configures checkstyleGate
+// and pmdGate (test.mustRunAfter names them): it must not need git, ask the compile task for its arguments or
+// resolve anything. The closures below are called from task actions and lazy providers, and answer once per build.
+
+// git's answer as text; null when git cannot be started
+def gitText = { List<String> args ->
+    try {
+        return providers.exec {
+            commandLine(['git', '-c', 'core.quotePath=false'] + args)
+            workingDir = projectDir
+            ignoreExitValue = true
+        }.standardOutput.asText.get()
+    } catch (Exception ignored) {       // ignoreExitValue covers a failing git, not a missing one
+        return null
+    }
 }
-def mergeBase = { -> scope == 'all' ? null : git(['merge-base', 'HEAD', baseRef]).find() }.memoize()
+// git's answer as lines; null when git cannot be started
+def git = { List<String> args -> gitText(args)?.readLines()?.collect { it.trim() }?.findAll { it } }
+// The paths a git command lists with -z, each exactly as named. Without -z git quotes a name that holds a double
+// quote, a backslash or a control character (core.quotePath=false or not) and a line break would cut it in two:
+// `Скидка "VIP".feature` came back as "src/.../Скидка \"VIP\".feature" and matched no file.
+def gitPaths = { List<String> args -> gitText(args)?.tokenize('\u0000') }
+// Lists of paths go to the gauntlet tools as a file of NUL-ended paths, the form `git diff -z` writes. Joined into
+// one argument they were split at every comma: the changed "Скидка, рубли.feature" became two paths that name no
+// file, and the scoped check passed on nothing. A file keeps every character of a name and has no length limit.
+def pathList = { String name, Collection<String> paths ->
+    def list = buildDirFile("gauntlet/${name}")
+    list.parentFile.mkdirs()
+    list.bytes = paths.collect { it + '\u0000' }.join('').getBytes('UTF-8')
+    return list.absolutePath
+}
+// A path as a process started in `dir` reads it: relative, so the directories above `dir` ("/home/me/Acme, Inc")
+// are no part of it - PMD and Cucumber split what they are given at every comma.
+def relativeTo = { File dir, File target ->
+    try {
+        return dir.toPath().toAbsolutePath().normalize().relativize(target.toPath().toAbsolutePath().normalize()).toString() ?: '.'
+    } catch (IllegalArgumentException otherRoot) {      // another drive (Windows): only the absolute path names it
+        return target.absolutePath
+    }
+}
+def gitMissing = 'git is not available'
+def mergeBase = { -> scope == 'all' ? null : git(['merge-base', 'HEAD', baseRef])?.find() }.memoize()
 // Why scope=changed cannot work here (null = fine). Reported by the gauntletScope task, never silently ignored.
 def scopeProblem = { ->
     if (scope == 'all') {
         return null
     }
-    if (git(['rev-parse', '--is-inside-work-tree']) != ['true']) {
-        return 'scope=changed needs a git work tree'
+    def workTree = git(['rev-parse', '--is-inside-work-tree'])
+    if (workTree != ['true']) {
+        return workTree == null ? gitMissing : 'scope=changed needs a git work tree'
     }
     return mergeBase() ? null : "cannot find the merge base of HEAD and '${baseRef}'"
 }.memoize()
@@ -113,16 +159,345 @@ def changedFiles = {
         return []   // gauntletScope fails the build before any scoped check runs
     }
     def files = new LinkedHashSet<String>()
-    files.addAll(git(['diff', '--relative', '--name-only', '--diff-filter=ACMR', mergeBase()]))
-    files.addAll(git(['ls-files', '--others', '--exclude-standard']))
+    files.addAll(gitPaths(['diff', '-z', '--relative', '--name-only', '--diff-filter=ACMR', mergeBase()]) ?: [])
+    files.addAll(gitPaths(['ls-files', '-z', '--others', '--exclude-standard']) ?: [])
     return files as List<String>
 }.memoize()
-def changedMainJava = { -> changedFiles()?.findAll { it.startsWith('src/main/java/') && it.endsWith('.java') } }
-def changedFeatures = { -> changedFiles()?.findAll { it.startsWith(featuresPath + '/') && it.endsWith('.feature') } }
+// the changed feature files under the features directory, however acceptance.features is written ("features/",
+// "./features"): the raw setting as a string prefix matched no path, and scope=changed mutated nothing
+def changedFeatures = { ->
+    def root = featuresDir.toPath().toAbsolutePath().normalize()
+    changedFiles()?.findAll { it.endsWith('.feature') && file(it).toPath().toAbsolutePath().normalize().startsWith(root) }
+}
+// The roots of the main source set that hold sources to judge: inside this build's directory (git reports the
+// changed files relative to it) and not under its build directory - a generated root there is build output.
+def mainSourceRoots = { ->
+    def under = { File dir, File parent -> dir.toPath().toAbsolutePath().normalize().startsWith(parent.toPath().toAbsolutePath().normalize()) }
+    sourceSets.main.java.srcDirs.findAll { under(it, projectDir) && !under(it, layout.buildDirectory.get().asFile) }
+}.memoize()
+// null = whole codebase; otherwise the changed .java files under a main source root
+def changedMainJava = { ->
+    def roots = mainSourceRoots()*.toPath()*.toAbsolutePath()*.normalize()
+    changedFiles()?.findAll { path ->
+        path.endsWith('.java') && roots.any { file(path).toPath().toAbsolutePath().normalize().startsWith(it) }
+    }
+}.memoize()
+// What Checkstyle, PMD and CPD look at: the changed main sources, or every main source root.
+def scanTargets = { ->
+    def changed = changedMainJava()
+    (changed == null ? mainSourceRoots() : changed.collect { file(it) }).findAll { it.exists() }
+}
+// The charset javac reads the sources of a compile task with (the order is checked on Gradle 8.14.3, JDK 21 and 25).
+// Gradle's compiler - in process, in its compiler daemon, on a toolchain - gives options.encoding to the compiler
+// API, which then ignores every -encoding argument; the arguments decide only when options.encoding is not set.
+// The command-line javac (options.fork with forkOptions.executable or javaHome) reads nothing but its arguments,
+// and there the last -encoding wins. An argument provider wired to a task that has not run yet cannot be asked.
+def compileEncoding = { String taskName ->
+    def compile = tasks.findByName(taskName)
+    if (!(compile instanceof JavaCompile)) {
+        return taskName == 'compileJava' ? 'UTF-8' : null
+    }
+    def options = compile.options
+    def fork = options.forkOptions
+    def commandLineJavac = options.fork && (fork.executable || (fork.hasProperty('javaHome') && fork.javaHome))
+    if (options.encoding && !commandLineJavac) {
+        return options.encoding
+    }
+    def arguments = options.compilerArgs.collect { it.toString() }
+    options.compilerArgumentProviders.each { provider ->
+        try {
+            arguments.addAll(provider.asArguments().collect { it.toString() })
+        } catch (Exception ignored) {
+            // its task has not run: the provider answers when javac is started, not now
+        }
+    }
+    def flag = arguments.lastIndexOf('-encoding')
+    return flag >= 0 && flag + 1 < arguments.size() ? arguments[flag + 1] : (options.encoding ?: 'UTF-8')
+}.memoize()
+def sourceEncoding = { -> compileEncoding('compileJava') }
+// The text of a source file, or null when its bytes are not valid in the source encoding. javac calls such a
+// byte an error as well ("unmappable character"), so null means the encoding above is not the one the source is
+// written in - reading on with replacement characters would silently turn `Tarifé` into another name.
+def decodeSource = { File src ->
+    try {
+        return java.nio.charset.Charset.forName(sourceEncoding()).newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                .decode(java.nio.ByteBuffer.wrap(src.bytes)).toString()
+    } catch (java.nio.charset.CharacterCodingException | IllegalArgumentException ignored) {
+        return null
+    }
+}
+// JLS 3.3: javac translates Unicode escapes before it reads anything else, so an escaped keyword, quote, comment
+// marker or line end is the real thing. A backslash that follows an odd number of backslashes starts no escape.
+def unicodeEscapes = { String source ->
+    if (!source.contains('\\u')) {
+        return source
+    }
+    def text = new StringBuilder(source.length())
+    def backslashes = 0     // contiguous backslashes right before the current character
+    def i = 0
+    while (i < source.length()) {
+        def c = source.charAt(i)
+        if (c == '\\' && backslashes % 2 == 0) {
+            def digits = i + 1
+            while (digits < source.length() && source.charAt(digits) == 'u') digits++
+            if (digits > i + 1 && digits + 4 <= source.length() && source.substring(digits, digits + 4) ==~ /[0-9a-fA-F]{4}/) {
+                text.append((char) Integer.parseInt(source.substring(digits, digits + 4), 16))
+                i = digits + 4
+                backslashes = 0
+                continue
+            }
+        }
+        backslashes = c == '\\' ? backslashes + 1 : 0
+        text.append(c)
+        i++
+    }
+    return text.toString()
+}
+// The compilation unit as javac reads it, with everything but its top-level code blanked: comments, literals and
+// the bodies of types. CrapGate.java has its own copy of this scan (topLevelSource, it runs without Gradle) -
+// keep the two in step.
+def javaTopLevelSource = { String raw ->
+    def source = unicodeEscapes(raw)
+    def code = new StringBuilder(source.length())
+    def state = 'code'
+    def depth = 0
+    def i = 0
+    while (i < source.length()) {
+        def c = source.charAt(i)
+        def next = i + 1 < source.length() ? source.charAt(i + 1) : '\0'
+        if (state == 'lineComment') {
+            def lineEnd = c == '\n' || c == '\r'        // JLS 3.4: CR, LF and CRLF end a line
+            code.append(lineEnd ? c : ' ')
+            if (lineEnd) state = 'code'
+            i++
+            continue
+        }
+        if (state == 'blockComment') {
+            if (c == '*' && next == '/') {
+                code.append('  ')
+                i += 2
+                state = 'code'
+            } else {
+                code.append(c == '\n' ? c : ' ')
+                i++
+            }
+            continue
+        }
+        if (state == 'textBlock') {
+            if (c == '\\' && i + 1 < source.length()) {
+                code.append(' ').append(next == '\n' ? '\n' : ' ')
+                i += 2
+            } else if (c == '"' && next == '"' && i + 2 < source.length() && source.charAt(i + 2) == '"') {
+                code.append('   ')
+                i += 3
+                state = 'code'
+            } else {
+                code.append(c == '\n' ? c : ' ')
+                i++
+            }
+            continue
+        }
+        if (state == 'string' || state == 'character') {
+            def delimiter = state == 'string' ? '"' : "'"
+            if (c == '\\' && i + 1 < source.length()) {
+                code.append(' ').append(next == '\n' ? '\n' : ' ')
+                i += 2
+            } else {
+                code.append(c == '\n' ? c : ' ')
+                if (c == delimiter) state = 'code'
+                i++
+            }
+            continue
+        }
+        if (c == '/' && next == '/') {
+            code.append('  ')
+            i += 2
+            state = 'lineComment'
+        } else if (c == '/' && next == '*') {
+            code.append('  ')
+            i += 2
+            state = 'blockComment'
+        } else if (c == '"' && next == '"' && i + 2 < source.length() && source.charAt(i + 2) == '"') {
+            code.append('   ')
+            i += 3
+            state = 'textBlock'
+        } else if (c == '"') {
+            code.append(' ')
+            i++
+            state = 'string'
+        } else if (c == "'") {
+            code.append(' ')
+            i++
+            state = 'character'
+        } else if (Character.isIdentifierIgnorable(c)) {
+            i++     // javac drops these from keywords and names (a zero-width joiner, a NUL)
+        } else {
+            if (c == '{') depth++
+            if (c == '}') depth = Math.max(0, depth - 1)
+            code.append(depth == 0 || c == '\n' ? c : ' ')
+            i++
+        }
+    }
+    return code.toString()
+}
+def declaredJavaPackage = { String topLevel ->
+    def pattern = Pattern.compile('(?<![\\p{javaJavaIdentifierPart}$])package\\s+([\\p{javaJavaIdentifierStart}][\\p{javaJavaIdentifierPart}]*(?:\\s*\\.\\s*[\\p{javaJavaIdentifierStart}][\\p{javaJavaIdentifierPart}]*)*)\\s*;')
+    def matcher = pattern.matcher(topLevel)
+    return matcher.find() ? matcher.group(1).replaceAll(/\s+/, '') : ''
+}
+def topLevelTypeNames = { String topLevel ->
+    def names = new LinkedHashSet<String>()
+    def type = Pattern.compile('(?<![\\p{javaJavaIdentifierPart}$])(?:class|interface|enum|record)\\s+([\\p{javaJavaIdentifierStart}][\\p{javaJavaIdentifierPart}]*)')
+    def matcher = type.matcher(topLevel)
+    while (matcher.find()) names << matcher.group(1)
+    return names
+}
+// Whether the top-level code holds more than a package declaration and imports - which is all there is in an
+// empty file, a file of comments and a package-info.java without annotations.
+def declaresSomething = { String topLevel ->
+    topLevel.replaceAll('(?<![\\p{javaJavaIdentifierPart}$])(?:package|import)\\s[^;]*;', ' ').replaceAll('[\\s;]', '') != ''
+}
+// What the compile task compiles: a source the build leaves out - on the source set or on the task itself - has
+// no class and no say in the changed types.
+def compiledSources = { ->
+    def compileJava = tasks.findByName('compileJava')
+    compileJava instanceof JavaCompile ? compileJava.source.files : sourceSets.main.java.files
+}
+// null = whole codebase; otherwise what the scan reads in every changed main source the build compiles
+def changedSources = { ->
+    def changed = changedMainJava()
+    if (changed == null) {
+        return null
+    }
+    def compiled = compiledSources()
+    return changed.findAll { compiled.contains(file(it)) }.collect { path ->
+        def text = decodeSource(file(path))          // null fails gauntletScope before any scoped check runs
+        def topLevel = text == null ? '' : javaTopLevelSource(text)
+        [path: path, name: file(path).name, unreadable: text == null, pkg: declaredJavaPackage(topLevel),
+         types: topLevelTypeNames(topLevel) as List, declares: declaresSomething(topLevel)]
+    }
+}.memoize()
+def qualifiedName = { String pkg, String simpleName -> (pkg ? pkg + '.' : '') + simpleName }
 def changedClassGlobs = { ->
-    changedMainJava()?.collectMany {
-        def fqcn = (it - 'src/main/java/').replaceAll(/\.java$/, '').replace('/', '.')
-        [fqcn, fqcn + '$*']
+    changedSources()?.collectMany { source -> source.types.collect { qualifiedName(source.pkg, it) } }?.unique()
+            ?.collectMany { [it, it + '$*'] }
+}
+// The SourceFile attribute of a class file (JVMS 4.7.10); null when it has none (-g:none) or cannot be read.
+def classSourceFile = { File classFile ->
+    def input = new DataInputStream(new ByteArrayInputStream(classFile.bytes))
+    def sourceFile = null
+    try {
+        if (input.readInt() != (int) 0xCAFEBABEL) {
+            return null
+        }
+        input.skipBytes(4)                                              // minor and major version
+        def strings = [:]
+        def constants = input.readUnsignedShort()
+        for (int index = 1; index < constants; index++) {
+            def tag = input.readUnsignedByte()
+            if (tag == 1) {
+                strings[index] = input.readUTF()
+            } else if (tag in [5, 6]) {
+                input.skipBytes(8)
+                index++                                                 // a long or a double takes two entries
+            } else if (tag in [3, 4, 9, 10, 11, 12, 17, 18]) {
+                input.skipBytes(4)
+            } else if (tag == 15) {
+                input.skipBytes(3)
+            } else if (tag in [7, 8, 16, 19, 20]) {
+                input.skipBytes(2)
+            } else {
+                return null
+            }
+        }
+        input.skipBytes(6)                                              // access flags, this class, super class
+        input.skipBytes(2 * input.readUnsignedShort())                  // interfaces
+        def attributes = { ->
+            for (int left = input.readUnsignedShort(); left > 0; left--) {
+                def name = strings[input.readUnsignedShort()]
+                def length = input.readInt()
+                if (name == 'SourceFile') {
+                    sourceFile = strings[input.readUnsignedShort()]
+                } else {
+                    input.skipBytes(length)
+                }
+            }
+        }
+        2.times {                                                       // fields, then methods
+            for (int left = input.readUnsignedShort(); left > 0; left--) {
+                input.skipBytes(6)                                      // access flags, name, descriptor
+                attributes()
+            }
+        }
+        attributes()
+        return sourceFile
+    } catch (IOException ignored) {
+        return null
+    }
+}
+// Backstop for the scan above: it reads sources, and the scoped checks then look at classes. When the two tell
+// different stories a scoped check would look at nothing and pass, so each of them asks first, once the classes
+// are compiled:
+//  - a top-level type derived from a changed source exists as <package>/<Name>.class;
+//  - a changed source that declares anything yields a type;
+//  - a class whose SourceFile attribute (javac writes it unless -g:none) names a changed source of its package
+//    belongs to a type derived from that source - or to an unchanged source of the same name (a second root).
+// package-info.java and module-info.java declare no type and are not asked.
+def changedClassProblems = { ->
+    def sources = (changedSources() ?: []).findAll { !(it.name in ['package-info.java', 'module-info.java']) }
+    def classDirs = sourceSets.main.output.classesDirs.files
+    def packageDirs = { String pkg -> classDirs.collect { pkg ? new File(it, pkg.replace('.', '/')) : it } }
+    def declares = { Collection<String> names, String simpleName -> names.any { simpleName == it || simpleName.startsWith(it + '$') } }
+    def unchangedSources = { ->
+        def compileJava = tasks.findByName('compileJava')
+        def generated = compileJava instanceof JavaCompile ? compileJava.options.generatedSourceOutputDirectory.asFile.getOrNull() : null
+        (compiledSources() + (generated?.isDirectory() ? fileTree(generated).files : [])) - sources.collect { file(it.path) }
+    }.memoize()
+    def unchangedSourceDeclares = { String pkg, String fileName, String simpleName ->
+        unchangedSources().findAll { it.name == fileName }.any { namesake ->
+            def text = decodeSource(namesake)
+            def topLevel = text == null ? '' : javaTopLevelSource(text)
+            declaredJavaPackage(topLevel) == pkg && declares(topLevelTypeNames(topLevel), simpleName)
+        }
+    }
+    def missing = sources.collectMany { source ->
+        source.types.findAll { type -> !packageDirs(source.pkg).any { new File(it, type + '.class').isFile() } }
+                .collect { qualifiedName(source.pkg, it) }
+    }.unique()
+    def silent = sources.findAll { !it.types && it.declares }*.path
+    def underived = []
+    sources.groupBy { [it.pkg, it.name] }.each { key, sameFile ->
+        def (String pkg, String fileName) = key
+        def names = sameFile.collectMany { it.types }
+        packageDirs(pkg).collectMany { (it.listFiles() ?: []) as List }.findAll { it.name.endsWith('.class') }.each { classFile ->
+            def simpleName = classFile.name.replaceFirst(/\.class$/, '')
+            if (!declares(names, simpleName) && classSourceFile(classFile) == fileName && !unchangedSourceDeclares(pkg, fileName, simpleName)) {
+                underived << qualifiedName(pkg, simpleName)
+            }
+        }
+    }
+    underived = underived.findAll { name -> !underived.any { name.startsWith(it + '$') } }      // a type, not its nested classes
+    def problems = []
+    if (missing) {
+        problems << "derived ${missing.join(', ')} from the changed sources, but no such compiled class exists"
+    }
+    if (silent) {
+        problems << "found no class, interface, enum or record declaration in ${silent.join(', ')}, which the build compiles"
+    }
+    if (underived) {
+        problems << "did not derive ${underived.join(', ')} from the changed sources, although the class files name one " +
+                "of them as their source"
+    }
+    return problems
+}.memoize()
+def requireChangedClasses = { ->
+    def problems = changedClassProblems()
+    if (problems) {
+        throw new GradleException("gauntlet: scope=changed ${problems.join('; ')}, so the changed types are unknown and the " +
+                "scoped checks would pass on nothing. Check the source encoding (JavaCompile options.encoding) and the type " +
+                "declaration, or run with -Pgauntlet.scope=all.")
     }
 }
 
@@ -130,6 +505,118 @@ def changedClassGlobs = { ->
 
 apply plugin: 'java'
 apply plugin: 'jacoco'
+
+def gateJavaHome = System.getenv('GAUNTLET_GATE_JAVA_HOME') ?: (findProperty('gauntlet.gateJavaHome') ?: '').toString()
+def gateJavaVersion = setting('gate.java.version', '')
+// a toolchain is asked for by its major version: 21.0.2, 17-ea and 1.8 are 21, 17 and 8
+def gateJavaMajor = gateJavaVersion.replaceFirst(/^1\./, '').find(/^\d+/)
+// the oldest Java every gate task runs on - Checkstyle 12.3.1 is Java 17 bytecode, the kit's tools need 16 (records,
+// Stream.toList): an older gate is named when a gate task starts, and no toolchain is looked up for it
+def gateJavaMin = 17
+// GAUNTLET_GATE_JAVA_HOME names the JVM itself: then no toolchain is looked up at all
+def gateJavaLauncher = !gateJavaHome && gateJavaMajor && (gateJavaMajor as int) >= gateJavaMin ? javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(gateJavaMajor as int)
+} : null
+def javaBin = "${System.getProperty('java.home')}/bin/java"
+def gateHomeJava = "${gateJavaHome}/bin/java".toString()
+def gateHomeName = System.getenv('GAUNTLET_GATE_JAVA_HOME') ? 'GAUNTLET_GATE_JAVA_HOME' : 'gauntlet.gateJavaHome'
+// The home names a JVM, not a version: its java says which Java it is (java.specification.version 1.8, 11, 17, read
+// as gate.java.version is). Asked once, when a gate task starts - a build without gate tasks never starts it.
+def gateHomeVersion = { ->
+    try {
+        def probe = providers.exec {
+            commandLine(gateHomeJava, '-XshowSettings:properties', '-version')
+            ignoreExitValue = true
+        }
+        def said = probe.standardError.asText.get() + probe.standardOutput.asText.get()
+        def spec = said =~ /(?m)^\s*java\.specification\.version = (\S+)\s*$/
+        return [major: spec.find() ? spec.group(1).replaceFirst(/^1\./, '').find(/^\d+/) : null,
+                said : said.readLines().findAll { it.trim() && !it.startsWith('Picked up ') }.take(3).join(' / ')]
+    } catch (Exception cannotStart) {           // no such file, not executable
+        return [major: null, said: cannotStart.message]
+    }
+}.memoize()
+def gateJavaBin = { ->
+    if (gateJavaHome) {
+        // gate.java.version's minimum holds for the home as well: an older JVM started the gate tasks and failed in
+        // them with errors of its own (JDK 8: a main class not found, a class version) instead of being named
+        def version = gateHomeVersion()
+        if (!version.major) {
+            throw new GradleException("gauntlet: ${gateHomeName} '${gateJavaHome}' names no Java the gate can run on: " +
+                    "${gateHomeJava} did not tell its version (${version.said}). Point it at the home of a JDK " +
+                    "${gateJavaMin} or newer.")
+        }
+        if ((version.major as int) < gateJavaMin) {
+            throw new GradleException("gauntlet: ${gateHomeName} '${gateJavaHome}' is Java ${version.major}: the gate " +
+                    "JVM runs the gauntlet's own tools, which need Java ${gateJavaMin} or newer. The application keeps " +
+                    "its own Java (JAVA_HOME, project.java.version); point ${gateHomeName} at a JDK ${gateJavaMin} or newer" +
+                    (gateHomeName == 'GAUNTLET_GATE_JAVA_HOME' ? " - the kit's CI sets it to the JDK of gate.java.version, " +
+                            "or of project.java.version when that is empty." : "."))
+        }
+        return gateHomeJava
+    }
+    if (gateJavaVersion && !gateJavaMajor) {
+        throw new GradleException("gauntlet: gate.java.version '${gateJavaVersion}' names no Java version - write its " +
+                "major version (21), in gauntlet/config/gauntlet.properties or the module's overlay.")
+    }
+    if (gateJavaMajor && (gateJavaMajor as int) < gateJavaMin) {
+        // the gate JVM runs the gauntlet's own code - its tools and its ArchUnit test - written for Java 17
+        throw new GradleException("gauntlet: gate.java.version '${gateJavaVersion}' is Java ${gateJavaMajor}: the gate " +
+                "JVM runs the gauntlet's own tools, which need Java ${gateJavaMin} or newer. The application keeps " +
+                "its own Java (project.java.version); write the gate's as ${gateJavaMin} or newer.")
+    }
+    return gateJavaLauncher != null ? gateJavaLauncher.get().executablePath.asFile.absolutePath : javaBin
+}
+// A project may pin `executable` or `javaLauncher` on every Test/JavaExec task, and Gradle refuses a launcher and
+// an executable that disagree. A gate task therefore gets both: its launcher is the gate JVM, and `executable`
+// either names the same JVM or is cleared. Nothing here resolves the toolchain while the build is configured.
+def gateJvmOf = { task ->
+    if (!(task instanceof JavaExec || task instanceof Test) || !(gateJavaHome || gateJavaLauncher != null)) {
+        return
+    }
+    try {
+        if (gateJavaHome) {
+            task.executable = gateHomeJava              // its version is checked when the task starts (gateJava)
+            task.javaLauncher.set(null)                 // without a launcher of its own the task follows `executable`
+        } else {
+            task.setExecutable((String) null)
+            task.javaLauncher = gateJavaLauncher
+        }
+    } catch (IllegalStateException alreadyRead) {
+        // Something read the task's launcher once the project was evaluated (an IDE's model builder, a plugin in
+        // an init script), and Gradle keeps a launcher that was read. The task runs with that one if it is the
+        // gate JVM - checked when the task starts.
+    }
+}
+def gateJava = { task ->
+    if (task instanceof Exec && !(task instanceof JavaExec)) {
+        task.doFirst { task.executable = gateJavaBin() }
+        return
+    }
+    if ((task instanceof JavaExec || task instanceof Test) && (gateJavaHome || gateJavaVersion)) {
+        gateJvmOf(task)
+        // The JVM the gate asks for is an input of the task. A launcher fixed before the gauntlet could set it stays
+        // when only gate.java.version or the gate home changes: the task would be UP-TO-DATE or come from the
+        // build cache, and the check below would never run.
+        task.inputs.property('gauntletGateJvm', gateJavaHome ? "home ${gateJavaHome}".toString()
+                : "Java ${gateJavaMajor ?: gateJavaVersion}".toString())
+        task.doFirst {
+            def launcher = task.javaLauncher.getOrNull()
+            def used = launcher != null ? launcher.executablePath.asFile : new File(task.executable ?: javaBin)
+            def gate = new File(gateJavaBin())
+            def same = gateJavaHome ? used.canonicalPath == gate.canonicalPath
+                    : (launcher != null ? launcher.metadata.languageVersion.asInt() == (gateJavaMajor as int)
+                    : used.canonicalPath == gate.canonicalPath)
+            if (!same) {
+                throw new GradleException("gauntlet: ${task.path} would run on ${used}, not on the gate JVM " +
+                        "(${gateJavaHome ?: 'Java ' + gateJavaMajor}). Something in this build fixed the task's launcher " +
+                        "before the gauntlet could set it - an init script or a plugin that reads the launchers of JVM " +
+                        "tasks after the project is evaluated. Run without it, or make gate.java.version the Java of " +
+                        "that launcher.")
+            }
+        }
+    }
+}
 
 sourceSets {
     acceptanceTest {
@@ -158,11 +645,25 @@ def addDefault = { String configuration, List<Object> notations ->
         notations.each { dependencies.add(configuration, it) }
     }
 }
+def cucumberVersion = setting('cucumber.version', '7.23.0')
+// The gates read Cucumber's message stream (acceptanceCheck, gherkinMutation). Cucumber 7 writes it with a JSON library
+// of its own; Cucumber 8 needs Jackson 2 or 3 on the classpath and fails the run without it. jackson-databind goes in
+// without a version, so a BOM or the Spring dependency-management plugin gives it the version it gives jackson-core and
+// jackson-annotations (a databind of its own version next to Boot's jackson-core broke Cucumber at start); only where
+// nothing names a version does jackson.version decide, as a version the kit prefers.
+def jacksonForCucumber = (cucumberVersion.find(/^\d+/) ?: '0').toInteger() >= 8 &&
+        configurations.getByName('acceptanceTestImplementation').dependencies.isEmpty()
 addDefault('acceptanceTestImplementation', [
-        dependencies.platform("io.cucumber:cucumber-bom:${setting('cucumber.version', '7.23.0')}"),
+        dependencies.platform("io.cucumber:cucumber-bom:${cucumberVersion}"),
         'io.cucumber:cucumber-java',
         'io.cucumber:cucumber-junit-platform-engine'] +
-        (setting('acceptance.spring', 'true').toBoolean() ? ['io.cucumber:cucumber-spring'] : []))
+        (setting('acceptance.spring', 'true').toBoolean() ? ['io.cucumber:cucumber-spring'] : []) +
+        (jacksonForCucumber ? ['tools.jackson.core:jackson-databind'] : []))
+if (jacksonForCucumber) {
+    dependencies.constraints.add('acceptanceTestImplementation', 'tools.jackson.core:jackson-databind') {
+        version { prefer setting('jackson.version', '3.2.1') }
+    }
+}
 addDefault('archTestImplementation', ["com.tngtech.archunit:archunit:${setting('archunit.version', '1.5.1')}"])
 addDefault('gauntletCheckstyle', ["com.puppycrawl.tools:checkstyle:${setting('checkstyle.version', '12.3.1')}"])
 addDefault('gauntletCpd', ["net.sourceforge.pmd:pmd-cli:${setting('pmd.version', '7.27.0')}",     // pmdGate and cpdReport
@@ -188,17 +689,31 @@ tasks.register('gauntletInfo') {
             "cucumber     : ${setting('cucumber.version', '7.23.0')}    scope: ${scope}    baseRef: ${baseRef}",
             "features     : ${featuresPath}",
             "acc. inputs  : ${acceptanceInputs ? acceptanceInputs.join(', ') : '(none)'}",
-            "test inputs  : ${testInputs ? testInputs.join(', ') : '(none)'}"].collect { it.toString() }
-    doLast { lines.each { println it } }
+            "test inputs  : ${testInputs ? testInputs.join(', ') : '(none)'}",
+            "tools        : PIT ${setting('pit.version', '1.22.1')}, ArchUnit ${setting('archunit.version', '1.5.1')}, " +
+                    "Checkstyle ${setting('checkstyle.version', '12.3.1')}, PMD ${setting('pmd.version', '7.27.0')}, " +
+                    "JaCoCo ${setting('jacoco.version', '0.8.15')}",
+            "gate JVM    : version=${gateJavaVersion ?: '(Gradle JVM)'}; home=${gateJavaHome ?: '(from toolchain)'}"]
+            .collect { it.toString() }
+    gauntletConfig.stringPropertyNames().findAll { it.startsWith('project.') }.sort().each { key ->
+        lines.add("${key} = ${gauntletConfig.getProperty(key)}".toString())
+    }
+    doLast {
+        lines.each { println it }
+        println "gate executable: ${gateJavaBin()}"
+    }
 }
 
 tasks.register('gauntletScope') {
     group = 'gauntlet'
     description = 'Prints the scope of the scoped checks; fails when scope=changed cannot tell what changed.'
-    def problem = scopeProblem()
-    def summary = scope == 'all' ? 'whole codebase' :
-            "changed vs ${baseRef} (merge-base ${mergeBase()?.take(10)}): ${changedFiles()?.size() ?: 0} file(s)".toString()
     doLast {
+        def problem = scopeProblem()
+        if (problem == gitMissing) {
+            throw new GradleException("gauntlet: ${problem} (no `git` could be started in ${projectDir}), so the changed " +
+                    "files are unknown. Put git on the PATH of this build - a running Gradle daemon keeps the PATH it was " +
+                    "started with - or run with -Pgauntlet.scope=all.")
+        }
         if (problem) {
             def branch = baseRef.contains('/') ? baseRef.substring(baseRef.indexOf('/') + 1) : baseRef
             throw new GradleException("gauntlet: ${problem}, so the changed files are unknown. Fetch the base branch: " +
@@ -207,7 +722,14 @@ tasks.register('gauntletScope') {
                     "GIT_DEPTH=0 / fetch-depth: 0). Or set baseRef in gauntlet/config/gauntlet.properties, or run " +
                     "with -Pgauntlet.scope=all.")
         }
-        logger.lifecycle("gauntlet scope: ${summary}")
+        def unreadable = (changedSources() ?: []).findAll { it.unreadable }*.path
+        if (unreadable) {
+            throw new GradleException("gauntlet: cannot read ${unreadable.join(', ')} as ${sourceEncoding()}, so the types the " +
+                    "changed sources declare are unknown. Declare the real source encoding where javac takes it from: " +
+                    "JavaCompile options.encoding (or -encoding in options.compilerArgs).")
+        }
+        logger.lifecycle('gauntlet scope: ' + (scope == 'all' ? 'whole codebase' :
+                "changed vs ${baseRef} (merge-base ${mergeBase().take(10)}): ${changedFiles().size()} file(s)"))
     }
 }
 
@@ -215,8 +737,15 @@ tasks.register('integrityCheck', Exec) {
     group = 'gauntlet'
     description = 'Finds disabled tests, coverage/mutation evasion, inline suppressions and gate tampering.'
     executable javaBin
-    args "${tools}/IntegrityCheck.java", '--root', projectDir.absolutePath, '--features', featuresPath,
+    args sourceUtf8, "${tools}/IntegrityCheck.java", '--root', projectDir.absolutePath, '--features', featuresPath,
             '--allowlist', configFile('integrity-allowlist.txt').absolutePath
+    doFirst {
+        // every source tree with the charset of the task that compiles it: a UTF-16 test tree read as UTF-8
+        // would hide @Disabled
+        args '--encoding', sourceEncoding(),
+                '--test-encoding', compileEncoding('compileTestJava') ?: sourceEncoding(),
+                '--acceptance-encoding', compileEncoding('compileAcceptanceTestJava') ?: sourceEncoding()
+    }
 }
 
 // Checkstyle runs through its CLI on purpose: the Gradle checkstyle plugin would hook into `check`/`build`
@@ -229,24 +758,57 @@ tasks.register('checkstyleGate', JavaExec) {
     classpath = configurations.gauntletCheckstyle
     mainClass = 'com.puppycrawl.tools.checkstyle.Main'
     systemProperty 'config_loc', configFile('checkstyle.xml').parentFile.absolutePath
-    def changed = changedMainJava()
-    def targets = changed == null ? [file('src/main/java').absolutePath] : changed.collect { file(it).absolutePath }
+    // Checkstyle cannot parse a module descriptor (Gradle's own checkstyle plugin leaves module-info.java out for
+    // that reason), and stops with "found 0" when nothing is left to look at.
+    def descriptor = 'module-info.java'
+    def targets = { ->
+        scanTargets().findAll { target ->
+            target.isFile() ? target.name != descriptor : Files.walk(target.toPath()).withCloseable { paths ->
+                paths.anyMatch { Files.isRegularFile(it) && it.fileName.toString() != descriptor }
+            }
+        }
+    }
     def report = buildDirFile('reports/checkstyle/gauntlet.xml')
-    args(['-c', configFile('checkstyle.xml').absolutePath, '-f', 'xml', '-o', report.absolutePath] + targets)
+    args '-c', configFile('checkstyle.xml').absolutePath, '-f', 'xml', '-o', report.absolutePath,
+            '-x', '[/\\\\]' + Pattern.quote(descriptor) + '$'
     // The CLI exits with the violation count, which the OS truncates to 8 bits (256 violations = exit 0),
     // so the verdict comes from the XML report instead.
     ignoreExitValue = true
-    onlyIf { !targets.isEmpty() && new File(targets[0]).exists() }
+    def complaints = new ByteArrayOutputStream()     // stderr: where Checkstyle names a file it could not parse
+    errorOutput = complaints
+    onlyIf { task -> !targets().isEmpty() || skippedByTheKit(task, 'no Java source in scope') }
     doFirst {
+        args targets()*.absolutePath
+        complaints.reset()
         report.delete()
         report.parentFile.mkdirs()
     }
     doLast {
+        def said = complaints.toString()
+        if (said.trim()) {
+            System.err.println(said.trim())
+        }
+        // One file Checkstyle cannot parse stops the whole run and leaves the report cut off.
+        def stopped = said =~ /(?m)^\S*CheckstyleException: Exception was thrown while processing (.+)$/
+        if (stopped.find()) {
+            def causes = said.readLines().findAll { it ==~ /Caused by: \S+: .+/ }
+            throw new GradleException("Checkstyle could not analyse ${relativePath(stopped.group(1))}" +
+                    (causes ? " (${causes.last().replaceFirst(/^Caused by: \S+: /, '')})" : '') + " and stopped there, so no " +
+                    "file is judged. Fix the file if it does not compile; if it does, Checkstyle " +
+                    "${setting('checkstyle.version', '12.3.1')} cannot read it (checkstyle.version in " +
+                    "gauntlet/config/gauntlet.properties).")
+        }
         if (!report.exists()) {
             throw new GradleException("Checkstyle did not produce ${report} - see the output above")
         }
+        def files
+        try {
+            files = new groovy.xml.XmlSlurper().parse(report).file
+        } catch (org.xml.sax.SAXException ignored) {
+            throw new GradleException("Checkstyle did not finish ${report} - see the output above")
+        }
         def violations = []
-        new groovy.xml.XmlSlurper().parse(report).file.each { f ->
+        files.each { f ->
             f.error.each { e ->
                 def check = e.@source.toString().tokenize('.').last().replaceAll(/Check$/, '')
                 violations << "[ERROR] ${f.@name}:${e.@line}: ${e.@message} [${check}]"
@@ -273,20 +835,23 @@ tasks.register('pmdGate', JavaExec) {
     mustRunAfter 'checkstyleGate'
     classpath = configurations.gauntletCpd
     mainClass = 'net.sourceforge.pmd.cli.PmdCli'
-    def changed = changedMainJava()
-    def targets = changed == null ? [file('src/main/java').absolutePath] : changed.collect { file(it).absolutePath }
     def report = buildDirFile('reports/pmd/gauntlet.xml')
-    args(['check', '--rulesets', configFile('pmd-ruleset.xml').absolutePath,
-          '--use-version', "java-${java.targetCompatibility.majorVersion}".toString(),
-          '--format', 'xml', '--report-file', report.absolutePath, '--relativize-paths-with', projectDir.absolutePath,
-          '--no-fail-on-violation', '--no-cache', '--no-progress', '--show-suppressed'] + targets.collectMany { ['--dir', it] })
+    args 'check', '--format', 'xml', '--report-file', report.absolutePath,
+            '--no-fail-on-violation', '--no-cache', '--no-progress', '--show-suppressed'
     ignoreExitValue = true   // the verdict comes from the XML report, like checkstyleGate
-    onlyIf { !targets.isEmpty() && new File(targets[0]).exists() }
+    onlyIf { task -> !scanTargets().isEmpty() || skippedByTheKit(task, 'no Java source in scope') }
     doFirst {
+        // PMD splits every value of --rulesets, --dir and --relativize-paths-with at commas: under "/home/me/Acme, Inc"
+        // it loaded no rules, and a changed "Ledger,Copy.java" left it no file - "PMD: OK" on nothing. The ruleset and
+        // the sources go relative to the directory PMD starts in (the report then names the sources that way too),
+        // the sources as positional parameters after "--", which PMD takes whole.
+        args(['--rulesets', relativeTo(workingDir, configFile('pmd-ruleset.xml')),
+              '--use-version', "java-${java.targetCompatibility.majorVersion}".toString(), '--encoding', sourceEncoding()])
         // the JDK's own classes (jrt-fs.jar of the JDK running PMD) explicitly, or PMD warns about guessing them
         def jdk = javaLauncher.get().metadata.installationPath.asFile
         args '--aux-classpath', (sourceSets.main.compileClasspath + sourceSets.main.output.classesDirs +
                 files(new File(jdk, 'lib/jrt-fs.jar'))).asPath
+        args(['--'] + scanTargets().collect { relativeTo(workingDir, it) })
         report.delete()
         report.parentFile.mkdirs()
     }
@@ -327,8 +892,8 @@ tasks.register('archTest', Test) {
     classpath = sourceSets.archTest.runtimeClasspath
     useJUnitPlatform()
     systemProperty 'gauntlet.architecture', configFile('architecture.properties').absolutePath
-    // the test reads the policy by its path, so Gradle would see only the path: the file itself is an input, or a
-    // narrowed policy would leave the task up to date and green
+    // the policy is read by the test, not handed to it: without this input a stricter policy left archTest
+    // UP-TO-DATE (or FROM-CACHE after clean) on the result of the old one
     inputs.file(configFile('architecture.properties')).withPropertyName('architecturePolicy')
             .withPathSensitivity(PathSensitivity.NONE)
     testLogging { events 'failed'; exceptionFormat = 'full'; showStandardStreams = true }
@@ -336,11 +901,102 @@ tasks.register('archTest', Test) {
     mustRunAfter 'test'
 }
 
+// What test and archTest ran, judged by their results rather than by the build script (TestCensus.java): every test
+// class compiled into a task's testClassesDirs must be in its JUnit XML results - finding T6, which only the
+// integrity allowlist accepts. B2 reads the script for filters and stays the early signal; each review round found
+// a form of filter it does not see (a variable, tasks['test'], matching { }, a closure parameter, a filter of the
+// test platform outside the script), and the census sees the effect of all of them - and of a test framework or
+// engine the task does not have (JUnit 4 tests without the vintage engine never run).
+def censusTasks = ['test', 'archTest']
+tasks.register('testCensus', Exec) {
+    group = 'gauntlet'
+    description = 'Fails when a test class that test or archTest compiled did not run (judged by their JUnit XML results).'
+    dependsOn censusTasks
+    executable javaBin
+    args sourceUtf8, "${tools}/TestCensus.java", '--project-dir', projectDir.absolutePath,
+            '--allowlist', configFile('integrity-allowlist.txt').absolutePath
+    doFirst {
+        // One results directory for both: a Test run deletes the TEST-*.xml it finds there, so archTest's run took
+        // test's results away (tasks.withType(Test) { reports.junitXml.outputLocation = ... } for a CI collector).
+        def xmlDirs = censusTasks.collect { tasks.getByName(it).reports.junitXml.outputLocation.get().asFile }
+        if (xmlDirs.unique(false).size() < xmlDirs.size()) {
+            throw new GradleException("gauntlet: test and archTest write their JUnit XML into one directory " +
+                    "(${xmlDirs[0]}), and each run deletes the results already there, so the census cannot tell what " +
+                    "test ran. Give each Test task a directory of its own: reports.junitXml.outputLocation = " +
+                    "layout.buildDirectory.dir(\"test-results/\${name}\").")
+        }
+        censusTasks.each { name ->
+            def task = tasks.getByName(name)
+            // The results on disk are this build's only when the task is part of it: with -x test, or a build script
+            // that takes the task out of the build (startParameter.excludedTaskNames), they are an earlier run's.
+            if (!gradle.taskGraph.hasTask(task)) {
+                throw new GradleException("gauntlet: ${task.path} is not part of this build (left out with -x, or by the " +
+                        "build itself), so whether the test classes it compiled ran is unknown. Run the gauntlet with it.")
+            }
+            // Without the report Gradle neither writes nor deletes it: the directory keeps an earlier run's results.
+            def xml = task.reports.junitXml
+            if (!xml.required.get()) {
+                throw new GradleException("gauntlet: testCensus judges ${task.path} by its JUnit XML results, and this build " +
+                        "switches them off (reports.junitXml.required = false), so whether its test classes ran is " +
+                        "unknown. Remove that setting.")
+            }
+            // The classes a source set compiles are what the task must run: a build that narrows testClassesDirs
+            // (testClassesDirs.asFileTree.matching { exclude ... }, files()) keeps test classes out of the run, and
+            // the census would judge only what is left. More directories than the source set's are judged too.
+            def testSet = sourceSets.getByName(name == 'test' ? 'test' : 'archTest')
+            // where the source set's compile tasks write: the build controls testClassesDirs and the source set's
+            // output.classesDirs alike (output.classesDirs.setFrom(files()) emptied both), not where javac writes
+            def compiled = ['java', 'kotlin', 'groovy']
+                    .collect { tasks.findByName(testSet.getCompileTaskName(it))?.destinationDirectory?.getOrNull()?.asFile }
+                    .findAll { it != null } as Set
+            def listed = task.testClassesDirs.files
+            if (!listed.containsAll(compiled)) {
+                throw new GradleException("gauntlet: ${task.path} runs the test classes in ${listed ?: 'nothing'}, " +
+                        "not the classes its source set compiles (${compiled.join(', ')}): a narrowed testClassesDirs " +
+                        "keeps test classes out of the run. Leave testClassesDirs as the source set's output.")
+            }
+            // the source sets that compile into the task's classes: their roots name the source file of a class
+            def dirs = listed.findAll { !it.isFile() }
+            def roots = sourceSets.findAll { set -> set.output.classesDirs.files.any { it in dirs } }
+                    .collectMany { it.allSource.srcDirs as List }
+            args '--task', name, '--classes-file', pathList("census-${name}-classes", dirs*.absolutePath),
+                    '--sources-file', pathList("census-${name}-sources", roots*.absolutePath)
+            // A test source its compile task leaves out (sourceSets.test.java.exclude, compileTestJava { exclude })
+            // has no class: nothing above could miss it, and nothing would ever run it. Java sources: the source
+            // set's directories on disk against what the compile task compiles.
+            // The conventional directory (src/test/java) counts even when the build moved the source set's
+            // directories elsewhere (srcDirs = []): a test there would compile and run in a plain build.
+            def compileInputs = tasks.getByName(testSet.compileJavaTaskName).source.files
+            def notCompiled = ((testSet.java.srcDirs as List) + [file("src/${testSet.name}/java")]).unique()
+                    .findAll { it.isDirectory() }
+                    .collectMany { dir -> fileTree(dir) { include '**/*.java' }.files as List }.unique()
+                    .findAll { !(it.name in ['package-info.java', 'module-info.java']) && !(it in compileInputs) }
+            args '--not-compiled-file', pathList("census-${name}-not-compiled", notCompiled*.absolutePath)
+            // Executed, UP-TO-DATE or FROM-CACHE: the directory holds the results of these very inputs (a run deletes
+            // the TEST-*.xml an earlier one wrote; the filters are inputs). SKIPPED (onlyIf, enabled = false): the
+            // task ran nothing in this build, whatever an earlier run left there.
+            def outcome = task.state.skipped ? task.state.skipMessage : null
+            if (outcome in [null, 'UP-TO-DATE', 'FROM-CACHE']) {
+                args '--results', xml.outputLocation.get().asFile.absolutePath
+            } else {
+                args '--not-run', outcome
+            }
+        }
+    }
+}
+
 def configureCucumber = { Test task, File features ->
     task.testClassesDirs = sourceSets.acceptanceTest.output.classesDirs
     task.classpath = sourceSets.acceptanceTest.runtimeClasspath
     task.useJUnitPlatform { includeEngines 'cucumber' }
-    task.systemProperty 'cucumber.features', features.absolutePath
+    // cucumber.features is a comma-separated list: a directory under "/home/me/Acme, Inc" goes relative to the
+    // project directory, where its test JVM then starts
+    if (features.absolutePath.contains(',')) {
+        task.workingDir = projectDir
+        task.systemProperty 'cucumber.features', relativeTo(projectDir, features)
+    } else {
+        task.systemProperty 'cucumber.features', features.absolutePath
+    }
     task.systemProperty 'cucumber.publish.quiet', 'true'
     if (glue) {
         task.systemProperty 'cucumber.glue', glue
@@ -348,28 +1004,141 @@ def configureCucumber = { Test task, File features ->
 }
 def hasFeatures = { File dir -> dir.exists() && Files.walk(dir.toPath()).withCloseable { s -> s.anyMatch { it.toString().endsWith('.feature') } } }
 
+// Cucumber's message stream (cucumber.plugin message:FILE) is the record of what a run did: every scenario it ran, the
+// feature file and line it came from, when it started and when it finished. acceptanceCheck counts it against the
+// scenarios the feature files define, gherkinMutation judges by it the order the mutants ran in - what the run did,
+// whatever its settings said. One stream per test JVM: a retry (the test-retry plugin) runs each round in a JVM of its
+// own, which would write the file anew. So a JVM's stream moves aside once Gradle reports the JVM done - its suite
+// right below the root of the run ("Gradle Test Executor 2"), which Gradle reports before it starts the next round.
+def cucumberMessages = { Test task, File dir ->
+    def current = new File(dir, 'current.ndjson')
+    def jvms = 0
+    task.outputs.dir(dir).withPropertyName('cucumberMessages')
+    task.doFirst {
+        dir.deleteDir()
+        dir.mkdirs()
+    }
+    task.afterSuite { TestDescriptor suite, TestResult result ->
+        if (suite.parent != null && suite.parent.parent == null && current.isFile()) {
+            Files.move(current.toPath(), new File(dir, "jvm-${++jvms}.ndjson").toPath())
+        }
+    }
+    return current
+}
+// junit-platform.properties of one classpath entry (a directory or a jar), or null
+def platformProperties = { File entry ->
+    def properties = null
+    if (entry.isDirectory() && new File(entry, 'junit-platform.properties').isFile()) {
+        properties = new Properties()
+        new File(entry, 'junit-platform.properties').withInputStream { properties.load(it) }
+    } else if (entry.isFile() && entry.name.endsWith('.jar')) {
+        try {
+            new java.util.zip.ZipFile(entry).withCloseable { jar ->
+                def found = jar.getEntry('junit-platform.properties')
+                if (found != null) {
+                    properties = new Properties()
+                    jar.getInputStream(found).withCloseable { properties.load(it) }
+                }
+            }
+        } catch (java.util.zip.ZipException notAJar) {     // the class loader skips it as well
+        }
+    }
+    return properties
+}
+// The cucumber.plugin of the task's test JVMs: the project's own plugins stay - of a system property of the task, else
+// of the first junit-platform.properties on its classpath, where JUnit Platform reads them - and the stream joins them.
+// Gradle keeps a -D of jvmArgs as a system property, so it stays; a project's argument provider is overridden.
+// Cucumber splits the list at commas: a stream under a directory named with one goes relative to the working
+// directory of the JVM.
+def cucumberPlugins = { Test task, File stream ->
+    def own = task.systemProperties['cucumber.plugin']?.toString()
+    if (own == null) {
+        own = task.classpath.files.findResult { platformProperties(it) }?.getProperty('cucumber.plugin')
+    }
+    def path = stream.absolutePath.contains(',') ? relativeTo(task.workingDir, stream) : stream.absolutePath
+    // entry by entry: Cucumber alone drops an empty last entry (`pretty,`), but not one in the middle of a list
+    def plugins = (own ?: '').split(',').collect { it.trim() }.findAll { it }
+    return '-Dcucumber.plugin=' + (plugins + ['message:' + path]).join(', ')
+}
+// What the gates need of every Cucumber run they judge, whatever the project's settings say. The steps execute: a dry
+// run (cucumber.execution.dry-run) reports every step passed without running the glue, and the stream cannot tell.
+// Cucumber discovers the features as the root engine: a @Suite setup turns that off, and then no scenario runs.
+def cucumberRun = ['cucumber.execution.dry-run': 'false', 'cucumber.junit-platform.discovery.as-root-engine': 'true']
+// the last -D the test JVM of a finished Test task got for a key, as Gradle lists the arguments
+def lastSystemProperty = { Test task, String key ->
+    def values = task.allJvmArgs.findAll { it.startsWith("-D${key}=") }
+    values ? values[-1].substring(key.length() + 3) : 'unset'
+}
+// _JAVA_OPTIONS of the test JVM's environment: the JVM reads it after the command line, so a -Dcucumber.* there beats
+// every -D the kit passes (dry-run, the plugin, the order), and Gradle's argument list does not show it
+def cucumberInJavaOptions = { Test task ->
+    def options = task.environment['_JAVA_OPTIONS']?.toString() ?: ''
+    (options =~ /-Dcucumber\.[^\s=]+=?\S*/).collect { "_JAVA_OPTIONS ${it}".toString() }
+}
+def acceptanceMessages = buildDirFile('cucumber-messages/acceptanceTest')
+
 tasks.register('acceptanceTest', Test) {
     group = 'gauntlet'
     description = 'Runs the Gherkin acceptance tests (Cucumber) from ' + featuresPath
     configureCucumber(it, featuresDir)
+    // the features are passed as a system property, which Gradle does not track by content: without this
+    // input a change to only the feature files leaves acceptanceTest UP-TO-DATE and the new spec never runs.
+    inputs.dir(featuresDir).optional().withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging { events 'failed'; exceptionFormat = 'full' }
-    onlyIf { hasFeatures(featuresDir) }
+    onlyIf { task -> hasFeatures(featuresDir) || skippedByTheKit(task, 'no feature file') }
     declareInputs(it, acceptanceInputs, 'acceptanceInputs')
     mustRunAfter 'archTest'
     finalizedBy 'acceptanceCheck'
     // acceptanceCheck must judge this run only, never results a previous run left behind
     def results = reports.junitXml.outputLocation.get().asFile
     doFirst { results.deleteDir(); results.mkdirs() }
+    def stream = cucumberMessages(it, acceptanceMessages)
+    doFirst { Test task ->
+        // Cucumber finds the scenarios by cucumber.features, not by the test classes Gradle hands each fork: forks in
+        // parallel (a maxParallelForks for every Test task) each ran every scenario, at the same time, and wrote one
+        // message stream at once. One at a time, every fork still runs them all.
+        task.maxParallelForks = 1
+        // at execution, as for gherkinMutantsRun: the provider reads the project's plugins as the JVM will get them
+        task.jvmArgumentProviders.add({ cucumberRun.collect { key, value -> "-D${key}=${value}".toString() } +
+                [cucumberPlugins(task, stream)] } as CommandLineArgumentProvider)
+    }
+    // After the run, where no doFirst can change them any more: a doFirst of the project's own that drops the kit's
+    // provider (one registered before apply from) would let a dry run pass every scenario.
+    doLast { Test task ->
+        def wrong = cucumberRun.findAll { key, value -> lastSystemProperty(task, key) != value }
+                .collect { key, value -> "${key}=${lastSystemProperty(task, key)}" } + cucumberInJavaOptions(task)
+        if (wrong) {
+            throw new GradleException("gauntlet: acceptanceTest ran with ${wrong.join(', ')}: the gates judge scenarios " +
+                    "whose steps executed. A doFirst of the project's own changed what the kit set (one registered " +
+                    "before apply from: tasks.withType(Test), a convention plugin, allprojects, an init script), or " +
+                    "_JAVA_OPTIONS of the task's environment overrides it - keep both off acceptanceTest.")
+        }
+    }
 }
 
 tasks.register('acceptanceCheck', Exec) {
     group = 'gauntlet'
     description = 'Fails when scenarios were skipped (aborted by an assumption or a skipped step) - Gradle would pass them - ' +
-            'or when feature files exist but no scenario ran.'
+            'when feature files exist but no scenario ran, or when a scenario they define did not run.'
     def results = buildDirFile('test-results/acceptanceTest')
     executable javaBin
-    args "${tools}/GherkinMutator.java", 'no-skipped', '--results', results.absolutePath,
-            '--features', featuresDir.absolutePath
+    args sourceUtf8, "${tools}/GherkinMutator.java", 'no-skipped', '--results', results.absolutePath,
+            '--features', featuresDir.absolutePath, '--messages', acceptanceMessages.absolutePath,
+            '--root', projectDir.absolutePath, '--allowlist', configFile('integrity-allowlist.txt').absolutePath
+    doFirst {
+        // The results and the stream on disk are this build's only when acceptanceTest is part of it and ran (or is
+        // UP-TO-DATE on these very inputs): left out with -x, they are an earlier run's; skipped (a project's onlyIf,
+        // enabled = false), they are gone - then no scenario ran.
+        def acceptance = tasks.getByName('acceptanceTest')
+        if (!gradle.taskGraph.hasTask(acceptance)) {
+            throw new GradleException("gauntlet: acceptanceCheck judges the acceptance run of this build, and " +
+                    "${acceptance.path} is not part of it (left out with -x, or not asked for): run them together.")
+        }
+        if (acceptance.state.skipped && !(acceptance.state.skipMessage in ['UP-TO-DATE', 'FROM-CACHE'])) {
+            results.deleteDir()
+            acceptanceMessages.deleteDir()
+        }
+    }
 }
 
 // ------------------------------------------------------------------------------ CRAP and DRY
@@ -395,23 +1164,27 @@ tasks.register('crapGate', Exec) {
     dependsOn 'jacocoTestReport', 'gauntletScope'
     mustRunAfter 'acceptanceTest'
     executable javaBin
-    args "${tools}/CrapGate.java", '--report', buildDirFile('reports/jacoco/test/jacocoTestReport.xml').absolutePath,
+    args sourceUtf8, "${tools}/CrapGate.java", '--report', buildDirFile('reports/jacoco/test/jacocoTestReport.xml').absolutePath,
             '--threshold', setting('crap.threshold', '8'), '--allowlist', configFile('crap-allowlist.txt').absolutePath,
             '--exclude', excludedClassGlobs.join(',')
-    def only = changedMainJava()
-    if (only != null) {
-        args '--only', only.join(',')
+    doFirst {
+        args '--encoding', sourceEncoding()
+        def only = changedSources()
+        if (only != null) {
+            requireChangedClasses()             // CrapGate derives the changed types the same way
+            args '--only-file', pathList('crap-changed-sources', only*.path)
+            sourceSets.main.java.srcDirs.each { args '--sources', it.absolutePath }                  // one root each
+        }
     }
 }
 
 tasks.register('cpdReport', JavaExec) {
     group = 'gauntlet'
-    description = 'Runs PMD CPD (copy/paste detector) over src/main/java.'
+    description = 'Runs PMD CPD (copy/paste detector) over the main sources.'
     def report = buildDirFile('reports/cpd/cpd.xml')
     classpath = configurations.gauntletCpd
     mainClass = 'net.sourceforge.pmd.cli.PmdCli'
-    args 'cpd', '--language', 'java', '--dir', file('src/main/java').absolutePath,
-            '--minimum-tokens', setting('dry.minimumTokens', '60'), '--format', 'xml',
+    args 'cpd', '--language', 'java', '--minimum-tokens', setting('dry.minimumTokens', '60'), '--format', 'xml',
             '--report-file', report.absolutePath, '--no-fail-on-violation', '--ignore-annotations'
     if (setting('dry.ignoreIdentifiers', 'true').toBoolean()) {
         args '--ignore-identifiers'
@@ -421,10 +1194,17 @@ tasks.register('cpdReport', JavaExec) {
     }
     // paths (files or directories) relative to the module, left out of the duplicate search (CLI --exclude, CPD 7.0+)
     listSetting('dry.exclude', '').each { args '--exclude', file(it).absolutePath }
-    inputs.dir('src/main/java').optional()
+    // every root of the main source set; the roots and the charset are inputs, known when the task is about to run
+    def roots = providers.provider { mainSourceRoots().findAll { it.exists() } }
+    inputs.files(roots).withPropertyName('mainSourceRoots')
+    inputs.property('sourceEncoding', providers.provider { sourceEncoding() })
     outputs.file(report)
-    onlyIf { file('src/main/java').exists() }
-    doFirst { report.parentFile.mkdirs() }
+    onlyIf { task -> !roots.get().isEmpty() || skippedByTheKit(task, 'no main source root') }
+    doFirst {
+        // positional after "--": CPD splits a --dir value at commas, not a positional one (see pmdGate)
+        args(['--encoding', sourceEncoding(), '--'] + roots.get()*.absolutePath)
+        report.parentFile.mkdirs()
+    }
 }
 
 tasks.register('dryGate', Exec) {
@@ -433,11 +1213,13 @@ tasks.register('dryGate', Exec) {
     dependsOn 'cpdReport', 'gauntletScope'
     mustRunAfter 'crapGate'
     executable javaBin
-    args "${tools}/DryGate.java", '--report', buildDirFile('reports/cpd/cpd.xml').absolutePath,
+    args sourceUtf8, "${tools}/DryGate.java", '--report', buildDirFile('reports/cpd/cpd.xml').absolutePath,
             '--project-dir', projectDir.absolutePath, '--max', setting('dry.maxDuplications', '0')
-    def only = changedMainJava()
-    if (only != null) {
-        args '--only', only.join(',')
+    doFirst {
+        def only = changedMainJava()
+        if (only != null) {
+            args '--only-file', pathList('dry-changed-sources', only)
+        }
     }
 }
 
@@ -458,7 +1240,12 @@ plugins.withId('info.solidsoft.pitest') {
         mutators = listSetting('pit.mutators', 'DEFAULTS') as Set
         outputFormats = ['XML', 'HTML'] as Set
         timestampedReports = false
-        enableDefaultIncrementalAnalysis = true
+        // No history (build/pitHistory.txt): PIT's incremental analysis keeps a KILLED verdict while the mutated class
+        // and the killing test's class are unchanged, and a SURVIVED one while the covering test classes are. A test
+        // weakened through a helper class or a test resource kept its kills, and the hardener's SubagentStop hook let
+        // the survivor through; a test sharpened that way kept its survivor. A history the project sets through the
+        // plugin is refused when pitest runs (its doFirst below).
+        enableDefaultIncrementalAnalysis = false
         excludedGroups = listSetting('pit.excludedGroups', 'no-mutate') as Set
         // nested classes too, as JaCoCo (jacocoExcludes) and CrapGate (outer class name) already do
         excludedClasses = excludedClassGlobs.collectMany { [it, it + '$*'] } as Set
@@ -486,15 +1273,36 @@ plugins.withId('info.solidsoft.pitest') {
             if (!pkg) {
                 throw new GradleException('gauntlet: set basePackage in gauntlet/config/gauntlet.properties')
             }
-        }
-        def targets = changedClassGlobs()
-        if (targets != null) {
-            if (targets.isEmpty()) {
-                onlyIf { false }
-                logger.lifecycle('gauntlet: no changed main classes - mutation testing skipped')
-            } else {
-                targetClasses.set(targets as Set)
+            // The plugin hands PIT the class directories to mutate as one comma-separated list (--mutableCodePaths),
+            // and PIT splits it: under "/home/me/Acme, Inc" it found "No mutations" and the gate passed on nothing.
+            def split = mutableCodePaths.files.find { it.absolutePath.contains(',') }
+            if (split) {
+                throw new GradleException("gauntlet: PIT would read ${split} as two paths at its comma and find nothing " +
+                        "to mutate. Build from a directory without a comma in its path.")
             }
+            // The plugin hands PIT the project's own history files with the flag above off as well, and the project can
+            // turn the flag on again: a weakened test kept its kills and mutationGate passed. Judged as the task has
+            // them now (pitest {} or the task, before this script, after it, in afterEvaluate) and fixed: a doFirst of
+            // the project's that runs after this one can no longer set them.
+            [historyInputLocation, historyOutputLocation, enableDefaultIncrementalAnalysis]*.finalizeValue()
+            def flag = enableDefaultIncrementalAnalysis.getOrElse(false)
+            def history = [historyInputLocation: historyInputLocation.present,
+                           historyOutputLocation: historyOutputLocation.present,
+                           'enableDefaultIncrementalAnalysis (withHistory)': flag].findAll { it.value }.keySet()
+            if (history) {
+                throw new GradleException("gauntlet: PIT incremental analysis is configured for this build (" +
+                        "${history.join(', ')}): PIT would keep the verdicts of an earlier run, and a test weakened " +
+                        "since would keep its kills. Remove it from pitest { } and the pitest task - in the build script, a convention " +
+                        "plugin or an init script.")
+            }
+        }
+        if (scope != 'all') {
+            // the changed types are known when the task is about to run (gauntletScope and the compiler ran)
+            targetClasses.set(providers.provider { changedClassGlobs() as Set })
+            onlyIf { task ->
+                changedClassGlobs() || changedClassProblems() || skippedByTheKit(task, 'no changed main class')
+            }
+            doFirst { requireChangedClasses() }   // a wrongly derived target would make PIT find "no mutations" and pass
         }
     }
 }
@@ -503,10 +1311,9 @@ tasks.register('pitSummary', Exec) {
     group = 'gauntlet'
     description = 'Lists surviving, uncovered and unverified (RUN_ERROR) mutants and oversized files from the PIT ' +
             'report; fails on a RUN_ERROR mutant outside config/pit-runerror-allowlist.txt.'
-    def nothingToMutate = changedClassGlobs()?.isEmpty()
-    onlyIf { !nothingToMutate }
+    onlyIf { task -> scope == 'all' || changedClassGlobs() || skippedByTheKit(task, 'no changed main class') }
     executable javaBin
-    args "${tools}/PitSummary.java", '--report', buildDirFile('reports/pitest/mutations.xml').absolutePath,
+    args sourceUtf8, "${tools}/PitSummary.java", '--report', buildDirFile('reports/pitest/mutations.xml').absolutePath,
             '--max-per-file', setting('pit.maxMutationsPerFile', '100'),
             '--allowlist', configFile('pit-runerror-allowlist.txt').absolutePath
 }
@@ -530,6 +1337,7 @@ tasks.register('mutationGate') {
 
 def mutantsDir = buildDirFile('gherkin-mutation/mutants')
 def mutantResults = buildDirFile('gherkin-mutation/results')
+def mutantMessages = buildDirFile('gherkin-mutation/messages')
 
 tasks.register('gherkinMutants', Exec) {
     group = 'gauntlet'
@@ -539,10 +1347,25 @@ tasks.register('gherkinMutants', Exec) {
         mustRunAfter 'pitest'
     }
     executable javaBin
-    args "${tools}/GherkinMutator.java", 'generate', '--features', featuresPath, '--out', mutantsDir.absolutePath
-    def only = changedFeatures()
-    if (only != null) {
-        args '--only', only.join(',')
+    args sourceUtf8, "${tools}/GherkinMutator.java", 'generate', '--features', featuresPath, '--out', mutantsDir.absolutePath
+    doFirst {
+        def changed = changedFiles()
+        if (changed != null) {
+            // The step definitions are what this gate checks: a changed glue file or acceptance resource can hollow
+            // a step of a feature that did not change, so then every feature is mutated. Deleting a glue file (a
+            // hook, a step class) or moving it away changes the glue as well: both ends of a rename count.
+            def touched = (gitPaths(['diff', '-z', '--relative', '--name-only', '--no-renames', mergeBase()]) ?: []) + changed
+            def roots = sourceSets.acceptanceTest.allSource.srcDirs.collect { it.toPath().toAbsolutePath().normalize() }
+            def changedGlue = touched.unique().findAll { path ->
+                !path.endsWith('.feature') && roots.any { file(path).toPath().toAbsolutePath().normalize().startsWith(it) }
+            }
+            if (changedGlue) {
+                logger.lifecycle("gauntlet: ${changedGlue.size()} acceptance glue file(s) changed (" +
+                        "${changedGlue.take(3).join(', ')}${changedGlue.size() > 3 ? ', ...' : ''}) - every feature is mutated")
+            } else {
+                args '--only-file', pathList('changed-features', changedFeatures())
+            }
+        }
     }
 }
 
@@ -551,14 +1374,61 @@ tasks.register('gherkinMutantsRun', Test) {
     description = 'Runs the generated mutant scenarios; failures are the expected outcome.'
     dependsOn 'gherkinMutants'
     configureCucumber(it, mutantsDir)
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
     ignoreFailures = true
     reports.junitXml.outputLocation.set(mutantResults)
     reports.html.required = false
     outputs.upToDateWhen { false }
     jacoco { enabled = false }
-    onlyIf { hasFeatures(mutantsDir) }
-    // Gradle 8.14 lists the report directory without creating it: recreate it after the wipe
-    doFirst { mutantResults.deleteDir(); mutantResults.mkdirs() }
+    onlyIf { task -> hasFeatures(mutantsDir) || skippedByTheKit(task, 'no Examples value in scope') }
+    def stream = cucumberMessages(it, mutantMessages)
+    doFirst { Test task ->
+        // failing scenarios are what this run is for: a project-wide failFast would stop it after the first kill
+        failFast = false
+        // The controls of a row run before its mutants and after them (GherkinMutator generate): one JVM, one scenario
+        // at a time, the files in the order of their names - not as the project runs its own acceptance tests (in
+        // junit-platform.properties, where a system property wins, or in tasks.withType(Test)). In parallel both
+        // controls ran first, and a stand that wears out (a quota) failed the mutant instead: a kill.
+        maxParallelForks = 1
+        forkEvery = 0
+        // an argument provider added at execution: the test JVM gets one -D per key, and a provider's beats the
+        // project's jvmArgs and systemProperty, even ones its own doFirst sets after this one. The message stream
+        // records what the run did with them (gherkinMutation judges the order by it).
+        jvmArgumentProviders.add({ ['-Dcucumber.execution.parallel.enabled=false', '-Dcucumber.execution.order=lexical'] +
+                cucumberRun.collect { key, value -> "-D${key}=${value}".toString() } +
+                [cucumberPlugins(task, stream)] } as CommandLineArgumentProvider)
+        // Gradle 8.14 lists the report directory without creating it: recreate it after the wipe
+        mutantResults.deleteDir()
+        mutantResults.mkdirs()
+    }
+    // A doFirst registered before this script (tasks.withType(Test) above the apply line, a convention plugin,
+    // allprojects, an init script) runs after the one above: its forks went through, and its own provider won - the
+    // mutants ran in parallel or in a random order, and the gate passed. So the settings are judged here, after the
+    // test action (it returns when mutants fail: ignoreFailures), where no doFirst can change them any more. Unset
+    // counts as wrong: the kit's provider was removed. The arguments are the ones Gradle lists: _JAVA_OPTIONS in the
+    // task's environment, an argument file, a provider that answers differently after the run or a doLast of the
+    // project that restores the settings are not seen here - gherkinMutation judges the order the scenarios really
+    // ran in, from Cucumber's message stream. This check stays the early message that names the setting.
+    doLast {
+        def last = { String key ->
+            def values = allJvmArgs.findAll { it.startsWith("-D${key}=") }
+            values ? values[-1].substring(key.length() + 3) : 'unset'
+        }
+        def used = [maxParallelForks: maxParallelForks, forkEvery: forkEvery,
+                    'cucumber.execution.parallel.enabled': last('cucumber.execution.parallel.enabled'),
+                    'cucumber.execution.order': last('cucumber.execution.order')] +
+                cucumberRun.collectEntries { key, value -> [(key): last(key)] }
+        def wrong = ([maxParallelForks: 1, forkEvery: 0, 'cucumber.execution.parallel.enabled': 'false',
+                      'cucumber.execution.order': 'lexical'] + cucumberRun).findAll { key, value -> used[key] != value }
+                .collect { key, value -> "${key}=${used[key]}" } + cucumberInJavaOptions(it)
+        if (wrong) {
+            throw new GradleException("gauntlet: gherkinMutantsRun ran with ${wrong.join(', ')}: its controls prove " +
+                    "nothing unless one JVM runs one scenario at a time, in the order of the file names. A doFirst " +
+                    "of the project's own changed what the kit set (one registered before apply from: " +
+                    "tasks.withType(Test), a convention plugin, allprojects, an init script), or _JAVA_OPTIONS of " +
+                    "the task's environment overrides it - keep both off gherkinMutantsRun.")
+        }
+    }
 }
 
 tasks.register('gherkinMutation', Exec) {
@@ -566,16 +1436,40 @@ tasks.register('gherkinMutation', Exec) {
     description = 'Gherkin acceptance mutation: every mutated Examples value must make a scenario fail.'
     dependsOn 'gherkinMutantsRun'
     executable javaBin
-    args "${tools}/GherkinMutator.java", 'verdict', '--mutants', mutantsDir.absolutePath, '--results', mutantResults.absolutePath
+    args sourceUtf8, "${tools}/GherkinMutator.java", 'verdict', '--mutants', mutantsDir.absolutePath, '--results', mutantResults.absolutePath,
+            '--messages', mutantMessages.absolutePath
+    // The glue the mutant run loaded, as compiled - its classpath (configureCucumber): a failure thrown by a transformer
+    // (@ParameterType, ...) is a rejected value, not a kill. Cucumber names a glue method by its class and method, and
+    // so does the verdict: the language of the glue and the encoding of its sources do not matter. The entries go as
+    // a list file (see pathList): a classpath can be long, and a path can hold any separator.
+    def glueClasspath = sourceSets.acceptanceTest.runtimeClasspath
+    doFirst { args '--glue-file', pathList('glue-classpath', glueClasspath.files*.absolutePath) }
 }
 
 // ------------------------------------------------------------------------------ aggregates
 
+// A gate's verdict is its tool's exit code. A build that sets ignoreExitValue on them (tasks.withType(Exec) { ... }
+// before the kit) let every finding pass; judged after the run, where no doFirst can change the setting any more.
+// checkstyleGate and pmdGate ignore the exit value themselves and judge their XML reports.
+['integrityCheck', 'testCensus', 'acceptanceCheck', 'crapGate', 'cpdReport', 'dryGate', 'pitSummary', 'gherkinMutants',
+ 'gherkinMutation'].each { name ->
+    tasks.named(name) { task ->
+        task.doLast {
+            def exit = task.executionResult.getOrNull()?.exitValue
+            if (exit != null && exit != 0) {
+                throw new GradleException("gauntlet: ${task.path} ended with exit value ${exit}, and the build ignores " +
+                        "exit values (ignoreExitValue = true): a gate's verdict is its tool's exit code. Remove that " +
+                        "setting.")
+            }
+        }
+    }
+}
+
 tasks.register('gauntletFast') {
     group = 'gauntlet'
-    description = 'Integrity, checkstyle, PMD, unit, architecture and acceptance tests, CRAP, DRY.'
-    dependsOn 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'test', 'archTest', 'acceptanceTest',
-            'acceptanceCheck', 'crapGate', 'dryGate'
+    description = 'Integrity, checkstyle, PMD, unit, architecture and acceptance tests, the test census, CRAP, DRY.'
+    dependsOn 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'test', 'archTest', 'testCensus',
+            'acceptanceTest', 'acceptanceCheck', 'crapGate', 'dryGate'
 }
 
 tasks.register('gauntlet') {
@@ -625,7 +1519,9 @@ abstract class GauntletBuildLock implements BuildService<GauntletBuildLock.Param
             Thread.sleep(2000)
         }
         channel.truncate(0)
-        channel.write(java.nio.ByteBuffer.wrap("pid ${ProcessHandle.current().pid()}".getBytes('UTF-8')), 0)
+        // the daemon runs on the project's JDK, which may be Java 8: no ProcessHandle (Java 9+) in this script
+        def pid = java.lang.management.ManagementFactory.runtimeMXBean.name.split('@')[0]
+        channel.write(java.nio.ByteBuffer.wrap("pid ${pid}".getBytes('UTF-8')), 0)
         channel.force(false)
     }
 
@@ -663,6 +1559,33 @@ tasks.configureEach { Task task ->
     task.doFirst { buildLock.get().hold(path) }
 }
 
+// ------------------------------------------------------------------------------ gate JVM
+
+// The gate JVM is the last word on these tasks, whatever the project says about its Test/JavaExec tasks before
+// this script, after it or in afterEvaluate: the configuration is added once every project is evaluated. (Later
+// is too late - Gradle fixes the launcher of a task when it puts the task into the task graph.) Gradle also keeps
+// a launcher that was read once the project is evaluated, and an init script's projectsEvaluated runs before this
+// one: so the gate JVM is set as well when a task is created (for what reads launchers in afterEvaluate - an IDE's
+// model builder, an init script) and after the project's own afterEvaluate actions (an action added from inside
+// afterEvaluate runs after all of them), over a launcher the project pinned there.
+def gateTasks = ['checkstyleGate', 'pmdGate', 'cpdReport', 'acceptanceTest', 'archTest', 'gherkinMutantsRun',
+                 'integrityCheck', 'testCensus', 'acceptanceCheck', 'crapGate', 'dryGate', 'pitSummary', 'gherkinMutants',
+                 'gherkinMutation']
+def gateJvmOfTasks = { ->
+    gateTasks.each { tasks.named(it) { gateJvmOf(it) } }
+    plugins.withId('info.solidsoft.pitest') {
+        tasks.named('pitest') { gateJvmOf(it) }
+    }
+}
+gateJvmOfTasks()
+afterEvaluate { afterEvaluate { gateJvmOfTasks() } }
+gradle.projectsEvaluated {
+    gateTasks.each { tasks.named(it) { gateJava(it) } }
+    plugins.withId('info.solidsoft.pitest') {
+        tasks.named('pitest') { gateJava(it) }
+    }
+}
+
 // ------------------------------------------------------------------------------ configuration cache
 
 // A project may enable the configuration cache (org.gradle.configuration-cache=true in gradle.properties).
@@ -670,7 +1593,7 @@ tasks.configureEach { Task task ->
 // doFirst), which the cache forbids. They opt out explicitly (Task.notCompatibleWithConfigurationCache): a build
 // that runs any of them discards its cache entry instead of failing; the project's own builds keep the cache.
 def notCacheable = { Task task -> task.notCompatibleWithConfigurationCache('gauntlet tasks read the project at execution time') }
-['gauntletInfo', 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'archTest', 'acceptanceTest',
+['gauntletInfo', 'gauntletScope', 'integrityCheck', 'checkstyleGate', 'pmdGate', 'archTest', 'testCensus', 'acceptanceTest',
  'acceptanceCheck', 'crapGate', 'cpdReport', 'dryGate', 'pitSummary', 'mutationGate', 'gherkinMutants',
  'gherkinMutantsRun', 'gherkinMutation', 'gauntletFast', 'gauntlet'].each { tasks.named(it, notCacheable) }
 plugins.withId('info.solidsoft.pitest') { tasks.named('pitest', notCacheable) }
