@@ -11,12 +11,15 @@ set -euo pipefail
 vendor="${1:?Usage: $0 <neon|codex|grok|kimi|qwen> <remote-url>}"
 remote="${2:?Usage: $0 <neon|codex|grok|kimi|qwen> <remote-url>}"
 src_root="$(git rev-parse --show-toplevel)"
+if [ "$(git -C "$src_root" rev-parse --is-shallow-repository)" = "true" ]; then
+  git -C "$src_root" fetch --quiet --unshallow origin
+fi
 full_sha="$(git -C "$src_root" rev-parse HEAD)"
 base_sha="$(git -C "$src_root" rev-parse --short HEAD)"
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/rvl-vendor-${vendor}.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-git clone --quiet "$src_root" "$tmp_dir/repo"
+git clone --quiet --no-local "$src_root" "$tmp_dir/repo"
 cd "$tmp_dir/repo"
 git checkout -q -B main "$full_sha"
 
