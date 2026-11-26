@@ -27,26 +27,27 @@ public class CertificateStorageSteps {
     private final CertificateRecords records;
     private final AttachmentCalls calls;
     private final MinioClient serviceClient;
+    private final StandFaults faults;
 
     private final Map<String, Runnable> outages;
 
     public CertificateStorageSteps(StandStorage storage, StorageProperties settings, AttachmentProperties attachments,
-            CertificateRecords records, AttachmentCalls calls, MinioClient serviceClient) {
+            CertificateRecords records, AttachmentCalls calls, MinioClient serviceClient, StandFaults faults) {
         this.storage = storage;
         this.settings = settings;
         this.attachments = attachments;
         this.records = records;
         this.calls = calls;
         this.serviceClient = serviceClient;
+        this.faults = faults;
         this.outages = Map.of("остановлено", storage::stop, "не отвечает", storage::pause);
     }
 
     @After
     public void recoverStorage() {
-        if (storage.disrupted()) {
-            storage.recover();
-            await("клиент хранилища сервиса снова отвечает").atMost(SERVICE_RECONNECT).ignoreExceptions()
-                    .until(this::serviceClientAnswers);
+        if (faults.storageDisturbed() || storage.disrupted()) {
+            restoreStorageAndClient();
+            faults.clearStorageDisturbed();
         }
     }
 
@@ -66,6 +67,7 @@ public class CertificateStorageSteps {
 
     @Дано("хранилище справок недоступно: {string}")
     public void storageDown(String outage) {
+        faults.markStorageDisturbed();
         Optional.ofNullable(outages.get(outage))
                 .orElseThrow(() -> new AssertionError("недоступности «" + outage + "» нет в перечне шага"))
                 .run();
@@ -73,8 +75,14 @@ public class CertificateStorageSteps {
 
     @Когда("хранилище справок снова доступно")
     public void storageBack() throws Exception {
-        recoverStorage();
+        restoreStorageAndClient();
         assertThat(storage.bucketExists(settings.bucket())).as("бакет после восстановления").isTrue();
+    }
+
+    private void restoreStorageAndClient() {
+        storage.recover();
+        await("клиент хранилища сервиса снова отвечает").atMost(SERVICE_RECONNECT).ignoreExceptions()
+                .until(this::serviceClientAnswers);
     }
 
     @Дано("в хранилище справок нет бакета Договоров")
