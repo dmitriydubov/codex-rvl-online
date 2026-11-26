@@ -7,12 +7,7 @@ mainAgent: true
 commandExecutionPolicy: auto
 tools:
   - view_file
-  - grep_search
-  - find_by_name
-  - list_dir
   - run_command
-  - read_url_content
-  - search_web
 hooks:
   - ../reviewer/hooks.json
 ---
