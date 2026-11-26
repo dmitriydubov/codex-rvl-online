@@ -1,12 +1,12 @@
 package ru.projectx.contracts.controller;
 
-class InvalidAttachmentPartException extends RuntimeException {
+class InvalidAttachmentFieldException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
     private final String field;
 
-    InvalidAttachmentPartException(String field) {
+    InvalidAttachmentFieldException(String field) {
         this.field = field;
     }
 

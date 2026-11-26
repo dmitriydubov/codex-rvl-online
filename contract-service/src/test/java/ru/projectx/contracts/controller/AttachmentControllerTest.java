@@ -154,6 +154,25 @@ class AttachmentControllerTest {
         verifyNoInteractions(uploads);
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "certificate, 1-1-1-1-1, 6778e8c2-985a-4d54-9bd3-0f6403b104d6, individual_request_id",
+        "certificate, 61a7982c-a0b4-4bbf-9527-60b40b752803, 1-1-1-1-1, participant_id",
+        "consent, 1-1-1-1-1, 6778e8c2-985a-4d54-9bd3-0f6403b104d6, policy_id",
+        "consent, 61a7982c-a0b4-4bbf-9527-60b40b752803, 1-1-1-1-1, family_member_id"})
+    void abbreviatedPathIdentifier_isAFormatViolation(String operation, String owner, String member, String field)
+            throws Exception {
+        String path = "certificate".equals(operation) ? PATH : CONSENT;
+
+        mvc.perform(multipart(path, owner, member).part(idPart(ATTACHMENT.toString()), file("image/jpeg")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details.length()").value(1))
+                .andExpect(jsonPath("$.error.details[0].field").value(field));
+        verifyNoInteractions(uploads);
+        assertThat(meters.find("contracts.attachments.rejected").counter()).isNull();
+    }
+
     @Test
     void missingAttachmentId_isValidationErrorNamingThePart() throws Exception {
         mvc.perform(multipart(PATH, REQUEST, PARTICIPANT).part(file("image/jpeg")).header(RequestIds.HEADER, TRACE))

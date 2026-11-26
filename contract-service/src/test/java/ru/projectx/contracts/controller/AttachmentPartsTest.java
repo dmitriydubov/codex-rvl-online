@@ -27,7 +27,7 @@ class AttachmentPartsTest {
     @ValueSource(strings = {"", "stand.txt"})
     void attachmentIdWithAnyFilename_isRejected(String filename) {
         assertThatThrownBy(() -> AttachmentParts.id(new MockPart("attachment_id", filename, ID_BYTES)))
-                .isInstanceOfSatisfying(InvalidAttachmentPartException.class,
+                .isInstanceOfSatisfying(InvalidAttachmentFieldException.class,
                         failure -> assertThat(failure.field()).isEqualTo("attachment_id"));
     }
 
@@ -36,7 +36,7 @@ class AttachmentPartsTest {
     void malformedUuid_isRejected(String value) {
         byte[] bytes = value.getBytes(StandardCharsets.US_ASCII);
         assertThatThrownBy(() -> AttachmentParts.id(new MockPart("attachment_id", bytes)))
-                .isInstanceOfSatisfying(InvalidAttachmentPartException.class,
+                .isInstanceOfSatisfying(InvalidAttachmentFieldException.class,
                         failure -> assertThat(failure.field()).isEqualTo("attachment_id"));
     }
 
@@ -45,7 +45,7 @@ class AttachmentPartsTest {
     @ValueSource(strings = {"   "})
     void missingOrBlankFilename_isRejected(String filename) {
         assertThatThrownBy(() -> AttachmentParts.file(new MockPart("file", filename, ID_BYTES)))
-                .isInstanceOfSatisfying(InvalidAttachmentPartException.class,
+                .isInstanceOfSatisfying(InvalidAttachmentFieldException.class,
                         failure -> assertThat(failure.field()).isEqualTo("file"));
     }
 

@@ -40,7 +40,7 @@ public class RequestFormatAdvice {
     }
 
     @ExceptionHandler
-    public ResponseEntity<ErrorResponse> invalidPart(InvalidAttachmentPartException invalid) {
+    public ResponseEntity<ErrorResponse> invalidAttachmentField(InvalidAttachmentFieldException invalid) {
         return ApiErrors.invalidField(invalid.field(), INVALID_FORMAT);
     }
 

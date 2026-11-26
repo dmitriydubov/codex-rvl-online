@@ -46,6 +46,11 @@ class AttachmentMigrationTest {
                     """).param("id", KNOWN).update();
             certificate(jdbc, KNOWN, "retained");
             certificate(jdbc, EARLY, "early");
+            certificate(jdbc, KNOWN, "deleted");
+            jdbc.sql("""
+                    update contract_documents set deleted_at = now(), delete_request_id = 'stand-delete'
+                    where file_key = 'deleted'
+                    """).update();
             consent(jdbc);
             connection.commit();
 
