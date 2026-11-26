@@ -74,6 +74,7 @@ databaseChangeLog:
             sql: >
               DELETE FROM contract_documents
               WHERE policy_id IS NOT NULL
+                 OR deleted_at IS NOT NULL
                  OR (individual_request_id IS NOT NULL
                      AND NOT EXISTS (
                          SELECT 1 FROM issuance_requests r

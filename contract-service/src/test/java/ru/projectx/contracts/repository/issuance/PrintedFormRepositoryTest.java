@@ -225,6 +225,8 @@ class PrintedFormRepositoryTest {
         UUID earlyAttachment = UUID.randomUUID();
         documents.saveAndFlush(PrintedForm.receivedAttachment(PrintedFormType.MEDICAL_CERTIFICATE, CERT_OWNER, FILE, NOW));
         documents.saveAndFlush(PrintedForm.receivedAttachment(PrintedFormType.MEDICAL_CERTIFICATE,
+                new DocumentAttachment(REQUEST, PARTICIPANT, null, null, UUID.randomUUID(), NOW, "req-del"), FILE, NOW));
+        documents.saveAndFlush(PrintedForm.receivedAttachment(PrintedFormType.MEDICAL_CERTIFICATE,
                 DocumentAttachments.certificate(EARLY_REQUEST, PARTICIPANT, earlyAttachment), FILE, NOW));
         documents.saveAndFlush(PrintedForm.receivedAttachment(PrintedFormType.PD_CONSENT, CONSENT_OWNER, FILE, NOW));
 

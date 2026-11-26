@@ -30,10 +30,6 @@ final class Uploads {
         return new CertificateUpload(REQUEST, participant, ATTACHMENT, file(contentType, content));
     }
 
-    static CertificateUpload forRequest(UUID request, UUID participant, @Nullable String contentType, String content) {
-        return new CertificateUpload(request, participant, ATTACHMENT, file(contentType, content));
-    }
-
     static ConsentUpload consentPdf() {
         return consent(POLICY, FAMILY_MEMBER, "application/pdf", CONTENT);
     }
