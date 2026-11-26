@@ -54,6 +54,10 @@
 - **Роли.** `specifier`, `hardener`, `reviewer` — агенты Antigravity в `.agents/agents/<роль>/agent.md`; их текст —
   те же `.claude/agents/<роль>.md`. Вызывай роль через `invoke_subagent` с `TypeName` = имя роли (`Workspace: inherit`
   в облачной среде, где `branch` не поддерживается; `Workspace: branch` для reviewer локально, если инструмент её даёт).
+  Если в облачной песочнице сабагенту выдан только `view_file` без записи и `run_command`: `specifier` возвращает полный
+  текст `.feature` дословно, и ты записываешь его байт-в-байт перед остановкой на утверждение; перед вызовом `hardener`
+  ты сам прогоняешь `./gradlew mutationGate --console=plain > /tmp/mutation-gate.log 2>&1`, передаёшь ему путь к логу и
+  отчётам PIT, применяешь его диффы только к `src/test/**` и `src/acceptanceTest/java/**` и перезапускаешь `mutationGate`.
   Других сабагентов в сессии шага не создавай (`define_subagent`, `run_workflow`, `/swarm`): процесс уже многоагентный (метод, п. 17).
 - **Ожидание роли.** Дождись итогового сообщения роли и прочитай его целиком. Роль упала, вернула пустой или
   обрезанный итог — запусти её снова с тем же заданием; не делай её работу сам и не пересказывай за неё.
@@ -68,14 +72,15 @@
   шаги 5–8 вплоть до открытого PR.
 - **Ответ внешнему ревьюеру** начинается строкой «Ответ Antigravity (Gemini 4 Carbon) на комментарий <ревьюер>»
   (с номером или датой) вместо «Ответ Claude Code …»; подставь свою модель, если она другая.
-- **Окружение.** agy запускают из корня репозитория с `ORG_GRADLE_PROJECT_publicRepositories=true`: иначе сборка
-  пойдёт в корпоративный реестр, а хуки не найдут задач набора. Гейты запускай на переднем плане, не фоновой
-  задачей: ход может закончиться, пока фоновая команда ещё идёт, а Stop-хук гонит свой прогон в тот же `build/`.
+- **Окружение.** agy запускают из корня репозитория с `ORG_GRADLE_PROJECT_publicRepositories=true` (в облачной
+  multi-workspace VM передавай `Cwd` каталога репозитория): иначе сборка пойдёт в корпоративный реестр, а хуки не найдут
+  задач набора. Гейты запускай с перенаправлением в файл (`> /tmp/...log 2>&1`, без `| tee`), дожидаясь завершения
+  задачи перед концом хода.
 
 ## 3. Перед словом «готово» (всегда; при неработающих хуках — единственная опора)
 
 1. Выполни сам (из каталога модуля, если задан `module`)
-   `./gradlew gauntletFast --continue --console=plain 2>&1 | tee /tmp/gauntlet-fast.log` и приложи к
+   `./gradlew gauntletFast --continue --console=plain > /tmp/gauntlet-fast.log 2>&1` и приложи к
    отчёту вывод `grep -E '^> Task |BUILD (SUCCESSFUL|FAILED)|^gauntlet: ' /tmp/gauntlet-fast.log` — строка `> Task …`
    у каждой задачи гейта (`gauntletScope`, `integrityCheck`, `checkstyleGate`, `pmdGate`, `test`, `archTest`,
    `testCensus`, `acceptanceTest`, `acceptanceCheck`, `jacocoTestReport`, `crapGate`, `cpdReport`, `dryGate`) и итог;

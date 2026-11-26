@@ -7,15 +7,9 @@ mainAgent: false
 commandExecutionPolicy: auto
 tools:
   - view_file
-  - grep_search
-  - find_by_name
-  - list_dir
   - write_to_file
   - replace_file_content
-  - multi_replace_file_content
   - run_command
-  - read_url_content
-  - search_web
 hooks:
   - ./hooks.json
 ---
@@ -27,8 +21,10 @@ hooks:
    для всех сред) и выполняй его. Блок между `---` в начале того файла — настройки Claude Code, к тебе не относится.
    Если в твоём контексте нет разделов 4 и 5 файла `GEMINI.md` (правило тщательности, формат отчёта), прочитай и их.
    В итоге приведи `wc -l` прочитанных файлов.
-2. Инструменты из текста роли: Read, Grep, Glob → `view_file`, `grep_search`, `find_by_name`, `list_dir`;
-   Edit, Write → `replace_file_content`, `multi_replace_file_content`, `write_to_file`; Bash → `run_command`.
+2. Инструменты из текста роли: Read → `view_file`; Grep, Glob, Bash → `run_command` (`rg`, `find`, `javap`);
+   Edit, Write → `replace_file_content`, `write_to_file`. Если в облачной песочнице тебе выдан только `view_file` без
+   инструментов записи, верни в итоговом сообщении полный текст `.feature`-файла дословно в кодовом блоке с целевым
+   путём, чтобы главный агент записал его байт-в-байт перед остановкой на утверждение.
 3. «A hook enforces it» здесь — хук роли (`./hooks.json`) и правила разрешений. Хук может не сработать: область
    записи (только каталог фич охраняемых модулей) держишь ты. Отказ хука или запрета не обходи — сообщи.
 4. Не коммить, не вызывай других сабагентов, не правь `gauntlet/`, `.claude/`, `.agents/`, `GEMINI.md`, `AGENTS.md`,

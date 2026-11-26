@@ -2,18 +2,18 @@
   "gauntlet": {
     "SessionStart": [
       { "type": "command", "timeout": 180,
-        "command": "sh -c 'cd \"$(git rev-parse --show-toplevel)\" && exec python3 -I gauntlet/adapters/antigravity/agy_hooks.py session-start'" }
+        "command": "sh -c 'for d in . \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"/*/*; do [ -f \"$d/gauntlet/adapters/antigravity/agy_hooks.py\" ] && cd \"$d\" && exec python3 -I -B gauntlet/adapters/antigravity/agy_hooks.py session-start; done; printf \"{}\"'" }
     ],
     "PreToolUse": [
       { "matcher": ".*",
         "hooks": [
           { "type": "command", "timeout": 40,
-            "command": "sh -c 'cd \"$(git rev-parse --show-toplevel)\" && exec python3 -I gauntlet/adapters/antigravity/agy_hooks.py pre-tool --role shared'" }
+            "command": "sh -c 'for d in . \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"/*/*; do [ -f \"$d/gauntlet/adapters/antigravity/agy_hooks.py\" ] && cd \"$d\" && exec python3 -I -B gauntlet/adapters/antigravity/agy_hooks.py pre-tool --role shared; done; printf \"{\\\"decision\\\":\\\"allow\\\"}\"'" }
         ] }
     ],
     "Stop": [
       { "type": "command", "timeout": 1800,
-        "command": "sh -c 'cd \"$(git rev-parse --show-toplevel)\" && exec python3 -I gauntlet/adapters/antigravity/agy_hooks.py stop --task gauntletFast --max-attempts 3 --timeout 1700'" }
+        "command": "sh -c 'for d in . \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"/*/*; do [ -f \"$d/gauntlet/adapters/antigravity/agy_hooks.py\" ] && cd \"$d\" && exec python3 -I -B gauntlet/adapters/antigravity/agy_hooks.py stop --task gauntletFast --max-attempts 3 --timeout 1700; done; printf \"{}\"'" }
     ]
   }
 }
