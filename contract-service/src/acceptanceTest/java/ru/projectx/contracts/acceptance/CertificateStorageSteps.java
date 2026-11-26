@@ -43,9 +43,11 @@ public class CertificateStorageSteps {
 
     @After
     public void recoverStorage() {
-        storage.recover();
-        await("клиент хранилища сервиса снова отвечает").atMost(SERVICE_RECONNECT).ignoreExceptions()
-                .until(this::serviceClientAnswers);
+        if (storage.disrupted()) {
+            storage.recover();
+            await("клиент хранилища сервиса снова отвечает").atMost(SERVICE_RECONNECT).ignoreExceptions()
+                    .until(this::serviceClientAnswers);
+        }
     }
 
     @Дано("хранилище справок Договоров — бакет {string}, base-path {string}, предельный размер файла {long} байт")

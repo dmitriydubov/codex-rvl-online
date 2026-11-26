@@ -55,7 +55,9 @@ public class DatabaseAvailabilitySteps {
 
     @After(order = AFTER_LOCK_RELEASE)
     public void restoreAndResume() {
-        connectionsRestored();
-        storageChecked();
+        if (pools.stream().anyMatch(SwitchableDataSource::failing) || !pause.paused().isEmpty()) {
+            connectionsRestored();
+            storageChecked();
+        }
     }
 }

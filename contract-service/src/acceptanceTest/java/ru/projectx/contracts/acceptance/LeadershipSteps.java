@@ -79,8 +79,10 @@ public class LeadershipSteps {
 
     @After(order = AFTER_DATABASE_RESTORED)
     public void thisInstanceLeadsAgain() {
-        stand.release();
-        await().atMost(ROLE_TIMEOUT).until(leadership::leader);
-        consumers.awaitEveryConsumer();
+        if (stand.heldByOther() || !leadership.leader()) {
+            stand.release();
+            await().atMost(ROLE_TIMEOUT).until(leadership::leader);
+            consumers.awaitEveryConsumer();
+        }
     }
 }
