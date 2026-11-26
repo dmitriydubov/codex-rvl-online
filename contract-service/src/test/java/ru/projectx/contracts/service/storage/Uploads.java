@@ -17,18 +17,17 @@ final class Uploads {
     private Uploads() {
     }
 
-    static CertificateUpload jpeg() {
+    static AttachmentUpload jpeg() {
         return of(PARTICIPANT, "image/jpeg", CONTENT);
     }
 
-    static CertificateUpload of(UUID participant, @Nullable String contentType, String content) {
+    static AttachmentUpload of(UUID participant, @Nullable String contentType, String content) {
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        return new CertificateUpload(REQUEST, participant, ATTACHMENT, contentType, bytes.length,
-                () -> new ByteArrayInputStream(bytes));
+        return AttachmentUpload.certificate(REQUEST, participant, ATTACHMENT,
+                new AttachmentContent(contentType, bytes.length, () -> new ByteArrayInputStream(bytes)));
     }
 
-    static CertificateUpload sized(@Nullable String contentType, long size) {
-        return new CertificateUpload(REQUEST, PARTICIPANT, ATTACHMENT, contentType, size,
-                () -> new ByteArrayInputStream(new byte[0]));
+    static AttachmentContent sized(@Nullable String contentType, long size) {
+        return new AttachmentContent(contentType, size, () -> new ByteArrayInputStream(new byte[0]));
     }
 }

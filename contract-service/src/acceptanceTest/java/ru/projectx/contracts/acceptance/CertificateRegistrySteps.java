@@ -34,8 +34,34 @@ public class CertificateRegistrySteps {
     @Тогда("справки участника {string} заявки {string} в реестре документов:")
     public void certificates(String participant, String request, DataTable expected) {
         List<CertificateRecords.Certificate> stored = records.of(UUID.fromString(request), UUID.fromString(participant));
+        inOrder(stored, expected);
+    }
+
+    @Тогда("согласия члена семьи {string} по полису {string} в реестре документов:")
+    public void consents(String member, String policy, DataTable expected) {
+        inOrder(records.consents(UUID.fromString(policy), UUID.fromString(member)), expected);
+    }
+
+    @Тогда("согласия члена семьи {string} по полису {string} в реестре документов, без учёта порядка:")
+    public void consentsInAnyOrder(String member, String policy, DataTable expected) {
+        List<CertificateRecords.Certificate> stored = records.consents(UUID.fromString(policy), UUID.fromString(member));
         List<Map<String, String>> rows = expected.asMaps();
-        assertThat(stored).as("справки участника %s", participant).hasSize(rows.size());
+        assertThat(stored).extracting(found -> found.attachment().toString())
+                .containsExactlyInAnyOrderElementsOf(rows.stream().map(row -> row.get("вложение")).toList());
+        for (Map<String, String> row : rows) {
+            matches(records.byAttachment(row.get("вложение")), row);
+        }
+    }
+
+    @Тогда("в реестре документов нет согласий члена семьи {string} по полису {string}")
+    public void noConsents(String member, String policy) {
+        assertThat(records.consents(UUID.fromString(policy), UUID.fromString(member)))
+                .as("согласия члена семьи %s", member).isEmpty();
+    }
+
+    private static void inOrder(List<CertificateRecords.Certificate> stored, DataTable expected) {
+        List<Map<String, String>> rows = expected.asMaps();
+        assertThat(stored).as("вложения владельца").hasSize(rows.size());
         for (int index = 0; index < rows.size(); index++) {
             matches(stored.get(index), rows.get(index));
         }
@@ -62,7 +88,7 @@ public class CertificateRegistrySteps {
             assertThat(certificate.key()).as("ключ объекта").matches(keyPattern(expected));
             return;
         }
-        if (CREATED_COLUMN.equals(column)) {
+        if (CREATED_COLUMN.equals(column) || "создано".equals(column)) {
             assertThat(certificate.createdAt()).as("момент записи").isEqualTo(OffsetDateTime.parse(expected).toInstant());
             return;
         }

@@ -10,7 +10,7 @@ import ru.projectx.contracts.entity.party.PersonOwner;
 class PrintedFormTest {
 
     private static final Instant NOW = Instant.parse("2026-02-10T07:05:00Z");
-    private static final ParticipantAttachment ATTACHMENT = new ParticipantAttachment(
+    private static final AttachmentOwner ATTACHMENT = AttachmentOwners.certificate(
             UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803"),
             UUID.fromString("6778e8c2-985a-4d54-9bd3-0f6403b104d6"),
             UUID.fromString("3c2f8e10-5a7b-4d21-9f6e-1b0a7c4d8e21"));
@@ -20,7 +20,7 @@ class PrintedFormTest {
 
     @Test
     void receivedCertificate_belongsToTheParticipantAttachmentAndNotToAPolicy() {
-        PrintedForm certificate = PrintedForm.receivedCertificate(ATTACHMENT, FILE, NOW);
+        PrintedForm certificate = PrintedForm.receivedAttachment(ATTACHMENT, FILE, NOW);
 
         assertThat(certificate.attachment()).contains(ATTACHMENT);
         assertThat(certificate.lmPolicyId()).isEmpty();
@@ -30,7 +30,7 @@ class PrintedFormTest {
 
     @Test
     void receivedCertificate_isAFinalMedicalCertificateOfFirstVersionWithItsStoredFile() {
-        PrintedForm certificate = PrintedForm.receivedCertificate(ATTACHMENT, FILE, NOW);
+        PrintedForm certificate = PrintedForm.receivedAttachment(ATTACHMENT, FILE, NOW);
 
         assertThat(certificate.docType()).isEqualTo(PrintedFormType.MEDICAL_CERTIFICATE);
         assertThat(certificate.kind()).isEqualTo(PrintedFormKind.FINAL);

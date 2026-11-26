@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 import ru.projectx.contracts.entity.contract.Contract;
 import ru.projectx.contracts.entity.document.PrintedForm;
+import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.exception.CertificateKeyMissingException;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 
@@ -17,8 +18,8 @@ public class InsuredCertificates {
     }
 
     public List<SubmittedCertificate> of(Contract contract) {
-        return forms.findByAttachmentIndividualRequestIdAndAttachmentParticipantIdOrderByCreatedAtAscIdAsc(
-                        contract.state().request().individualRequestId(), contract.participantId()).stream()
+        return forms.findActiveParticipantDocuments(contract.state().request().individualRequestId(),
+                        contract.participantId(), PrintedFormType.MEDICAL_CERTIFICATE).stream()
                 .map(InsuredCertificates::certificate)
                 .toList();
     }

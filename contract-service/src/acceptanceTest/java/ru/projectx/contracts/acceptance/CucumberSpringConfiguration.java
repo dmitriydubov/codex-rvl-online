@@ -1,6 +1,7 @@
 package ru.projectx.contracts.acceptance;
 
 import io.cucumber.spring.CucumberContextConfiguration;
+import io.minio.MinioClient;
 import java.io.IOException;
 import javax.sql.DataSource;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
@@ -58,6 +60,7 @@ import ru.projectx.contracts.service.leadership.LeaderLockConnections;
         "projectx.brokers.marketing.listener-auto-startup=true",
         "projectx.brokers.marketing.order-events.queue=order.event.rvl.topic"})
 @Import(CucumberSpringConfiguration.Stand.class)
+@MockitoSpyBean(types = MinioClient.class)
 public class CucumberSpringConfiguration {
 
     @TestConfiguration(proxyBeanMethods = false)

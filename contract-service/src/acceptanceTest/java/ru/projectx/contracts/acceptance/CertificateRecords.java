@@ -23,6 +23,12 @@ public class CertificateRecords {
               from contract_documents
              where attachment_id = :attachment
             """;
+    private static final String CONSENTS = """
+            select id, attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
+              from contract_documents
+             where policy_id = :policy and family_member_id = :member
+             order by created_at, id
+            """;
 
     private static final String REKEY = """
             update contract_documents set file_key = :key where attachment_id = :attachment
@@ -41,6 +47,30 @@ public class CertificateRecords {
     List<Certificate> of(UUID request, UUID participant) {
         return jdbc.sql(CERTIFICATES).param("request", request).param("participant", participant)
                 .query(this::certificate).list();
+    }
+
+    List<Certificate> consents(UUID policy, UUID member) {
+        return jdbc.sql(CONSENTS).param("policy", policy).param("member", member).query(this::certificate).list();
+    }
+
+    List<String> rows(String attachment) {
+        return jdbc.sql("select to_jsonb(form)::text from contract_documents form where attachment_id = :attachment")
+                .param("attachment", UUID.fromString(attachment)).query(String.class).list();
+    }
+
+    List<Certificate> attachedDocuments() {
+        return jdbc.sql("""
+                select id, attachment_id, doc_type::text as doc_type, content_type, file_size, file_hash, file_key, created_at
+                from contract_documents where attachment_id is not null
+                """).query(this::certificate).list();
+    }
+
+    int markDeleted(String attachment, OffsetDateTime when, String requestId) {
+        return jdbc.sql("""
+                update contract_documents set deleted_at = :when, delete_request_id = :request
+                where attachment_id = :attachment and deleted_at is null
+                """).param("when", when).param("request", requestId)
+                .param("attachment", UUID.fromString(attachment)).update();
     }
 
     Certificate byAttachment(String attachment) {

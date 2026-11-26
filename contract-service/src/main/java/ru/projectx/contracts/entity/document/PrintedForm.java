@@ -74,7 +74,11 @@ public class PrintedForm {
 
     @Nullable
     @Embedded
-    private ParticipantAttachment attachment;
+    private AttachmentOwner attachment;
+
+    @Nullable
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     protected PrintedForm() {
     }
@@ -90,10 +94,10 @@ public class PrintedForm {
         this.createdAt = now;
     }
 
-    private PrintedForm(ParticipantAttachment attachment, StoredFile file, Instant now) {
+    private PrintedForm(AttachmentOwner attachment, StoredFile file, Instant now) {
         this.attachment = attachment;
         this.kind = PrintedFormKind.FINAL;
-        this.docType = PrintedFormType.MEDICAL_CERTIFICATE;
+        this.docType = AttachmentOwners.documentType(attachment);
         this.version = FIRST_VERSION;
         this.fileKey = file.key();
         this.fileHash = file.hash();
@@ -106,7 +110,7 @@ public class PrintedForm {
         return new PrintedForm(owner, document, now);
     }
 
-    public static PrintedForm receivedCertificate(ParticipantAttachment attachment, StoredFile file, Instant now) {
+    public static PrintedForm receivedAttachment(AttachmentOwner attachment, StoredFile file, Instant now) {
         return new PrintedForm(attachment, file, now);
     }
 
@@ -134,8 +138,12 @@ public class PrintedForm {
         return Optional.ofNullable(uskFileUrl);
     }
 
-    public Optional<ParticipantAttachment> attachment() {
+    public Optional<AttachmentOwner> attachment() {
         return Optional.ofNullable(attachment);
+    }
+
+    public boolean deleted() {
+        return deletedAt != null;
     }
 
     public Optional<StoredFile> storedFile() {

@@ -15,7 +15,7 @@ import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssueError;
 import ru.projectx.contracts.entity.policy.LmPolicy;
 import ru.projectx.contracts.entity.policy.LmPolicyStatus;
-import ru.projectx.contracts.entity.document.ParticipantAttachment;
+import ru.projectx.contracts.entity.document.AttachmentOwners;
 import ru.projectx.contracts.entity.party.PersonOwner;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.document.PrintedFormType;
@@ -146,8 +146,8 @@ class IssuanceSnapshotTest {
     @Test
     void receivedCertificateOfAParticipant_belongsToNoRecord_andDoesNotBreakTheSnapshot() {
         Contract contract = Issuances.contract(EARLIER, Tasks.SPOUSE, "DKM-2026-000001");
-        PrintedForm certificate = PrintedForm.receivedCertificate(
-                new ParticipantAttachment(Tasks.REQUEST, Tasks.SPOUSE, UUID.fromString("5d0e9a3c-2b7f-4c18-8e6a-1f3b9c7d2e40")),
+        PrintedForm certificate = PrintedForm.receivedAttachment(
+                AttachmentOwners.certificate(Tasks.REQUEST, Tasks.SPOUSE, UUID.fromString("5d0e9a3c-2b7f-4c18-8e6a-1f3b9c7d2e40")),
                 new StoredFile("certificates/61a7/5d0e.pdf", "f".repeat(64), 76L, "application/pdf"), NOW);
         PrintedForm contractForm = formOfContract(contract.id(), "https://s3.sogaz.ru/rvl/km/2026/02/DKM-2026-000001.pdf");
 

@@ -52,9 +52,12 @@ class InternalApiIT {
 
     @Test
     void unknownRequest_isAnsweredInTheCommonErrorFormatInSnakeCase() throws IOException, InterruptedException {
-        HttpResponse<String> response = upload(UUID.randomUUID(), "СТЕНД".getBytes(StandardCharsets.UTF_8));
+        URI uri = URI.create("http://localhost:" + port + "/internal/v1/requests/" + UUID.randomUUID() + "/package");
+        HttpRequest call = HttpRequest.newBuilder(uri).timeout(TIMEOUT).header(RequestIds.HEADER, TRACE).GET().build();
+        HttpResponse<String> response = http.send(call, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
         assertThat(response.statusCode()).isEqualTo(404);
+        assertThat(response.headers().firstValue(RequestIds.HEADER)).contains(TRACE);
         JsonNode error = json.readTree(response.body()).path("error");
         assertThat(error.propertyNames()).containsExactlyInAnyOrder("code", "message", "details", "request_id");
         assertThat(error.path("code").asString()).isEqualTo("REQUEST_NOT_FOUND");

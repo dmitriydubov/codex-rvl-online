@@ -24,23 +24,23 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
-import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import ru.projectx.contracts.dto.AttachmentDetails;
 import ru.projectx.contracts.dto.AttachmentResponse;
+import ru.projectx.contracts.dto.ConsentResponse;
 import ru.projectx.contracts.exception.AttachmentConflictException;
 import ru.projectx.contracts.exception.AttachmentDefect;
 import ru.projectx.contracts.exception.AttachmentRejectedException;
-import ru.projectx.contracts.exception.ParticipantNotFoundException;
 import ru.projectx.contracts.exception.RequestCancelledException;
-import ru.projectx.contracts.exception.RequestNotFoundException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.storage.AttachmentMetrics;
 import ru.projectx.contracts.service.storage.AttachmentUploads;
-import ru.projectx.contracts.service.storage.CertificateUpload;
+import ru.projectx.contracts.service.storage.AttachmentUpload;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -50,6 +50,7 @@ class AttachmentControllerTest {
     private static final UUID PARTICIPANT = UUID.fromString("6778e8c2-985a-4d54-9bd3-0f6403b104d6");
     private static final UUID ATTACHMENT = UUID.fromString("3c2f8e10-5a7b-4d21-9f6e-1b0a7c4d8e21");
     private static final String PATH = "/internal/v1/requests/{request}/participants/{participant}/attachments";
+    private static final String CONSENT = "/internal/v1/policies/{policy}/family-members/{member}/consents";
     private static final byte[] CONTENT = "СТЕНД: вымышленная справка 070/у".getBytes(StandardCharsets.UTF_8);
     private static final String TRACE = "a41f8c02-7d3b-4e19-9a55-2c7e0b6f1d84";
 
@@ -65,9 +66,9 @@ class AttachmentControllerTest {
 
     @Test
     void acceptedUpload_answersTheRegistryRecordInSnakeCase() throws Exception {
-        when(uploads.receive(any())).thenReturn(new AttachmentResponse(UUID.fromString(
-                "0b6c1d2e-7f3a-4b5c-9d8e-1f2a3b4c5d6e"), ATTACHMENT, REQUEST, PARTICIPANT, "image/jpeg", 76, "ab",
-                Instant.parse("2026-02-10T07:05:00Z")));
+        AttachmentDetails details = new AttachmentDetails(UUID.fromString("0b6c1d2e-7f3a-4b5c-9d8e-1f2a3b4c5d6e"),
+                ATTACHMENT, "image/jpeg", 76, "ab", Instant.parse("2026-02-10T07:05:00Z"));
+        when(uploads.receive(any())).thenReturn(new AttachmentResponse(REQUEST, PARTICIPANT, details));
 
         mvc.perform(upload(REQUEST.toString(), PARTICIPANT.toString(), ATTACHMENT.toString(), file("image/jpeg")))
                 .andExpect(status().isOk())
@@ -86,15 +87,53 @@ class AttachmentControllerTest {
     void upload_passesPathPartsAndTheFileToTheService() throws Exception {
         mvc.perform(upload(REQUEST.toString(), PARTICIPANT.toString(), ATTACHMENT.toString(), file("image/png")));
 
-        ArgumentCaptor<CertificateUpload> received = ArgumentCaptor.forClass(CertificateUpload.class);
+        ArgumentCaptor<AttachmentUpload> received = ArgumentCaptor.forClass(AttachmentUpload.class);
         verify(uploads).receive(received.capture());
-        CertificateUpload upload = received.getValue();
-        assertThat(upload.individualRequestId()).isEqualTo(REQUEST);
-        assertThat(upload.participantId()).isEqualTo(PARTICIPANT);
-        assertThat(upload.attachmentId()).isEqualTo(ATTACHMENT);
-        assertThat(upload.contentType()).isEqualTo("image/png");
-        assertThat(upload.size()).isEqualTo(CONTENT.length);
+        AttachmentUpload upload = received.getValue();
+        assertThat(upload.owner().individualRequestId()).isEqualTo(REQUEST);
+        assertThat(upload.owner().participantId()).isEqualTo(PARTICIPANT);
+        assertThat(upload.owner().attachmentId()).isEqualTo(ATTACHMENT);
+        assertThat(upload.file().contentType()).isEqualTo("image/png");
+        assertThat(upload.file().size()).isEqualTo(CONTENT.length);
         assertThat(readAll(upload)).isEqualTo(CONTENT);
+    }
+
+    @Test
+    void acceptedConsent_isExposedWithThePolicyAndFamilyMember() throws Exception {
+        AttachmentDetails saved = new AttachmentDetails(UUID.randomUUID(), ATTACHMENT, "application/pdf",
+                CONTENT.length, "ab", Instant.parse("2026-02-10T07:05:00Z"));
+        when(uploads.receive(any())).thenReturn(new ConsentResponse(REQUEST, PARTICIPANT, saved));
+
+        mvc.perform(multipart(CONSENT, REQUEST, PARTICIPANT)
+                        .part(idPart(ATTACHMENT.toString()), file("application/pdf")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.document_id").value(saved.documentId().toString()))
+                .andExpect(jsonPath("$.attachment_id").value(ATTACHMENT.toString()))
+                .andExpect(jsonPath("$.policy_id").value(REQUEST.toString()))
+                .andExpect(jsonPath("$.family_member_id").value(PARTICIPANT.toString()))
+                .andExpect(jsonPath("$.individual_request_id").doesNotExist())
+                .andExpect(jsonPath("$.participant_id").doesNotExist());
+        ArgumentCaptor<AttachmentUpload> received = ArgumentCaptor.forClass(AttachmentUpload.class);
+        verify(uploads).receive(received.capture());
+        AttachmentUpload upload = received.getValue();
+        assertThat(upload.owner().policyId()).isEqualTo(REQUEST);
+        assertThat(upload.owner().familyMemberId()).isEqualTo(PARTICIPANT);
+        assertThat(upload.owner().individualRequestId()).isNull();
+        assertThat(upload.owner().participantId()).isNull();
+        assertThat(readAll(upload)).isEqualTo(CONTENT);
+    }
+
+    @Test
+    void attachmentIdFilename_isAFormatViolationWithoutARejectionMetric() throws Exception {
+        MockPart id = new MockPart("attachment_id", "", ATTACHMENT.toString().getBytes(StandardCharsets.US_ASCII));
+
+        mvc.perform(multipart(CONSENT, REQUEST, PARTICIPANT).part(id, file("application/pdf")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details.length()").value(1))
+                .andExpect(jsonPath("$.error.details[0].field").value("attachment_id"));
+        verifyNoInteractions(uploads);
+        assertThat(meters.find("contracts.attachments.rejected").counter()).isNull();
     }
 
     @ParameterizedTest
@@ -117,7 +156,7 @@ class AttachmentControllerTest {
 
     @Test
     void missingAttachmentId_isValidationErrorNamingThePart() throws Exception {
-        mvc.perform(multipart(PATH, REQUEST, PARTICIPANT).file(file("image/jpeg")).header(RequestIds.HEADER, TRACE))
+        mvc.perform(multipart(PATH, REQUEST, PARTICIPANT).part(file("image/jpeg")).header(RequestIds.HEADER, TRACE))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.details[0].field").value("attachment_id"))
                 .andExpect(jsonPath("$.error.details[0].reason").value("обязательное поле не передано"));
@@ -125,7 +164,7 @@ class AttachmentControllerTest {
 
     @Test
     void missingFile_isValidationErrorNamingThePart() throws Exception {
-        mvc.perform(multipart(PATH, REQUEST, PARTICIPANT).param("attachment_id", ATTACHMENT.toString()))
+        mvc.perform(multipart(PATH, REQUEST, PARTICIPANT).part(idPart(ATTACHMENT.toString())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.details[0].field").value("file"))
                 .andExpect(jsonPath("$.error.details[0].reason").value("обязательное поле не передано"));
@@ -158,17 +197,6 @@ class AttachmentControllerTest {
     }
 
     @Test
-    void unknownRequest_isNotFound() throws Exception {
-        expectError(new RequestNotFoundException(REQUEST), 404, "REQUEST_NOT_FOUND", "задачи на выпуск по заявке нет");
-    }
-
-    @Test
-    void unknownParticipant_isNotFound() throws Exception {
-        expectError(new ParticipantNotFoundException(REQUEST, PARTICIPANT), 404, "PARTICIPANT_NOT_FOUND",
-                "участника нет в составе заявки");
-    }
-
-    @Test
     void cancelledRequest_isInvalidState() throws Exception {
         expectError(new RequestCancelledException(REQUEST), 409, "INVALID_STATE", "работа по заявке прекращена");
     }
@@ -176,7 +204,7 @@ class AttachmentControllerTest {
     @Test
     void conflictingAttachment_isAttachmentConflict() throws Exception {
         expectError(new AttachmentConflictException(ATTACHMENT), 409, "ATTACHMENT_CONFLICT",
-                "вложение уже принято с другим содержимым или по другому участнику");
+                "идентификатор вложения уже занят");
     }
 
     @Test
@@ -218,18 +246,22 @@ class AttachmentControllerTest {
     }
 
     private static MockMultipartHttpServletRequestBuilder upload(String request, String participant,
-            String attachment, MockMultipartFile file) {
-        MockMultipartHttpServletRequestBuilder builder = multipart(PATH, request, participant).file(file);
-        builder.param("attachment_id", attachment).header(RequestIds.HEADER, TRACE);
+            String attachment, MockPart file) {
+        MockMultipartHttpServletRequestBuilder builder = multipart(PATH, request, participant).part(file);
+        builder.part(idPart(attachment)).header(RequestIds.HEADER, TRACE);
         return builder;
     }
 
-    private static MockMultipartFile file(String contentType) {
-        return new MockMultipartFile("file", "Тестова_Анна_070у.jpg", contentType, CONTENT);
+    private static MockPart file(String contentType) {
+        return new MockPart("file", "Тестова_Анна_070у.jpg", CONTENT, MediaType.parseMediaType(contentType));
     }
 
-    private static byte[] readAll(CertificateUpload upload) throws IOException {
-        try (InputStream stream = upload.content().open()) {
+    private static MockPart idPart(String attachment) {
+        return new MockPart("attachment_id", attachment.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] readAll(AttachmentUpload upload) throws IOException {
+        try (InputStream stream = upload.file().source().open()) {
             return stream.readAllBytes();
         }
     }

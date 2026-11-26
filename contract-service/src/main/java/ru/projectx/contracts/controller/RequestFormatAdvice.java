@@ -5,7 +5,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -36,13 +35,13 @@ public class RequestFormatAdvice {
     }
 
     @ExceptionHandler
-    public ResponseEntity<ErrorResponse> missingParameter(MissingServletRequestParameterException missing) {
-        return ApiErrors.invalidField(missing.getParameterName(), MISSING);
+    public ResponseEntity<ErrorResponse> missingPart(MissingServletRequestPartException missing) {
+        return ApiErrors.invalidField(missing.getRequestPartName(), MISSING);
     }
 
     @ExceptionHandler
-    public ResponseEntity<ErrorResponse> missingPart(MissingServletRequestPartException missing) {
-        return ApiErrors.invalidField(missing.getRequestPartName(), MISSING);
+    public ResponseEntity<ErrorResponse> invalidPart(InvalidAttachmentPartException invalid) {
+        return ApiErrors.invalidField(invalid.field(), INVALID_FORMAT);
     }
 
     @ExceptionHandler

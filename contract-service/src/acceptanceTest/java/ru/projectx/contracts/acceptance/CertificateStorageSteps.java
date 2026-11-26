@@ -101,6 +101,7 @@ public class CertificateStorageSteps {
     }
 
     @Тогда("содержимое объекта справки по вложению {string} в хранилище совпадает с отправленным")
+    @Тогда("содержимое объекта согласия по вложению {string} в хранилище совпадает с отправленным")
     public void objectContent(String attachment) throws Exception {
         String key = records.byAttachment(attachment).key();
         assertThat(storage.object(settings.bucket(), key)).as("объект %s", key)
@@ -108,8 +109,14 @@ public class CertificateStorageSteps {
     }
 
     @Тогда("папки объектов справок по вложениям {string} и {string} разные")
+    @Тогда("папки объектов согласий по вложениям {string} и {string} разные")
     public void separateFolders(String first, String second) {
         assertThat(folder(records.byAttachment(first).key())).isNotEqualTo(folder(records.byAttachment(second).key()));
+    }
+
+    @Тогда("Договоры не обращались к хранилищу при загрузке")
+    public void noStorageCallsDuringUpload() {
+        assertThat(calls.storageCalls()).as("вызовы клиента S3 во время загрузки").isZero();
     }
 
     private String folder(String key) {

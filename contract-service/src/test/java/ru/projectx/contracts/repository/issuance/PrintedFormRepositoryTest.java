@@ -14,7 +14,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.projectx.contracts.entity.issuance.DocumentKind;
 import ru.projectx.contracts.entity.issuance.IssuanceRequest;
-import ru.projectx.contracts.entity.document.ParticipantAttachment;
+import ru.projectx.contracts.entity.document.AttachmentOwner;
+import ru.projectx.contracts.entity.document.AttachmentOwners;
 import ru.projectx.contracts.entity.document.PrintedForm;
 import ru.projectx.contracts.entity.document.PrintedFormType;
 import ru.projectx.contracts.entity.issuance.RequestParticipant;
@@ -28,7 +29,7 @@ class PrintedFormRepositoryTest {
     private static final UUID REQUEST = UUID.fromString("61a7982c-a0b4-4bbf-9527-60b40b752803");
     private static final UUID PARTICIPANT = UUID.fromString("6778e8c2-985a-4d54-9bd3-0f6403b104d6");
     private static final UUID ATTACHMENT = UUID.fromString("3c2f8e10-5a7b-4d21-9f6e-1b0a7c4d8e21");
-    private static final ParticipantAttachment OWNER = new ParticipantAttachment(REQUEST, PARTICIPANT, ATTACHMENT);
+    private static final AttachmentOwner OWNER = AttachmentOwners.certificate(REQUEST, PARTICIPANT, ATTACHMENT);
     private static final StoredFile FILE = new StoredFile("certificates/0b6c1d2e/" + ATTACHMENT + ".jpg",
             "7851d78af0fb98bbbda8933f49860a009ac7761c21a1136613c8a6704b156251", 76, "image/jpeg");
 
@@ -56,7 +57,7 @@ class PrintedFormRepositoryTest {
 
     @Test
     void certificate_isFoundByAttachmentWithItsOwnerAndFile() {
-        documents.saveAndFlush(PrintedForm.receivedCertificate(OWNER, FILE, NOW));
+        documents.saveAndFlush(PrintedForm.receivedAttachment(OWNER, FILE, NOW));
 
         assertThat(documents.findByAttachmentAttachmentId(ATTACHMENT)).get().satisfies(found -> {
             assertThat(found.attachment()).contains(OWNER);
@@ -76,19 +77,49 @@ class PrintedFormRepositoryTest {
 
     @Test
     void secondRecordOfTheSameAttachment_isRefusedByTheDatabase() {
-        documents.saveAndFlush(PrintedForm.receivedCertificate(OWNER, FILE, NOW));
-        ParticipantAttachment again = new ParticipantAttachment(REQUEST, PARTICIPANT, ATTACHMENT);
+        documents.saveAndFlush(PrintedForm.receivedAttachment(OWNER, FILE, NOW));
+        AttachmentOwner again = AttachmentOwners.certificate(REQUEST, PARTICIPANT, ATTACHMENT);
 
-        assertThatThrownBy(() -> documents.saveAndFlush(PrintedForm.receivedCertificate(again, FILE, NOW)))
+        assertThatThrownBy(() -> documents.saveAndFlush(PrintedForm.receivedAttachment(again, FILE, NOW)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
-    void certificateOfAnUnknownRequest_isRefusedByTheDatabase() {
-        ParticipantAttachment stranger = new ParticipantAttachment(UUID.randomUUID(), PARTICIPANT, UUID.randomUUID());
+    void consentAndCertificateCannotShareTheSameAttachmentId() {
+        AttachmentOwner consent = AttachmentOwners.consent(REQUEST, PARTICIPANT, ATTACHMENT);
+        documents.saveAndFlush(PrintedForm.receivedAttachment(consent, FILE, NOW));
 
-        assertThatThrownBy(() -> documents.saveAndFlush(PrintedForm.receivedCertificate(stranger, FILE, NOW)))
-                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> documents.saveAndFlush(PrintedForm.receivedAttachment(OWNER, FILE, NOW)))
+                .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("uq_contract_documents_attachment_id");
+        assertThat(documents.findByAttachmentAttachmentId(ATTACHMENT)).get()
+                .satisfies(found -> assertThat(found.attachment()).contains(consent));
+        assertThat(documents.findActiveParticipantDocuments(REQUEST, PARTICIPANT, PrintedFormType.MEDICAL_CERTIFICATE))
+                .isEmpty();
+    }
+
+    @Test
+    void certificateOfAnUnknownRequest_canBeStoredBeforeIssuance() {
+        AttachmentOwner stranger = AttachmentOwners.certificate(UUID.randomUUID(), PARTICIPANT, UUID.randomUUID());
+
+        documents.saveAndFlush(PrintedForm.receivedAttachment(stranger, FILE, NOW));
+
+        assertThat(documents.findByAttachmentAttachmentId(stranger.attachmentId())).get()
+                .satisfies(found -> assertThat(found.attachment()).contains(stranger));
+    }
+
+    @Test
+    void activeCertificates_omitSoftDeletedRowsAndOtherParticipants() {
+        PrintedForm active = documents.saveAndFlush(PrintedForm.receivedAttachment(OWNER, FILE, NOW));
+        PrintedForm deleted = documents.saveAndFlush(PrintedForm.receivedAttachment(
+                AttachmentOwners.certificate(REQUEST, PARTICIPANT, UUID.randomUUID()), FILE, NOW));
+        documents.saveAndFlush(PrintedForm.receivedAttachment(
+                AttachmentOwners.certificate(REQUEST, UUID.randomUUID(), UUID.randomUUID()), FILE, NOW));
+        jdbc.sql("update contract_documents set deleted_at = now(), delete_request_id = 'stand-delete' where id = :id")
+                .param("id", deleted.id()).update();
+
+        assertThat(documents.findActiveParticipantDocuments(REQUEST, PARTICIPANT, PrintedFormType.MEDICAL_CERTIFICATE))
+                .extracting(PrintedForm::id).containsExactly(active.id());
+        assertThat(documents.findById(deleted.id())).get().satisfies(found -> assertThat(found.deleted()).isTrue());
     }
 
     @Test

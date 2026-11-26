@@ -92,6 +92,12 @@ public class PrometheusSteps {
                 .isEqualTo(growth);
     }
 
+    @Тогда("суммарный прирост счётчика Prometheus {string} по всем меткам за сценарий — {int}")
+    public void totalCounterGrowth(String name, int growth) throws IOException, InterruptedException {
+        assertThat(valueOf(scrape(), name) - valueOf(beforeScenario, name)).as("прирост всех рядов %s", name)
+                .isEqualTo(growth);
+    }
+
     private static void assertDocumented(String name, String label) throws IOException {
         Pattern row = Pattern.compile("^\\| `" + Pattern.quote(name) + "\\{(?:[a-z_]+, ?)*" + Pattern.quote(label)
                 + "(?:, ?[a-z_]+)*}` \\|", Pattern.MULTILINE);

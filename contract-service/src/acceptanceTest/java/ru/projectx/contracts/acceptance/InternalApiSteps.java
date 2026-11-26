@@ -15,6 +15,7 @@ import tools.jackson.databind.JsonNode;
 public class InternalApiSteps {
 
     private static final String PRESENT = "есть";
+    private static final String UUID_PRESENT = "есть UUID";
     private static final Pattern SAME_AS = Pattern.compile("как в ответе №(\\d+)");
     private static final String CREATED_AT = "created_at";
     private static final String REQUEST_ID_KEY = "requestId";
@@ -28,6 +29,8 @@ public class InternalApiSteps {
     }
 
     @Тогда("Договоры ответили на загрузку справки {int}:")
+    @Тогда("Договоры ответили на загрузку согласия {int}:")
+    @Тогда("Договоры ответили на загрузку вложения {int}:")
     public void answeredUpload(int status, DataTable fields) {
         AttachmentCalls.Answer answer = calls.last();
         assertThat(answer.status()).as("код ответа, тело %s", answer.body()).isEqualTo(status);
@@ -99,7 +102,9 @@ public class InternalApiSteps {
                     .isEqualTo(calls.body(calls.number(Integer.parseInt(same.group(1)))).path(name));
             return;
         }
-        if (!PRESENT.equals(expected)) {
+        if (UUID_PRESENT.equals(expected)) {
+            assertThat(UUID.fromString(actual.asString())).hasToString(actual.asString());
+        } else if (!PRESENT.equals(expected)) {
             assertValue(name, actual.asString(), expected);
         }
         assertThat(actual.asString()).as("поле %s", name).isNotBlank();
