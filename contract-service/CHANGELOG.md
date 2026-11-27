@@ -24,6 +24,8 @@
 - Миграция схемы `015-attachments.yaml`: значение перечисления `PD_CONSENT`, снятие внешнего ключа
   `fk_contract_documents_request`, колонки `policy_id`, `family_member_id`, `deleted_at` и `deleted_request_id`,
   ограничения целостности владельца и мягкого удаления, индекс `ix_contract_documents_consent`.
+- Маршрут `internal/v1/policies` в `devops/test/helm/values.yaml` для вызова загрузки согласий через ingress тестового
+  стенда k3s.
 
 ### Изменено
 
@@ -50,6 +52,13 @@
 - Передача части `attachment_id` с атрибутом `filename` (включая `filename=""`) и передача части `file` без `filename`, с
   пустым или пробельным `filename` теперь отвечают `400 VALIDATION_ERROR` с точным полем (`attachment_id` или `file`) вместо
   `500 INTERNAL_ERROR` или молчаливого приёма, без роста счётчика `contracts_attachments_rejected_total`.
+
+### Перенос
+
+- При ручном переносе исходников в рабочий контур удалить снятые классы
+  `src/main/java/ru/projectx/contracts/entity/document/ParticipantAttachment.java` и
+  `src/main/java/ru/projectx/contracts/exception/ParticipantNotFoundException.java`. Миграция `015-attachments.yaml`
+  выполняется Liquibase при старте автоматически, новых зависимостей и переменных окружения нет.
 
 ## [1.0.0-rc.1] - 2026-11-25
 
