@@ -93,12 +93,10 @@ public class MinioCertificateStore implements CertificateStore {
     }
 
     private void handleRemovalRefusal(ErrorResponseException refused) {
-        String code = refused.errorResponse().code();
-        if (NO_SUCH_KEY.equals(code) && bucketPresent()) {
-            return;
+        RuntimeException translated = refusal(refused, "удалении");
+        if (!(translated instanceof CertificateMissingException)) {
+            throw translated;
         }
-        log.warn("хранилище справок отказало в удалении объекта: код {}", code);
-        throw new StorageUnavailableException(refused);
     }
 
     private boolean bucketPresent() {

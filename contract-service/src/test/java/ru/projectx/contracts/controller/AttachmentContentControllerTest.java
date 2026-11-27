@@ -18,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,12 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -61,23 +57,31 @@ class AttachmentContentControllerTest {
     private final AttachmentContentController controller = new AttachmentContentController(contents);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(new RequestFormatAdvice(metrics), new DomainErrorAdvice(), new UnexpectedErrorAdvice())
-            .setMessageConverters(new ResourceHttpMessageConverter(),
-                    new JacksonJsonHttpMessageConverter(JsonMapper.builder()
-                            .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()))
+            .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
+                    .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()))
             .addFilters(new RequestIdFilter())
             .build();
 
     @Test
-    void activeAttachment_streamsRawBytesWithHeadersClosesStreamAndLogsCompletionAfterStreaming() throws Exception {
+    void activeAttachment_streamsRawBytesWithHeadersIgnoresRangeClosesStreamAndLogsCompletionAfterStreaming()
+            throws Exception {
         AtomicInteger sequence = new AtomicInteger();
         AtomicInteger closedStep = new AtomicInteger();
         AtomicInteger loggedStep = new AtomicInteger();
-        InputStream stream = stepRecordingStream(sequence, closedStep);
-        when(contents.openContent(ATTACHMENT)).thenReturn(new AttachmentStream("image/jpeg", BINARY.length, HASH, stream));
+        when(contents.openContent(ATTACHMENT))
+                .thenReturn(new AttachmentStream("image/jpeg", BINARY.length, HASH, stepRecordingStream(sequence, closedStep)))
+                .thenReturn(new AttachmentStream("image/jpeg", BINARY.length, HASH, new ByteArrayInputStream(BINARY)));
 
         MvcResult result = performRecordingFilterLog(sequence, loggedStep);
+        MvcResult ranged = mvc.perform(get(PATH, ATTACHMENT)
+                        .header(RequestIds.HEADER, TRACE)
+                        .header(HttpHeaders.RANGE, "bytes=0-2"))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist(HttpHeaders.ACCEPT_RANGES))
+                .andReturn();
 
         assertThat(result.getResponse().getContentAsByteArray()).isEqualTo(BINARY);
+        assertThat(ranged.getResponse().getContentAsByteArray()).isEqualTo(BINARY);
         assertThat(closedStep.get()).isPositive();
         assertThat(loggedStep.get()).isGreaterThan(closedStep.get());
     }
@@ -95,6 +99,7 @@ class AttachmentContentControllerTest {
                 .andExpect(status().isNotModified())
                 .andExpect(header().string(RequestIds.HEADER, TRACE))
                 .andExpect(header().string(HttpHeaders.ETAG, QUOTED_ETAG))
+                .andExpect(header().doesNotExist(HttpHeaders.ACCEPT_RANGES))
                 .andReturn();
 
         assertThat(result.getResponse().getContentAsByteArray()).isEmpty();
@@ -103,36 +108,41 @@ class AttachmentContentControllerTest {
     }
 
     @Test
-    void notModifiedCheck_returnsNotModifiedEntityWithoutBodyAndClosesStream() {
-        AtomicBoolean read = new AtomicBoolean();
-        AtomicBoolean closed = new AtomicBoolean();
-        InputStream stream = trackingStream(read, closed);
-        when(contents.openContent(ATTACHMENT))
-                .thenReturn(new AttachmentStream("application/pdf", BINARY.length, HASH, stream));
-        WebRequest webRequest = mock(WebRequest.class);
-        when(webRequest.checkNotModified(HASH)).thenReturn(true);
-
-        ResponseEntity<Resource> response = controller.content(ATTACHMENT, webRequest);
-
-        assertThat(response).isEqualTo(ResponseEntity.status(HttpStatus.NOT_MODIFIED).build());
-        assertThat(read).isFalse();
-        assertThat(closed).isTrue();
-    }
-
-    @Test
-    void midStreamFailure_closesOpenedS3InputStream() throws Exception {
+    void uncommittedStreamFailure_resetsContentHeadersClosesStreamAndReturnsJsonError() throws Exception {
         AtomicBoolean closed = new AtomicBoolean();
         InputStream failing = failingReadStream(closed);
         when(contents.openContent(ATTACHMENT)).thenReturn(new AttachmentStream("image/jpeg", 1024L, HASH, failing));
 
         mvc.perform(get(PATH, ATTACHMENT).header(RequestIds.HEADER, TRACE))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError())
+                .andExpect(header().string(RequestIds.HEADER, TRACE))
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"))
+                .andExpect(header().doesNotExist(HttpHeaders.ETAG))
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.error.request_id").value(TRACE));
 
         assertThat(closed).isTrue();
     }
 
     @Test
-    void streamFailingToCloseOnNotModified_throwsUncheckedIoException() {
+    void committedStreamFailure_closesStreamWithoutResettingCommittedResponse() {
+        AtomicBoolean closed = new AtomicBoolean();
+        when(contents.openContent(ATTACHMENT))
+                .thenReturn(new AttachmentStream("image/jpeg", 1024L, HASH, failingReadStream(closed)));
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.checkNotModified(HASH)).thenReturn(false);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        response.setCommitted(true);
+
+        assertThatThrownBy(() -> controller.content(ATTACHMENT, webRequest, response))
+                .isInstanceOf(IOException.class)
+                .hasMessage("mid-stream disconnect");
+        assertThat(closed).isTrue();
+        assertThat(response.getHeader(HttpHeaders.ETAG)).isEqualTo(QUOTED_ETAG);
+    }
+
+    @Test
+    void streamFailingToCloseOnNotModified_propagatesCloseIoException() {
         InputStream broken = new FilterInputStream(new ByteArrayInputStream(BINARY)) {
             @Override
             public void close() throws IOException {
@@ -143,9 +153,9 @@ class AttachmentContentControllerTest {
         WebRequest webRequest = mock(WebRequest.class);
         when(webRequest.checkNotModified(HASH)).thenReturn(true);
 
-        assertThatThrownBy(() -> controller.content(ATTACHMENT, webRequest))
-                .isInstanceOf(UncheckedIOException.class)
-                .hasMessage("поток вложения не закрыт");
+        assertThatThrownBy(() -> controller.content(ATTACHMENT, webRequest, new MockHttpServletResponse()))
+                .isInstanceOf(IOException.class)
+                .hasMessage("broken close");
     }
 
     @ParameterizedTest
@@ -154,6 +164,7 @@ class AttachmentContentControllerTest {
         mvc.perform(get(PATH, rawId).header(RequestIds.HEADER, TRACE))
                 .andExpect(status().isBadRequest())
                 .andExpect(header().string(RequestIds.HEADER, TRACE))
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.error.details.length()").value(1))
                 .andExpect(jsonPath("$.error.details[0].field").value("attachment_id"))
@@ -171,6 +182,7 @@ class AttachmentContentControllerTest {
 
         mvc.perform(get(PATH, ATTACHMENT).header(RequestIds.HEADER, TRACE))
                 .andExpect(status().isNotFound())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"))
                 .andExpect(jsonPath("$.error.code").value("ATTACHMENT_NOT_FOUND"))
                 .andExpect(jsonPath("$.error.message").value("вложения с таким идентификатором нет"))
                 .andExpect(jsonPath("$.error.details").isEmpty())
@@ -178,6 +190,7 @@ class AttachmentContentControllerTest {
 
         mvc.perform(get(PATH, ATTACHMENT).header(RequestIds.HEADER, TRACE))
                 .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "application/json"))
                 .andExpect(jsonPath("$.error.code").value("STORAGE_UNAVAILABLE"))
                 .andExpect(jsonPath("$.error.message").value("хранилище файлов недоступно"))
                 .andExpect(jsonPath("$.error.details").isEmpty())
@@ -202,6 +215,7 @@ class AttachmentContentControllerTest {
                     .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
                     .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, BINARY.length))
                     .andExpect(header().string(HttpHeaders.ETAG, QUOTED_ETAG))
+                    .andExpect(header().doesNotExist(HttpHeaders.ACCEPT_RANGES))
                     .andReturn();
         } finally {
             filterLogger.detachAppender(appender);

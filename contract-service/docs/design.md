@@ -931,19 +931,23 @@ PDF, в том числе на несколько страниц, поэтому
 **Потоковая выдача содержимого вложения без транзакции и без буферизации в куче.** Вызов чтения содержимого
 (`AttachmentContentController`, `AttachmentContentService`, `AttachmentRegistry`, `MinioCertificateStore`) в короткой
 транзакции чтения находит активную запись по `attachment_id` (`deleted_at IS NULL`), а поток байтов из S3 открывает уже
-вне `@Transactional`, чтобы медленный клиент не удерживал соединение пула базы на время скачивания файла. Тело отдаётся
-через `InputStreamResource` и стандартный `ResourceHttpMessageConverter`, который перекачивает поток порциями в ответ
-сервлета и закрывает `InputStream` в `try-with-resources` как при штатном завершении, так и при обрыве записи, без чтения
-файла целиком в `byte[]` и без асинхронной переделегации (`StreamingResponseBody`), из-за которой `RequestIdFilter`
-закрывал бы MDC и писал запись о завершении вызова раньше фактической отправки байтов. Условный заголовок `If-None-Match`
-проверяется явно в `AttachmentContentController` через `WebRequest.checkNotModified(fileHash)` с немедленным закрытием
-открытого потока S3 перед возвратом `304 Not Modified`: если отдать `200 OK` с `ETag` и положиться на перехват внутри
-`HttpEntityMethodProcessor`, Spring MVC вернёт `304` до вызова `ResourceHttpMessageConverter` и оставит открытый поток
-ответа MinIO незакрытым. Неизвестный `attachment_id`, идентификатор печатной формы 1С:УСК (`attachment_id IS NULL`) и
-мягко удалённая запись (`deleted_at IS NOT NULL`) получают `404 ATTACHMENT_NOT_FOUND` до обращения к S3; прекращение
-заявки и передача или регистрация договора КМ в 1С:УСК скачивание вложения не блокируют. Если запись активна, а в живом
-бакете объекта по ключу нет (`NoSuchKey` при существующем бакете), сервис пишет `WARN` только с `attachment_id` (без
-ключа объекта и персональных данных) и отвечает `404 ATTACHMENT_NOT_FOUND` без роста `contracts_storage_unavailable_total`.
+вне `@Transactional`, чтобы медленный клиент не удерживал соединение пула базы на время скачивания файла. Тело пишется
+напрямую в выходной поток `HttpServletResponse` через `InputStream.transferTo` внутри `try-with-resources`: байты
+перекачиваются порциями в текущем потоке сервлета без чтения файла целиком в `byte[]` и без асинхронной переделегации
+(`StreamingResponseBody`), из-за которой `RequestIdFilter` закрывал бы MDC и писал запись о завершении вызова раньше
+фактической отправки байтов, а поток ответа MinIO гарантированно закрывается и при штатном завершении, и при `304 Not
+Modified`, и при обрыве записи. Отказ от возврата `ResponseEntity<Resource>` с `InputStreamResource` исключает ложный
+заголовок `Accept-Ranges: bytes` и падение `AbstractMessageConverterMethodProcessor` на заголовке `Range` (диапазоны не
+поддерживаются, запрос с `Range` штатно получает полный поток `200 OK`); если же ошибка чтения из S3 произошла до
+фиксации ответа сервлета, контроллер сбрасывает незафиксированные заголовки вложения с сохранением `X-Request-Id`, а
+`ApiErrors` явно выставляет `application/json`, чтобы `UnexpectedErrorAdvice` отдал корректный JSON `500 INTERNAL_ERROR`.
+Условный заголовок `If-None-Match` проверяется через `WebRequest.checkNotModified(fileHash)` с закрытием открытого потока
+S3 на выходе из `try-with-resources`. Неизвестный `attachment_id`, идентификатор печатной формы 1С:УСК (`attachment_id
+IS NULL`) и мягко удалённая запись (`deleted_at IS NOT NULL`) получают `404 ATTACHMENT_NOT_FOUND` до обращения к S3;
+прекращение заявки и передача или регистрация договора КМ в 1С:УСК скачивание вложения не блокируют. Если запись активна,
+а в живом бакете объекта по ключу нет (`NoSuchKey` при существующем бакете), сервис пишет `WARN` только с `attachment_id`
+(без ключа объекта и персональных данных) и отвечает `404 ATTACHMENT_NOT_FOUND` без роста
+`contracts_storage_unavailable_total`.
 
 **Двухфазное мягкое удаление вложения: сначала S3 вне транзакции, затем отметка в реестре и защита переданных справок.**
 Удаление (`AttachmentDeletionController`, `AttachmentDeletionService`, `AttachmentDeletionTransactions`,

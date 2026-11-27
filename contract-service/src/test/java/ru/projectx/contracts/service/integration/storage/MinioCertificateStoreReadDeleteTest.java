@@ -10,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
@@ -26,6 +29,7 @@ import java.security.InvalidKeyException;
 import okhttp3.Headers;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
 
@@ -136,12 +140,24 @@ class MinioCertificateStoreReadDeleteTest {
 
     @Test
     void remove_answeredNoSuchKeyInMissingBucket_throwsStorageUnavailable() throws Exception {
-        ErrorResponseException missing = errorResponse("NoSuchKey", "Object does not exist");
-        doThrow(missing).when(client).removeObject(any());
-        when(client.bucketExists(any())).thenReturn(false);
+        Logger logger = (Logger) LoggerFactory.getLogger(MinioCertificateStore.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            ErrorResponseException missing = errorResponse("NoSuchKey", "Object does not exist");
+            doThrow(missing).when(client).removeObject(any());
+            when(client.bucketExists(any())).thenReturn(false);
 
-        assertThatThrownBy(() -> store.remove(KEY)).isInstanceOf(StorageUnavailableException.class)
-                .hasCause(missing);
+            assertThatThrownBy(() -> store.remove(KEY)).isInstanceOf(StorageUnavailableException.class)
+                    .hasCause(missing);
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .containsExactly("в хранилище справок нет бакета справок");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @Test

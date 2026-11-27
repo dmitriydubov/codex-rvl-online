@@ -1,17 +1,14 @@
 package ru.projectx.contracts.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.util.UUID;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.context.request.WebRequest;
+import ru.projectx.contracts.service.RequestIds;
 import ru.projectx.contracts.service.storage.AttachmentContentReads;
 import ru.projectx.contracts.service.storage.AttachmentStream;
 
@@ -25,24 +22,34 @@ public class AttachmentContentController {
     }
 
     @GetMapping("/attachments/{attachment_id}/content")
-    public ResponseEntity<Resource> content(@PathVariable("attachment_id") UUID attachmentId, WebRequest request) {
+    public void content(@PathVariable("attachment_id") UUID attachmentId, WebRequest request,
+            HttpServletResponse response) throws IOException {
         AttachmentStream content = contents.openContent(attachmentId);
-        if (request.checkNotModified(content.fileHash())) {
-            closeStream(content.inputStream());
-            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).build();
+        try (InputStream stream = content.inputStream()) {
+            if (request.checkNotModified(content.fileHash())) {
+                return;
+            }
+            writeStream(content, stream, response);
         }
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(content.contentType()))
-                .contentLength(content.fileSize())
-                .eTag(content.fileHash())
-                .body(new InputStreamResource(content.inputStream()));
     }
 
-    private static void closeStream(InputStream stream) {
+    private static void writeStream(AttachmentStream content, InputStream stream, HttpServletResponse response)
+            throws IOException {
+        response.setContentType(content.contentType());
+        response.setContentLengthLong(content.fileSize());
+        response.setHeader(HttpHeaders.ETAG, "\"" + content.fileHash() + "\"");
         try {
-            stream.close();
-        } catch (IOException closing) {
-            throw new UncheckedIOException("поток вложения не закрыт", closing);
+            stream.transferTo(response.getOutputStream());
+        } catch (IOException failure) {
+            clearUncommittedHeaders(response);
+            throw failure;
+        }
+    }
+
+    private static void clearUncommittedHeaders(HttpServletResponse response) {
+        if (!response.isCommitted()) {
+            response.reset();
+            response.setHeader(RequestIds.HEADER, RequestIds.current());
         }
     }
 }
