@@ -47,11 +47,17 @@ public class AttachmentDeletionTransactions {
 
     @Transactional
     public void markDeleted(UUID attachmentId, DeletionCandidate candidate, String requestId) {
-        CertificateOwner owner = candidate.certificateOwner();
-        if (owner != null) {
-            lockAndEnsureUnlocked(attachmentId, owner);
+        if (!canMarkDeleted(attachmentId, candidate.certificateOwner())) {
+            return;
         }
         documents.markDeletedByAttachmentId(attachmentId, clock.instant(), requestId);
+    }
+
+    private boolean canMarkDeleted(UUID attachmentId, CertificateOwner owner) {
+        if (!isActive(attachmentId)) {
+            return false;
+        }
+        return owner == null || lockAndVerifyActive(attachmentId, owner);
     }
 
     private DeletionCandidate candidate(UUID attachmentId, PrintedForm document) {
@@ -69,15 +75,38 @@ public class AttachmentDeletionTransactions {
     }
 
     private void lockAndEnsureUnlocked(UUID attachmentId, CertificateOwner owner) {
-        List<Contract> pairContracts = contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(
-                owner.individualRequestId(), owner.participantId());
-        if (pairContracts.isEmpty()) {
-            return;
-        }
-        lockContracts(attachmentId, pairContracts);
-        if (hasSubmittedContract(owner.individualRequestId(), pairContracts)) {
+        List<Contract> pairContracts = lockedPairContracts(attachmentId, owner);
+        if (!pairContracts.isEmpty() && hasSubmittedContract(owner.individualRequestId(), pairContracts)) {
             throw new AttachmentLockedException(attachmentId);
         }
+    }
+
+    private boolean lockAndVerifyActive(UUID attachmentId, CertificateOwner owner) {
+        List<Contract> pairContracts = lockedPairContracts(attachmentId, owner);
+        if (pairContracts.isEmpty()) {
+            return true;
+        }
+        return verifyUnlockedWhileActive(attachmentId, owner.individualRequestId(), pairContracts);
+    }
+
+    private boolean verifyUnlockedWhileActive(UUID attachmentId, UUID individualRequestId,
+            List<Contract> pairContracts) {
+        if (!isActive(attachmentId)) {
+            return false;
+        }
+        if (hasSubmittedContract(individualRequestId, pairContracts)) {
+            throw new AttachmentLockedException(attachmentId);
+        }
+        return true;
+    }
+
+    private List<Contract> lockedPairContracts(UUID attachmentId, CertificateOwner owner) {
+        List<Contract> pairContracts = contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(
+                owner.individualRequestId(), owner.participantId());
+        if (!pairContracts.isEmpty()) {
+            lockContracts(attachmentId, pairContracts);
+        }
+        return pairContracts;
     }
 
     private void lockContracts(UUID attachmentId, List<Contract> pairContracts) {
@@ -96,6 +125,10 @@ public class AttachmentDeletionTransactions {
         return outbox.existsByCorrelationIdAndAggregateTypeAndAggregateIdInAndEventType(
                 individualRequestId, KmContractEvents.CONTRACT_AGGREGATE, contractIds,
                 KmContractEvents.KM_CONTRACT_SUBMITTED);
+    }
+
+    private boolean isActive(UUID attachmentId) {
+        return documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(attachmentId);
     }
 
     private static boolean submittedOrIssued(Contract contract) {

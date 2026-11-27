@@ -134,13 +134,17 @@ class PrintedFormRepositoryTest {
 
         transaction.executeWithoutResult(status -> {
             assertThat(documents.findByAttachmentAttachmentId(ATTACHMENT)).isPresent();
+            assertThat(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(ATTACHMENT)).isTrue();
             assertThat(documents.markDeletedByAttachmentId(ATTACHMENT, deletedAt, "req-first")).isEqualTo(1);
+            assertThat(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(ATTACHMENT)).isFalse();
             DocumentAttachment cleared = documents.findByAttachmentAttachmentId(ATTACHMENT).orElseThrow()
                     .attachment().orElseThrow();
             assertThat(cleared.deletedAt()).isEqualTo(deletedAt);
             assertThat(cleared.deletedRequestId()).isEqualTo("req-first");
             assertThat(documents.markDeletedByAttachmentId(ATTACHMENT, NOW.plusSeconds(99), "req-second")).isZero();
             assertThat(documents.markDeletedByAttachmentId(UUID.randomUUID(), deletedAt, "req-missing")).isZero();
+            assertThat(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(UUID.randomUUID()))
+                    .isFalse();
         });
 
         DocumentAttachment afterRepeat = documents.findByAttachmentAttachmentId(ATTACHMENT).orElseThrow()

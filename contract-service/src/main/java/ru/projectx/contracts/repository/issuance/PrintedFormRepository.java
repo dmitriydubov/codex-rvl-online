@@ -19,6 +19,8 @@ public interface PrintedFormRepository extends JpaRepository<PrintedForm, UUID> 
 
     Optional<PrintedForm> findByAttachmentAttachmentId(UUID attachmentId);
 
+    boolean existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(UUID attachmentId);
+
     List<PrintedForm> findByAttachmentIndividualRequestIdAndAttachmentParticipantIdAndDocTypeAndAttachmentDeletedAtIsNullOrderByCreatedAtAscIdAsc(
             UUID individualRequestId, UUID participantId, PrintedFormType docType);
 

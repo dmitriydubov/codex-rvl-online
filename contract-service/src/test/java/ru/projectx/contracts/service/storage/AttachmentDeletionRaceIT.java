@@ -164,10 +164,11 @@ class AttachmentDeletionRaceIT {
     }
 
     @Test
-    void twoConcurrentDeletesOfSameAttachment_completeIdempotentlyKeepingFirstWinnersRequestId() throws Exception {
+    void twoConcurrentDeletesWithSubmissionAfterFirstWinner_completeIdempotentlyKeepingWinnersAuditAndEmptyUskDocs()
+            throws Exception {
         CountDownLatch bothInPhaseTwo = new CountDownLatch(2);
         CountDownLatch winnerRecorded = new CountDownLatch(1);
-        store.onRemove(() -> coordinatePhaseTwo(bothInPhaseTwo, winnerRecorded));
+        store.onRemove(() -> coordinatePhaseTwoAndSubmit(bothInPhaseTwo, winnerRecorded));
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
@@ -182,6 +183,9 @@ class AttachmentDeletionRaceIT {
         Map<String, Object> row = deletionRow();
         assertThat(row.get("deleted_at")).isNotNull();
         assertThat(row.get("deleted_request_id")).isEqualTo("req-winner");
+        String payload = jdbc.sql("select payload from outbox_messages where event_type = 'KmContractSubmitted'")
+                .query(String.class).single();
+        assertThat(payload).contains("\"documents\": []");
         assertThat(store.sawActiveTransaction()).isFalse();
     }
 
@@ -197,11 +201,12 @@ class AttachmentDeletionRaceIT {
         }
     }
 
-    private static void coordinatePhaseTwo(CountDownLatch bothInPhaseTwo, CountDownLatch winnerRecorded) {
+    private void coordinatePhaseTwoAndSubmit(CountDownLatch bothInPhaseTwo, CountDownLatch winnerRecorded) {
         bothInPhaseTwo.countDown();
         awaitLatch(bothInPhaseTwo);
         if ("req-second".equals(MDC.get(RequestIds.MDC_KEY))) {
             awaitLatch(winnerRecorded);
+            submissionRecording.submit(contractId, IDENTIFIERS);
         }
     }
 

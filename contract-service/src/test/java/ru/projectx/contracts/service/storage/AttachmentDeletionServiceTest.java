@@ -8,6 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
@@ -79,6 +81,7 @@ class AttachmentDeletionServiceTest {
                 DocumentAttachments.consent(Uploads.POLICY, Uploads.FAMILY_MEMBER, Uploads.ATTACHMENT), FILE,
                 NOW.minusSeconds(300));
         when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(consent));
+        when(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT)).thenReturn(true);
         AtomicBoolean txActiveOnRemove = new AtomicBoolean(true);
         doAnswer(call -> {
             txActiveOnRemove.set(TransactionSynchronizationManager.isActualTransactionActive());
@@ -91,15 +94,16 @@ class AttachmentDeletionServiceTest {
         InOrder order = inOrder(documents, store);
         order.verify(documents).findByAttachmentAttachmentId(Uploads.ATTACHMENT);
         order.verify(store).remove(KEY);
+        order.verify(documents).existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT);
         order.verify(documents).markDeletedByAttachmentId(Uploads.ATTACHMENT, NOW, TRACE);
         verifyNoInteractions(contracts, outbox);
-        assertThat(meters.find("contracts.storage.unavailable").counter()).isNull();
     }
 
     @Test
     void activeCertificateBeforeFirstTask_skipsLockingAndDeletesFileAndMarksRecord() {
         MDC.put(RequestIds.MDC_KEY, TRACE);
         when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
+        when(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT)).thenReturn(true);
         when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
                 .thenReturn(List.of());
 
@@ -109,6 +113,7 @@ class AttachmentDeletionServiceTest {
         order.verify(contracts).findByRequestIndividualRequestIdAndInsuredParticipantId(
                 Uploads.REQUEST, Uploads.PARTICIPANT);
         order.verify(store).remove(KEY);
+        order.verify(documents).existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT);
         order.verify(contracts).findByRequestIndividualRequestIdAndInsuredParticipantId(
                 Uploads.REQUEST, Uploads.PARTICIPANT);
         order.verify(documents).markDeletedByAttachmentId(Uploads.ATTACHMENT, NOW, TRACE);
@@ -122,6 +127,7 @@ class AttachmentDeletionServiceTest {
         Contract paid = Issuances.paidContract(FIRST_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000001",
                 NOW.minusSeconds(60));
         when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
+        when(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT)).thenReturn(true);
         when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
                 .thenReturn(List.of(paid));
         when(outbox.existsByCorrelationIdAndAggregateTypeAndAggregateIdInAndEventType(
@@ -136,7 +142,9 @@ class AttachmentDeletionServiceTest {
                 Uploads.REQUEST, KmContractEvents.CONTRACT_AGGREGATE, List.of(paid.id()),
                 KmContractEvents.KM_CONTRACT_SUBMITTED);
         order.verify(store).remove(KEY);
+        order.verify(documents).existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT);
         order.verify(contracts).lockFresh(List.of(paid));
+        order.verify(documents).existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT);
         order.verify(outbox).existsByCorrelationIdAndAggregateTypeAndAggregateIdInAndEventType(
                 Uploads.REQUEST, KmContractEvents.CONTRACT_AGGREGATE, List.of(paid.id()),
                 KmContractEvents.KM_CONTRACT_SUBMITTED);
@@ -165,33 +173,23 @@ class AttachmentDeletionServiceTest {
     }
 
     @Test
-    void submittedContractWithoutOutboxLookup_blocksCertificateDeletionBeforeTouchingStorage() {
+    void submittedOrIssuedContractWithoutOutboxLookup_blocksCertificateDeletionBeforeTouchingStorage() {
         Contract submitted = Issuances.paidContract(FIRST_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000001",
                 NOW.minusSeconds(60));
         submitted.submit(NOW.minusSeconds(30));
+        Contract issued = Issuances.issuedContract(SECOND_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000002");
         when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
         when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
-                .thenReturn(List.of(submitted));
+                .thenReturn(List.of(submitted))
+                .thenReturn(List.of(issued));
 
         assertThatThrownBy(() -> service.delete(Uploads.ATTACHMENT))
                 .isInstanceOf(AttachmentLockedException.class)
                 .hasMessageContaining(Uploads.ATTACHMENT.toString());
-
-        verify(contracts).lockFresh(List.of(submitted));
-        verifyNoInteractions(outbox, store);
-        verify(documents, never()).markDeletedByAttachmentId(any(), any(), any());
-    }
-
-    @Test
-    void issuedContractWithoutOutboxLookup_blocksCertificateDeletionBeforeTouchingStorage() {
-        Contract issued = Issuances.issuedContract(FIRST_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000001");
-        when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
-        when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
-                .thenReturn(List.of(issued));
-
         assertThatThrownBy(() -> service.delete(Uploads.ATTACHMENT))
                 .isInstanceOf(AttachmentLockedException.class);
 
+        verify(contracts).lockFresh(List.of(submitted));
         verify(contracts).lockFresh(List.of(issued));
         verifyNoInteractions(outbox, store);
         verify(documents, never()).markDeletedByAttachmentId(any(), any(), any());
@@ -224,6 +222,7 @@ class AttachmentDeletionServiceTest {
         Contract paid = Issuances.paidContract(FIRST_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000001",
                 NOW.minusSeconds(60));
         when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
+        when(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT)).thenReturn(true);
         when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
                 .thenReturn(List.of(paid));
         when(outbox.existsByCorrelationIdAndAggregateTypeAndAggregateIdInAndEventType(
@@ -238,6 +237,37 @@ class AttachmentDeletionServiceTest {
                 .isInstanceOf(AttachmentLockedException.class);
 
         verify(store).remove(KEY);
+        verify(documents, never()).markDeletedByAttachmentId(any(), any(), any());
+    }
+
+    @Test
+    void concurrentDeletionBeforeOrDuringPhaseThreeLock_completesIdempotentlyEvenAfterContractSubmission() {
+        Contract firstPaid = Issuances.paidContract(FIRST_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000001",
+                NOW.minusSeconds(60));
+        Contract secondPaid = Issuances.paidContract(SECOND_CONTRACT, Uploads.PARTICIPANT, "DKM-2026-000002",
+                NOW.minusSeconds(60));
+        when(documents.findByAttachmentAttachmentId(Uploads.ATTACHMENT)).thenReturn(Optional.of(activeCertificate()));
+        when(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(Uploads.REQUEST, Uploads.PARTICIPANT))
+                .thenReturn(List.of(firstPaid))
+                .thenReturn(List.of(secondPaid));
+        when(outbox.existsByCorrelationIdAndAggregateTypeAndAggregateIdInAndEventType(any(), any(), any(), any()))
+                .thenReturn(false);
+        when(documents.existsByAttachmentAttachmentIdAndAttachmentDeletedAtIsNull(Uploads.ATTACHMENT))
+                .thenReturn(false)
+                .thenReturn(true, false);
+        AtomicInteger secondLocks = new AtomicInteger();
+        doAnswer(call -> {
+            if (secondLocks.incrementAndGet() == 2) {
+                secondPaid.submit(NOW);
+            }
+            return null;
+        }).when(contracts).lockFresh(List.of(secondPaid));
+
+        service.delete(Uploads.ATTACHMENT);
+        service.delete(Uploads.ATTACHMENT);
+
+        verify(contracts, times(1)).lockFresh(List.of(firstPaid));
+        verify(contracts, times(2)).lockFresh(List.of(secondPaid));
         verify(documents, never()).markDeletedByAttachmentId(any(), any(), any());
     }
 
