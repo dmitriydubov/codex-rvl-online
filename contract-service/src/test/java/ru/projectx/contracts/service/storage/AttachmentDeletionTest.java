@@ -30,7 +30,7 @@ class AttachmentDeletionTest {
             DocumentAttachments.certificate(UUID.randomUUID(), UUID.randomUUID(), ATTACHMENT), FILE, Instant.EPOCH);
 
     private final AttachmentDeletionTransactions transactions = mock();
-    private final AttachmentObjectStore objects = mock();
+    private final AttachmentObjectDeletes objects = mock();
     private final AttachmentMetrics metrics = mock();
     private final AttachmentDeletion deletion = new AttachmentDeletion(transactions, objects, metrics);
 

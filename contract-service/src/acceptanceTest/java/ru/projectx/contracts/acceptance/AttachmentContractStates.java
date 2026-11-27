@@ -53,6 +53,14 @@ class AttachmentContractStates {
                 + " and event_type = 'KmContractSubmitted'").param("contract", contract).query(Long.class).single();
     }
 
+    void expectNoSubmittedDocuments(UUID contract) {
+        assertThat(jdbc.sql("""
+                select payload #> '{data,documents}' = '[]'::jsonb
+                  from outbox_messages
+                 where event_type = 'KmContractSubmitted' and aggregate_id = :contract
+                """).param("contract", contract).query(Boolean.class).single()).isTrue();
+    }
+
     UUID copyAs(UUID template, String participant, String status) {
         return jdbc.sql("""
                 insert into contracts (id, number, status, individual_request_id, insured_participant_id,

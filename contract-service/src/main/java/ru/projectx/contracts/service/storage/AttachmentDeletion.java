@@ -12,10 +12,10 @@ import ru.projectx.contracts.exception.StorageUnavailableException;
 public class AttachmentDeletion implements AttachmentDeletes {
 
     private final AttachmentDeletionTransactions transactions;
-    private final AttachmentObjectStore objects;
+    private final AttachmentObjectDeletes objects;
     private final AttachmentMetrics metrics;
 
-    public AttachmentDeletion(AttachmentDeletionTransactions transactions, AttachmentObjectStore objects,
+    public AttachmentDeletion(AttachmentDeletionTransactions transactions, AttachmentObjectDeletes objects,
             AttachmentMetrics metrics) {
         this.transactions = transactions;
         this.objects = objects;

@@ -1,5 +1,6 @@
 package ru.projectx.contracts.service.integration.storage;
 
+import io.minio.MinioAsyncClient;
 import io.minio.MinioClient;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
@@ -17,5 +18,15 @@ public class StorageClientConfig {
     @Bean
     public MinioCertificateStore certificateStore(MinioClient storageClient, StorageProperties settings) {
         return new MinioCertificateStore(storageClient, settings.bucket());
+    }
+
+    @Bean(destroyMethod = "close")
+    public MinioAsyncClient attachmentStorageClient(StorageProperties settings, SslBundles bundles) {
+        return StorageHttpClients.minioAsync(settings, bundles);
+    }
+
+    @Bean
+    public MinioAttachmentStore attachmentStore(MinioAsyncClient attachmentStorageClient, StorageProperties settings) {
+        return new MinioAttachmentStore(attachmentStorageClient, settings.bucket());
     }
 }

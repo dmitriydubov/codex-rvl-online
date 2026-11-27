@@ -43,7 +43,7 @@ import ru.projectx.contracts.repository.issuance.ContractRepository;
 import ru.projectx.contracts.repository.issuance.PrintedFormRepository;
 import ru.projectx.contracts.repository.journal.OutboxMessageRepository;
 import ru.projectx.contracts.service.RequestIds;
-import ru.projectx.contracts.service.integration.storage.MinioCertificateStore;
+import ru.projectx.contracts.service.integration.storage.MinioAttachmentStore;
 import ru.projectx.contracts.service.issuance.IssuanceService;
 import ru.projectx.contracts.service.km.submission.KmContractSubmissionRecording;
 import ru.projectx.contracts.service.reference.ExternalIdentifiers;
@@ -95,7 +95,7 @@ class AttachmentDeletionRaceIT {
     private DataSource dataSource;
 
     @MockitoBean
-    private MinioCertificateStore storage;
+    private MinioAttachmentStore storage;
 
     private final UUID request = UUID.randomUUID();
     private final UUID participant = UUID.randomUUID();

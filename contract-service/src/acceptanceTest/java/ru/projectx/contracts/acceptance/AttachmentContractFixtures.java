@@ -64,6 +64,10 @@ class AttachmentContractFixtures {
         return states.id(REQUEST, PARTICIPANT);
     }
 
+    void expectNoSubmittedDocuments() {
+        states.expectNoSubmittedDocuments(contract());
+    }
+
     void history(String history) {
         draft(REQUEST, PARTICIPANT);
         switch (history) {

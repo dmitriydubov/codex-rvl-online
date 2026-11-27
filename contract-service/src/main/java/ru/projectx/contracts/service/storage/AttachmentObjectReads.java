@@ -2,9 +2,7 @@ package ru.projectx.contracts.service.storage;
 
 import java.io.InputStream;
 
-public interface AttachmentObjectStore {
+public interface AttachmentObjectReads {
 
     InputStream open(String key);
-
-    void remove(String key);
 }

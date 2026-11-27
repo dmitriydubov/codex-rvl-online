@@ -22,6 +22,7 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class AttachmentContentControllerTest {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
-            .setControllerAdvice(new DomainErrorAdvice())
+            .setControllerAdvice(new DomainErrorAdvice(), new UnexpectedErrorAdvice())
             .setMessageConverters(new JacksonJsonHttpMessageConverter(JsonMapper.builder()
                     .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()))
             .addFilters(new RequestIdFilter())
@@ -72,6 +73,7 @@ class AttachmentContentControllerTest {
                 .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "image/jpeg"))
                 .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, BYTES.length))
                 .andExpect(header().string(HttpHeaders.ETAG, ETAG))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().string(RequestIds.HEADER, REQUEST_ID));
 
         assertThat(closed).isTrue();
@@ -84,6 +86,7 @@ class AttachmentContentControllerTest {
         mvc.perform(get(CONTENT, ATTACHMENT).header(HttpHeaders.IF_NONE_MATCH, ETAG))
                 .andExpect(status().isNotModified())
                 .andExpect(header().string(HttpHeaders.ETAG, ETAG))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().bytes(new byte[0]));
 
         assertThat(closed).isTrue();
@@ -101,6 +104,45 @@ class AttachmentContentControllerTest {
                 .isInstanceOf(IOException.class).hasMessageNotContaining("private").hasNoCause();
 
         assertThat(closed).isTrue();
+    }
+
+    @Test
+    void failedReadBeforeCommit_replacesTheBufferedBytesAndAttachmentHeadersWith503() throws Exception {
+        var stream = prepareReadFailure();
+
+        mvc.perform(get(CONTENT, ATTACHMENT).header(RequestIds.HEADER, REQUEST_ID))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error.code").value("STORAGE_UNAVAILABLE"))
+                .andExpect(header().doesNotExist(HttpHeaders.ETAG))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().string(RequestIds.HEADER, REQUEST_ID));
+        verify(stream).close();
+    }
+
+    @Test
+    void failedReadAfterCommit_propagatesAnIoFailureWithoutAnErrorBody() throws Exception {
+        var stream = prepareReadFailure();
+        var response = mock(HttpServletResponse.class);
+        var output = mock(ServletOutputStream.class);
+        when(response.isCommitted()).thenReturn(true);
+        when(response.getOutputStream()).thenReturn(output);
+
+        assertThatThrownBy(() -> controller.download(ATTACHMENT.toString(), mock(WebRequest.class), response))
+                .isInstanceOf(IOException.class).hasNoCause()
+                .satisfies(failure -> assertThatThrownBy(() ->
+                        new UnexpectedErrorAdvice().ioFailure((IOException) failure, response)).isSameAs(failure));
+        verify(output).write(any(byte[].class), anyInt(), anyInt());
+        verify(stream).close();
+    }
+
+    @Test
+    void ioFailureBeforeCommitUsesTheStandardInternalError() throws Exception {
+        var response = mock(HttpServletResponse.class);
+        var result = new UnexpectedErrorAdvice().ioFailure(new IOException("private/test-object.jpg"), response);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(500);
+        assertThat(result.getBody().error().code()).isEqualTo("INTERNAL_ERROR");
+        assertThat(result.getBody().error().message()).doesNotContain("private");
     }
 
     @Test
@@ -151,5 +193,15 @@ class AttachmentContentControllerTest {
             }
         };
         when(reads.open(ATTACHMENT)).thenReturn(new AttachmentContent(bytes, "image/jpeg", BYTES.length, "abc0123"));
+    }
+
+    private InputStream prepareReadFailure() throws Exception {
+        var source = mock(InputStream.class);
+        when(source.transferTo(any())).thenAnswer(call -> {
+            call.getArgument(0, java.io.OutputStream.class).write(BYTES, 0, 2);
+            throw new StorageUnavailableException();
+        });
+        when(reads.open(ATTACHMENT)).thenReturn(new AttachmentContent(source, "image/jpeg", BYTES.length, "abc0123"));
+        return source;
     }
 }

@@ -3,7 +3,9 @@ package ru.projectx.contracts.service.integration.storage;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.net.ssl.X509TrustManager;
+import io.minio.MinioAsyncClient;
 import io.minio.MinioClient;
+import io.minio.credentials.StaticProvider;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +28,22 @@ final class StorageHttpClients {
         return MinioClient.builder()
                 .endpoint(settings.endpoint())
                 .region(settings.region())
-                .credentials(settings.accessKey(), settings.secretKey())
+                .credentialsProvider(credentials(settings))
                 .httpClient(of(settings, bundles), true)
                 .build();
+    }
+
+    static MinioAsyncClient minioAsync(StorageProperties settings, SslBundles bundles) {
+        return MinioAsyncClient.builder()
+                .endpoint(settings.endpoint())
+                .region(settings.region())
+                .credentialsProvider(credentials(settings))
+                .httpClient(of(settings, bundles), true)
+                .build();
+    }
+
+    private static StaticProvider credentials(StorageProperties settings) {
+        return new StaticProvider(settings.accessKey(), settings.secretKey(), null);
     }
 
     static OkHttpClient of(StorageProperties settings, SslBundles bundles) {

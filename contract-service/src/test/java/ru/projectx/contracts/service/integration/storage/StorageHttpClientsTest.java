@@ -95,6 +95,19 @@ class StorageHttpClientsTest {
         });
     }
 
+    @Test
+    void attachmentClient_signsDownloadsForTheConfiguredEndpointBucketRegionAndKey() {
+        contexts.run(context -> {
+            try (var client = StorageHttpClients.minioAsync(settings("storage"), context.getBean(SslBundles.class))) {
+                String url = client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder().method(Method.GET)
+                        .bucket("rvl-contracts").object("certificates/a.jpg").build());
+
+                assertThat(url).startsWith("https://s3.contour.example:9000/rvl-contracts/certificates/a.jpg?")
+                        .contains("X-Amz-Credential=access%2F").contains("%2Fus-east-1%2Fs3%2F");
+            }
+        });
+    }
+
     private static String[] subjects(OkHttpClient client) {
         return Arrays.stream(client.x509TrustManager().getAcceptedIssuers())
                 .map(X509Certificate::getSubjectX500Principal).map(Object::toString).toArray(String[]::new);

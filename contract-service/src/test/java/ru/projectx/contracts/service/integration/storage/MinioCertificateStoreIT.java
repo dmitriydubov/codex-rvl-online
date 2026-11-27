@@ -8,6 +8,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
 import io.minio.GetObjectResponse;
 import io.minio.MakeBucketArgs;
+import io.minio.MinioAsyncClient;
 import io.minio.MinioClient;
 import io.minio.StatObjectArgs;
 import java.io.ByteArrayInputStream;
@@ -34,16 +35,21 @@ class MinioCertificateStoreIT {
 
     private static final MinIOContainer STORAGE = TestStorage.container();
     private static MinioClient client;
+    private static MinioAsyncClient attachmentClient;
 
     @BeforeAll
     static void startStorage() throws Exception {
         STORAGE.start();
-        client = new StorageClientConfig().storageClient(settings(BUCKET), new DefaultSslBundleRegistry());
+        var config = new StorageClientConfig();
+        var bundles = new DefaultSslBundleRegistry();
+        client = config.storageClient(settings(BUCKET), bundles);
+        attachmentClient = config.attachmentStorageClient(settings(BUCKET), bundles);
         client.makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build());
     }
 
     @AfterAll
     static void stopStorage() throws Exception {
+        attachmentClient.close();
         client.close();
         STORAGE.stop();
     }
@@ -88,10 +94,10 @@ class MinioCertificateStoreIT {
 
     @Test
     void downloadAndRepeatedRemovalWorkOnALiveBucket() throws Exception {
-        var store = new MinioCertificateStore(client, BUCKET);
+        var store = new MinioAttachmentStore(attachmentClient, BUCKET);
         var file = new StoredFile("certificates/stand/repeated-removal.pdf", "0".repeat(64), CONTENT.length,
                 "application/pdf");
-        store.store(file, () -> new ByteArrayInputStream(CONTENT));
+        new MinioCertificateStore(client, BUCKET).store(file, () -> new ByteArrayInputStream(CONTENT));
 
         try (var stream = store.open(file.key())) {
             assertThat(stream.readAllBytes()).isEqualTo(CONTENT);
@@ -103,7 +109,7 @@ class MinioCertificateStoreIT {
 
     @Test
     void downloadAndRemovalFailWhenTheBucketDoesNotExist() {
-        var store = new MinioCertificateStore(client, "contracts-missing");
+        var store = new MinioAttachmentStore(attachmentClient, "contracts-missing");
         assertThatThrownBy(() -> store.open("certificates/none/1.jpg")).isInstanceOf(StorageUnavailableException.class);
         assertThatThrownBy(() -> store.remove("certificates/none/1.jpg")).isInstanceOf(StorageUnavailableException.class);
     }

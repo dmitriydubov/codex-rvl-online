@@ -1,5 +1,7 @@
 package ru.projectx.contracts.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -15,6 +17,14 @@ import ru.projectx.contracts.dto.ErrorResponse;
 public class UnexpectedErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(UnexpectedErrorAdvice.class);
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<ErrorResponse> ioFailure(IOException failure, HttpServletResponse response) throws IOException {
+        if (response.isCommitted()) {
+            throw failure;
+        }
+        return unexpected(failure);
+    }
 
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> unexpected(Exception failure) {

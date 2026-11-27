@@ -16,10 +16,10 @@ public class AttachmentDownloads implements AttachmentContentReads {
     private static final Logger log = LoggerFactory.getLogger(AttachmentDownloads.class);
 
     private final AttachmentRegistry registry;
-    private final AttachmentObjectStore objects;
+    private final AttachmentObjectReads objects;
     private final AttachmentMetrics metrics;
 
-    public AttachmentDownloads(AttachmentRegistry registry, AttachmentObjectStore objects, AttachmentMetrics metrics) {
+    public AttachmentDownloads(AttachmentRegistry registry, AttachmentObjectReads objects, AttachmentMetrics metrics) {
         this.registry = registry;
         this.objects = objects;
         this.metrics = metrics;
@@ -30,7 +30,8 @@ public class AttachmentDownloads implements AttachmentContentReads {
         StoredFile file = registry.active(attachmentId).flatMap(PrintedForm::storedFile)
                 .orElseThrow(AttachmentNotFoundException::new);
         try {
-            return new AttachmentContent(objects.open(file.key()), file.contentType(), file.size(), file.hash());
+            var stream = new AttachmentDownloadStream(objects.open(file.key()), metrics);
+            return new AttachmentContent(stream, file.contentType(), file.size(), file.hash());
         } catch (CertificateMissingException missing) {
             throw missingObject(attachmentId, missing);
         } catch (StorageUnavailableException unavailable) {
@@ -40,9 +41,8 @@ public class AttachmentDownloads implements AttachmentContentReads {
     }
 
     private static AttachmentNotFoundException missingObject(UUID attachmentId, CertificateMissingException missing) {
-        log.warn("в хранилище отсутствует объект вложения {}", attachmentId);
-        AttachmentNotFoundException failure = new AttachmentNotFoundException();
-        failure.setStackTrace(missing.getStackTrace());
-        return failure;
+        log.atWarn().addKeyValue("failure_type", missing.getClass().getSimpleName())
+                .log("в хранилище отсутствует объект вложения {}", attachmentId);
+        return new AttachmentNotFoundException();
     }
 }

@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -12,6 +13,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,17 +34,27 @@ class AttachmentDownloadsTest {
     private static final StoredFile FILE = new StoredFile("private/object.pdf", "ab", 3, "application/pdf");
 
     private final AttachmentRegistry registry = mock();
-    private final AttachmentObjectStore objects = mock();
+    private final AttachmentObjectReads objects = mock();
     private final AttachmentMetrics metrics = mock();
     private final AttachmentDownloads downloads = new AttachmentDownloads(registry, objects, metrics);
 
     @Test
-    void opensTheStoredKeyAndTransfersOwnershipOfTheStream() {
+    void opensTheStoredKeyAndTransfersOwnershipOfTheStream() throws Exception {
         activeAttachment();
         var stream = new ByteArrayInputStream(new byte[] {1, 0, 3});
         when(objects.open(FILE.key())).thenReturn(stream);
 
-        assertThat(downloads.open(ATTACHMENT)).isEqualTo(new AttachmentContent(stream, "application/pdf", 3, "ab"));
+        var content = downloads.open(ATTACHMENT);
+        assertThat(content.contentType()).isEqualTo("application/pdf");
+        assertThat(content.size()).isEqualTo(3);
+        assertThat(content.hash()).isEqualTo("ab");
+        try (var opened = content.stream()) {
+            assertThat(opened.read()).isEqualTo(1);
+            byte[] remaining = new byte[2];
+            assertThat(opened.read(remaining)).isEqualTo(2);
+            assertThat(remaining).containsExactly(0, 3);
+            assertThat(opened.read(remaining)).isEqualTo(-1);
+        }
         verifyNoInteractions(metrics);
     }
 
@@ -62,8 +75,7 @@ class AttachmentDownloadsTest {
         logger.addAppender(journal);
         try {
             assertThatThrownBy(() -> downloads.open(ATTACHMENT)).isInstanceOf(AttachmentNotFoundException.class)
-                    .hasNoCause().satisfies(failure ->
-                            assertThat(failure.getStackTrace()).isEqualTo(missing.getStackTrace()));
+                    .hasNoCause().hasMessageNotContaining(FILE.key());
             assertThat(journal.list).singleElement().satisfies(event -> {
                 assertThat(event.getLevel()).isEqualTo(Level.WARN);
                 assertThat(event.getFormattedMessage()).isEqualTo("в хранилище отсутствует объект вложения " + ATTACHMENT);
@@ -84,6 +96,33 @@ class AttachmentDownloadsTest {
 
         assertThatThrownBy(() -> downloads.open(ATTACHMENT)).isSameAs(unavailable);
         verify(metrics).countStorageUnavailable();
+    }
+
+    @Test
+    void failedBodyReadCountsTheOutageAndSanitizesTheFailure() throws Exception {
+        activeAttachment();
+        var source = mock(InputStream.class);
+        when(source.read()).thenThrow(new IOException(FILE.key()));
+        when(objects.open(FILE.key())).thenReturn(source);
+
+        try (var stream = downloads.open(ATTACHMENT).stream()) {
+            assertThatThrownBy(stream::read).isInstanceOf(StorageUnavailableException.class)
+                    .hasNoCause().hasMessageNotContaining(FILE.key());
+        }
+        verify(source).close();
+        verify(metrics).countStorageUnavailable();
+    }
+
+    @Test
+    void failedCloseDoesNotExposeTheRawStorageError() throws Exception {
+        activeAttachment();
+        var source = mock(InputStream.class);
+        doThrow(new IOException(FILE.key())).when(source).close();
+        when(objects.open(FILE.key())).thenReturn(source);
+
+        var stream = downloads.open(ATTACHMENT).stream();
+        assertThatThrownBy(stream::close).isInstanceOf(IOException.class).hasNoCause()
+                .hasMessageNotContaining(FILE.key());
     }
 
     private void activeAttachment() {

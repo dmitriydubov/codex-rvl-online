@@ -51,6 +51,7 @@ public class AttachmentSetupSteps {
         if ("справка дозагружена после передачи".equals(history)) {
             contracts.state("SUBMITTED");
             prepared.upload("справка PDF");
+            contracts.expectNoSubmittedDocuments();
         } else {
             prepared.upload("справка JPEG");
             contracts.history(history);
