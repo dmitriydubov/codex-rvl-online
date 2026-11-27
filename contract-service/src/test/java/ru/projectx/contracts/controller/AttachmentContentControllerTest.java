@@ -26,7 +26,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
@@ -95,6 +98,23 @@ class AttachmentContentControllerTest {
                 .andReturn();
 
         assertThat(result.getResponse().getContentAsByteArray()).isEmpty();
+        assertThat(read).isFalse();
+        assertThat(closed).isTrue();
+    }
+
+    @Test
+    void notModifiedCheck_returnsNotModifiedEntityWithoutBodyAndClosesStream() {
+        AtomicBoolean read = new AtomicBoolean();
+        AtomicBoolean closed = new AtomicBoolean();
+        InputStream stream = trackingStream(read, closed);
+        when(contents.openContent(ATTACHMENT))
+                .thenReturn(new AttachmentStream("application/pdf", BINARY.length, HASH, stream));
+        WebRequest webRequest = mock(WebRequest.class);
+        when(webRequest.checkNotModified(HASH)).thenReturn(true);
+
+        ResponseEntity<Resource> response = controller.content(ATTACHMENT, webRequest);
+
+        assertThat(response).isEqualTo(ResponseEntity.status(HttpStatus.NOT_MODIFIED).build());
         assertThat(read).isFalse();
         assertThat(closed).isTrue();
     }

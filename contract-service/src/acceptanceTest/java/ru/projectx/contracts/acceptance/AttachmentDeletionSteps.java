@@ -79,7 +79,7 @@ public class AttachmentDeletionSteps {
 
     @Когда("стенд создаёт пустой бакет Договоров в хранилище справок")
     public void createsEmptyBucket() throws Exception {
-        storage.createBucket(settings.bucket());
+        storage.recreateBucket(settings.bucket());
     }
 
     @Тогда("в журнале Договоров есть запись о вызове DELETE с requestId из ответа и кодом ответа {int}")
@@ -91,7 +91,7 @@ public class AttachmentDeletionSteps {
 
     @Тогда("в журнале Договоров есть запись о вызове DELETE с requestId {string} и кодом ответа {int}")
     public void deleteJournaledWithRequestId(String requestId, int status) {
-        journal.assertSyncCallLogged("DELETE", requestId, status);
+        SyncCallLogAssertions.assertLogged(journal, "DELETE", requestId, status);
     }
 
     private static String path(String attachment) {

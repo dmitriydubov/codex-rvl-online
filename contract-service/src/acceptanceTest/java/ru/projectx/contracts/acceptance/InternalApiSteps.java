@@ -86,7 +86,7 @@ public class InternalApiSteps {
 
     @Тогда("в журнале Договоров есть запись о вызове с requestId {string} и кодом ответа {int}")
     public void callJournaled(String requestId, int status) {
-        journal.assertSyncCallLogged("POST", requestId, status);
+        SyncCallLogAssertions.assertLogged(journal, "POST", requestId, status);
     }
 
     private void assertField(JsonNode body, String name, String expected) {

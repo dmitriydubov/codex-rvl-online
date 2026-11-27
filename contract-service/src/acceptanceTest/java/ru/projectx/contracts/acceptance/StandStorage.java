@@ -71,10 +71,6 @@ final class StandStorage {
     void recreateBucket(String bucket) throws Exception {
         recover();
         removeBucket(bucket);
-        createBucket(bucket);
-    }
-
-    void createBucket(String bucket) throws Exception {
         client().makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
     }
 

@@ -88,7 +88,7 @@ public class PackageStateSteps {
 
     @Тогда("в журнале Договоров есть запись о вызове GET с requestId {string} и кодом ответа {int}")
     public void getJournaledWithRequestId(String requestId, int status) {
-        journal.assertSyncCallLogged("GET", requestId, status);
+        SyncCallLogAssertions.assertLogged(journal, "GET", requestId, status);
     }
 
     @Тогда("значение поля {string} сообщения {string} есть в его теле, но не попало в ответ Договоров о состоянии пакета")

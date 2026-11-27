@@ -36,7 +36,7 @@ public class AttachmentContentSteps {
 
     @Когда("стенд создаёт бакет Договоров и возвращает объект справки по вложению {string}")
     public void bucketCreatedAndCertificateRestored(String attachment) throws Exception {
-        storage.createBucket(settings.bucket());
+        storage.recreateBucket(settings.bucket());
         storage.putObject(settings.bucket(), records.byAttachment(attachment).key(), calls.acceptedContent(attachment));
     }
 
