@@ -3,6 +3,7 @@ package ru.projectx.contracts.repository.issuance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import jakarta.persistence.EntityManager;
 import java.sql.Connection;
 import java.time.Instant;
 import java.util.List;
@@ -62,6 +63,9 @@ class PrintedFormRepositoryTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @BeforeEach
     void knownRequest() {
@@ -125,6 +129,24 @@ class PrintedFormRepositoryTest {
     @Test
     void unknownAttachment_isNotFound() {
         assertThat(documents.findByAttachmentAttachmentId(ATTACHMENT)).isEmpty();
+    }
+
+    @Test
+    void deletionClearsThePersistenceContextAndPreservesTheFirstAuditValues() {
+        UUID id = documents.saveAndFlush(
+                PrintedForm.receivedAttachment(PrintedFormType.MEDICAL_CERTIFICATE, CERT_OWNER, FILE, NOW)).id();
+        transaction.executeWithoutResult(status -> {
+            PrintedForm cached = entityManager.find(PrintedForm.class, id);
+            assertThat(documents.findActiveAttachment(ATTACHMENT)).contains(cached);
+            assertThat(documents.markAttachmentDeleted(ATTACHMENT, NOW, "first-delete")).isEqualTo(1);
+            assertThat(entityManager.contains(cached)).isFalse();
+            assertThat(documents.markAttachmentDeleted(ATTACHMENT, NOW.plusSeconds(4), "second-delete")).isZero();
+            assertThat(documents.markAttachmentDeleted(UUID.randomUUID(), NOW, "missing-delete")).isZero();
+            assertThat(documents.findActiveAttachment(ATTACHMENT)).isEmpty();
+        });
+        DocumentAttachment deleted = documents.findById(id).orElseThrow().attachment().orElseThrow();
+        assertThat(deleted.deletedAt()).isEqualTo(NOW);
+        assertThat(deleted.deletedRequestId()).isEqualTo("first-delete");
     }
 
     @Test

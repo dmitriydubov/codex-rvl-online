@@ -87,6 +87,28 @@ class MinioCertificateStoreIT {
     }
 
     @Test
+    void downloadAndRepeatedRemovalWorkOnALiveBucket() throws Exception {
+        var store = new MinioCertificateStore(client, BUCKET);
+        var file = new StoredFile("certificates/stand/repeated-removal.pdf", "0".repeat(64), CONTENT.length,
+                "application/pdf");
+        store.store(file, () -> new ByteArrayInputStream(CONTENT));
+
+        try (var stream = store.open(file.key())) {
+            assertThat(stream.readAllBytes()).isEqualTo(CONTENT);
+        }
+        store.remove(file.key());
+        assertThatThrownBy(() -> store.open(file.key())).isInstanceOf(CertificateMissingException.class);
+        assertThatCode(() -> store.remove(file.key())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void downloadAndRemovalFailWhenTheBucketDoesNotExist() {
+        var store = new MinioCertificateStore(client, "contracts-missing");
+        assertThatThrownBy(() -> store.open("certificates/none/1.jpg")).isInstanceOf(StorageUnavailableException.class);
+        assertThatThrownBy(() -> store.remove("certificates/none/1.jpg")).isInstanceOf(StorageUnavailableException.class);
+    }
+
+    @Test
     void missingBucket_isStorageUnavailableAndTheBucketIsNotCreated() throws Exception {
         StoredFile file = new StoredFile("certificates/1/2.png", "0".repeat(64), CONTENT.length, "image/png");
 

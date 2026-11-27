@@ -24,7 +24,7 @@ import java.util.Optional;
 import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.utility.DockerImageName;
 
-final class StandStorage {
+final class StandStorage implements AutoCloseable {
 
     private static final String IMAGE_VARIABLE = "TEST_MINIO_IMAGE";
     private static final String DEFAULT_IMAGE =
@@ -35,13 +35,19 @@ final class StandStorage {
     private static final long UNKNOWN_PART_SIZE = -1;
 
     private final MinIOContainer container;
+    private final StorageTimeoutProxy timeoutProxy;
     private State state = State.RUNNING;
+    private Optional<BucketSnapshot> removedBucket = Optional.empty();
     private MinioClient admin;
 
     private enum State { RUNNING, STOPPED, PAUSED }
 
-    private StandStorage(MinIOContainer container) {
+    private record BucketSnapshot(String bucket, String key, byte[] content) {
+    }
+
+    private StandStorage(MinIOContainer container) throws IOException {
         this.container = container;
+        this.timeoutProxy = new StorageTimeoutProxy(container::getS3URL);
     }
 
     static StandStorage container() throws IOException {
@@ -57,7 +63,16 @@ final class StandStorage {
     }
 
     String endpoint() {
-        return container.getS3URL();
+        return timeoutProxy.endpoint();
+    }
+
+    long serviceActivity() {
+        return timeoutProxy.activity();
+    }
+
+    @Override
+    public void close() throws IOException {
+        timeoutProxy.close();
     }
 
     String accessKey() {
@@ -86,6 +101,11 @@ final class StandStorage {
 
     boolean bucketExists(String bucket) throws Exception {
         return client().bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+    }
+
+    void removeBucketWithObject(String bucket, String key) throws Exception {
+        removedBucket = Optional.of(new BucketSnapshot(bucket, key, object(bucket, key)));
+        removeBucket(bucket);
     }
 
     List<String> keys(String bucket, String prefix) throws Exception {
@@ -118,25 +138,40 @@ final class StandStorage {
     }
 
     void pause() {
-        docker().pauseContainerCmd(container.getContainerId()).exec();
+        timeoutProxy.pause();
         state = State.PAUSED;
     }
 
     boolean disrupted() {
-        return state != State.RUNNING;
+        return state != State.RUNNING || removedBucket.isPresent();
     }
 
     void recover() {
         switch (state) {
             case STOPPED -> docker().startContainerCmd(container.getContainerId()).exec();
-            case PAUSED -> docker().unpauseContainerCmd(container.getContainerId()).exec();
+            case PAUSED -> timeoutProxy.resume();
             case RUNNING -> {
+                restoreRemovedBucket();
                 return;
             }
             default -> throw new IllegalStateException("неизвестное состояние хранилища стенда " + state);
         }
         state = State.RUNNING;
         await("хранилище стенда снова отвечает").atMost(RECOVERY).ignoreExceptions().until(this::answers);
+    }
+
+    private void restoreRemovedBucket() {
+        if (removedBucket.isEmpty()) {
+            return;
+        }
+        BucketSnapshot snapshot = removedBucket.orElseThrow();
+        try {
+            client().makeBucket(MakeBucketArgs.builder().bucket(snapshot.bucket()).build());
+            putObject(snapshot.bucket(), snapshot.key(), snapshot.content());
+            removedBucket = Optional.empty();
+        } catch (Exception failure) {
+            throw new IllegalStateException("бакет стенда не восстановлен", failure);
+        }
     }
 
     private boolean answers() throws Exception {
@@ -150,7 +185,7 @@ final class StandStorage {
 
     private MinioClient client() {
         if (admin == null) {
-            admin = MinioClient.builder().endpoint(endpoint()).credentials(accessKey(), secretKey()).build();
+            admin = MinioClient.builder().endpoint(container.getS3URL()).credentials(accessKey(), secretKey()).build();
         }
         return admin;
     }

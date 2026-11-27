@@ -53,4 +53,14 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, UU
                            limit :batch)
             """, nativeQuery = true)
     int eraseFinishedPayloadsCreatedBefore(@Param("cutoff") Instant cutoff, @Param("batch") int batch);
+
+    @Query("""
+            select case when count(message) > 0 then true else false end from OutboxMessage message
+             where message.correlationId = :individualRequestId
+               and message.aggregateType = 'CONTRACT'
+               and message.aggregateId in :contractIds
+               and message.eventType = 'KmContractSubmitted'
+            """)
+    boolean existsKmContractSubmission(@Param("individualRequestId") UUID individualRequestId,
+            @Param("contractIds") Collection<UUID> contractIds);
 }

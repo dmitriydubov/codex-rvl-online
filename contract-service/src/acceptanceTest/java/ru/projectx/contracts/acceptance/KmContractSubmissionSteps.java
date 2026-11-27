@@ -114,6 +114,13 @@ public class KmContractSubmissionSteps {
                 .isEqualTo("certificate-" + documentId + "." + extension);
     }
 
+    @Тогда("в передаче договора КМ №{int} документов — {int}")
+    public void documentCount(int ordinal, int expected) {
+        JsonNode documents = body(ordinal).path("data").path("documents");
+        assertThat(documents.isArray()).isTrue();
+        assertThat(documents.size()).isEqualTo(expected);
+    }
+
     @Тогда("документ №{int} передачи договора КМ №{int} ссылается на объект справки по вложению {string} — {string}")
     public void link(int documentOrdinal, int ordinal, String attachment, String expected) {
         String link = body(ordinal).path("data").path("documents").path(documentOrdinal - 1).path("link").stringValue();

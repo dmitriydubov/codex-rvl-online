@@ -45,7 +45,7 @@ public class MedicalDataSteps {
         medicalDataStaysOut(fileName, attachment);
     }
 
-    private String exposition() throws IOException, InterruptedException {
+    String exposition() throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(metrics).timeout(TIMEOUT).GET().build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         assertThat(response.statusCode()).as("ответ /actuator/prometheus").isEqualTo(200);

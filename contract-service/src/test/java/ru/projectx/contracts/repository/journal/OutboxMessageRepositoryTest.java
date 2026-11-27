@@ -122,6 +122,37 @@ class OutboxMessageRepositoryTest {
                 .containsExactlyInAnyOrder(UUID.fromString(THIRD), UUID.fromString(FOURTH));
     }
 
+    @Test
+    void submissionLookupUsesMetadataAcrossStatusesAndAfterBodyErasure() {
+        UUID pending = UUID.randomUUID();
+        UUID published = UUID.randomUUID();
+        UUID failed = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        transaction.executeWithoutResult(status -> {
+            messages.save(submission(pending, "CONTRACT", "KmContractSubmitted"));
+            messages.save(submission(published, "CONTRACT", "KmContractSubmitted")).markPublished(NOW);
+            messages.save(submission(failed, "CONTRACT", "KmContractSubmitted")).markFailed("отказ");
+            messages.save(submission(other, "CONTRACT", STATUS_CHANGE));
+            messages.save(submission(other, "INDIVIDUAL_REQUEST", "KmContractSubmitted"));
+        });
+        transaction.executeWithoutResult(status ->
+                assertThat(messages.eraseFinishedPayloadsCreatedBefore(NOW, 10)).isEqualTo(2));
+
+        for (UUID id : List.of(pending, published, failed)) {
+            assertThat(messages.existsKmContractSubmission(REQUEST, List.of(other, id))).isTrue();
+        }
+        assertThat(messages.existsKmContractSubmission(REQUEST, List.of(other))).isFalse();
+        assertThat(messages.existsKmContractSubmission(UUID.randomUUID(), List.of(pending, failed))).isFalse();
+        assertThat(messages.findAll()).filteredOn(m -> m.status() != OutboxStatus.NEW)
+                .allSatisfy(message -> assertThat(message.payload()).isEmpty());
+    }
+
+    private static OutboxMessage submission(UUID contract, String aggregateType, String event) {
+        return OutboxMessage.compose(new OutboxDraft(aggregateType, contract,
+                new MessageEnvelope(UUID.randomUUID(), REQUEST, "rvl.km-contract.submitted", event, 1), "{}"),
+                NOW.minusSeconds(1));
+    }
+
     private List<String> dueOf(Set<String> eventTypes, int limit) {
         return ids(messages.findDueOf(eventTypes, NOW, Limit.of(limit)));
     }

@@ -1,8 +1,10 @@
 package ru.projectx.contracts.service.integration.storage;
 
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import io.minio.errors.MinioException;
@@ -15,10 +17,11 @@ import org.slf4j.LoggerFactory;
 import ru.projectx.contracts.entity.document.StoredFile;
 import ru.projectx.contracts.exception.CertificateMissingException;
 import ru.projectx.contracts.exception.StorageUnavailableException;
+import ru.projectx.contracts.service.storage.AttachmentObjectStore;
 import ru.projectx.contracts.service.storage.CertificateStore;
 import ru.projectx.contracts.service.storage.ContentSource;
 
-public class MinioCertificateStore implements CertificateStore {
+public class MinioCertificateStore implements CertificateStore, AttachmentObjectStore {
 
     private static final Logger log = LoggerFactory.getLogger(MinioCertificateStore.class);
     private static final long AUTOMATIC_PART_SIZE = -1;
@@ -51,6 +54,48 @@ public class MinioCertificateStore implements CertificateStore {
         } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
             throw unanswered(failure);
         }
+    }
+
+    @Override
+    public InputStream open(String key) {
+        GetObjectArgs object = GetObjectArgs.builder().bucket(bucket).object(key).build();
+        try {
+            return client.getObject(object);
+        } catch (ErrorResponseException refused) {
+            throw readRefusal(refused);
+        } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
+            throw attachmentStorageFailure(failure);
+        }
+    }
+
+    @Override
+    public void remove(String key) {
+        RemoveObjectArgs object = RemoveObjectArgs.builder().bucket(bucket).object(key).build();
+        try {
+            client.removeObject(object);
+        } catch (MinioException | IOException | GeneralSecurityException | RuntimeException failure) {
+            throw attachmentStorageFailure(failure);
+        }
+    }
+
+    private RuntimeException readRefusal(ErrorResponseException refused) {
+        if (missingInBucket(refused)) {
+            return new CertificateMissingException();
+        }
+        return attachmentStorageFailure(refused);
+    }
+
+    private boolean missingInBucket(ErrorResponseException refused) {
+        try {
+            return NO_SUCH_KEY.equals(refused.errorResponse().code()) && bucketPresent();
+        } catch (StorageUnavailableException unavailable) {
+            return false;
+        }
+    }
+
+    private static StorageUnavailableException attachmentStorageFailure(Exception failure) {
+        log.warn("хранилище вложений не выполнило операцию: {}", failure.getClass().getName());
+        return new StorageUnavailableException();
     }
 
     private RuntimeException refusal(ErrorResponseException refused) {

@@ -4,6 +4,7 @@ import io.cucumber.spring.ScenarioScope;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +28,8 @@ public class AttachmentCalls {
     private static final String REQUEST_ID = "X-Request-Id";
     private static final int OK = 200;
 
-    record Answer(int status, Optional<String> requestId, Optional<String> sentRequestId, String body) {
+    record Answer(int status, Optional<String> requestId, Optional<String> sentRequestId, String body,
+            HttpHeaders headers, byte[] bytes) {
     }
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
@@ -45,11 +47,7 @@ public class AttachmentCalls {
         HttpRequest.Builder call = HttpRequest.newBuilder(URI.create(base + request.path())).timeout(TIMEOUT)
                 .header("Content-Type", request.contentType())
                 .POST(HttpRequest.BodyPublishers.ofByteArray(request.body()));
-        request.requestId().ifPresent(value -> call.header(REQUEST_ID, value));
-        HttpResponse<String> response = http.send(call.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        answers.add(new Answer(response.statusCode(), response.headers().firstValue(REQUEST_ID), request.requestId(),
-                response.body()));
-        remember(request, response.statusCode());
+        remember(request, send(call, request.requestId()));
     }
 
     Answer last() {
@@ -99,9 +97,14 @@ public class AttachmentCalls {
                 .method(method, json.map(body -> HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                         .orElseGet(HttpRequest.BodyPublishers::noBody));
         json.ifPresent(body -> call.header("Content-Type", "application/json"));
+        send(call, requestId);
+    }
+
+    private int send(HttpRequest.Builder call, Optional<String> requestId) throws IOException, InterruptedException {
         requestId.ifPresent(value -> call.header(REQUEST_ID, value));
-        HttpResponse<String> response = http.send(call.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        HttpResponse<byte[]> response = http.send(call.build(), HttpResponse.BodyHandlers.ofByteArray());
         answers.add(new Answer(response.statusCode(), response.headers().firstValue(REQUEST_ID), requestId,
-                response.body()));
+                new String(response.body(), StandardCharsets.UTF_8), response.headers(), response.body()));
+        return response.statusCode();
     }
 }

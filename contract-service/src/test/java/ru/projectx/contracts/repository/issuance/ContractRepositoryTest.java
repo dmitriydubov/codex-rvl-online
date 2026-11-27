@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -111,6 +112,25 @@ class ContractRepositoryTest {
         assertThat(contracts.findByRequestIndividualRequestIdAndStatusNotIn(REQUEST,
                 Set.of(ContractStatus.ISSUED, ContractStatus.ERROR, ContractStatus.CANCELLED)))
                 .extracting(Contract::number).containsExactly("DKM-2026-000001");
+    }
+
+    @Test
+    void contractsOfThePairIncludeFinishedHistoryAndExcludeOtherParticipantsAndRequests() {
+        Contract current = contract(SPOUSE, "DKM-2026-000001");
+        Contract cancelled = contract(SPOUSE, "DKM-2026-000002");
+        cancelled.cancel(new Cancellation(CancelReason.OTHER, null, NOW), NOW);
+        Contract failed = contract(SPOUSE, "DKM-2026-000003");
+        failed.markError(new IssueError("TEST_FAILURE", "отказ"), NOW);
+        var anotherRequest = new RequestReference(UUID.randomUUID(), REFERENCE.insuranceContractId(),
+                REFERENCE.insurerPolicyId());
+        var draft = new ContractDraft("DKM-2026-000004",
+                new IssuanceTerms(anotherRequest, INSURED, TERMS.programId(), PERIOD), SPOUSE, BigDecimal.ONE);
+        Contract elsewhere = Contract.open(draft, NOW);
+        elsewhere.cancel(new Cancellation(CancelReason.OTHER, null, NOW), NOW);
+        contracts.saveAllAndFlush(List.of(current, cancelled, failed, elsewhere, contract(CHILD, "DKM-2026-000005")));
+
+        assertThat(contracts.findByRequestIndividualRequestIdAndInsuredParticipantId(REQUEST, SPOUSE))
+                .extracting(Contract::number).containsExactlyInAnyOrder(current.number(), cancelled.number(), failed.number());
     }
 
     @Test

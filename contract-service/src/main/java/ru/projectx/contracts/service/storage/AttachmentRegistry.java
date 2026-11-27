@@ -2,6 +2,7 @@ package ru.projectx.contracts.service.storage;
 
 import java.time.Clock;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import ru.projectx.contracts.entity.document.PrintedForm;
@@ -21,6 +22,11 @@ public class AttachmentRegistry {
         this.requests = requests;
         this.documents = documents;
         this.clock = clock;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PrintedForm> active(UUID attachmentId) {
+        return documents.findActiveAttachment(attachmentId);
     }
 
     @Transactional(readOnly = true)
