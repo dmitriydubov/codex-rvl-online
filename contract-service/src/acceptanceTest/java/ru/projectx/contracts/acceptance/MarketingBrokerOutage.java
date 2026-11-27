@@ -19,10 +19,12 @@ public class MarketingBrokerOutage {
     private static final Duration PATIENCE = Duration.ofSeconds(30);
 
     private final RabbitMQContainer broker;
+    private final OrderEventQueue events;
     private volatile boolean unavailable;
 
-    public MarketingBrokerOutage(RabbitMQContainer broker) {
+    public MarketingBrokerOutage(RabbitMQContainer broker, OrderEventQueue events) {
         this.broker = broker;
+        this.events = events;
     }
 
     void start() {
@@ -37,6 +39,9 @@ public class MarketingBrokerOutage {
         if (unavailable) {
             control("clear_vhost_limits", "-p", VIRTUAL_HOST);
             unavailable = false;
+            Awaitility.await().atMost(PATIENCE).untilAsserted(() ->
+                    assertThat(events.state().getConsumerCount()).as("потребителей очереди %s", events.name())
+                            .isPositive());
         }
     }
 
